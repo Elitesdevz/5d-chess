@@ -13,3 +13,9 @@ Verification: `npm test` and `npm run test:browser`. Casino browser tests cover 
 The roulette client uses an SVG wheel with linked bet previews, a ball that lands in the server-selected pocket, court/number chips, recent draws and a receipt ledger. Repeat restores the previous selection without submitting it. Half, double and maximum shortcuts respect whole coins and the current balance. Phone layouts use six columns of number keys; the wheel scrolls into view during a spin and shows the net result beside the winning number. These presentation changes preserve the deployed server and odds.
 
 Dice also supports an alternate, consent-based Elo table. Elo wagers have no profit tax, preserve Elo on a win, remove the stake on a loss, and use a frozen Dutch-midnight valuation. Eligibility, quota, lifetime loss totals and retry recovery are enforced by the server. See [Elo wagers](elo-wagers.md) for the complete trigger rules, pricing formula and operations.
+
+## Throw and payout presentation
+
+Drag throws use release direction and speed to set their visible flight, bounce and spin. A final flick overrides the earlier wind-up; slow drags use displacement, and Space still throws forward. Release outside the canvas completes a captured throw. Motion cannot alter the server-set face or payout. Wins add a bounded gold coin/sparkle flourish around the handover, with a quiet reduced-motion alternative.
+
+The blank green key on the Elo table returns to coin wagers and closes Elo offers until the next Dutch midnight. It calls the existing server decision endpoint with refusal, so the daily lock survives reload and cannot be reopened by a client trigger. It is disabled while a saved wager or presentation is in progress.

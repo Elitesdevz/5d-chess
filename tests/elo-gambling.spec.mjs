@@ -36,7 +36,7 @@ test('a completed broke coin throw requests the soul encounter; refusing persist
  const {page,view,errors}=await fixture(t,{broke:true})
  await page.locator('[data-phase=ready]').waitFor();await page.locator('#roll-die').click();await page.locator('[data-table-mode=offer]').waitFor()
  assert.match(await page.locator('#encounter-question').textContent(),/deal with your soul/);assert.equal((await view()).reason,'broke')
- await page.getByRole('button',{name:'No',exact:true}).click();await page.locator('[data-table-mode=normal]').waitFor();assert.equal((await view()).allowed,false)
+ await page.getByRole('button',{name:'No',exact:true}).click();await page.locator('.silent-room[data-table-mode=normal]').waitFor();assert.equal((await view()).allowed,false)
  await page.reload();await page.locator('.webgl-unavailable[data-table-mode=normal]').waitFor();assert.equal((await view()).allowed,false);assert.doesNotMatch(await page.locator('body').innerText(),/Keeper/i);assert.deepEqual(errors,[])
 })
 
@@ -76,4 +76,14 @@ test('the fifth 3D Elo throw finishes its receipt, plays the exit and returns to
  await page.locator('.scene-ready[data-table-mode=offer]').waitFor();await page.locator('[data-control=yes]:visible').click();await page.locator('.silent-room[data-table-mode=elo]').waitFor();await page.locator('[data-control=elo-plus-1]:visible').click();await page.locator('[data-control=offer]:visible').click()
  await page.locator('[data-phase=ready]').waitFor({timeout:30000});const settled=await casino();assert.equal((await view()).used,5)
  await page.locator('#dice-canvas').focus();await page.keyboard.press(' ');await page.locator('.silent-room[data-phase=banish]').waitFor({timeout:30000});await page.locator('#dice-canvas[data-cutscene=banish]').waitFor({timeout:30000});await page.locator('[data-phase=result][data-table-mode=normal]').waitFor({timeout:30000});assert.deepEqual(await casino(),settled);assert.equal((await view()).allowed,false);assert.deepEqual(errors,[])
+})
+
+test('the blank green table key returns to coins and closes Elo wagers through reload and server retries',async t=>{
+ const {page,view,casino,errors,base}=await fixture(t,{webgl:true})
+ await page.locator('.scene-ready[data-table-mode=offer]').waitFor();await page.locator('[data-control=yes]:visible').click();await page.locator('.silent-room[data-table-mode=elo]').waitFor()
+ const before=await view(),balance=(await casino()).coins,button=page.getByRole('button',{name:'Return to coin wagers and close Elo wagers for today',exact:true});await button.waitFor();assert.equal(await button.locator('span').evaluate(e=>getComputedStyle(e).clipPath),'inset(50%)')
+ const frame=Number(await page.locator('#dice-canvas').getAttribute('data-frame'));await page.setViewportSize({width:390,height:844});await page.waitForFunction(n=>Number(document.querySelector('#dice-canvas').dataset.frame)>n,frame,{timeout:30000});const rect=await button.boundingBox();assert.ok(rect.x>=0&&rect.x+rect.width<=391&&rect.height>=44)
+ await button.click();await page.locator('.silent-room[data-table-mode=normal]').waitFor();const after=await view();assert.equal(after.allowed,false);assert.equal(after.stage,'normal');assert.equal(after.used,before.used);assert.equal(after.elo,before.elo);assert.equal((await casino()).coins,balance)
+ assert.equal((await(await page.request.post(base+'/api/casino/elo/trigger',{data:{reason:'chance'}})).json()).accepted,false)
+ await page.reload();await page.locator('.scene-ready[data-table-mode=normal]').waitFor();assert.equal((await view()).allowed,false);assert.equal(await page.locator('[data-control=return-coins]').isVisible(),false);assert.deepEqual(errors,[])
 })

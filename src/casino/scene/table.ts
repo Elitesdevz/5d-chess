@@ -3,7 +3,7 @@ import {mesh,box,cylinder,coinGeometry,v} from './geometry.ts'
 import {casinoCoins} from '../../casino-model.ts'
 import {label,type Materials} from './materials.ts'
 
-export type TableAction={kind:'face'|'stake'|'minus'|'plus'|'offer'|'amount'|'yes'|'no'|'eloAdd';value?:number}
+export type TableAction={kind:'face'|'stake'|'minus'|'plus'|'offer'|'amount'|'yes'|'no'|'eloAdd'|'returnCoins';value?:number}
 export interface TableControl {id:string;action:TableAction;object:T.Group;surface:T.Mesh;edge:T.Mesh;size:[number,number];disabled:boolean}
 function writing(parent:T.Object3D,text:string,width:number,height:number,position:number[],color='#debf80'){
  const inscription=label(text,512,color),material=new T.MeshStandardMaterial({map:inscription.map,transparent:true,alphaTest:.05,roughness:.75,depthWrite:false,side:T.DoubleSide})
@@ -58,9 +58,10 @@ export class Table {
   this.payout=writing(this.payoutPlate,'583.12',.31,.075,[0,.026,.022])
   for(const [id,text] of [['yes','YES'],['no','NO']] as const){const key=this.key(id,{kind:id},[.32,.18],m);writing(key.object,text,.23,.09,[0,.033,0])}
   for(const n of [1,10,50]){const key=this.key('elo-plus-'+n,{kind:'eloAdd',value:n},[.19,.14],m);writing(key.object,'+'+n,.15,.075,[0,.033,0])}
+  this.key('return-coins',{kind:'returnCoins'},[.16,.16],m)
   this.root.add(this.question);this.question.position.set(0,.912,.13)
   this.questionLabel=writing(this.question,'DEAL WITH YOUR SOUL?',1.1,.13,[0,.004,0],'#d5b2a1')
-  writing(this.question,'RISK ELO FOR COINS · UP TO 10 ROUNDS',1.0,.075,[0,.004,.10],'#bfa59b')
+  writing(this.question,'RISK ELO FOR COINS · UP TO 5 ROUNDS',1.0,.075,[0,.004,.10],'#bfa59b')
   writing(this.question,'WIN: KEEP ELO + COINS / LOSE: STAKED ELO',1.12,.07,[0,.004,.19],'#bfa59b')
   this.question.visible=false
   this.layout(false);this.setMode('normal')
@@ -85,6 +86,7 @@ export class Table {
    else if(c.action.kind==='eloAdd')c.object.position.set(portrait?-.46+(n===1?0:n===10?.22:.44):-.95+(n===1?0:n===10?.23:.46),.91,portrait?-.08:.22)
    else if(c.action.kind==='face')c.object.position.set(portrait?((n-1)%3-1)*.30:(n-3.5)*.205,.91,portrait?.37+Math.floor((n-1)/3)*.25:.57)
    else if(c.action.kind==='stake'){const i=[25,100,500,1000].indexOf(n);c.object.position.set((portrait?-.46:-1.04)+(i%2)*.22,.91,(portrait?-.15:.12)+Math.floor(i/2)*.20)}
+   else if(c.id==='return-coins')c.object.position.set(portrait?.47:1.01,.91,portrait?-.25:.03)
    else if(c.id==='offer')c.object.position.set(portrait?.47:.76,.91,portrait?.04:.34)
    else c.object.position.set(c.id==='minus'?-.31:c.id==='plus'?.31:0,.91,.87)
   }
@@ -93,7 +95,7 @@ export class Table {
   if(mode!==this.mode){this.mode=mode;this.morph=0;this.lastStake=-1}
   this.offerUnit.update(mode==='elo'?'ELO':'COINS');this.payoutTitle.update(mode==='elo'?'COIN REWARD':'WIN RETURN');this.soulStake=stake;this.reward=reward;this.question.visible=mode==='offer';this.payoutPlate.visible=mode!=='offer'
   this.questionLabel.update(reason==='broke'?'DEAL WITH YOUR SOUL?':'TRY SOMETHING NEW?')
-  for(const c of this.controls)c.object.visible=mode==='offer'?['yes','no'].includes(c.id):mode==='elo'?c.action.kind==='face'||c.action.kind==='eloAdd'||['amount','offer'].includes(c.id):!['yes','no'].includes(c.id)&&c.action.kind!=='eloAdd'
+  for(const c of this.controls)c.object.visible=mode==='offer'?['yes','no'].includes(c.id):mode==='elo'?c.action.kind==='face'||c.action.kind==='eloAdd'||['amount','offer','return-coins'].includes(c.id):!['yes','no','return-coins'].includes(c.id)&&c.action.kind!=='eloAdd'
  }
  animate(dt:number){this.morph=Math.min(1,this.morph+dt*1.6);for(const c of this.controls)c.object.scale.y=.02+.98*this.morph;const felt=this.felt.material as T.MeshStandardMaterial;felt.color.lerp(new T.Color(this.mode==='normal'?0x123e35:this.mode==='offer'?0x24212a:0x39131e),Math.min(1,dt*3))}
  setState(coins:number,stake:number,face:number,phase:string,disabled:boolean){
@@ -104,7 +106,7 @@ export class Table {
    c.disabled=(disabled&&!(c.id==='offer'&&phase==='ready'))||(this.mode==='elo'&&(c.id==='amount'||c.id==='offer'&&this.soulStake<1))
    const selected=c.action.kind==='face'&&c.action.value===face
    ;(c.edge.material as T.MeshStandardMaterial).color.set(selected?0xd8b464:0x6d5127)
-   ;(c.surface.material as T.MeshStandardMaterial).color.set(c.id==='offer'&&this.mode==='elo'?(c.disabled?0x3b1117:0x811f28):selected?0x254b3d:c.disabled?0x080c0d:0x111c1a)
+   ;(c.surface.material as T.MeshStandardMaterial).color.set(c.id==='return-coins'?(c.disabled?0x123625:0x35ad60):c.id==='offer'&&this.mode==='elo'?(c.disabled?0x3b1117:0x811f28):selected?0x254b3d:c.disabled?0x080c0d:0x111c1a)
   }
  }
  private makePiles(coins:number){
