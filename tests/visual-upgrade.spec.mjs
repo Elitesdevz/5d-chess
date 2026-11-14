@@ -57,6 +57,7 @@ test('visual upgrade: code slots, notification dropdowns, daily deals and respon
   await page.setViewportSize({width,height:900})
   for(const path of ['/chess/lobby.html','/chess/collection.html#shop']){
    await page.goto(base+path);await page.locator(path.includes('lobby')?'.home-deal':'[data-daily-buy]').first().waitFor()
+   if(width<=393)await page.locator('[data-coins]').evaluate(e=>e.textContent='99,999.9999')
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth),width,`${path} overflows at ${width}`)
    if(width===393)await page.screenshot({path:'.playwright/'+(path.includes('lobby')?'home':'shop')+'-mobile.png',fullPage:true})
   }
