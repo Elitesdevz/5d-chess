@@ -42,12 +42,19 @@ export function renderAccount(profile:Profile){
   const brand=document.getElementById('brand-home') as HTMLAnchorElement|null
   if(brand)brand.href='/chess/lobby.html'
 }
+function markCurrentNav(){for(const link of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a')){const target=new URL(link.href),active=target.pathname===location.pathname&&(!target.hash||target.hash===(location.hash||'#shop'));if(active)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')}}
 function renderEconomyNav(){
  const header=document.querySelector('.app-topbar')
  if(!header)return
  let nav=header.querySelector<HTMLElement>('.economy-nav')
- if(!nav){nav=document.createElement('nav');nav.className='economy-nav';nav.setAttribute('aria-label','Collection');header.insertBefore(nav,header.querySelector('.match-meta')??header.querySelector('#account-area')??header.querySelector('.header-actions'))}
- nav.innerHTML=`<span class="coin-balance" title="Coins earned in games and daily spins">${icon('coin')}<strong data-coins>0</strong></span><a href="/chess/collection.html#shop" aria-label="Shop" title="Shop">${icon('shop')}<span>Shop</span></a><a href="/chess/collection.html#inventory" aria-label="Inventory" title="Inventory">${icon('inventory')}<span>Inventory</span></a><a href="/chess/collection.html#market" aria-label="Market" title="Market">${icon('market')}<span>Market</span></a><a class="casino-nav-link" href="/chess/roulette.html" aria-label="Roulette" title="Roulette">${icon('wheel')}<span>Roulette</span></a><a class="casino-nav-link" href="/chess/dice.html" aria-label="Dice" title="Dice">${icon('dice')}<span>Dice</span></a>`
+ if(!nav){nav=document.createElement('nav');nav.className='economy-nav';nav.setAttribute('aria-label','Main navigation');header.insertBefore(nav,header.querySelector('.match-meta')??header.querySelector('#account-area')??header.querySelector('.header-actions'))}
+ header.classList.add('has-economy')
+ const brand=header.querySelector('.brand');brand?.setAttribute('aria-label','5D Chess home')
+ let purse=header.querySelector<HTMLElement>('.header-wallet')
+ if(!purse){purse=document.createElement('div');purse.className='header-wallet';purse.setAttribute('role','group');purse.setAttribute('aria-label','Coin balance');purse.innerHTML=`<span class="wallet-seal">${icon('coin')}</span><span class="wallet-copy"><small>COINS</small><strong data-coins>0</strong></span>`;header.insertBefore(purse,header.querySelector('.header-actions')??header.querySelector('#account-area'))}
+ nav.innerHTML=`<a class="home-nav-link" href="/chess/lobby.html" aria-label="Home" title="Home">${icon('home')}<span>Home</span></a><a href="/chess/collection.html#shop" aria-label="Shop" title="Shop">${icon('shop')}<span>Shop</span></a><a href="/chess/collection.html#inventory" aria-label="Inventory" title="Inventory">${icon('inventory')}<span>Inventory</span></a><a href="/chess/collection.html#market" aria-label="Market" title="Market">${icon('market')}<span>Market</span></a><a class="casino-nav-link" href="/chess/roulette.html" aria-label="Roulette" title="Roulette">${icon('wheel')}<span>Roulette</span></a><a class="casino-nav-link" href="/chess/dice.html" aria-label="Dice" title="Dice">${icon('dice')}<span>Dice</span></a><button class="stocks-nav-button" type="button" aria-label="Stocks" title="Stocks">${icon('chart')}<span>Stocks</span></button>`
+ markCurrentNav()
+
 }
 export function updateNoticeCount(count:number){document.querySelectorAll<HTMLElement>('[data-notification-count]').forEach(el=>{el.hidden=!count;el.textContent=String(count)})}
 export async function fetchNotices(){const data=await api<{items:Notice[];unread:number}>('/notifications');updateNoticeCount(data.unread);renderNotificationPanel(data.items);return data}
@@ -62,6 +69,7 @@ export async function refreshAccount(){
 }
 export async function initShell(options:{redirectHome?:boolean}={}){
   initBackdrop()
+  window.addEventListener('hashchange',markCurrentNav)
   document.querySelectorAll<HTMLElement>('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon!))
   document.addEventListener('click',event=>{
     document.querySelectorAll<HTMLDetailsElement>('.account-menu').forEach(menu=>{

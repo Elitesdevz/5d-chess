@@ -20,7 +20,7 @@ const eloQuote=()=>awaitingThrow?.currency==='elo'?awaitingThrow.coinReward??0:s
 const safeStore=(key:string,value:unknown)=>{try{value===undefined?sessionStorage.removeItem(key):sessionStorage.setItem(key,JSON.stringify(value))}catch{}}
 function say(text:string,duration=5000){if(game!=='dice')return;clearTimeout(dialogueTimer);el('keeper-dialogue').textContent=text;scene?.speak(text,duration);dialogueTimer=window.setTimeout(()=>{el('keeper-dialogue').textContent=''},duration)}
 function diceRoom(){
- const buttons=[...[1,2,3,4,5,6].map(n=>({id:'face-'+n,label:'Choose face '+n})),...[25,100,500,1000].map(n=>({id:'stake-'+n,label:`Stake ${n} coins`})),{id:'minus',label:'Decrease stake by 25'},{id:'plus',label:'Increase stake by 25'},{id:'amount',label:'Edit stake amount'},{id:'offer',label:'Offer coins'},{id:'yes',label:'Yes, explore Elo wagers'},{id:'no',label:'No, return to coins'},...[1,10,50].map(n=>({id:'elo-plus-'+n,label:'Add '+n+' Elo'}))]
+ const buttons=[...[1,2,3,4,5,6].map(n=>({id:'face-'+n,label:'Choose face '+n})),...[25,100,500,1000].map(n=>({id:'stake-'+n,label:`Stake ${n} coins`})),{id:'minus',label:'Decrease stake by 25'},{id:'plus',label:'Increase stake by 25'},{id:'amount',label:'Edit stake amount'},{id:'offer',label:'Offer coins'},{id:'yes',label:'Yes, explore Elo wagers'},{id:'no',label:'No, return to coins'},{id:'return-coins',label:'Return to coin wagers and close Elo wagers for today'},...[1,10,50].map(n=>({id:'elo-plus-'+n,label:'Add '+n+' Elo'}))]
  return `<section class="silent-room" data-phase="idle"><canvas id="dice-canvas" tabindex="0" aria-label="Seated at a felt table opposite a shadowed figure. Drag empty space to look; use the brass keys to wager." aria-describedby="table-instructions soul-disclosure"></canvas><div class="silent-vignette"></div><div class="table-tools"><button id="center-view" type="button">${icon('target')}<span>Center view</span></button><button id="open-rules" type="button">${icon('info')}<span>Rules</span></button><button id="open-history" type="button">${icon('clock')}<span>History</span></button></div><div class="physical-controls" aria-label="Controls on the table">${buttons.map(b=>`<button type="button" class="physical-control" data-control="${b.id}" aria-describedby="soul-disclosure" aria-label="${b.label}"><span>${b.label}</span></button>`).join('')}</div><div class="dice-accessible-status"><span id="soul-disclosure" hidden>Elo wagers risk permanent rating loss. Win: keep your Elo and collect the quoted coins. Lose: lose the staked Elo. Each face has a 1/6 chance; no tax applies.</span><p id="keeper-dialogue" aria-live="polite"></p><span id="table-instructions">Drag empty space to look · Home to center · Pick up the die to throw</span></div><div class="dice-accessible-status"><span id="elo-live-status" aria-live="polite"></span><span id="chosen-label">Face 1</span><span id="return-estimate"></span><span class="table-purse">Purse <strong id="table-balance"></strong></span></div><form id="wager-form" class="table-fallback"><label id="stake-label" for="stake">Stake in coins</label><input id="stake" type="number" min="1" max="100000" step="1" value="100" required><div id="elo-fallback-increments" hidden>${[1,10,50].map(n=>`<button type="button" data-elo-add="${n}">+${n} Elo</button>`).join('')}</div><p id="elo-fallback-quote" hidden></p><div class="fallback-faces">${[1,2,3,4,5,6].map(n=>`<button type="button" data-face="${n}" aria-label="Choose face ${n}">${pips(n)}</button>`).join('')}</div><button id="place-bet" type="submit">Offer coins</button><button id="roll-die" type="button" hidden>Throw die</button></form><div id="encounter-fallback" class="encounter-fallback" hidden><p id="encounter-question"></p><p>Risk Elo for a coin reward. Win: keep your Elo and collect the quoted coins. Lose: the staked Elo is removed. Each face has a 1/6 chance. Up to five wagers per Dutch day.</p><button type="button" data-encounter-decision="yes">Yes</button><button type="button" data-encounter-decision="no">No</button></div><p id="casino-error" class="table-error" role="alert" hidden></p><section id="round-result" class="table-result" aria-live="polite" hidden></section><dialog id="amount-dialog" class="table-modal"><form id="amount-form"><span class="eyebrow">YOUR OFFER</span><h2>How many coins?</h2><label for="custom-stake">Whole coins, from 1 to 100,000</label><input id="custom-stake" type="number" min="1" max="100000" step="1" required><div class="modal-actions"><button id="cancel-amount" type="button">Cancel</button><button type="submit">Set stake</button></div></form></dialog><dialog id="table-information" class="table-modal"><button id="close-information" type="button" class="modal-close" aria-label="Close table information">×</button><section id="table-rules"><section id="elo-rules" hidden><h2>Elo wagers</h2><p>Choose one face and stake 1–100 Elo. A correct face (1/6 chance) keeps your Elo and pays the full quoted coin reward. A loss removes the staked Elo and pays no coins. Elo wagers pay no tax.</p><p>Each point in your stake has its own daily coin value, from your current Elo downwards. The curve uses the player rating distribution and is frozen at midnight in the Netherlands.</p><p id="elo-rule-stats"></p><button id="leave-elo" type="button">Return to coin wagers</button></section>${rules(game)}</section><section id="table-history"><span class="eyebrow">ROUND RECEIPTS</span><h2>Your time at the table</h2><div id="round-history"></div></section></dialog></section>`
 }
 function renderLayout(){el('casino-root').innerHTML=game==='dice'?diceRoom():`${rouletteHeading()}<div class="casino-layout royal-layout">${rouletteArena()}${rouletteWager()}</div><dialog id="roulette-history-dialog" class="table-modal roulette-history-modal"><button id="close-roulette-history" type="button" class="modal-close" aria-label="Close roulette history">×</button><div class="ledger-heading"><div><h2>Your roulette history</h2><p>Past results do not predict the next draw.</p></div><div id="roulette-ledger"></div></div><div id="round-history"></div></dialog>`}
@@ -103,6 +103,7 @@ async function settle(event?:Event){
  }
 }
 function action(a:TableAction|{kind:'throw'}){
+ if(a.kind==='returnCoins'){if(!busy&&!encounterBusy&&tableMode==='elo')void decideEncounter(false);return}
  if(a.kind==='yes'||a.kind==='no'){void decideEncounter(a.kind==='yes');return}
  if(tableMode==='offer')return
  if(a.kind==='eloAdd'){if(!busy&&!encounterBusy){el<HTMLInputElement>('stake').value=String(cycleEloStake(stake(),a.value!,Math.min(100,(soul?.quotes.length??1)-1)));updateChoice()}return}
@@ -154,17 +155,17 @@ async function decideEncounter(accept:boolean){
 }
 function bindDice(){
  const canvas=el<HTMLCanvasElement>('dice-canvas')
- let gesture:{id:number;x:number;y:number;yaw:number;pitch:number;throwing:boolean;action?:TableAction|{kind:'throw'}}|undefined
+ let gesture:{id:number;x:number;y:number;yaw:number;pitch:number;throwing:boolean;samples:{x:number;y:number;t:number}[];action?:TableAction|{kind:'throw'}}|undefined
  const cancel=()=>{if(gesture&&canvas.hasPointerCapture(gesture.id))canvas.releasePointerCapture(gesture.id);gesture=undefined;scene?.setDrag(0,0)}
  canvas.addEventListener('pointerdown',e=>{
   if(e.button!==0&&e.button!==2)return;e.preventDefault();canvas.focus({preventScroll:true})
   const look=scene?.getLook()??{yaw:0,pitch:0},hit=scene?.pick(e.clientX,e.clientY)
-  gesture={id:e.pointerId,x:e.clientX,y:e.clientY,...look,throwing:phase==='ready',action:hit};canvas.setPointerCapture(e.pointerId)
+  gesture={id:e.pointerId,x:e.clientX,y:e.clientY,...look,throwing:phase==='ready',samples:[{x:e.clientX,y:e.clientY,t:performance.now()}],action:hit};canvas.setPointerCapture(e.pointerId)
  })
  canvas.addEventListener('pointermove',e=>{
   if(!gesture||e.pointerId!==gesture.id)return
   const x=e.clientX-gesture.x,y=e.clientY-gesture.y
-  if(gesture.throwing)scene?.setDrag(x,y)
+  if(gesture.throwing){const now=performance.now();gesture.samples.push({x:e.clientX,y:e.clientY,t:now});gesture.samples=gesture.samples.filter(p=>now-p.t<=100);scene?.setDrag(x,y)}
   else if(!gesture.action&&!['exchange','rolling'].includes(phase))scene?.setLook(gesture.yaw-x*.004,gesture.pitch+y*.004)
  })
  canvas.addEventListener('pointerup',e=>{
@@ -172,8 +173,8 @@ function bindDice(){
   const g=gesture,rect=canvas.getBoundingClientRect(),inside=e.clientX>=rect.left&&e.clientX<=rect.right&&e.clientY>=rect.top&&e.clientY<=rect.bottom
   const distance=Math.hypot(e.clientX-g.x,e.clientY-g.y)
   gesture=undefined;if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId)
+  if(g.throwing){const now=performance.now(),sample=g.samples.find(p=>now-p.t<=100)??{x:e.clientX,y:e.clientY,t:now},dt=Math.max(8,now-sample.t);scene?.releaseDrag(e.clientX-g.x,e.clientY-g.y,(e.clientX-sample.x)/dt,(e.clientY-sample.y)/dt);void throwDie();return}
   if(!inside){scene?.setDrag(0,0);return}
-  if(g.throwing){void throwDie();return}
   if(g.action&&distance<9)action(g.action)
  })
  canvas.addEventListener('pointercancel',cancel);canvas.addEventListener('lostpointercapture',()=>{if(gesture)cancel()});canvas.addEventListener('contextmenu',e=>e.preventDefault());window.addEventListener('blur',cancel)
@@ -184,14 +185,14 @@ function bindDice(){
  })
  el('center-view').onclick=()=>{cancel();scene?.recenter()}
  for(const button of document.querySelectorAll<HTMLButtonElement>('[data-control]')){
-  button.onclick=()=>{const id=button.dataset.control!,a=id.startsWith('face-')?{kind:'face',value:Number(id.slice(5))}:id.startsWith('elo-plus-')?{kind:'eloAdd',value:Number(id.slice(9))}:id.startsWith('stake-')?{kind:'stake',value:Number(id.slice(6))}:{kind:id};action(a as TableAction)}
+  button.onclick=()=>{const id=button.dataset.control!,a=id.startsWith('face-')?{kind:'face',value:Number(id.slice(5))}:id.startsWith('elo-plus-')?{kind:'eloAdd',value:Number(id.slice(9))}:id.startsWith('stake-')?{kind:'stake',value:Number(id.slice(6))}:{kind:id==='return-coins'?'returnCoins':id};action(a as TableAction)}
   button.onfocus=()=>scene?.highlight(button.dataset.control);button.onblur=()=>scene?.highlight(undefined);button.onpointerenter=()=>scene?.highlight(button.dataset.control);button.onpointerleave=()=>scene?.highlight(undefined)
  }
  const project=()=>{
   if(!scene)return
   for(const c of scene.controls()){
    const button=document.querySelector<HTMLButtonElement>(`[data-control="${c.id}"]`)!
-   const enlarge=innerWidth<600&&(tableMode==='offer'||tableMode==='elo'&&(c.action.kind==='eloAdd'||c.id==='offer')),width=enlarge?Math.max(44,c.width):c.width,height=enlarge?Math.max(44,c.height):c.height
+   const enlarge=innerWidth<600&&(tableMode==='offer'||tableMode==='elo'&&(c.action.kind==='eloAdd'||c.id==='offer'||c.id==='return-coins')),width=enlarge?Math.max(44,c.width):c.width,height=enlarge?Math.max(44,c.height):c.height
    button.hidden=!c.visible;button.disabled=c.disabled;button.style.cssText=`left:${(c.x+(c.width-width)/2).toFixed(1)}px;top:${(c.y+(c.height-height)/2).toFixed(1)}px;width:${width.toFixed(1)}px;height:${height.toFixed(1)}px;pointer-events:${phase==='ready'&&c.id!=='offer'?'none':'auto'}`
    if(c.id==='offer')button.setAttribute('aria-label',phase==='ready'?'Throw die':pending?'Retry the same offer':tableMode==='elo'?'DEAL':'Offer coins')
   }

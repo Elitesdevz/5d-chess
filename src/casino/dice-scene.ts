@@ -2,6 +2,8 @@ import * as T from 'three'
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js'
 import {materials} from './scene/materials.ts'
 import {box,mesh,cylinder,dice,resultRotation,v} from './scene/geometry.ts'
+import {throwMotion,type ThrowMotion} from './throw-motion.ts'
+import {WinGold} from './scene/win-gold.ts'
 import {People} from './scene/rig.ts'
 import {Table,type TableAction} from './scene/table.ts'
 
@@ -16,6 +18,7 @@ export class DiceScene {
  readonly world=new T.Scene()
  readonly camera=new T.PerspectiveCamera(62,1,.035,25)
  readonly table:Table
+ private gold:WinGold;private nextThrow:ThrowMotion|undefined;private throwMotion=throwMotion();
  private renderer:T.WebGLRenderer
  private people:People
  private die:T.Group
@@ -32,7 +35,7 @@ export class DiceScene {
  private coinOwner='table';private dieOwner='keeper'
  private reactionStart=0;private reactionKind:'none'|'payout'|'banish'='none';private reactionResolve:(()=>void)|undefined;private mood=0;
  private result=1;private coins=0;private stake=100;private face=1;private disabled=false
- private startPosition=v();private landing=v();private startRotation=new T.Quaternion()
+ private throwHandStart=v(.40,1.02,.55);private startPosition=v();private landing=v();private startRotation=new T.Quaternion()
  private reduced=matchMedia('(prefers-reduced-motion: reduce)').matches
  private fence:WebGLSync|null=null
  private mode:'normal'|'offer'|'elo'='normal';private cameraLocked=false;private speech:T.Sprite;private speechMap:T.CanvasTexture;private speechCanvas:HTMLCanvasElement;private speechUntil=0;private haze:T.ShaderMaterial[]=[]
@@ -46,7 +49,7 @@ export class DiceScene {
   this.world.background=new T.Color(0x030707);this.world.fog=new T.FogExp2(0x040909,.135)
   const generator=new T.PMREMGenerator(this.renderer),room=new RoomEnvironment()
   this.environment=generator.fromScene(room,.06);this.world.environment=this.environment.texture;this.world.environmentIntensity=.16;room.dispose();generator.dispose()
-  const m=materials();this.table=new Table(this.world,m);this.people=new People(this.world,m);this.die=dice(m);this.world.add(this.die);this.die.scale.setScalar(.65)
+  const m=materials();this.table=new Table(this.world,m);this.gold=new WinGold(this.world,this.table.coin);this.people=new People(this.world,m);this.die=dice(m);this.world.add(this.die);this.die.scale.setScalar(.65)
   for(let i=0;i<5;i++){const coin=mesh(this.table.coin,m.gold,this.wager,[0,i*.01,0]);coin.rotation.y=i*.38}this.wager.visible=false;this.world.add(this.wager)
   this.speechCanvas=document.createElement('canvas');this.speechCanvas.width=1024;this.speechCanvas.height=256;this.speechMap=new T.CanvasTexture(this.speechCanvas);this.speechMap.colorSpace=T.SRGBColorSpace
   this.speech=new T.Sprite(new T.SpriteMaterial({map:this.speechMap,transparent:true,depthWrite:false,fog:false}));this.speech.position.set(0,1.98,-.82);this.speech.scale.set(1.22,.305,1);this.speech.visible=false;this.world.add(this.speech)
@@ -91,7 +94,7 @@ export class DiceScene {
    if(this.fence){const status=gl.clientWaitSync(this.fence,0,0);if(status===gl.TIMEOUT_EXPIRED)return;gl.deleteSync(this.fence);this.fence=null}
    const dt=Math.min(.25,(now-this.previous)/1000||.016);this.previous=now;this.drawn=now
    this.yaw=T.MathUtils.damp(this.yaw,this.lookYaw,12,dt);this.pitch=T.MathUtils.damp(this.pitch,this.lookPitch,12,dt)
-   this.updateCamera();this.pose(now);this.table.animate(dt);if(this.mode==='elo'&&this.reactionKind!=='payout')this.wager.visible=false;this.haze.forEach(m=>m.uniforms.time.value=now/1000);if(this.speech.visible){const remaining=this.speechUntil-now;this.speech.material.opacity=T.MathUtils.clamp(remaining/900,0,1);this.speech.visible=remaining>0}
+   this.updateCamera();this.pose(now);this.table.animate(dt);if(this.mode==='elo'&&this.reactionKind!=='payout')this.wager.visible=false;this.gold.update(now,this.reduced);this.canvas.dataset.winGlow=String(this.gold.active);this.haze.forEach(m=>m.uniforms.time.value=now/1000);if(this.speech.visible){const remaining=this.speechUntil-now;this.speech.material.opacity=T.MathUtils.clamp(remaining/900,0,1);this.speech.visible=remaining>0}
    this.candles.forEach((c,i)=>c.intensity=1.28+Math.sin(now*.002+i)*.035+Math.sin(now*.007+i)*.012)
    this.renderer.render(this.world,this.camera);this.canvas.dataset.frame=String(++this.frame);this.canvas.dataset.pitch=this.pitch.toFixed(3)
    this.fence=gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE,0);gl.flush()
@@ -116,12 +119,12 @@ export class DiceScene {
    left=track(t,[[0,left],[.18,v(-.80,.965,.75)],[.31,v(-.80,1.02,.75)],[.57,v(-.14,1.04,.22)],[.72,v(-.14,1.04,.22)],[1,v(-.46,.94,.94)]])
    kr=track(t,[[0,kr],[.42,kr],[.65,v(-.13,1.06,.14)],[.74,v(-.13,1.06,.14)],[.94,v(-.63,.96,-.64)],[1,kr]])
    kl=track(t,[[0,kl],[.64,kl],[.83,v(.24,1.06,.24)],[.91,v(.24,1.06,.24)],[1,kl]])
-   right=track(t,[[0,right],[.65,right],[.84,v(.24,1.04,.34)],[.92,v(.24,1.04,.34)],[1,v(.44,1.02,.84)]])
+   right=track(t,[[0,right],[.65,right],[.84,v(.24,1.04,.34)],[.92,v(.24,1.04,.34)],[1,v(.40,1.02,.55)]])
    lc=t<.22?smooth(t/.22)*.2:t<.70?.85:.12;kc=t>.61&&t<.94?.85:.18;rc=t>.83?.72:.2
   }else if(this.phase==='ready'){
-   right.set(.44,1.02,.84);right.add(v(this.drag.x*.15,this.drag.y*.07,Math.abs(this.drag.y)*.05));rc=.72
+   right.set(.40,1.02,.55);right.add(v(this.drag.x*.15,this.drag.y*.07,Math.abs(this.drag.y)*.05));rc=.72
   }else if(this.phase==='rolling'){
-   right=track(t,[[0,right],[.12,v(.40,1.12,.94)],[.25,v(.26,1.03,.54)],[.40,v(.44,.95,.86)],[1,v(.44,.95,.86)]])
+   right=track(t,[[0,this.throwHandStart],[.08,this.throwHandStart.clone().add(v(this.throwMotion.x*.035,.055,this.throwMotion.z*.035))],[.17,this.throwHandStart.clone().add(v(this.throwMotion.x*.10,.025,this.throwMotion.z*.10))],[.32,this.throwHandStart.clone().add(v(this.throwMotion.x*.16,-.035,this.throwMotion.z*.16))],[1,v(.44,.95,.86)]])
    rc=t<.18?.65:.12
   }
   const reaction=T.MathUtils.clamp((now-this.reactionStart)/(this.reduced?180:this.reactionKind==='banish'?1900:2600),0,1)
@@ -162,13 +165,13 @@ export class DiceScene {
   }else if(this.phase==='rolling'){
    if(t<.17){this.die.position.lerp(v(0,.05,-.01),.25)}
    else{
-    if(this.dieOwner!=='world'){this.world.attach(this.die);this.startPosition.copy(this.die.position);this.startRotation.copy(this.die.quaternion);this.dieOwner='world'}
+    if(this.dieOwner!=='world'){this.world.attach(this.die);this.startPosition.copy(this.die.position);this.startRotation.copy(this.die.quaternion);this.dieOwner='world';const reach=.25+this.throwMotion.power*.80;this.landing.set(T.MathUtils.clamp(this.startPosition.x+this.throwMotion.x*reach,-1.04,1.04),.960,T.MathUtils.clamp(this.startPosition.z+this.throwMotion.z*reach,-.76,.72));for(const c of this.table.controls)if(c.object.visible&&Math.abs(this.landing.x-c.object.position.x)<c.size[0]/2+.04&&Math.abs(this.landing.z-c.object.position.z)<c.size[1]/2+.04)this.landing.y=1.003;this.canvas.dataset.throwLanding=JSON.stringify([this.landing.x,this.landing.y,this.landing.z])}
     const q=T.MathUtils.clamp((t-.17)/.83,0,1),flight=T.MathUtils.clamp(q/.57,0,1)
-    this.die.position.copy(this.startPosition).lerp(this.landing,smooth(flight))
-    const bounce=q<.57?Math.sin(Math.PI*flight)*.48:Math.abs(Math.sin((q-.57)/.43*Math.PI*3))*Math.pow(1-(q-.57)/.43,2)*.13
+    this.die.position.copy(this.startPosition).lerp(this.landing,1-(1-q)**2)
+    const bounce=q<.57?4*flight*(1-flight)*this.throwMotion.lift:Math.abs(Math.sin((q-.57)/.43*Math.PI*3))*Math.pow(1-(q-.57)/.43,2)*.13
     this.die.position.y=T.MathUtils.lerp(this.startPosition.y,this.landing.y,flight)+bounce
-    const spin=new T.Quaternion().setFromEuler(new T.Euler(q*15,q*9,q*13));this.die.quaternion.copy(this.startRotation).multiply(spin)
-    if(q>.66)this.die.quaternion.slerp(resultRotation(this.result),smooth((q-.66)/.34))
+    const spin=new T.Quaternion().setFromEuler(new T.Euler(this.throwMotion.z*q*this.throwMotion.turns,q*this.throwMotion.x*5,-this.throwMotion.x*q*this.throwMotion.turns));this.die.quaternion.copy(this.startRotation).multiply(spin)
+    if(q>.80)this.die.quaternion.slerp(resultRotation(this.result),smooth((q-.80)/.20))
    }
   }else if(this.phase==='idle'){
    this.die.position.set(-.16,.960,-.35);this.die.quaternion.copy(resultRotation(1))
@@ -193,14 +196,15 @@ export class DiceScene {
  setLook(yaw:number,pitch:number){if(this.cameraLocked)return;this.lookYaw=T.MathUtils.clamp(yaw,-.72,.72);this.lookPitch=T.MathUtils.clamp(pitch,-.22,1.03)}
  recenter(){this.lookYaw=0;this.lookPitch=0}
  setDrag(x:number,y:number){this.drag.set(T.MathUtils.clamp(x/220,-1,1),T.MathUtils.clamp(-y/220,-.4,1))}
- ready(){this.phase='ready';this.drag.set(0,0);this.dieOwner='player';this.people.right.hand.grip.attach(this.die);this.die.position.set(0,.055,-.014);this.refresh()}
+ ready(){this.phase='ready';this.drag.set(0,0);this.dieOwner='player';this.people.right.hand.grip.attach(this.die);this.die.position.set(0,.055,-.014);this.refresh();this.pose(performance.now())}
  async exchange(){
   this.world.attach(this.wager);this.wager.visible=true;this.coinOwner='table';this.dieOwner='keeper';this.people.keeperLeft.hand.grip.attach(this.die);this.die.position.set(0,.054,0)
   this.phase='exchange';this.began=performance.now();this.duration=this.reduced?150:3600;this.recenter();this.refresh();await new Promise<void>(resolve=>this.finish=resolve)
  }
+ releaseDrag(dx:number,dy:number,vx:number,vy:number){this.nextThrow=throwMotion(dx,dy,vx,vy,this.canvas.clientWidth,this.canvas.clientHeight)}
  async roll(result:number){
-  this.result=result;this.phase='rolling';this.began=performance.now();this.duration=this.reduced?400:2100
-  this.landing.set(T.MathUtils.clamp(this.drag.x*.22,-.25,.25),.960,-.12+this.drag.y*.08);this.drag.set(0,0);this.recenter();this.refresh();await new Promise<void>(resolve=>this.finish=resolve)
+  this.throwHandStart.copy(this.people.right.hand.root.position);this.result=result;this.throwMotion=this.nextThrow??throwMotion();this.nextThrow=undefined;this.canvas.dataset.throwMotion=JSON.stringify(this.throwMotion);this.phase='rolling';this.began=performance.now();this.duration=this.reduced?400:1750+this.throwMotion.power*650
+  this.landing.set(0,.960,-.12);this.drag.set(0,0);this.recenter();this.refresh();await new Promise<void>(resolve=>this.finish=resolve)
  }
  pick(clientX:number,clientY:number):TableAction|{kind:'throw'}|undefined{
   const rect=this.canvas.getBoundingClientRect();this.raycaster.setFromCamera(new T.Vector2((clientX-rect.left)/rect.width*2-1,-(clientY-rect.top)/rect.height*2+1),this.camera)
@@ -221,9 +225,9 @@ export class DiceScene {
  }
  highlight(id:string|undefined){for(const c of this.table.controls)(c.edge.material as T.MeshStandardMaterial).emissive.set(c.id===id?0x5b3a12:0x000000)}
  setMood(value:number){this.mood=value;this.people.setMood(value);this.canvas.dataset.dealerMood=value.toFixed(2)}
- async reward(){this.wager.scale.setScalar(1.25);this.wager.visible=true;this.reactionKind='payout';this.phase='payout';this.reactionStart=performance.now();this.canvas.dataset.reaction='payout';this.lockCamera(true);await new Promise<void>(resolve=>this.reactionResolve=resolve)}
+ async reward(){this.gold.start(performance.now());this.wager.scale.setScalar(1.25);this.wager.visible=true;this.reactionKind='payout';this.phase='payout';this.reactionStart=performance.now();this.canvas.dataset.reaction='payout';this.lockCamera(true);await new Promise<void>(resolve=>this.reactionResolve=resolve)}
  async banish(){this.reactionKind='banish';this.phase='banish';this.reactionStart=performance.now();this.canvas.dataset.reaction='banish';this.lockCamera(true);await new Promise<void>(resolve=>this.reactionResolve=resolve)}
- diagnostics(){return {phase:this.phase,coinOwner:this.coinOwner,dieOwner:this.dieOwner,look:this.getLook(),drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles}}
+ diagnostics(){return {phase:this.phase,coinOwner:this.coinOwner,dieOwner:this.dieOwner,look:this.getLook(),throwMotion:this.throwMotion,launch:this.startPosition.toArray(),landing:this.landing.toArray(),goldActive:this.gold.active,drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles}}
  dispose(){
   if(this.disposed)return;this.disposed=true;cancelAnimationFrame(this.ticker);this.resize.disconnect();this.finish?.();this.finish=undefined;this.reactionResolve?.();this.reactionResolve=undefined
   const geometries=new Set<T.BufferGeometry>(),materials=new Set<T.Material>(),textures=new Set<T.Texture>()

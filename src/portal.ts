@@ -77,6 +77,7 @@ function noticeRow(notice:Notice,open:()=>void){
   row.onclick=open;return row
 }
 async function lobby(){
+  const puzzle=el<HTMLDialogElement>('puzzle-soon');el('open-puzzle').onclick=()=>puzzle.showModal();el('close-puzzle').onclick=()=>puzzle.close()
   const session=await getSession().catch(()=>null)
   if(!session?.user){location.replace('/chess/login.html');return}
   if(!session.profile){error('lobby-error','The home page needs the matching updated game server.');return}
