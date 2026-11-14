@@ -86,7 +86,7 @@ export class Table {
    else if(c.action.kind==='eloAdd')c.object.position.set(portrait?-.46+(n===1?0:n===10?.22:.44):-.95+(n===1?0:n===10?.23:.46),.91,portrait?-.08:.22)
    else if(c.action.kind==='face')c.object.position.set(portrait?((n-1)%3-1)*.30:(n-3.5)*.205,.91,portrait?.37+Math.floor((n-1)/3)*.25:.57)
    else if(c.action.kind==='stake'){const i=[25,100,500,1000].indexOf(n);c.object.position.set((portrait?-.46:-1.04)+(i%2)*.22,.91,(portrait?-.15:.12)+Math.floor(i/2)*.20)}
-   else if(c.id==='return-coins')c.object.position.set(portrait?.47:1.01,.91,portrait?-.25:.03)
+   else if(c.id==='return-coins')c.object.position.set(portrait?.47:1.01,.91,portrait?-.60:.03)
    else if(c.id==='offer')c.object.position.set(portrait?.47:.76,.91,portrait?.04:.34)
    else c.object.position.set(c.id==='minus'?-.31:c.id==='plus'?.31:0,.91,.87)
   }
