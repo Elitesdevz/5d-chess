@@ -9,6 +9,7 @@ import {COLORS, drawPiece,equippedEffect} from './art.ts'
 
 interface Camera extends Point {scale: number}
 interface Display {
+  objectives?: readonly Coord[]
   state: State
   moves: readonly Candidate[]
   queued: readonly Order[]
@@ -341,7 +342,7 @@ export class Scene {
     const panel = document.getElementById('sidebar')?.getBoundingClientRect()
     const right = this.width > 1000 && panel && panel.left > area.left + this.width * .55
       ? Math.min(this.width * .4, area.right - panel.left + 16) : 0
-    const bottom = this.width <= 1000 ? 122 : 0
+    const bottom = this.width <= 1000 && panel ? 122 : 0
     const scale = clamp(Math.min((this.width - right - 40) / (width + d.width + 52),
       (this.height - bottom - 54) / (height + d.height + 102)), MIN_SCALE, 1.38)
     this.center({x: width / 2 + right / (2 * scale), y: height / 2 + bottom / (2 * scale), scale})
@@ -483,6 +484,12 @@ export class Scene {
       if (node.x + d.width / 2 + 65 < low.x || node.x - d.width / 2 - 65 > high.x ||
         node.y + d.height / 2 + 65 < low.y || node.y - d.height / 2 - 65 > high.y) continue
       this.drawBoard(node, current)
+    }
+    for(const c of this.view.objectives??[]){
+      const node=this.layout.nodes.get(boardKey(c));if(!node)continue
+      const point=squarePoint(s,c,this.layout),tile=this.dimensions(node.size).tile
+      ctx.save();ctx.strokeStyle='#f4d381';ctx.lineWidth=2;ctx.fillStyle='#f4d38120'
+      ctx.beginPath();ctx.arc(point.x,point.y,tile*.42,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.restore()
     }
     for (const order of this.overlays.paths ? this.view.queued : []) {
       const move = order as Candidate
