@@ -1,3 +1,4 @@
+import {clickMatchSquare,matchSquare} from './helpers/match-board.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {spawn} from 'node:child_process'
@@ -75,8 +76,7 @@ test('account and lobby flow uses the multiplayer server', async t => {
   const canvas = page.locator('#scene')
   const box = await canvas.boundingBox()
   const scale = Number((await page.locator('#scale').textContent()).replace('%','')) / 100
-  const clickSquare = async (x, y) => canvas.click({position:{x:box.width/2+(x+.5-7)*32*scale,
-    y:box.height/2+((y+.5-7)*32-2)*scale}})
+  const clickSquare = async (x,y) => clickMatchSquare(page,x,y,4)
   await clickSquare(4,13)
   await clickSquare(5,11)
   await page.getByText('U0·T0 e1 → U0·T0 f3').waitFor()
@@ -87,7 +87,7 @@ test('account and lobby flow uses the multiplayer server', async t => {
     const rect=await guest.locator('#scene').boundingBox()
     const zoom=Number((await guest.locator('#scale').textContent()).replace('%',''))/100
     const squares=[[[0,9],[2,8]],[[9,0],[8,2]],[[13,4],[11,5]]][i]
-    for(const [x,y] of squares) await guest.locator('#scene').click({position:{x:rect.width/2+(x+.5-7)*32*zoom,y:rect.height/2+((y+.5-7)*32-2)*zoom}})
+    for(const [x,y] of squares) await clickMatchSquare(guest,x,y,4)
     await guest.getByRole('button',{name:'Lock orders'}).click()
   }
   await page.getByText('1 rounds resolved').waitFor({timeout:8000})
@@ -154,7 +154,7 @@ test('account and lobby flow uses the multiplayer server', async t => {
   const classicBox=await active.locator('#scene').boundingBox()
   const classicScale=Number((await active.locator('#scale').textContent()).replace('%',''))/100
   const route=classicRoom.state.turn==='red'?[[4,10],[5,8]]:[[4,3],[5,5]]
-  for(const [x,y] of route)await active.locator('#scene').click({position:{x:classicBox.width/2+(x+.5-7)*32*classicScale,y:classicBox.height/2+((y+.5-7)*32-2)*classicScale}})
+  for(const [x,y] of route)await clickMatchSquare(active,x,y,2)
   await active.getByRole('button',{name:'Submit turn'}).click()
   await active.getByText('1 rounds resolved').waitFor({timeout:8000})
   const classicAfter=await (await page.request.get(base+`/api/games/${classicCode}`)).json()

@@ -2,10 +2,10 @@ import {aiOpponent,type AiId,type AiReward} from './ai-model.ts'
 import {profileHref} from './profile-model.ts'
 import {type Loadout} from './collection.ts'
 import {setCosmetics} from './art.ts'
-import {initShell,refreshAccount} from './shell.ts'
+import {api,initShell,refreshAccount} from './shell.ts'
 import {requiredBoards,optionalAllowance} from './rules.ts'
 import {awareness, nextPlayable, threatSquares} from './awareness.ts'
-import {initMatchUI, setMatchHeader, collapseControls,updateMatchUI,updateSelectionInfo} from './ui.ts'
+import {initMatchUI, setMatchHeader, collapseControls,updateMatchUI,updateSelectionInfo,renderMatchPlayers} from './ui.ts'
 import {Scene} from './scene.ts'
 import {COLORS, NAMES, pieceIcon} from './art.ts'
 import {type Candidate, type Coord, type Order, type Player, type Resolution, type State,
@@ -19,6 +19,7 @@ type Room = {code: string; title: string; seats: Partial<Record<Player, string>>
 const element = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const code = new URLSearchParams(location.search).get('code')?.toUpperCase()
 if (!code || !/^[A-Z]{4}$/.test(code)) location.replace('/chess/lobby.html')
+const playerCards=new Map<string,{rating:number;avatar:string;frame?:string}|null>()
 let room: Room | undefined
 let frame: number | null = null
 let selected: Coord | undefined
@@ -59,7 +60,7 @@ function sync() {
   if (!room) return
   updateSelectionInfo(shown(),selected,preview())
   const info = canPlan() && room?.seat ? awareness(shown(), room.seat, draft) : undefined
-  scene.update({state:shown(), animation, playable: info?.playable, checked: info && threatSquares(info.threats), moves:canPlan() ? choices : [], selected, preview:preview(), queued:draft})
+  scene.update({state:shown(), history:frame!==null, animation, playable: info?.playable, checked: info && threatSquares(info.threats), moves:canPlan() ? choices : [], selected, preview:preview(), queued:draft})
 }
 function clear() { selected = undefined; choices = []; hover = undefined; routes = []; routeIndex = 0 }
 function pick(c?: Coord) {
@@ -97,15 +98,13 @@ function render() {
   setMatchHeader(seat, `${room.code} · ${element('phase').textContent?.toLowerCase()}`)
   element('metrics').textContent = `Present T${present(s)} · ${s.universes.length} universes · ${s.rifts.length} rifts`
   const seats = element('seats')
-  seats.replaceChildren(...(room.state.movement === 'classic' ? turnOrder(room.state) : players(room.state)).map(player => {
-    const span = document.createElement('span')
-    span.style.setProperty('--seat-color',COLORS[player])
-    span.className = `${player === seat ? 'self' : ''} ${room!.locked[player] ? 'locked' : ''}`
-    if (room!.state.movement === 'classic' && room!.state.turn === player) span.classList.add('turn-owner')
-    span.textContent = `${room!.state.movement === 'classic' && room!.state.turn === player ? '▶ ' : ''}${names[player]}: `
-    if(room!.seats[player]){const link=document.createElement('a');link.className='player-profile-link';link.href=room!.ai&&player==='yellow'?'/chess/lobby.html#ai':profileHref(room!.seats[player]!);link.textContent=room!.seats[player]!;span.append(link)}else span.append('Open')
-    if(room!.locked[player])span.append(' ✓')
-    return span
+  for(const [player,name]of Object.entries(room.seats))if(name&&!(room.ai&&player==='yellow')&&!playerCards.has(name)){
+    playerCards.set(name,null)
+    void api<{rating:number;avatar:string;frame?:string}>('/profile?user='+encodeURIComponent(name)).then(card=>{playerCards.set(name,card);render()}).catch(()=>{})
+  }
+  renderMatchPlayers(scene,s,seats,(room.state.movement==='classic'?turnOrder(room.state):players(room.state)).map(player=>{
+    const name=room!.seats[player],card=name?playerCards.get(name):undefined,bot=room!.ai&&player==='yellow'?aiOpponent(room!.ai.id):undefined,cosmetic=room!.cosmetics?.[player]
+    return {player,name:bot?.name??name??'Open seat',self:player===seat,rating:card?.rating,avatar:card?.avatar??cosmetic?.icon,frame:card?.frame??cosmetic?.frame,href:name?(bot?'/chess/lobby.html#ai':profileHref(name)):undefined,detail:bot?'AI · '+bot.difficulty:name?'Player':'Waiting',locked:room!.locked[player]}
   }))
   const last = room.results.length
   element('history-label').textContent = frame === null ? `${last} rounds resolved` : frame ? `After round ${frame}` : 'Opening position'
@@ -232,12 +231,12 @@ function applyRoom(next: Room) {
     if(!result.outcomes.length){draft=[];clear();frame=null;return}
     const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 260 : result.travel ? Math.max(1200, Math.min(8000, (result.ticks ?? 0) * 180)) : 1600
     animation = {outcomes: result.outcomes, started: performance.now(), duration, result: next.state, travel: result.travel, ticks: result.ticks}
-    requestAnimationFrame(() => scene.fit())
+    requestAnimationFrame(() => scene.frameAnimation())
     frame = null
     message('Movement resolving…')
     window.setTimeout(() => {
       animation = undefined; message(''); render()
-      if (room?.seat) nextPlayable(scene, awareness(room.state, room.seat, draft).playable)
+      scene.finishAnimation()
     }, duration + 30)
   }
 }

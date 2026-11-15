@@ -1,7 +1,16 @@
 import {COLORS,NAMES,pieceIcon} from './art.ts'
 import {type Player,type State,type Order,type Coord,type Candidate,frontier,present,boardKey,coordName,pieceAt,boardTurn} from './model.ts'
 import {requiredBoards} from './rules.ts'
+import {framedAvatar} from './cosmetic-art.ts'
 import type {Scene} from './scene.ts'
+
+export interface MatchPlayer {player:Player;name:string;rating?:number;avatar?:string;frame?:string;href?:string;self?:boolean;detail?:string;locked?:boolean}
+const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!))
+export function renderMatchPlayers(scene:Scene,s:State,host:HTMLElement,roster:MatchPlayer[]){
+ const html=roster.map(p=>`<span class="faction match-player ${p.self?'self':''} ${p.locked?'locked':''} ${s.eliminated.includes(p.player)?'dead':''} ${s.turn===p.player?'turn-owner':''}" style="--faction:${COLORS[p.player]};--seat-color:${COLORS[p.player]}">${p.href?`<a class="player-profile-link" href="${escape(p.href)}" aria-label="${escape(p.name)}">`:'<span class="player-identity">'}<span class="player-portrait">${p.avatar?framedAvatar(p.avatar,p.frame):pieceIcon('K',p.player,32)}</span><span class="player-copy"><strong>${escape(p.name)}${p.self&&p.name!=='You'?'<i class="you-tag">you</i>':''}</strong><small>${p.rating!==undefined?Math.round(p.rating).toLocaleString()+' Elo':escape(p.detail??'Local player')}${p.locked?' · Ready':''}</small></span>${p.href?'</a>':'</span>'}</span>`).join('')
+ if(host.innerHTML!==html)host.innerHTML=html
+ scene.setRoster(html)
+}
 
 export function setMatchHeader(player:Player|undefined,summary:string){
  const panel=document.getElementById('sidebar')!;panel.style.setProperty('--faction',player?COLORS[player]:'#bdbdbd')
@@ -36,11 +45,18 @@ export function updateMatchUI(scene:Scene,s:State,player:Player|undefined,orders
  }))
  document.querySelectorAll<HTMLElement>('[data-capture-legend]').forEach(el=>el.textContent='Capture')
 }
-/** Docked on desktop, expandable planning sheet on mobile. */
+/** Movable planning island, with an expandable sheet on small screens. */
 export function initMatchUI(scene?:Scene){
  const panel=document.getElementById('sidebar')!,handle=document.getElementById('panel-handle')!,mobile=matchMedia('(max-width:1000px) and (min-height:521px), (max-width:599px)')
  const reset=()=>{panel.style.removeProperty('left');panel.style.removeProperty('top');panel.style.removeProperty('right');if(!mobile.matches){panel.classList.remove('mobile-open');handle.setAttribute('aria-expanded','false')}}
  window.addEventListener('resize',reset)
+ handle.addEventListener('pointerdown',e=>{
+  if(mobile.matches||e.button!==0)return
+  const r=panel.getBoundingClientRect(),parent=panel.parentElement!.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top
+  handle.setPointerCapture(e.pointerId)
+  const move=(event:PointerEvent)=>{panel.style.left=Math.max(8,Math.min(parent.width-r.width-8,event.clientX-parent.left-dx))+'px';panel.style.top=Math.max(8,Math.min(parent.height-r.height-8,event.clientY-parent.top-dy))+'px';panel.style.right='auto'}
+  handle.addEventListener('pointermove',move);handle.addEventListener('lostpointercapture',()=>handle.removeEventListener('pointermove',move),{once:true})
+ })
  const layers=document.querySelector<HTMLDetailsElement>('.layer-control')
  layers?.addEventListener('toggle',()=>{if(!layers.open)return;const r=layers.querySelector('summary')!.getBoundingClientRect(),menu=layers.querySelector<HTMLElement>('.overlays')!;menu.style.left=Math.max(8,Math.min(innerWidth-178,r.right-170))+'px';menu.style.bottom=Math.max(8,innerHeight-r.top+8)+'px'})
  window.addEventListener('resize',()=>{if(layers)layers.open=false})

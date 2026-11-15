@@ -1,3 +1,4 @@
+import {clickMatchSquare,matchSquare} from './helpers/match-board.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
@@ -33,7 +34,7 @@ test('five AI characters, playable Classic/Live duels, private plans and visible
  // Use actual canvas input to submit a legal opening and wait for the AI reply.
  const opening=await(await context.request.get(path)).json()
  await page.getByRole('button',{name:'Focus player',exact:true}).click();await page.waitForTimeout(150)
- const square=async(x,y)=>{const box=await page.locator('#scene').boundingBox(),scale=Number((await page.locator('#scale').innerText()).replace('%',''))/100;await page.locator('#scene').click({position:{x:box.width/2+(x+.5-7)*32*scale,y:box.height/2+((y+.5-7)*32-2)*scale}})}
+ const square=async(x,y)=>clickMatchSquare(page,x,y,2)
  await square(4,10);await square(5,8);await page.getByRole('button',{name:'Submit turn',exact:true}).click()
  let after
  for(let i=0;i<80;i++){after=await(await context.request.get(path)).json();if(!after.ai.thinking&&after.state.round>=opening.state.round+2)break;await page.waitForTimeout(50)}

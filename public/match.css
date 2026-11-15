@@ -20,3 +20,60 @@
 .match-screen[data-phase=replay] .phase{color:#d7c093;border-color:#bea36545;background:#c9ab6b12}.match-screen[data-phase=locked] .phase,.match-screen[data-phase='waiting turn'] .phase{color:#a1c5cc;border-color:#7cadbc35;background:#7cadbc10}.match-screen[data-phase=finished] .phase,.match-screen[data-phase='game over'] .phase{color:#dfd2a3;border-color:#c5b37b45;background:#c5b37b12}
 .match-screen .budget>div>span,.match-screen .budget>span>small{font-size:9px}.match-screen .phase{font-size:9px}.match-screen .board-chip>span{font-size:9px}
 @media(max-width:600px){.match-screen .top-history #replay:not(:disabled){display:inline-block;font-size:0;min-width:22px;min-height:24px}.match-screen .top-history #replay:not(:disabled):before{content:'▶';font-size:9px}.match-screen[data-phase=replay] .match-status .match-meta>.eyebrow,.match-screen[data-phase=replay] .match-status .match-context{display:none}.match-screen[data-phase=replay] .match-status .top-history{grid-column:1/-1;grid-row:1;justify-content:center;width:100%}.match-status .top-history #history-label{max-width:95px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+
+/* Full-window table with a movable planning island. */
+.match-screen .workspace{display:block;position:relative;flex:1;min-height:0;padding:0;overflow:hidden}
+.match-screen .theater,.match-screen[data-multiverse=false] .theater{position:absolute;inset:0;display:block;border:0;border-radius:0;background:#101b1b;overflow:hidden}
+.match-screen .viewport{position:absolute;inset:0;width:100%;height:100%}
+.match-screen .scene-heading{position:absolute;left:18px;top:12px;right:auto;z-index:3;height:27px;min-height:27px;padding:0 10px;gap:20px;border:0;border-radius:7px;background:#15251fe8;pointer-events:none}
+.match-screen .board-navigator{position:absolute;top:49px;left:18px;right:330px;z-index:3;padding:0;border:0;background:none;min-height:0}
+.match-screen .board-navigator[hidden]{display:none}
+.match-screen .sidebar,.match-screen .sidebar.mobile-open{position:absolute;left:auto;right:18px;top:18px;bottom:auto;width:290px;height:auto;max-height:calc(100% - 36px);border:1px solid #a5bf7b35;border-radius:15px;box-shadow:0 15px 55px #0007;overflow:hidden;z-index:7}
+.match-screen .sidebar .round-panel{height:auto;max-height:calc(100dvh - 195px);overflow:auto;border-radius:15px}
+.match-screen .sidebar .drag-handle{cursor:grab;touch-action:none}.match-screen .sidebar .drag-handle:active{cursor:grabbing}
+.match-screen .sidebar .desktop-handle{display:block!important;color:#92a47e;font-size:10px}
+.match-screen .match-board-footer{position:absolute;left:18px;bottom:4px;right:330px;min-height:20px;padding:0;background:transparent;border:0;pointer-events:none}
+.match-screen .match-board-footer .legend{display:none}.match-screen .map-caption{font-size:10px;max-width:100%;text-shadow:0 1px 5px #000}
+.match-screen .map-tools{bottom:31px;left:18px}.match-screen .minimap{left:18px;right:auto;top:91px;width:100px;opacity:.85}
+/* Shared identities in the match strip and attached to each frontier board. */
+.match-status .factions,.match-status .online-seats{display:flex;gap:7px;min-width:0;flex-wrap:nowrap}
+.match-status .match-meta{gap:15px;flex:1}.match-status .match-context{flex-shrink:0}
+.match-status .match-player,.board-roster .match-player{display:flex;align-items:center;min-width:0;padding:5px 8px;background:#13221c;border:1px solid color-mix(in srgb,var(--faction) 40%,transparent);border-radius:9px;color:#dbe4d1;gap:0}
+.match-player>.player-profile-link,.match-player>.player-identity{display:flex;align-items:center;gap:8px;min-width:0;text-decoration:none;color:inherit}
+.match-player .player-portrait{display:grid;place-items:center;width:29px;height:29px;flex:0 0 29px;padding:0;background:none}
+.match-player .player-portrait>svg,.match-player .player-portrait>.framed-avatar{width:100%;height:100%}
+.match-player .player-copy{display:flex;flex-direction:column;min-width:0;gap:3px;text-align:left}
+.match-player .player-copy strong{font-size:11px;font-weight:650;max-width:115px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e2ead9}
+.match-player .player-copy small{font-size:9px;color:#9eaf94;line-height:1.2;white-space:nowrap}
+.match-player .you-tag{font-size:7px;font-style:normal;text-transform:uppercase;color:var(--faction);margin-left:5px}.match-player.dead{opacity:.4}.match-player.locked{background:#24301d}
+.match-screen .match-status .match-player a{font-size:inherit;max-width:none}
+.board-rosters{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.board-roster{position:absolute;left:0;top:0;width:146px;display:grid;gap:5px;pointer-events:auto}
+.board-roster:before{content:'';position:absolute;left:-15px;top:16px;width:15px;height:1px;background:#a2b39266}
+.board-roster .match-player{box-shadow:0 5px 18px #0003;padding:7px 8px;background:#182922f5;border-left:3px solid var(--faction)}
+.board-roster .player-copy strong{max-width:91px;font-size:10px}.board-roster .player-copy small{font-size:9px}
+@media(max-width:1000px){
+ .match-screen .sidebar,.match-screen .sidebar.mobile-open{top:auto;bottom:12px;right:12px;left:auto;width:290px;max-height:68dvh;height:64px;border-radius:13px}
+ .match-screen .sidebar.mobile-open{height:auto;max-height:68dvh}.match-screen .sidebar .round-panel{max-height:68dvh;height:auto;padding-bottom:15px;border-radius:13px}
+ .match-screen .sidebar .drag-handle{cursor:pointer;border-radius:13px 13px 0 0}.match-screen .sidebar .desktop-handle{display:none!important}
+ .match-screen .board-navigator{right:18px}.match-screen .map-tools{bottom:88px;left:12px}.match-screen .match-board-footer{left:12px;right:12px;bottom:78px}
+ .match-status{gap:10px}.match-status .match-meta{gap:10px}.match-status .match-player{padding:4px 6px}.match-player .player-copy strong{max-width:85px}
+}
+@media(max-width:600px){
+ .match-screen .scene-heading{left:12px;top:8px;gap:8px;padding-inline:8px}.match-screen .scene-heading h2{font-size:11px}.match-screen .scene-heading .metrics{font-size:8px}
+ .match-screen .board-navigator{top:43px;left:12px;right:12px}.match-screen .minimap{top:83px;left:12px;width:65px}.match-screen .sidebar,.match-screen .sidebar.mobile-open{left:12px;right:12px;width:auto;bottom:10px}
+ .match-status .match-player{flex:1;padding:4px 5px;border-radius:7px}.match-status .factions,.match-status .online-seats{width:100%;gap:4px}.match-player .player-portrait{width:23px;height:23px;flex-basis:23px}
+ .match-player>.player-profile-link,.match-player>.player-identity{gap:5px}.match-player .player-copy strong{font-size:9px;max-width:90px}.match-player .player-copy small{font-size:8px}.match-player .you-tag{display:none}
+ .match-status .online-seats>span{font-size:inherit}.match-status .online-seats>span a{font-size:inherit}.match-status .match-player .player-copy strong{max-width:62px}
+ .board-roster{width:var(--roster-width,250px);grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}.board-roster:before{top:-12px;left:16px;width:1px;height:12px}.board-roster .match-player{padding:5px}.board-roster .player-copy strong{font-size:9px;max-width:75px}.board-roster .player-copy small{font-size:8px}.board-roster .player-portrait{width:24px;height:24px;flex-basis:24px}
+}
+@media(max-height:520px) and (min-width:600px){
+ .match-screen .sidebar,.match-screen .sidebar.mobile-open{top:10px;bottom:auto;right:10px;left:auto;width:245px;height:auto;max-height:calc(100% - 20px)}.match-screen .sidebar .round-panel{max-height:calc(100dvh - 112px)}
+ .match-screen .sidebar:not(.mobile-open) #planning,.match-screen .sidebar:not(.mobile-open) #turn,.match-screen .sidebar:not(.mobile-open) .panel-kicker{display:block}.match-screen .sidebar .drag-handle{cursor:grab;height:38px;min-height:38px}
+ .match-screen .board-navigator{right:270px}.match-screen .map-tools{bottom:27px}.match-screen .match-board-footer{bottom:4px;right:270px}.match-status .match-player .player-portrait{width:22px;height:22px;flex-basis:22px}.match-status .match-player{padding:3px 6px}
+}
+.match-screen .match-status .match-meta{text-align:left;justify-content:flex-start}
+.match-screen .match-status:has(.online-seats) .match-meta{flex:0 1 auto}
+.match-screen .online-seats .match-player span{padding:0;border:0;background:none;border-radius:0;overflow-wrap:normal;line-height:inherit}
+.match-screen .online-seats .match-player>.player-profile-link{overflow:visible;max-width:none}
+.match-screen .match-player .you-tag{display:inline;width:auto;height:auto;background:none;border-radius:0;flex:none;font-style:normal}
