@@ -44,11 +44,11 @@ function inspectItem(item:Collectible){
   dialog.querySelector<HTMLButtonElement>('[data-close]')!.onclick=()=>dialog.close();dialog.querySelector<HTMLButtonElement>('[data-close-x]')!.onclick=()=>dialog.close();dialog.querySelectorAll<HTMLButtonElement>('[data-variant]').forEach(b=>b.onclick=()=>draw(b.dataset.variant as Player))
  };draw(color);document.body.append(dialog);dialog.showModal();dialog.onclose=()=>dialog.remove()
 }
-function inspectEffect(item:Collectible){
+function inspectEffect(item:Collectible,kind:Kind='N',faction:Player='red'){
  const dialog=document.createElement('dialog');dialog.className='transaction-dialog effect-preview-dialog';dialog.innerHTML=`<h2>${item.name}</h2><canvas width="480" height="240" aria-label="${item.name} animated board preview"></canvas><p>${item.description}</p><p class="pool-note">Cosmetic only. Applies to all your pieces, including online play.</p><button type="button" class="button" data-close>Close preview</button>`
  document.body.append(dialog);dialog.showModal();const canvas=dialog.querySelector('canvas')!,ctx=canvas.getContext('2d')!,start=performance.now(),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;let frame=0
  const tick=(now:number)=>{const p=reduced?.45:((now-start)%2600)/2600;ctx.clearRect(0,0,480,240);ctx.fillStyle='#17241e';ctx.fillRect(0,0,480,240);for(let y=0;y<4;y++)for(let x=0;x<8;x++){ctx.fillStyle=(x+y)%2?'#d6d0ad22':'#697f5322';ctx.fillRect(x*60,y*60,60,60)}
- if(item.type==='movement'){const at={x:70+p*330,y:120};drawMovement(ctx,item.id,[{x:70,y:120},at],at,p,(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawPiece(ctx,'N','red',x,y,46);ctx.restore()},reduced);drawPiece(ctx,'N','red',at.x,at.y,46)}else{drawPiece(ctx,'R','red',180,120,46);drawCapture(ctx,item.id,{x:290,y:120},p,()=>drawPiece(ctx,'N','blue',0,0,46),reduced)}
+ if(item.type==='movement'){const at={x:70+p*330,y:120};drawMovement(ctx,item.id,[{x:70,y:120},at],at,p,(x,y,a)=>{ctx.save();ctx.globalAlpha=a;drawPiece(ctx,kind,faction,x,y,46);ctx.restore()},reduced);drawPiece(ctx,kind,faction,at.x,at.y,46)}else{drawPiece(ctx,'R','red',180,120,46);drawCapture(ctx,item.id,{x:290,y:120},p,()=>drawPiece(ctx,'N','blue',0,0,46),reduced)}
  if(!reduced)frame=requestAnimationFrame(tick)};tick(start+800);dialog.querySelector<HTMLButtonElement>('[data-close]')!.onclick=()=>dialog.close();dialog.onclose=()=>{cancelAnimationFrame(frame);dialog.remove()}
 }
 function renderEffects(){
@@ -60,8 +60,9 @@ function renderEffects(){
  el('animation-grid').querySelectorAll<HTMLButtonElement>('[data-effect-copies]').forEach(b=>b.onclick=()=>manageCopies(b.dataset.effectCopies!))
 }
 const shopKeys=new Map<string,string>()
+let inventoryPage=0,inventoryColumns=0,inventoryQuery=''
 let shopFilter='all'
-let showWelcome=false,shopVisited=false,crateFilter='all',inventoryTab='equipment',setSearch='',setsOnlyComplete=false,setLimit=18
+let showWelcome=false,shopVisited=false,crateFilter='all',inventoryTab='equipment',setSearch='',setType='all',setProgress='all',setLimit=18
 const art=(item:Collectible,player:Player='red')=>item.type==='skin'?skinSetIcon(item.id,player):item.type==='shape'?skinSetIcon('default',player,item.id):itemArt(item)
 function mountShop(id:string,key:string,draw:()=>string){if(shopKeys.get(id)===key)return;el(id).innerHTML=draw();shopKeys.set(id,key)}
 function crateCard(crate:typeof CRATES[number]){
@@ -77,8 +78,13 @@ const percentWeight=(n:number)=>`${(n/10000).toFixed(4).replace(/\.?0+$/,'')}%`
 function pieceChoice(item:Collectible){return ['skin','shape'].includes(item.type)?`<label>Piece type<select data-purchase-kind>${KINDS.map(k=>`<option value="${k}" ${slot===k||slot==='icon'&&k==='N'?'selected':''}>${NAMES[k]}</option>`).join('')}</select></label><p class="pool-note">One piece only. Collect all six for a complete Set.</p>`:''}
 function directCard(id:string){const item=itemById(id)!;return `<article class="featured-card" style="--rarity:${RARITY_COLORS[item.rarity]}"><button class="feature-art-button" type="button" data-inspect="${id}"><span class="item-picture">${itemArt(item)}</span></button><small class="rarity-label">${item.rarity} · ${ITEM_LABELS[item.type]}</small><strong>${item.name}</strong><button type="button" class="button" data-buy="${id}">${item.price.toLocaleString()} coins</button></article>`}
 function applyShopFilter(){
- const all=shopFilter==='all', boxes=shopFilter==='boxes'
- document.querySelectorAll<HTMLElement>('#shop [data-crate-card]').forEach(card=>{card.hidden=!(all||boxes)||((all||boxes)&&crateFilter!=='all'&&(card.parentElement?.id==='general-crates'||card.parentElement?.id==='weekly-cases')&&card.dataset.category!==crateFilter)})
+ const all=shopFilter==='all', cases=shopFilter==='cases'
+ document.querySelectorAll<HTMLElement>('#shop [data-crate-card]').forEach(card=>{
+  const crate=CRATES.find(c=>c.id===card.dataset.crateCard)
+  const matches=crate && crateTickets(crate).some(ticket=>ticket.weight>0 && (shopFilter==='sets' ? !!ticket.setId : shopFilter==='animation' ? ticket.item.type==='movement'||ticket.item.type==='capture' : ticket.item.type===shopFilter))
+  const subfilter=crateFilter==='all'||!(card.parentElement?.id==='general-crates'||card.parentElement?.id==='weekly-cases')||card.dataset.category===crateFilter
+  card.hidden=!(all||cases||matches)||!subfilter
+ })
  document.querySelectorAll<HTMLElement>('#daily-deal-items .featured-card, #seasonal-items .featured-card, #featured-items .featured-card').forEach(card=>{
   const id=card.querySelector<HTMLElement>('[data-inspect]')?.dataset.inspect
   const type=id?itemById(id)?.type:undefined
@@ -142,7 +148,7 @@ function bindShop(){
 function selectedItem(){return itemById(state.wallet.inventory.find(o=>o.uid===preview)?.itemId??'')}
 const slotType=():ItemType=>layer
 const shapeFor=(kind:Kind)=>state.wallet.loadout.shapes?.[kind]??state.wallet.loadout.shape??'default'
-const currentAppearance=(type:ItemType,kind:Kind|'icon'=slot)=>type==='icon'?state.wallet.loadout.icon:type==='frame'?state.wallet.loadout.frame??'default':type==='shape'?shapeFor(kind as Kind):state.wallet.loadout.pieces[kind as Kind]??'default'
+const currentAppearance=(type:ItemType,kind:Kind|'icon'=slot)=>type==='movement'||type==='capture'?(kind==='icon'?'default':state.wallet.loadout[type==='movement'?'movements':'captures']?.[kind]??state.wallet.loadout[type]??'default'):type==='icon'?state.wallet.loadout.icon:type==='frame'?state.wallet.loadout.frame??'default':type==='shape'?shapeFor(kind as Kind):state.wallet.loadout.pieces[kind as Kind]??'default'
 const draftAppearance=(type:ItemType)=>appearanceDrafts.get(`${slot}:${type}`)??currentAppearance(type)
 const equippedId=()=>currentAppearance(layer)
 const ownedId=(id:string)=>id==='default'?'default':state.wallet.inventory.find(o=>covers(o,id,slot==='icon'?undefined:slot)&&!o.pending&&!o.listed)?.uid
@@ -154,6 +160,16 @@ function previewArt(id:string,kind:Kind='N'){
 }
 function renderPreview(){
  const item=selectedItem(),id=item?.id??'default',kind:Kind=slot==='icon'?'N':slot
+ if(slot!=='icon'&&(layer==='movement'||layer==='capture')){
+  const equipped=currentAppearance(layer),uid=ownedId(id),unavailable=!uid
+  const skin=draftAppearance('skin'),outline=draftAppearance('shape')
+  el('equipment-preview').innerHTML=`<div class="preview-canvas effect-stage">${pieceIcon(kind,color,140,skin,outline)}${item?`<span class="effect-preview-mark">${itemArt(item)}</span>`:''}</div><div class="preview-colors">${PLAYERS.map(p=>`<button type="button" data-color="${p}" style="--faction:${COLORS[p]}" aria-label="${p} variant" aria-pressed="${p===color}"></button>`).join('')}</div><div class="look-summary"><span><small>SKIN</small><strong>${itemById(skin)?.name??'Classic'}</strong></span><b>+</b><span><small>OUTLINE</small><strong>${itemById(outline)?.name??'Classic'}</strong></span></div><h2>${item?.name??'Classic'}</h2><p>${layer==='movement'?'Movement animation':'Capture animation'} - ${NAMES[kind]}</p>${item?'<button class="button" type="button" id="preview-effect">Preview animation</button>':''}<div class="equip-actions"><button class="button primary" id="equip-preview" type="button" ${unavailable||id===equipped?'disabled':''}>${unavailable?'Item unavailable':id===equipped?'Equipped':'Equip animation'}</button></div>`
+  el('equipment-preview').querySelectorAll<HTMLButtonElement>('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color as Player;renderInventory()})
+  el('preview-effect')?.addEventListener('click',()=>{if(item)inspectEffect(item,kind,color)})
+  el('equip-preview').onclick=()=>void submit('/economy/equip',{slot:`${layer}-${kind}`,uid}).then(()=>message('collection-status','Animation updated.')).catch(report)
+  el('inventory-grid').querySelectorAll<HTMLElement>('[data-preview]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.preview===preview)))
+  return
+ }
  const primary=slot==='icon'?'icon':'skin',secondary=slot==='icon'?'frame':'shape',first=draftAppearance(primary),second=draftAppearance(secondary)
  const fullDesign=KINDS.every(k=>state.wallet.inventory.some(o=>covers(o,first,k)&&!o.pending&&!o.listed))
  const unchanged=first===currentAppearance(primary)&&second===currentAppearance(secondary),firstUid=ownedId(first),secondUid=ownedId(second)
@@ -161,7 +177,7 @@ function renderPreview(){
  el('equipment-preview').style.setProperty('--rarity',item?RARITY_COLORS[item.rarity]:'#a9c486')
  const largeArt=slot==='icon'?framedAvatar(first,second):pieceIcon(kind,color,210,first,second)
  const name=(value:string,fallback:string)=>itemById(value)?.name??fallback
- el('equipment-preview').innerHTML=`<div class="preview-canvas"><span class="preview-stage-label">${slot==='icon'?'PLAYER IDENTITY':NAMES[kind].toUpperCase()}</span>${largeArt}<span class="preview-plinth"></span></div>${slot!=='icon'?`<div class="preview-colors">${PLAYERS.map(p=>`<button type="button" data-color="${p}" style="--faction:${COLORS[p]}" aria-label="${p} variant" aria-pressed="${p===color}"></button>`).join('')}</div>`:'<div style="height:20px"></div>'}<div class="look-summary"><span><small>${primary==='icon'?'ICON':'SKIN'}</small><strong>${name(first,primary==='icon'?'Player':'Classic')}</strong></span><b>+</b><span><small>${secondary==='frame'?'FRAME':'OUTLINE'}</small><strong>${name(second,secondary==='frame'?'No frame':'Classic')}</strong></span></div><h2>${slot==='icon'?'Player icon':NAMES[kind]}</h2>${slot!=='icon'?`<div class="preview-set-roster">${KINDS.map(k=>`<span title="${NAMES[k]}">${pieceIcon(k,color,40,k===kind?first:currentAppearance('skin',k),k===kind?second:shapeFor(k))}</span>`).join('')}</div>`:''}<div class="equip-actions"><button class="button primary" id="equip-preview" type="button" ${!usable||unchanged?'disabled':''}>${unchanged?'Equipped':!usable?owned?.pending?'Keep or refund below':'Item unavailable':'Equip look'}</button>${slot!=='icon'&&layer==='skin'?`<button class="button" id="equip-set" type="button" ${!fullDesign||KINDS.every(k=>(state.wallet.loadout.pieces[k]??'default')===first)?'disabled':''}>${KINDS.every(k=>(state.wallet.loadout.pieces[k]??'default')===first)?'Full set equipped':'Equip full skin set'}</button>`:''}</div>`
+ el('equipment-preview').innerHTML=`<div class="preview-canvas"><span class="preview-stage-label">${slot==='icon'?'PLAYER IDENTITY':NAMES[kind].toUpperCase()}</span>${largeArt}<span class="preview-plinth"></span></div>${slot!=='icon'?`<div class="preview-colors">${PLAYERS.map(p=>`<button type="button" data-color="${p}" style="--faction:${COLORS[p]}" aria-label="${p} variant" aria-pressed="${p===color}"></button>`).join('')}</div>`:'<div style="height:20px"></div>'}<div class="look-summary"><span><small>${primary==='icon'?'ICON':'SKIN'}</small><strong>${name(first,primary==='icon'?'Player':'Classic')}</strong></span><b>+</b><span><small>${secondary==='frame'?'FRAME':'OUTLINE'}</small><strong>${name(second,secondary==='frame'?'No frame':'Classic')}</strong></span></div><h2>${slot==='icon'?'Player icon':NAMES[kind]}</h2><div class="equip-actions"><button class="button primary" id="equip-preview" type="button" ${!usable||unchanged?'disabled':''}>${unchanged?'Equipped':!usable?owned?.pending?'Keep or refund below':'Item unavailable':'Equip look'}</button>${slot!=='icon'&&layer==='skin'?`<button class="button" id="equip-set" type="button" ${!fullDesign||KINDS.every(k=>(state.wallet.loadout.pieces[k]??'default')===first)?'disabled':''}>${KINDS.every(k=>(state.wallet.loadout.pieces[k]??'default')===first)?'Full set equipped':'Equip full skin set'}</button>`:''}</div>`
  el('equipment-preview').querySelectorAll<HTMLButtonElement>('[data-color]').forEach(b=>b.onclick=()=>{color=b.dataset.color as Player;renderInventory()})
  el('equip-preview').onclick=()=>void submit('/economy/equip-look',{target:slot,primary:firstUid,secondary:secondUid}).then(()=>message('collection-status','Appearance updated.')).catch(report)
  el('equip-set')?.addEventListener('click',()=>void submit('/economy/equip-design',{itemId:first}).then(()=>{for(const k of KINDS)appearanceDrafts.delete(`${k}:skin`);message('collection-status','Full skin set equipped.')}).catch(report))
@@ -186,20 +202,39 @@ function renderInventory(){
  const grouped=new Map<string,OwnedItem[]>()
  for(const owned of state.wallet.inventory){const item=itemById(owned.itemId);if(!item||item.type!==type||slot!=='icon'&&owned.kind&&owned.kind!==slot)continue;const group=grouped.get(item.id)??[];group.push(owned);grouped.set(item.id,group)}
  const groups=[...grouped.entries()].filter(([id,copies])=>{const item=itemById(id)!;return (rarity==='all'||item.rarity===rarity)&&(!search||item.name.toLowerCase().includes(search))&&(status==='all'||status==='duplicates'&&copies.length>1||status==='attention'&&copies.some(o=>o.pending||o.listed))}).sort(([a,ac],[b,bc])=>Number(bc.some(o=>o.pending))-Number(ac.some(o=>o.pending))||RARITIES.indexOf(itemById(b)!.rarity)-RARITIES.indexOf(itemById(a)!.rarity)||itemById(a)!.name.localeCompare(itemById(b)!.name))
- el('inventory-summary').textContent=`${state.wallet.inventory.length} cosmetic copies · ${new Set(state.wallet.inventory.map(o=>o.itemId)).size} designs · ${state.wallet.cases?.length??0} unopened cases`
- el('armory-title').textContent=type==='skin'?`${NAMES[slot as Kind]} skins`:type==='shape'?`${NAMES[slot as Kind]} outlines`:type==='frame'?'Icon frames':'Player icons';el('armory-count').textContent=`${groups.length} designs`
+ const pendingCount=state.wallet.inventory.filter(o=>o.pending).length,caseCount=state.wallet.cases?.length??0
+ el('inventory-attention').hidden=!pendingCount
+ el('inventory-attention-text').textContent=`${pendingCount} ${pendingCount===1?'reward needs':'rewards need'} your decision`
+ el('inventory-case-count').hidden=!caseCount
+ el('inventory-case-count').textContent=String(caseCount)
+ el('inventory-clear-filters').hidden=rarity==='all'&&!search&&status==='all'
+ el('armory-title').textContent=type==='skin'?`${NAMES[slot as Kind]} skins`:type==='shape'?`${NAMES[slot as Kind]} outlines`:type==='frame'?'Icon frames':type==='movement'?`${NAMES[slot as Kind]} movement`:type==='capture'?`${NAMES[slot as Kind]} kills`:'Player icons';el('armory-count').textContent=`${groups.length} ${groups.length===1?'design':'designs'}`
  el('equipment-slots').innerHTML=[...KINDS,'icon'].map(k=>`<button type="button" data-slot="${k}" aria-pressed="${slot===k}">${k==='icon'?framedAvatar(state.wallet.loadout.icon,state.wallet.loadout.frame):pieceIcon(k as Kind,color,32,state.wallet.loadout.pieces[k as Kind]??'default',shapeFor(k as Kind))}<span>${k==='icon'?'Player icon':NAMES[k as Kind]}</span></button>`).join('')
  el('equipment-slots').querySelectorAll<HTMLButtonElement>('[data-slot]').forEach(b=>b.onclick=()=>{slot=b.dataset.slot as typeof slot;layer=slot==='icon'?(layer==='frame'?'frame':'icon'):(layer==='shape'?'shape':'skin');preview=ownedId(draftAppearance(layer))??'default';renderInventory()})
- const layers:ItemType[]=slot==='icon'?['icon','frame']:['skin','shape']
- el('inventory-layers').innerHTML=layers.map(l=>`<button type="button" data-layer="${l}" aria-pressed="${layer===l}">${l==='shape'?'Outline / shape':l==='skin'?'Skin':l==='frame'?'Animated frame':'Icon'}</button>`).join('')
+ const layers:ItemType[]=slot==='icon'?['icon','frame']:['skin','shape','movement','capture']
+ el('inventory-layers').innerHTML=layers.map(l=>`<button type="button" data-layer="${l}" aria-pressed="${layer===l}">${l==='shape'?'Outline':l==='skin'?'Skin':l==='frame'?'Animated frame':l==='movement'?'Movement':l==='capture'?'Kill':'Icon'}</button>`).join('')
  el('inventory-layers').querySelectorAll<HTMLButtonElement>('[data-layer]').forEach(b=>b.onclick=()=>chooseLayer(b.dataset.layer as ItemType))
- const defaultName=type==='frame'?'No frame':type==='icon'?'Player':'Classic pieces'
- el('inventory-grid').innerHTML=`<article class="owned-card" style="--rarity:#a9c486"><button class="preview-item" type="button" data-preview="default"><span class="item-picture">${previewArt('default',slot==='icon'?'N':slot)}</span><strong>${defaultName}</strong></button><small class="copy-tag">${equipped==='default'?'Equipped':'Default'}</small></article>`+groups.map(([id,copies])=>{
+ const query=[slot,type,rarity,search,status].join('|')
+ if(query!==inventoryQuery){inventoryPage=0;inventoryQuery=query}
+ const width=el('inventory-grid').clientWidth,minimum=innerWidth<=600?94:128,gap=innerWidth<=600?7:8
+ const columns=width?Math.max(1,Math.floor((width+gap)/(minimum+gap))):Math.max(1,inventoryColumns||2)
+ inventoryColumns=columns
+ const defaultName=type==='frame'?'No frame':type==='icon'?'Player':type==='movement'||type==='capture'?'Classic animation':'Classic pieces'
+ const defaultCard=(rarity==='all'&&!search&&status==='all'?`<article class="owned-card" style="--rarity:#a9c486"><button class="preview-item" type="button" data-preview="default"><span class="item-picture">${type==='movement'||type==='capture'?pieceIcon(slot as Kind,color,60):previewArt('default',slot==='icon'?'N':slot)}</span><strong>${defaultName}</strong></button><small class="copy-tag">${equipped==='default'?'Equipped':'Default'}</small></article>`:'')
+ const cards=groups.map(([id,copies])=>{
   const item=itemById(id)!,available=copies.find(o=>!o.pending&&!o.listed),pending=copies.find(o=>o.pending),owned=available??pending??copies[0]
-  return `<article class="owned-card ${equipped===id?'equipped-card':''}" style="--rarity:${RARITY_COLORS[item.rarity]}"><button class="preview-item" type="button" data-preview="${owned.uid}"><span class="item-picture">${previewArt(id,slot==='icon'?'N':slot)}</span><small class="rarity-label">${item.rarity}${item.monthly?' &middot; SEASONAL':''}</small><strong>${item.name}</strong></button><small class="copy-tag ${pending?'pending':''}">${pending?'Duplicate choice waiting':equipped===id?'Equipped &middot; ':''}${copies.length} ${copies.length===1?'copy':'copies'}</small>${pending?`<button class="button" type="button" data-manage="${id}">Choose reward</button>`:available?`<button class="button" type="button" data-sell="${available.uid}">Sell ${copies.length>1?'a copy':'copy'}</button>`:'<small class="copy-tag">Listed</small>'}${copies.length>1||copies.some(o=>o.listed)?`<button class="manage-copy-link" type="button" data-manage="${id}">Manage copies</button>`:''}</article>`
- }).join('')
- if(!groups.length)el('inventory-grid').insertAdjacentHTML('beforeend',`<div class="inventory-empty"><p>${grouped.size?'No matching designs.':'Your collection starts here.'}</p><a class="button" href="#shop">Explore shop</a></div>`)
- el('inventory-grid').querySelectorAll<HTMLButtonElement>('[data-preview]').forEach(b=>b.onclick=()=>{preview=b.dataset.preview!;appearanceDrafts.set(`${slot}:${layer}`,state.wallet.inventory.find(o=>o.uid===preview)?.itemId??'default');renderPreview()})
+  return `<article class="owned-card ${equipped===id?'equipped-card':''}" style="--rarity:${RARITY_COLORS[item.rarity]}"><button class="preview-item" type="button" data-preview="${owned.uid}"><span class="item-picture">${type==='movement'||type==='capture'?itemArt(item):previewArt(id,slot==='icon'?'N':slot)}</span><small class="rarity-label">${item.rarity}${item.monthly?' &middot; SEASONAL':''}</small><strong>${item.name}</strong></button><small class="copy-tag ${pending?'pending':''}">${pending?'Duplicate choice waiting':equipped===id?'Equipped &middot; ':''}${copies.length} ${copies.length===1?'copy':'copies'}</small><button class="manage-copy-link" type="button" data-manage="${id}">${pending?'Resolve reward':copies.some(o=>o.listed)?'Manage listing':'Manage copies'}</button></article>`
+ })
+ if(defaultCard)cards.unshift(defaultCard)
+ const pageCount=Math.max(1,Math.ceil(cards.length/(columns*2)))
+ inventoryPage=Math.min(inventoryPage,pageCount-1)
+ el('inventory-grid').innerHTML=cards.slice(inventoryPage*columns*2,(inventoryPage+1)*columns*2).join('')
+ el('inventory-pagination').hidden=pageCount<=1
+ el<HTMLButtonElement>('inventory-prev').disabled=inventoryPage===0
+ el<HTMLButtonElement>('inventory-next').disabled=inventoryPage>=pageCount-1
+ el('inventory-page-label').textContent=`${inventoryPage+1} / ${pageCount}`
+ if(!groups.length)el('inventory-grid').insertAdjacentHTML('beforeend',`<div class="inventory-empty"><strong>${grouped.size?'No designs found':'Nothing here yet'}</strong><p>${grouped.size?'Try another search or clear your filters.':'Explore the shop to find a look you love.'}</p>${grouped.size?'':'<a class="button" href="#shop">Explore shop</a>'}</div>`)
+ el('inventory-grid').querySelectorAll<HTMLButtonElement>('[data-preview]').forEach(b=>b.onclick=()=>{preview=b.dataset.preview!;appearanceDrafts.set(`${slot}:${layer}`,state.wallet.inventory.find(o=>o.uid===preview)?.itemId??'default');renderPreview();if(matchMedia('(max-width: 600px)').matches)el('equipment-preview').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'})})
  el('inventory-grid').querySelectorAll<HTMLButtonElement>('[data-manage]').forEach(b=>b.onclick=()=>manageCopies(b.dataset.manage!))
  el('inventory-grid').querySelectorAll<HTMLButtonElement>('[data-sell]').forEach(b=>b.onclick=()=>sell(b.dataset.sell!))
  renderPreview()
@@ -211,9 +246,24 @@ function renderOwnedCases(){
 }
 function renderSets(){
  if(inventoryTab!=='sets')return
- const rows=SETS.filter(s=>(!setSearch||s.name.toLowerCase().includes(setSearch))&&(!setsOnlyComplete||planSet(state.wallet.inventory,s).complete))
- el('set-summary').textContent=`${SETS.filter(s=>planSet(state.wallet.inventory,s).complete).length} complete / ${SETS.length} Sets · Listed and pending copies are unavailable until released.`
- el('set-grid').innerHTML=rows.slice(0,setLimit).map(s=>{const p=planSet(state.wallet.inventory,s),requirements=setRequirements(s);return `<article class="set-card ${p.complete?'set-complete':''}" style="--rarity:${RARITY_COLORS[itemById(s.itemId)!.rarity]}"><div class="set-card-art">${setArt(s)}</div><span class="rarity-label">${s.outlineId&&s.skinId?'SKINS + REQUIRED OUTLINES':s.skinId?'SKIN SET':'OUTLINE SET'}</span><h3>${s.name}</h3><progress value="${p.collected}" max="${p.total}" aria-label="${s.name} completion"></progress><p>${p.collected} / ${p.total} pieces available</p><div class="set-piece-grid">${requirements.map(r=>{const has=state.wallet.inventory.some(o=>covers(o,r.itemId,r.kind)&&!o.pending&&!o.listed);return `<span class="${has?'collected':'missing'}" title="${NAMES[r.kind]} ${itemById(r.itemId)!.type==='skin'?'skin':'outline'} · ${has?'collected':'missing'}">${itemArt(itemById(r.itemId)!,28,r.kind)}</span>`}).join('')}</div><div class="set-card-actions"><button class="button" type="button" data-equip-collection="${s.id}" ${!p.complete?'disabled':''}>Equip Set</button><button class="button primary" type="button" data-sell-set="${s.id}" ${!p.complete?'disabled':''}>Sell complete Set</button></div></article>`}).join('')||'<p class="market-empty">No Sets match these filters.</p>'
+ const entries=SETS.map(set=>{
+  const requirements=setRequirements(set),plan=planSet(state.wallet.inventory,set)
+  const owned=requirements.filter(r=>state.wallet.inventory.some(o=>covers(o,r.itemId,r.kind))).length
+  return {set,requirements,plan,owned}
+ })
+ const rows=entries.filter(({set,plan,owned})=>(!setSearch||set.name.toLowerCase().includes(setSearch))&&(setType==='all'||setType==='combined'&&!!set.skinId&&!!set.outlineId||setType==='skin'&&!!set.skinId&&!set.outlineId||setType==='outline'&&!!set.outlineId&&!set.skinId)&&(setProgress==='all'||setProgress==='started'&&owned>0||setProgress==='complete'&&plan.complete||setProgress==='unstarted'&&owned===0))
+  .sort((a,b)=>Number(b.owned>0)-Number(a.owned>0)||b.owned/b.requirements.length-a.owned/a.requirements.length||a.set.name.localeCompare(b.set.name))
+ const visible=rows.slice(0,setLimit)
+ el('set-summary').textContent=`${entries.filter(e=>e.owned>0).length} started / ${SETS.length} sets - ${entries.filter(e=>e.plan.complete).length} ready to equip`
+ let lastGroup=''
+ el('set-grid').innerHTML=visible.map(({set:s,plan:p,requirements,owned})=>{
+  const group=owned?'In your collection':'Not started',heading=group!==lastGroup?`<h3 class="set-group-heading">${group}</h3>`:'';lastGroup=group
+  return `${heading}<article class="set-card ${p.complete?'set-complete':''} ${owned?'':'set-unstarted'}" data-set-id="${s.id}" data-owned-progress="${owned}" style="--rarity:${RARITY_COLORS[itemById(s.itemId)!.rarity]}"><div class="set-card-art">${setArt(s)}</div><span class="rarity-label">${s.outlineId&&s.skinId?'SKINS + REQUIRED OUTLINES':s.skinId?'SKIN SET':'OUTLINE SET'}</span><h3>${s.name}</h3><progress value="${owned}" max="${p.total}" aria-label="${s.name} collected"></progress><p>${owned} / ${p.total} pieces collected${owned!==p.collected?` - ${p.collected} available`:''}</p><div class="set-piece-grid">${requirements.map(r=>{
+   const copies=state.wallet.inventory.filter(o=>covers(o,r.itemId,r.kind)),available=copies.some(o=>!o.pending&&!o.listed)
+   const status=available?'Collected':copies.length?'Unavailable':'Missing'
+   return `<span class="${available?'collected':copies.length?'unavailable':'missing'}" title="${NAMES[r.kind]} ${itemById(r.itemId)!.type==='skin'?'skin':'outline'} - ${status}" aria-label="${NAMES[r.kind]} ${itemById(r.itemId)!.type==='skin'?'skin':'outline'}: ${status}">${itemArt(itemById(r.itemId)!,28,r.kind)}</span>`
+  }).join('')}</div><div class="set-card-actions"><button class="button" type="button" data-equip-collection="${s.id}" ${!p.complete?'disabled':''}>Equip Set</button><button class="button primary" type="button" data-sell-set="${s.id}" ${!p.complete?'disabled':''}>Sell complete Set</button></div></article>`
+ }).join('')||'<p class="market-empty">No Sets match these filters.</p>'
  el('set-more').hidden=rows.length<=setLimit
  el('set-grid').querySelectorAll<HTMLButtonElement>('[data-equip-collection]').forEach(b=>b.onclick=()=>void submit('/economy/equip-collection',{setId:b.dataset.equipCollection}).then(()=>message('collection-status','Complete Set equipped.')).catch(report))
  el('set-grid').querySelectorAll<HTMLButtonElement>('[data-sell-set]').forEach(b=>b.onclick=()=>sellSet(b.dataset.sellSet!))
@@ -249,13 +299,15 @@ function render(){renderShop();renderInventory();renderMarket();renderSets();ren
 function route(){
  const view=['shop','inventory','market'].includes(location.hash.slice(1))?location.hash.slice(1):'shop'
  document.querySelectorAll<HTMLElement>('.collection-view').forEach(v=>v.hidden=v.id!==view)
- document.querySelectorAll<HTMLAnchorElement>('.collection-tabs a').forEach(a=>{if(a.hash==='#'+view)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')})
+ document.querySelectorAll<HTMLAnchorElement>('.collection-tabs a').forEach(a=>{a.hidden=view==='inventory'&&a.hash==='#inventory';if(a.hash==='#'+view)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')})
  el('shop-filters').hidden=view!=='shop'
+ el('inventory-subtabs').hidden=view!=='inventory'
  el('collection-title').textContent=view==='shop'?'Shop':view==='inventory'?'Inventory':'Market'
  el('collection-intro').textContent=view==='shop'?'Find your next signature piece.':view==='inventory'?'Your collection. Your pieces. Your style.':'A new home for every extra copy.'
  document.title=`${el('collection-title').textContent} · 5D Chess`
  if(view==='shop'&&!shopVisited){shopVisited=true;showWelcome=!state.wallet.shopSeen;el('starter-note').hidden=!showWelcome;void api('/economy/visit-shop',{}).then(()=>{state.wallet.shopSeen=true}).catch(report)}else if(view!=='shop'){showWelcome=false;el('starter-note').hidden=true}
  if(view==='shop')applyShopFilter()
+ if(view==='inventory')requestAnimationFrame(()=>renderInventory())
  if(view==='market')void loadMarket().catch(report)
 }
 async function init(){
@@ -265,9 +317,15 @@ async function init(){
  bindShop()
  document.querySelectorAll<HTMLButtonElement>('[data-inventory-tab]').forEach(b=>b.onclick=()=>{inventoryTab=b.dataset.inventoryTab!;el('inventory-equipment').hidden=inventoryTab!=='equipment';el('set-collection').hidden=inventoryTab!=='sets';el('owned-cases').hidden=inventoryTab!=='cases';el('animation-collection').hidden=inventoryTab!=='effects';document.querySelectorAll('[data-inventory-tab]').forEach(t=>t.setAttribute('aria-pressed',String(t===b)));if(inventoryTab==='sets')renderSets();if(inventoryTab==='cases')renderOwnedCases();if(inventoryTab==='effects')renderEffects()})
  el('set-search').oninput=()=>{setSearch=el<HTMLInputElement>('set-search').value.trim().toLowerCase();setLimit=18;renderSets()}
- el('sets-complete').onchange=()=>{setsOnlyComplete=el<HTMLInputElement>('sets-complete').checked;setLimit=18;renderSets()}
+ el('set-type').onchange=()=>{setType=el<HTMLSelectElement>('set-type').value;setLimit=18;renderSets()}
+ el('set-progress').onchange=()=>{setProgress=el<HTMLSelectElement>('set-progress').value;setLimit=18;renderSets()}
  el('set-more').onclick=()=>{setLimit+=18;renderSets()}
  for(const id of ['inventory-rarity','market-rarity'])for(const rarity of RARITIES){const option=document.createElement('option');option.value=rarity;option.textContent=rarity[0].toUpperCase()+rarity.slice(1);el(id).append(option)}
+ el('inventory-clear-filters').onclick=()=>{el<HTMLInputElement>('inventory-search').value='';el<HTMLSelectElement>('inventory-rarity').value='all';el<HTMLSelectElement>('inventory-status').value='all';renderInventory()}
+ el('inventory-show-attention').onclick=()=>{const pending=state.wallet.inventory.find(o=>o.pending);if(pending)manageCopies(pending.itemId)}
+ el('inventory-prev').onclick=()=>{inventoryPage--;renderInventory()}
+ el('inventory-next').onclick=()=>{inventoryPage++;renderInventory()}
+ new ResizeObserver(()=>{const width=el('inventory-grid').clientWidth,min=innerWidth<=600?94:128,gap=innerWidth<=600?7:8;const columns=width?Math.max(1,Math.floor((width+gap)/(min+gap))):0;if(columns&&columns!==inventoryColumns)renderInventory()}).observe(el('inventory-grid'))
  el('inventory-rarity').onchange=renderInventory
  el('inventory-status').onchange=renderInventory
  el('inventory-search').oninput=renderInventory

@@ -37,12 +37,12 @@ test('Live dimensional routes pass intervening occupied boards while spatial and
  now[index(c(5,6))]={player:'yellow',kind:'P',moved:true}
  assert.equal(legalMoves(s,c(5,5,2),c(5,7,2)).length,0)
 })
-test('dimensional arrival still trades with an occupied destination',()=>{
+test('dimensional arrival captures an occupied destination and survives',()=>{
  const s=sparse(),now=[...s.universes[0].boards[0].cells],old=[...now]
  now[index(c(5,5))]={player:'red',kind:'R',moved:true};old[index(c(5,5))]={player:'yellow',kind:'B',moved:true}
  s.universes[0].boards=[{t:0,cells:old,enPassant:[]},{t:1,cells:now,enPassant:[]}]
  const r=resolveRound(s,[move(s,c(5,5,1),c(5,5,0))],{partial:true})
- assert.equal(r.outcomes[0].status,'collided');assert.equal(frontier(r.state.universes.at(-1)).cells[index(c(5,5))],null)
+ assert.equal(r.outcomes[0].status,'applied');assert.equal(frontier(r.state.universes.at(-1)).cells[index(c(5,5))].kind,'R')
 })
 test('opposing dimensional travellers collide on a shared connection regardless of drawn row spacing',()=>{
  const s=sparse(),root=s.universes[0];root.boards[0].cells[index(c(5,5))]={player:'red',kind:'R',moved:true}

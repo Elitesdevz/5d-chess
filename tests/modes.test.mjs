@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {initialState,index,frontier,present,boardTurn,activation,players} from '../src/model.ts'
 import {legalMoves} from '../src/moves.ts'
 import {resolveRound,sourceBudget} from '../src/resolve.ts'
+import {resolveLive} from '../src/continuous.ts'
 import {requiredBoards} from '../src/rules.ts'
 import {layoutOf,squarePoint} from '../src/geometry.ts'
 const c=(x,y,t=0,u=0)=>({x,y,t,u})
@@ -27,16 +28,16 @@ test('Classic enforces its persisted player order, board owners, and Present obl
  s=result.state;assert.equal(s.turn,'red');assert.equal(boardTurn(s,s.universes[0]),'red');assert.equal(present(s),1)
 })
 
-test('Live catches a bishop with an instant knight block; both disappear',()=>{
+test('Live bishop captures a stationary knight and stops before the king',()=>{
  const s=setup([[3,3,'yellow','B'],[8,8,'red','K'],[4,7,'red','N'],[10,3,'yellow','K']])
  const attack=move(s,c(3,3),c(8,8)),block=move(s,c(4,7),c(5,5))
  const r=resolveRound(s,[attack,block])
  assert.equal(r.rejected.length,0)
- assert.equal(r.outcomes.filter(o=>o.status==='collided').length,2)
+ assert.equal(r.outcomes.filter(o=>o.status==='collided').length,1)
  assert.ok(!r.eliminated.includes('red'))
- assert.equal(frontier(r.state.universes[0]).cells[index(c(5,5))],null)
+ assert.equal(frontier(r.state.universes[0]).cells[index(c(5,5))].kind,'B')
  assert.equal(frontier(r.state.universes[0]).cells[index(c(8,8))].kind,'K')
- assert.ok(r.travel.some(t=>t.piece.kind==='B'&&t.collision&&t.endTick>0))
+ assert.ok(r.travel.some(t=>t.piece.kind==='B'&&!t.collision&&t.endTick>0))
 })
 
 test('faster pieces cross and collide between ticks, and traces use the displayed geometry',()=>{
@@ -49,6 +50,18 @@ test('faster pieces cross and collide between ticks, and traces use the displaye
    assert.deepEqual({x:trace.points.at(-1).x,y:trace.points.at(-1).y},end)
    assert.ok(Number.isFinite(trace.endTick))
  }
+})
+
+test('friendly moving pieces bounce to distinct nearby open squares and replay deterministically',()=>{
+ const s=setup([[3,5,'red','R'],[7,5,'red','R'],[3,10,'red','K'],[10,3,'yellow','K']])
+ const orders=[move(s,c(3,5),c(6,5)),move(s,c(7,5),c(4,5))]
+ const result=resolveLive(s,orders,[]),again=resolveLive(s,orders,[])
+ assert.deepEqual(result,again)
+ assert.ok(result.outcomes.every(o=>o.status==='applied'&&o.captures.length===0))
+ assert.equal(frontier(result.state.universes[0]).cells.filter(p=>p?.player==='red'&&p.kind==='R').length,2)
+ const arrivals=result.travel.map(t=>t.to)
+ assert.notDeepEqual(arrivals[0],arrivals[1])
+ for(const trace of result.travel){assert.ok(Math.hypot(trace.to.x-5,trace.to.y-5)<=3);assert.ok(trace.endTick>trace.points.at(-2).tick)}
 })
 
 test('shared branches merge historical destinations, retain all owners, and pull Present backward',()=>{
@@ -109,11 +122,11 @@ test('new movement sessions round-trip their fixed order, plans and journals',as
  }
 })
 
-test('plan safety warns if a physical king capture would also destroy your own king',async()=>{
+test('a king can capture a stationary piece without being destroyed',async()=>{
  const {awareness}=await import('../src/awareness.ts')
  const s=setup([[7,7,'red','K'],[8,8,'yellow','N'],[10,3,'yellow','K']])
  const capture=move(s,c(7,7),c(8,8))
- assert.equal(awareness(s,'red',[capture]).kingLost,true)
+ assert.equal(awareness(s,'red',[capture]).kingLost,false)
 })
 
 test('a slower, late queen block can miss the bishop and lose its king',()=>{
@@ -122,7 +135,7 @@ test('a slower, late queen block can miss the bishop and lose its king',()=>{
  assert.equal(r.rejected.length,0)
  assert.ok(r.eliminated.includes('red'))
  assert.equal(r.outcomes.find(o=>o.move.piece.kind==='Q').status,'applied')
- assert.equal(r.outcomes.find(o=>o.move.piece.kind==='B').status,'collided')
+ assert.equal(r.outcomes.find(o=>o.move.piece.kind==='B').status,'applied')
 })
 
 test('a Live batch cannot skip another faction’s required Present source',()=>{

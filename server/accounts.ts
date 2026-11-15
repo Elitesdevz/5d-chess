@@ -8,7 +8,11 @@ import {type Notice,type Preferences,type Profile,type Rating,type RatingPool,PO
 export interface Account extends EconomicAccount {puzzleCompleted?:number[]; aiDaily?:AiDaily; publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
 export interface RatingChange {before: number; after: number; delta: number}
 export interface RatedRoom {code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
+export function pruneNotices(account: Account, now=Date.now()) {
+  if (account.notifications) account.notifications=account.notifications.filter(n=>n.permanent || (n.kind==='casino' && /received .* coins \(1% of profit\)/.test(n.detail)) || n.created>now-3*24*60*60*1000)
+}
 export function ensureAccount(account: Account) {
+  pruneNotices(account)
   account.rating ??= {value:1200,games:0}
   wallet(account)
   account.settings ??= {avatar:'default',movement:'live',players:2,moveNotifications:true}
@@ -29,7 +33,7 @@ export function notify(account: Account, notice: Omit<Notice,'id'|'created'|'rea
   const u=ensureAccount(account)
   if (!u.settings.moveNotifications && !['rating','result','casino'].includes(notice.kind)) return
   u.notifications.unshift({...notice,id:randomBytes(12).toString('hex'),created:Date.now(),read:false})
-  u.notifications.length=Math.min(u.notifications.length,100)
+
 }
 export function startRatings(room: RatedRoom, accounts: Account[]) {
   if (room.state.movement !== 'live' || !room.rated || room.ratingStart || Object.keys(room.seats).length!==playerCount(room.state)) return

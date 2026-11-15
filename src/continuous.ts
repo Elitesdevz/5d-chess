@@ -1,6 +1,6 @@
 import {
   type Board, type Candidate, type Coord, type EnPassant, type Kind, type Outcome, type Piece, type Player, type Resolution, type State, type Travel, type TravelPoint, type Universe,
-  activation, boardKey, frontier, getBoard, index, isMain, playerCount, players, present, promotes, sameBoard
+  activation, boardKey, frontier, getBoard, index, insideState, isMain, playerCount, players, present, promotes, sameBoard
 } from './model.ts'
 import {layoutOf, moveGeometry, squarePoint} from './geometry.ts'
 import {requiredBoards} from './rules.ts'
@@ -13,7 +13,7 @@ export const SPEEDS: Record<Kind, {normal: number; dimensional: number}> = {
 }
 type Draft = {t: number; cells: (Piece | null)[]; enPassant: EnPassant[]}
 interface Segment {space: string; start: number; end: number; a: number[]; b: number[]}
-interface Body {segments: Segment[]; piece: Piece; at: Coord; points: TravelPoint[]; alive: boolean; out?: Outcome; trace?: Travel; draft?: Draft}
+interface Body {segments: Segment[]; piece: Piece; at: Coord; points: TravelPoint[]; alive: boolean; stopped?: boolean; bounced?: boolean; out?: Outcome; trace?: Travel; draft?: Draft}
 const EPS = 1e-7
 export function travelPosition(points: readonly TravelPoint[], tick: number) {
   let previous = points[0]
@@ -27,11 +27,11 @@ export function travelPosition(points: readonly TravelPoint[], tick: number) {
   return {x: previous.x, y: previous.y}
 }
 /** Physics uses logical board/connection coordinates, never rendered timeline rows. */
-function contact(a: Body, b: Body, end: number): number | undefined {
+function contact(a: Body, b: Body, end: number, after=0): number | undefined {
   let earliest = Infinity
   for (const A of a.segments) for (const B of b.segments) {
     if (A.space !== B.space) continue
-    const start = Math.max(A.start, B.start), stop = Math.min(A.end, B.end, end + 1)
+    const start = Math.max(A.start, B.start, after), stop = Math.min(A.end, B.end, end + 1)
     if (stop < start) continue
     const position = (s: Segment, t: number) => s.a.map((v, i) => v + (s.b[i] - v) * (Number.isFinite(s.end) && s.end > s.start ? (t - s.start) / (s.end - s.start) : 0))
     const x = position(A, start).map((v, i) => v - position(B, start)[i])
@@ -135,43 +135,144 @@ export function resolveLive(s: State, valid: Candidate[], rejected: Resolution['
       bodies.push({piece, at, segments: [{space: boardSpace(at), start: 0, end: Infinity, a: local(at), b: local(at)}], points: [{...squarePoint(staged, at, layout), tick: 0}], alive: true, draft})
     }
   }
-  const ticks = Math.max(0, ...travel.map(t => t.endTick)), dead = new Set<Player>()
-  const events: {tick: number; a: Body; b: Body}[] = []
-  for (let a = 0; a < bodies.length; a++) for (let b = a + 1; b < bodies.length; b++) {
-    if ((!bodies[a].out && !bodies[b].out) || (bodies[a].out && bodies[a].out === bodies[b].out)) continue
-    const tick = contact(bodies[a], bodies[b], ticks)
-    if (tick !== undefined) events.push({tick, a: bodies[a], b: bodies[b]})
-  }
-  events.sort((a, b) => a.tick - b.tick)
-  for (let i = 0; i < events.length;) {
-    const tick = events[i].tick, contacts: typeof events = []
-    while (i < events.length && Math.abs(events[i].tick - tick) < EPS) { const event = events[i++]; if (event.a.alive && event.b.alive) contacts.push(event) }
-    const hit = new Set<Body>()
-    for (const {a, b} of contacts) {
-      hit.add(a); hit.add(b)
-      if (a.out) a.out.captures.push({at: b.at, piece: b.piece})
-      if (b.out) b.out.captures.push({at: a.at, piece: a.piece})
-    }
-    for (const body of hit) {
-      body.alive = false
-      if (body.piece.kind === 'K') dead.add(body.piece.player)
-      if (body.out) body.out.status = 'collided'
-      if (body.trace) { body.trace.endTick = tick; body.trace.collision = true }
-      else if (body.draft) {
-        body.draft.cells[index(body.at)] = null
-        travel.push({piece: body.piece, from: body.at, to: body.at, points: body.points, distance: 0, normalSpeed: 0, dimensionalSpeed: 0, endTick: tick, collision: true})
+  let ticks = Math.max(0, ...travel.map(t => t.endTick))
+  const dead = new Set<Player>(), bounceGrace = new Map<string,number>()
+  const pairKey=(a:Body,b:Body)=>[bodies.indexOf(a),bodies.indexOf(b)].sort((x,y)=>x-y).join(':')
+  const activeSegment=(body:Body,tick:number)=>body.segments.find(seg=>seg.start<=tick+EPS&&seg.end>=tick-EPS&&Number.isFinite(seg.end)&&seg.end>seg.start)
+  const location=(seg:Segment,tick:number)=>seg.a.map((value,i)=>value+(seg.b[i]-value)*Math.max(0,Math.min(1,(tick-seg.start)/(seg.end-seg.start))) )
+  function returnToSources(a:Body,b:Body,tick:number){
+    let end=tick
+    for(const body of [a,b]){
+      const trace=body.trace!,source=drafts.get(trace.from.u)
+      if(!source)return false
+      const destination={...trace.from,t:source.t},before=body.points.filter(p=>p.tick<tick),nowPoint=travelPosition(body.points,tick)
+      const segments=body.segments.filter(part=>Number.isFinite(part.end)&&part.start<tick).reverse()
+      const oldPoints=[...before].reverse(),returned:TravelPoint[]=[{...nowPoint,tick}],path:Segment[]=[]
+      let cursor=tick
+      for(const seg of segments){
+        const at=Math.min(tick,seg.end),current=location(seg,at),length=at-seg.start
+        if(length<=EPS)continue
+        path.push({space:seg.space,start:cursor,end:cursor+length,a:current,b:seg.a});cursor+=length
       }
+      for(const point of oldPoints){const when=tick+(tick-point.tick);returned.push({...point,tick:when})}
+      if(cursor<=tick+EPS){
+        const length=Math.max(.05,Math.hypot(body.at.x-destination.x,body.at.y-destination.y)/(SPEEDS[body.piece.kind].normal||3))
+        path.push({space:boardSpace(destination),start:tick,end:tick+length,a:local(body.at),b:local(destination)});cursor=tick+length
+      }
+      returned.push({...squarePoint(staged,destination,layout),tick:cursor})
+      body.points.splice(0,body.points.length,...before,...returned)
+      body.at=destination;body.draft=source;body.bounced=true;body.stopped=false
+      body.segments=[...path,{space:boardSpace(destination),start:cursor,end:Infinity,a:local(destination),b:local(destination)}]
+      trace.to=destination;trace.endTick=cursor;end=Math.max(end,cursor)
     }
+    ticks=Math.max(ticks,end);bounceGrace.set(pairKey(a,b),end+EPS);return true
+  }
+  function bounce(a:Body,b:Body,tick:number){
+    const ordered=[a,b].sort((x,y)=>{const ax=x.trace!.from,by=y.trace!.from;return ax.u-by.u||ax.t-by.t||ax.y-by.y||ax.x-by.x})
+    const segments=ordered.map(body=>activeSegment(body,tick))
+    const board=segments[0]?.space.match(/^board:(\d+):(\d+)$/)
+    if(!board||segments[1]?.space!==segments[0]?.space)return returnToSources(a,b,tick)
+    const u=Number(board[1]),t=Number(board[2]),draft=drafts.get(u)??branches.find(branch=>branch.id===u)?.boards[0] as Draft|undefined
+    if(!draft)return returnToSources(a,b,tick)
+    const points=segments.map(seg=>location(seg!,tick)),centre=points[0].map((v,i)=>(v+points[1][i])/2)
+    const occupied=new Set<string>()
+    for(const body of bodies){
+      if(!body.alive||body===a||body===b)continue
+      const seg=body.segments.find(part=>part.space===segments[0]!.space&&part.start<=tick+EPS&&part.end>=tick-EPS)
+      if(!seg)continue
+      const pos=Number.isFinite(seg.end)&&seg.end>seg.start?location(seg,tick):seg.a
+      occupied.add(`${Math.round(pos[0]/32)},${Math.round(pos[1]/32)}`)
+    }
+    const candidates=(i:number)=>{
+      const origin=points[i],list:Coord[]=[]
+      for(let y=0;y<14;y++)for(let x=0;x<14;x++){
+        const dest={x,y,u,t}
+        if(!insideState(s,dest)||Math.hypot(x-centre[0]/32,y-centre[1]/32)>3+EPS||occupied.has(`${x},${y}`))continue
+        const steps=Math.ceil(Math.max(Math.abs(x-origin[0]/32),Math.abs(y-origin[1]/32))*4),seen=new Set<string>();let clear=true
+        for(let n=1;n<=steps;n++){
+          const sx=Math.round(origin[0]/32+(x-origin[0]/32)*n/steps),sy=Math.round(origin[1]/32+(y-origin[1]/32)*n/steps),key=`${sx},${sy}`
+          if(seen.has(key))continue;seen.add(key)
+          if(!insideState(s,{x:sx,y:sy})||occupied.has(key)){clear=false;break}
+        }
+        if(clear)list.push(dest)
+      }
+      // Stable pseudorandom ordering keeps resolution and save replays identical.
+      const seed=`${s.round}:${tick.toFixed(6)}:${ordered[i].trace!.from.u}:${ordered[i].trace!.from.t}:${ordered[i].trace!.from.x}:${ordered[i].trace!.from.y}`
+      const hash=(c:Coord)=>{let h=2166136261;for(const ch of `${seed}:${c.x}:${c.y}`)h=Math.imul(h^ch.charCodeAt(0),16777619);return h>>>0}
+      return list.sort((x,y)=>hash(x)-hash(y)||x.y-y.y||x.x-y.x)
+    }
+    const lists=ordered.map((_,i)=>candidates(i))
+    const duration=(i:number,c:Coord)=>Math.max(.05,Math.hypot(c.x*32-points[i][0],c.y*32-points[i][1])/(32*(SPEEDS[ordered[i].piece.kind].normal||3)))
+    let choice:Coord[]|undefined
+    for(const first of lists[0]){for(const second of lists[1]){
+      if(first.x===second.x&&first.y===second.y)continue
+      const hypothetical=ordered.map((body,i)=>{const dest=i?second:first,finish=tick+duration(i,dest);return {...body,segments:[{space:segments[i]!.space,start:tick,end:finish,a:points[i],b:local(dest)},{space:boardSpace(dest),start:finish,end:Infinity,a:local(dest),b:local(dest)}]}})
+      if(contact(hypothetical[0],hypothetical[1],tick+Math.max(duration(0,first),duration(1,second)),tick+0.0001)!==undefined)continue
+      choice=[first,second];break
+    }if(choice)break}
+    if(!choice){
+      choice=segments.map((seg,i)=>({x:Math.round(seg!.a[0]/32),y:Math.round(seg!.a[1]/32),u,t}))
+      if(choice.some(c=>!insideState(s,c))||(choice[0].x===choice[1].x&&choice[0].y===choice[1].y))return returnToSources(a,b,tick)
+    }
+    let end=tick
+    ordered.forEach((body,i)=>{
+      const dest=choice![i],finish=tick+duration(i,dest),at=travelPosition(body.points,tick)
+      body.points.splice(0,body.points.length,...body.points.filter(p=>p.tick<tick),{...at,tick},{...squarePoint(staged,dest,layout),tick:finish})
+      body.at=dest;body.draft=draft;body.bounced=true;body.stopped=false
+      body.segments=[{space:boardSpace(dest),start:tick,end:finish,a:points[i],b:local(dest)},{space:boardSpace(dest),start:finish,end:Infinity,a:local(dest),b:local(dest)}]
+      body.trace!.to=dest;body.trace!.endTick=finish;end=Math.max(end,finish)
+    })
+    ticks=Math.max(ticks,end);bounceGrace.set(pairKey(a,b),end+EPS)
+    return true
+  }
+  // Recompute contacts after a capture: a surviving attacker stops on the
+  // victim's square and may itself be hit by a later traveller.
+  let now=0
+  for (;;) {
+    const events: {tick:number; a:Body; b:Body}[]=[]
+    for(let a=0;a<bodies.length;a++)for(let b=a+1;b<bodies.length;b++){
+      const first=bodies[a],second=bodies[b]
+      if(!first.alive||!second.alive||(!first.out&&!second.out)||(first.out&&first.out===second.out))continue
+      const tick=contact(first,second,ticks,Math.max(now,bounceGrace.get(pairKey(first,second))??0))
+      if(tick===undefined)continue
+      const moving=(body:Body)=>!!body.trace&&!body.stopped&&tick<=body.trace.endTick+EPS
+      if(moving(first)||moving(second))events.push({tick,a:first,b:second})
+    }
+    if(!events.length)break
+    const tick=Math.min(...events.map(e=>e.tick)), contacts=events.filter(e=>Math.abs(e.tick-tick)<EPS),hit=new Set<Body>(),stops=new Map<Body,Body>()
+    const moving=(body:Body)=>!!body.trace&&!body.stopped&&tick<=body.trace.endTick+EPS
+    for(const {a,b} of contacts){
+      const am=moving(a),bm=moving(b)
+      if(am&&bm&&a.piece.player===b.piece.player&&bounce(a,b,tick))continue
+      if(am&&bm){hit.add(a);hit.add(b);a.out?.captures.push({at:b.at,piece:b.piece});b.out?.captures.push({at:a.at,piece:a.piece})}
+      else {const attacker=am?a:b,victim=am?b:a;hit.add(victim);attacker.out?.captures.push({at:victim.at,piece:victim.piece});stops.set(attacker,victim)}
+    }
+    for(const body of hit){
+      body.alive=false
+      if(body.piece.kind==='K')dead.add(body.piece.player)
+      if(body.out)body.out.status='collided'
+      if(body.trace){body.trace.endTick=tick;body.trace.collision=true}
+      else if(body.draft){body.draft.cells[index(body.at)]=null;travel.push({piece:body.piece,from:body.at,to:body.at,points:body.points,distance:0,normalSpeed:0,dimensionalSpeed:0,endTick:tick,collision:true})}
+    }
+    for(const [attacker,victim] of stops){
+      if(!attacker.alive||!attacker.trace)continue
+      attacker.stopped=true;attacker.at={...victim.at};attacker.draft=victim.draft
+      const point={...squarePoint(staged,attacker.at,layout),tick}
+      attacker.points.splice(0,attacker.points.length,...attacker.points.filter(p=>p.tick<tick),point)
+      attacker.trace.to=attacker.at;attacker.trace.endTick=tick
+      attacker.segments=[{space:boardSpace(attacker.at),start:tick,end:Infinity,a:local(attacker.at),b:local(attacker.at)}]
+    }
+    now=tick
   }
   for (const body of bodies.filter(b => b.alive && b.trace)) {
     const kind = body.piece.kind === 'P' && promotes(body.piece.player, body.at, s) ? 'Q' : body.piece.kind
     body.draft!.cells[index(body.at)] = {...body.piece, moved: true, kind}
     const m = body.out!.move
-    if (m.enPassant) {
+    if (m.enPassant && !body.bounced) {
       const victim = bodies.find(b => !b.out && b.alive && b.draft === body.draft && index(b.at) === index(m.enPassant!))
       if (victim) {victim.alive = false; body.draft!.cells[index(victim.at)] = null; body.out!.captures.push({at: victim.at, piece: victim.piece})}
     }
-    if (kind === 'P' && sameBoard(m.from, m.to) && Math.abs(m.from.x - m.to.x) + Math.abs(m.from.y - m.to.y) === 2)
+    if (!body.bounced && kind === 'P' && sameBoard(m.from, m.to) && Math.abs(m.from.x - m.to.x) + Math.abs(m.from.y - m.to.y) === 2)
       body.draft!.enPassant.push({square: m.to, crossed: {x: (m.from.x + m.to.x) / 2, y: (m.from.y + m.to.y) / 2}, round: s.round + 1})
   }
   const eliminated = players(s).filter(p => dead.has(p)), allDead = players(s).filter(p => dead.has(p) || s.eliminated.includes(p))

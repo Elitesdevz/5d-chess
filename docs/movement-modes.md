@@ -50,7 +50,7 @@ The server records display polylines with these logical event times. The client 
 Units have a swept collision diameter of 17 world pixels (smaller than a square). The resolver solves continuous contact between trajectory segments, including contacts between tick boundaries. Adjacent stationary pieces do not touch.
 
 - A knight or king is at its destination at tick zero. It can therefore intercept a slower slider that crosses its square later.
-- Any physical collision removes both pieces, including friendly pieces. Avoid crossing friendly routes. The two legs of one castle are exempt from colliding with each other.
+- Two opposing moving pieces that collide are both removed. Friendly moving pieces bounce toward distinct, clear, unoccupied squares within three tiles; if no suitable landing is available, they return toward their previous squares. They remain in motion while bouncing. A moving piece that hits a stationary piece captures it and stops on its square, including a friendly piece. The two legs of one castle are exempt from colliding with each other.
 - A piece that has arrived stays physical at its destination for the rest of the batch. Two early arrivals can annihilate each other and leave the square free for a later third arrival.
 - Exactly simultaneous multi-piece contacts remove all units participating in that contact. Results do not depend on request ordering.
 - Captured kings eliminate their faction at batch completion. Check remains advisory; it never forbids a move or performs checkmate detection.

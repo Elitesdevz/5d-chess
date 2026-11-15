@@ -31,17 +31,17 @@ test('tutorial rejects illegal, forged, opponent and incomplete multi-board orde
  assert.match(testPuzzle(many,solution.slice(0,1)).message,/Present/)
  assert.equal(testPuzzle(many,[solution[0],solution[0]]).ok,false)
 })
-test('feedback distinguishes legal-but-wrong moves, live king suicide and completed objectives',()=>{
+test('feedback distinguishes legal-but-wrong moves and completed objectives',()=>{
  const p=PUZZLES[0],s=p.setup(),wrong=order(s,at(6,9),at(6,7))
  const attempt=testPuzzle(p,[wrong]);assert.equal(attempt.ok,false);assert.ok(attempt.result);assert.equal(attempt.message,p.failure)
- const king=PUZZLES[11],ks=king.setup(),suicide=order(ks,at(6,6),at(6,5)),dead=testPuzzle(king,[suicide]);assert.equal(dead.ok,false);assert.ok(dead.result.eliminated.includes('red'))
+ const king=PUZZLES[11],ks=king.setup(),suicide=order(ks,at(6,6),at(6,5)),dead=testPuzzle(king,[suicide]);assert.equal(dead.ok,false);assert.equal(dead.result.eliminated.includes('red'),false)
  const final=PUZZLES[29],plans=final.solution(final.setup());assert.equal(testPuzzle(final,plans.slice(1)).ok,false)
 })
 test('tutorial accepts alternative successful interceptions rather than requiring an exact scripted answer',()=>{
  const p=PUZZLES[12],s=p.setup(),alternatives=legalMoves(s,at(4,7)).filter(m=>testPuzzle(p,[m]).ok)
  assert.ok(alternatives.length>=2)
 })
-test('verified progress persists per account, is idempotent, and never changes coins or Elo',async t=>{
+test('verified progress persists per account, is idempotent, and rewards first completion without changing Elo',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'chess-tutorial-'));t.after(()=>rm(dir,{recursive:true,force:true}));let store=new ChessStore(dir)
  try{
   store.transaction(unit=>{for(const name of ['Alice','Bob'])unit.users.add(name,ensureAccount({name,salt:'s',hash:'h'}))})
@@ -50,7 +50,7 @@ test('verified progress persists per account, is idempotent, and never changes c
   for(const id of [1,9,15,23,26,30,30])store.transaction(unit=>{const p=puzzleById(id);const reply=puzzleApi(unit.users.get('Alice'),`/api/puzzles/${id}/solve`,'POST',{orders:p.solution(p.setup())});assert.equal(reply.status,200)})
   assert.deepEqual(store.transaction(unit=>puzzleProgress(unit.users.get('Alice'))).completed,[1,9,15,23,26,30])
   assert.deepEqual(store.transaction(unit=>puzzleProgress(unit.users.get('Bob'))).completed,[])
-  const after=store.snapshot().users;for(let i=0;i<2;i++){assert.deepEqual(after[i].wallet,before[i].wallet);assert.deepEqual(after[i].rating,before[i].rating)}
+  const after=store.snapshot().users;for(let i=0;i<2;i++){assert.equal(after[i].wallet.coins,before[i].wallet.coins+(after[i].name==='Alice'?150:0));assert.deepEqual(after[i].rating,before[i].rating)}
   store.close();store=new ChessStore(dir)
   assert.deepEqual(store.transaction(unit=>puzzleApi(unit.users.get('Alice'),'/api/puzzles','GET',{})).value,{completed:[1,9,15,23,26,30],total:30,next:2})
   assert.throws(()=>store.transaction(unit=>puzzleApi(unit.users.get('Alice'),'/api/puzzles/31/solve','POST',{orders:[]})))

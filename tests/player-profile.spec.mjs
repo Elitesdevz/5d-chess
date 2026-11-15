@@ -14,7 +14,7 @@ import {initialState} from '../src/model.ts'
 async function fixture(t){
  const dir=await mkdtemp(join(tmpdir(),'chess-profile-ui-')),store=new ChessStore(dir),now=Date.now()
  store.transaction(u=>{for(const name of ['Alice','Bob']){const account=ensureAccount({name,salt:'fixture',hash:'fixture',rating:{value:name==='Alice'?1800:1200,games:12},wallet:{coins:5000,starterGranted:true,inventory:[],loadout:{icon:'default',pieces:{}}}});u.users.add(name,account);u.putSession(createHash('sha256').update(name+'-profile-token').digest('hex'),{user:name,expires:now+600000})}
- const a=u.users.get('Alice');a.wallet.inventory=[['skin-neon',undefined],['skin-frost','P'],['skin-obsidian','Q'],['icon-laurel',undefined],['frame-copper-orbit',undefined],['skin-maple',undefined]].map(([itemId,kind],i)=>({uid:'profile-piece-'+i,itemId,kind,pending:false,acquired:now}));a.wallet.inventory[5].listed='profile-market-listing';u.listings().push({id:'profile-market-listing',seller:'Alice',uid:'profile-piece-5',itemId:'skin-maple',price:500,created:now})
+ const a=u.users.get('Alice');a.wallet.inventory=[['skin-neon',undefined],['skin-frost','P'],['skin-obsidian','Q'],['icon-laurel',undefined],['frame-copper-orbit',undefined],['skin-maple',undefined],['capture-void',undefined],['movement-time',undefined]].map(([itemId,kind],i)=>({uid:'profile-piece-'+i,itemId,kind,pending:false,acquired:now}));a.wallet.inventory[5].listed='profile-market-listing';u.listings().push({id:'profile-market-listing',seller:'Alice',uid:'profile-piece-5',itemId:'skin-maple',price:500,created:now})
  a.casino={sequence:3,recent:[{id:'a'.repeat(24),game:'dice',currency:'elo',stake:12,eloLost:12,won:false,net:0,credited:0,created:now+20},{id:'b'.repeat(24),game:'dice',currency:'elo',stake:50,won:true,net:1000,credited:1000,created:now+10},{id:'c'.repeat(24),game:'roulette',won:false,stake:100,net:-100,credited:0,created:now}]}
  for(let i=0;i<24;i++){const state=initialState(2,'classic',['red','yellow']);state.eliminated=['yellow'];const code='P'+String(i).padStart(3,'0');u.rooms.add(code,{code,title:'Across the river',owner:'Alice',seats:{red:'Alice',yellow:'Bob'},state,journal:[],results:[],locked:{},created:now-1000-i,rated:true,ratingChanges:{red:{before:1784,after:1800,delta:16},yellow:{before:1216,after:1200,delta:-16}}})}
  const state=initialState(2,'live',['red','yellow']);u.rooms.add('PLAY',{code:'PLAY',title:'An open timeline',owner:'Alice',seats:{red:'Alice',yellow:'Bob'},state,journal:[],results:[],locked:{},created:now-100,rated:true})});store.close()
@@ -45,4 +45,14 @@ test('leaderboards, market sellers, match participants and the split header lead
  await page.goto(base+'/chess/leaderboard.html');await page.locator('#full-ranking-table').getByRole('link',{name:'Alice',exact:true}).click();await page.getByRole('heading',{name:'Alice',exact:true}).waitFor()
  await page.goto(base+'/chess/collection.html#market');await page.locator('.seller').getByRole('link',{name:'Alice',exact:true}).click();await page.getByRole('heading',{name:'Alice',exact:true}).waitFor()
  await page.goto(base+'/chess/online.html?code=PLAY');await page.locator('#seats').getByRole('link',{name:'Alice',exact:true}).waitFor();for(const width of [390,320]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'in-game profile header fits '+width);assert.equal(await page.locator('.account-profile-link .profile-avatar').isVisible(),true)}await page.setViewportSize({width:1366,height:900});await page.locator('#seats').getByRole('link',{name:'Alice',exact:true}).click();await page.getByRole('heading',{name:'Alice',exact:true}).waitFor();assert.deepEqual(errors,[])
+})
+
+test('spotlight displays mixed items and animated effects',async t=>{
+ const {base,page,context,errors}=await fixture(t)
+ await page.goto(base+'/chess/profile.html?user=Alice');await page.getByRole('button',{name:'Edit profile',exact:true}).click();await page.locator('#profile-bio').waitFor()
+ for(const [i,id] of ['icon-laurel','capture-void','movement-time'].entries())await page.locator(`[data-skin-slot="${i}"]`).selectOption(id)
+ await page.getByRole('button',{name:'Save profile'}).click();await page.locator('#profile-editor').waitFor({state:'hidden'})
+ assert.equal(await page.locator('.profile-showcase canvas').count(),2)
+ assert.deepEqual((await(await context.request.get(base+'/api/profile')).json()).showcase.map(x=>x.itemId),['icon-laurel','capture-void','movement-time'])
+ assert.deepEqual(errors,[])
 })
