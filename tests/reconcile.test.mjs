@@ -53,3 +53,25 @@ test('friendly movers contesting a capture bounce nearby without losing or overw
  for(const t of r.travel.filter(t=>t.piece.kind==='R'))assert.ok(Math.hypot(t.to.x-5,t.to.y-5)<=3)
  assert.deepEqual(r,resolveLive(s,orders,[]))
 })
+
+for(const [label,pieces,paths,attackerKind]of [
+ ['king captures a checking pawn before its planned capture',[[6,6,'red','K'],[5,5,'yellow','P']],[[[6,6],[5,5]],[[5,5],[6,6]]],'K'],
+ ['king captures a knight before its jump',[[6,6,'red','K'],[5,5,'yellow','N']],[[[6,6],[5,5]],[[5,5],[7,6]]],'K'],
+ ['knight captures a pawn before it starts travelling',[[4,7,'red','N'],[5,5,'yellow','P']],[[[4,7],[5,5]],[[5,5],[5,6]]],'N']
+])test(label,()=>{
+ const s=position(pieces),orders=paths.map(([a,b])=>move(s,c(...a),c(...b)))
+ for(const batch of [orders,[...orders].reverse()]){
+  const r=resolveRound(s,batch,{partial:true}),board=frontier(r.state.universes[0])
+  assert.deepEqual(r.rejected,[]);assert.ok(!r.eliminated.includes('red'))
+  assert.equal(board.cells[index(c(5,5))]?.player,'red');assert.equal(board.cells[index(c(5,5))]?.kind,attackerKind)
+  assert.equal(r.outcomes.find(o=>o.move.player==='yellow').status,'collided')
+  assert.equal(r.outcomes.find(o=>o.move.player==='red').status,'applied')
+  assert.equal(r.travel.find(t=>t.piece.player==='yellow').endTick,0)
+ }
+})
+test('a king vacates its old square before an opposing knight arrives there',()=>{
+ const s=position([[6,6,'red','K'],[4,5,'yellow','N']]),orders=[move(s,c(6,6),c(7,7)),move(s,c(4,5),c(6,6))]
+ const r=resolveRound(s,orders,{partial:true}),board=frontier(r.state.universes[0])
+ assert.deepEqual(r.rejected,[]);assert.deepEqual(r.eliminated,[])
+ assert.equal(board.cells[index(c(7,7))]?.kind,'K');assert.equal(board.cells[index(c(6,6))]?.kind,'N')
+})

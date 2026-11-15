@@ -256,6 +256,43 @@ export function resolveLive(s: State, valid: Candidate[], rejected: Resolution['
     }
   }
   } else {
+  // Instant movement has explicit initiative: all kings, then all knights,
+  // then travelling pieces depart. Later-phase pieces still occupy their source.
+  const initiative=(body:Body)=>body.piece.kind==='K'?0:body.piece.kind==='N'?1:2
+  for(const phase of [0,1]){
+    const arrivals=new Set(bodies.filter(body=>body.alive&&body.trace&&initiative(body)===phase))
+    const atPhase=(body:Body):Coord=>body.trace&&initiative(body)>phase
+      ? {...body.trace.from,t:drafts.get(body.trace.from.u)!.t} : body.at
+    const hits=new Set<Body>(),bounces:{a:Body;b:Body}[]=[]
+    for(let i=0;i<bodies.length;i++)for(let j=i+1;j<bodies.length;j++){
+      const a=bodies[i],b=bodies[j],am=arrivals.has(a),bm=arrivals.has(b)
+      if(!a.alive||!b.alive||(!am&&!bm)||(a.out&&a.out===b.out))continue
+      const A=atPhase(a),B=atPhase(b)
+      if(boardKey(A)!==boardKey(B)||index(A)!==index(B))continue
+      if(am&&bm){
+        if(a.piece.player===b.piece.player){bounces.push({a,b});continue}
+        hits.add(a);hits.add(b)
+        a.out!.captures.push({at:B,piece:b.piece});b.out!.captures.push({at:A,piece:a.piece})
+      }else{
+        const attacker=am?a:b,victim=am?b:a
+        attacker.out!.captures.push({at:atPhase(victim),piece:victim.piece});hits.add(victim)
+      }
+    }
+    for(const body of hits){
+      const at=atPhase(body);body.alive=false
+      if(body.piece.kind==='K')dead.add(body.piece.player)
+      if(body.out)body.out.status='collided'
+      if(body.trace){
+        body.at=at;body.trace.to=at;body.trace.endTick=0;body.trace.collision=true
+        body.points.splice(0,body.points.length,{...squarePoint(staged,at,layout),tick:0})
+      }else if(body.draft){
+        body.draft.cells[index(at)]=null
+        travel.push({piece:body.piece,from:at,to:at,points:body.points,distance:0,normalSpeed:0,dimensionalSpeed:0,endTick:0,collision:true})
+      }
+    }
+    for(const body of arrivals)if(body.alive)body.stopped=true
+    for(const {a,b} of bounces)if(a.alive&&b.alive)bounce(a,b,0)
+  }
   // Recompute contacts after a capture: a surviving attacker stops on the
   // victim's square and may itself be hit by a later traveller.
   let now=0
