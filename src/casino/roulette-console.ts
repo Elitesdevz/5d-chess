@@ -12,7 +12,7 @@ export class RouletteConsole {
  readonly chipPosition=v(-1.08,1.08,.64)
  private stakeLabel:ReturnType<typeof label>;private returnLabel:ReturnType<typeof label>
  private stackMeshes:T.Mesh[][]=[];private wagerMeshes:T.Mesh[]=[];private textures:ReturnType<typeof label>[]=[]
- private lastStake=-1;private lastReturn=-1;private lastCoins=-1
+ private plates:T.Group[]=[];private spinGroup:T.Group;private lastStake=-1;private lastReturn=-1;private lastCoins=-1
  readonly spin:T.Mesh;readonly chipEdge:T.Mesh
  constructor(world:T.Scene,private m:Materials){
   world.add(this.root);this.wallet.position.set(-.98,1.005,.52);this.wager.position.set(-.67,1.005,.52);this.root.add(this.wallet,this.wager)
@@ -28,18 +28,24 @@ export class RouletteConsole {
   for(let i=0;i<8;i++)this.wagerMeshes.push(this.pokerChip(this.wager,.18,.054+i*.021,0,2,i===7))
   this.stakeLabel=this.plate('AMOUNT BET',this.stakePosition,.60)
   this.returnLabel=this.plate('WIN RETURN',this.returnPosition,.64)
-  const spin=new T.Group();spin.position.copy(this.spinPosition);this.root.add(spin)
+  const spin=this.spinGroup=new T.Group();spin.position.copy(this.spinPosition);this.root.add(spin)
   box(spin,[.47,.035,.31],[0,0,0],m.darkGold.clone(),.035)
   this.spin=box(spin,[.44,.038,.28],[0,.015,0],m.ebony.clone(),.025)
   this.writing(spin,'SPIN',.39,.12,v(0,.036,-.015))
   this.writing(spin,'↻',.16,.055,v(0,.036,.078),'#a89260')
+ }
+ layout(portrait:boolean){
+  this.wallet.position.set(portrait?-.53:-.98,1.005,portrait?.30:.52);this.wallet.scale.setScalar(portrait?.60:1)
+  this.wager.position.set(portrait?-.35:-.67,1.005,portrait?.50:.52);this.wager.scale.setScalar(portrait?.60:1)
+  this.plates.forEach((plate,i)=>{plate.position.set(portrait?(i===0?-.22:.22):(i===0?-.38:.30),1.045,portrait?.78:.93);plate.scale.setScalar(portrait?.65:1)})
+  this.spinPosition.set(portrait?0:.92,1.045,portrait?1.09:.93);this.spinGroup.position.copy(this.spinPosition);this.spinGroup.scale.setScalar(portrait?.85:1)
  }
  private writing(parent:T.Object3D,text:string,w:number,h:number,pos:T.Vector3,color='#edcf90'){
   const inscription=label(text,512,color);this.textures.push(inscription)
   const plane=new T.Mesh(new T.PlaneGeometry(w,h),new T.MeshBasicMaterial({map:inscription.map,transparent:true,depthWrite:false}));plane.position.copy(pos);plane.rotation.x=-Math.PI/2;parent.add(plane);return inscription
  }
  private plate(title:string,position:T.Vector3,width:number){
-  const g=new T.Group();g.position.copy(position);g.rotation.x=.30;this.root.add(g)
+  const g=new T.Group();this.plates.push(g);g.position.copy(position);g.rotation.x=.30;this.root.add(g)
   box(g,[width,.028,.28],[0,0,0],this.m.darkGold,.025)
   box(g,[width-.018,.031,.26],[0,.009,0],this.m.ebony,.02)
   this.writing(g,title,width*.84,.055,v(0,.027,-.073),'#b6a678')
@@ -55,7 +61,7 @@ export class RouletteConsole {
  update(coins:number,stake:number,returns:number,busy:boolean){
   if(stake!==this.lastStake){this.stakeLabel.update(casinoCoins(stake));this.wagerMeshes.forEach((chip,i)=>chip.visible=i<Math.min(8,Math.max(1,Math.ceil(Math.log2(stake+1)))));this.lastStake=stake}
   if(returns!==this.lastReturn){this.returnLabel.update(casinoCoins(returns));this.lastReturn=returns}
-  if(coins!==this.lastCoins){this.stackMeshes.forEach((stack,d)=>stack.forEach((chip,i)=>chip.visible=i<Math.min(6,Math.max(1,Math.ceil(coins/CHIP_VALUES[d]/6)))));this.lastCoins=coins}
+  if(coins!==this.lastCoins){this.stackMeshes.forEach((stack,d)=>{const count=Math.min(6,Math.max(0,Math.ceil(coins/CHIP_VALUES[d]/6)));stack.forEach((chip,i)=>{chip.visible=i>=6-count;chip.position.y=.047+(i-(6-count))*.021})});this.lastCoins=coins}
   ;(this.spin.material as T.MeshStandardMaterial).color.setHex(busy?0x080c0d:0x183d30)
  }
  highlight(on:boolean){(this.chipEdge.material as T.MeshStandardMaterial).emissive.setHex(on?0x806333:0)}

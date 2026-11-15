@@ -148,7 +148,7 @@ export class RouletteRoom{
   if(parent){if(this.coinOwner!==owner){parent.attach(this.wagerCoins);this.wagerCoins.position.set(0,.01,0);this.wagerCoins.rotation.set(0,0,0)}this.wagerCoins.visible=true}else this.wagerCoins.visible=false
   this.coinOwner=owner
  }
- private fit(){const w=Math.max(1,this.canvas.clientWidth),h=Math.max(1,this.canvas.clientHeight);this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.fov=this.camera.aspect<1?90:62;this.camera.updateProjectionMatrix()}
+ private fit(){const w=Math.max(1,this.canvas.clientWidth),h=Math.max(1,this.canvas.clientHeight);this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.furniture.layout(w<h);for(const k of this.keys){if(k.zone==='chips'){k.position.set(w<h?-.48:-.88,1.1,w<h?.43:.55);k.width=w<h?.6:1.05;k.depth=w<h?.4:.58}else if(k.zone==='mat'){k.position.set(w<h?.35:.70,1.02,-.12);k.width=w<h?1.1:1.8}else if(k.button.classList.contains('roulette-spin-key')){k.position.copy(this.furniture.spinPosition).add(v(0,.04,0));k.width=w<h?.40:.47;k.depth=w<h?.26:.31}}this.camera.fov=this.camera.aspect<1?74:62;this.camera.updateProjectionMatrix()}
  private projectKeys(){const rect=this.canvas.getBoundingClientRect();for(const k of this.keys){const p=k.position.clone().project(this.camera),left=k.position.clone().add(v(-k.width/2,0,0)).project(this.camera),right=k.position.clone().add(v(k.width/2,0,0)).project(this.camera),front=k.position.clone().add(v(0,0,k.depth/2)).project(this.camera),back=k.position.clone().add(v(0,0,-k.depth/2)).project(this.camera)
    const width=Math.max(12,Math.abs(right.x-left.x)*rect.width/2),height=Math.max(12,Math.abs(front.y-back.y)*rect.height/2);k.button.style.left=(p.x+1)*rect.width/2+'px';k.button.style.top=(1-p.y)*rect.height/2+'px';k.button.style.width=width*.94+'px';k.button.style.height=height*.94+'px';k.button.hidden=this.active||k.mode!==this.focusMode||p.z>1||p.x<-1||p.x>1||p.y<-1||p.y>1
   }}
@@ -168,14 +168,14 @@ export class RouletteRoom{
    if(p===1){this.cameraLocked=false;this.canvas.dataset.lookLocked='false';this.room.querySelector<HTMLButtonElement>('[data-room-center]')!.disabled=false}
    if(p===1&&(!this.won||elapsed>=duration+(this.reduced?200:2200))){this.active=false;this.camBlend=0;this.room.dataset.phase='idle';this.canvas.dataset.camera='seat';this.rotation=this.endRotation;this.canvas.dataset.lookLocked='false';this.wagerCoins.visible=false;const done=this.complete;this.complete=undefined;done?.()}
   }
-  const portrait=this.camera.aspect<1,seat=v(0,portrait?2.1:1.75,portrait?2.9:2.15),over=v(-1.03,portrait?4.2:3.05,-.449)
+  const portrait=this.camera.aspect<1,seat=v(0,portrait?1.50:1.75,portrait?1.72:2.15),over=v(-1.03,portrait?4.2:3.05,-.449)
   const breath=this.reduced?0:Math.sin(now*.0012)*.0015;seat.y+=breath
   const direction=this.look.clone().sub(seat).applyEuler(new T.Euler(-this.pitch,-this.yaw,0,'YXZ')),seatLook=seat.clone().add(direction)
   this.matBlend=T.MathUtils.damp(this.matBlend,this.focusMode==='mat'&&!this.active?1:0,10,delta);if(this.matBlend<.002)this.matBlend=0
   seat.lerp(v(.70,portrait?3.6:2.45,.72),this.matBlend);seatLook.lerp(v(.70,1.01,-.12),this.matBlend)
   this.chipBlend=T.MathUtils.damp(this.chipBlend,this.focusMode==='chips'&&!this.active?1:0,10,delta);if(this.chipBlend<.002)this.chipBlend=0
-  seat.lerp(v(-.90,portrait?2.35:2.05,.621),this.chipBlend);seatLook.lerp(v(-.90,1.04,portrait?.94:.62),this.chipBlend)
-  this.camera.fov=portrait?T.MathUtils.lerp(90,74,Math.max(this.matBlend,this.chipBlend,this.camBlend)):62;this.camera.updateProjectionMatrix();this.camera.position.copy(seat.lerp(over,this.camBlend));this.camera.up.set(0,1,0).lerp(v(0,0,-1),Math.max(this.camBlend,this.chipBlend)).normalize();this.camera.lookAt(seatLook.lerp(this.spinLook,this.camBlend));this.camera.updateMatrixWorld()
+  seat.lerp(v(portrait?-.48:-.90,portrait?2.25:2.05,portrait?.32:.621),this.chipBlend);seatLook.lerp(v(portrait?-.48:-.90,1.04,portrait?.57:.62),this.chipBlend)
+  this.camera.position.copy(seat.lerp(over,this.camBlend));this.camera.up.set(0,1,0).lerp(v(0,0,-1),Math.max(this.camBlend,this.chipBlend)).normalize();this.camera.lookAt(seatLook.lerp(this.spinLook,this.camBlend));this.camera.updateMatrixWorld()
   this.canvas.dataset.lookYaw=this.yaw.toFixed(3);this.canvas.dataset.lookPitch=this.pitch.toFixed(3);this.canvas.dataset.eyeHeight=this.camera.position.y.toFixed(3);this.canvas.dataset.view=!this.active&&this.focusMode!=='seat'?this.focusMode:'first-person'
   this.posePeople(now,this.active?p:0,elapsed-duration)
 
