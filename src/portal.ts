@@ -1,8 +1,7 @@
 import {type AI_OPPONENTS} from './ai-model.ts'
 import {pieceIcon} from './art.ts'
 import {profileHref} from './profile-model.ts'
-import {itemById} from './collection.ts'
-import {itemArt} from './rewards.ts'
+import {HomeDeals} from './home-deals.ts'
 import {initDailySpin,type Economy} from './rewards.ts'
 import {avatarArt,framedAvatar} from './cosmetic-art.ts'
 import {api,ApiError,getSession,initShell,refreshRating,renderAccount,fetchNotices,updateNoticeCount,openNotifications} from './shell.ts'
@@ -235,8 +234,9 @@ async function lobby(){
   }
   const codeInput=el<HTMLInputElement>('quick-code')
   codeInput.addEventListener('input',()=>{codeInput.value=codeInput.value.replace(/[^a-z]/gi,'').slice(0,4).toUpperCase();document.querySelectorAll('.slot-display b').forEach((b,i)=>{b.textContent=codeInput.value[i]||'_';b.classList.toggle('filled',!!codeInput.value[i])})})
-  const loadDeals=async()=>{const data=await api<Economy>('/economy');el('home-daily-deals').innerHTML=data.dailyDeals.map(d=>{const item=itemById(d.itemId)!;return `<a class="home-deal" href="/chess/collection.html#shop">${itemArt(item,48)}<span><strong>${item.name}</strong><small><s>${d.originalPrice}</s> ${d.price} coins</small></span></a>`}).join('')}
-  void loadDeals().catch(()=>{el('home-daily-deals').textContent='Deals unavailable. Visit the shop to retry.'})
+  const deals=new HomeDeals(el('home-daily-deals'))
+  const loadDeals=async()=>deals.update(await api<Economy>('/economy'))
+  void loadDeals().catch(()=>deals.unavailable())
   window.setInterval(()=>{if(document.visibilityState==='visible')void loadDeals().catch(()=>{})},60000)
   void initDailySpin()
   await refresh()
