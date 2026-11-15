@@ -13,8 +13,8 @@ interface Key {button:HTMLButtonElement;position:T.Vector3;width:number;depth:nu
 export class RouletteRoom{
  private world=new T.Scene();private camera=new T.PerspectiveCamera(49,1,.1,70);private renderer:T.WebGLRenderer
  private room:HTMLElement;private canvas:HTMLCanvasElement;private keys:Key[]=[];private rotor=new T.Group();private wheel=new T.Group();private ball:T.Mesh;private chip:T.Mesh;private patrons:ClubGuest[]=[];private dealer:ClubGuest;private player:PlayerRig;private finishes!:Materials;private wagerCoins=new T.Group();private coinOwner='tray';private matFocus=false;private matBlend=0
- private busy=false;private active=false;private yaw=0;private pitch=0;private frame=0;private last=0;private observer:ResizeObserver;private disposed=false;private raf=0
- private choice:RouletteChoice='white';private stake=100;private coins=0;private rotation=0;private spinAt=0;private endRotation=0;private ballStart=0;private ballEnd=0;private result=0;private won=false;private rarity=0;private complete?:()=>void
+ private busy=false;private active=false;private cameraLocked=false;private yaw=0;private pitch=0;private frame=0;private last=0;private observer:ResizeObserver;private disposed=false;private raf=0
+ private choice:RouletteChoice='white';private stake=100;private coins=0;private rotation=0;private spinAt=0;private animationCheckpoint=0;private endRotation=0;private ballStart=0;private ballEnd=0;private result=0;private won=false;private rarity=0;private complete?:()=>void
  private sparkGeometry=new T.BufferGeometry();private halo:T.Mesh;private winLight:T.PointLight;private winCoins:T.InstancedMesh;private sparks:T.Points;private burstAt=-Infinity;private reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;private drag?:{x:number;y:number;yaw:number;pitch:number}
  private look=v(.15,1.02,-.12);private spinLook=v(-1.03,1.08,-.45);private camBlend=0;private textureCache=new Map<string,T.CanvasTexture>();private fence:WebGLSync|null=null
  constructor(root:HTMLElement){
@@ -64,16 +64,16 @@ export class RouletteRoom{
   const button=document.createElement('button');button.type='button';button.className='roulette-world-key';button.setAttribute('aria-label',label==='SPIN'?'Place bet & spin':label);button.title=label;button.dataset.tableBet=choice===undefined?'':String(choice);button.innerHTML=`<span>${label}</span>`;button.onclick=()=>{if(!this.busy)action()};this.room.querySelector('.roulette-table-keys')!.append(button);this.keys.push({button,position,width,depth,choice,mesh:physical})
  }
  private buildControls(){
-  for(let n=1;n<=36;n++){const color=pocketColor(n);this.addKey('Bet on '+n,v(.04+(n-1)%6*.265,1.008,-.70+Math.floor((n-1)/6)*.20),.246,.183,()=>document.querySelector<HTMLButtonElement>(`[data-pocket="${n}"]`)!.click(),n,color==='white'?0xe3d8bc:0x1b3038)}
+  for(let n=1;n<=36;n++){const color=pocketColor(n);this.addKey('Bet on '+n,v(.04+(n-1)%6*.265,1.008,-.70+Math.floor((n-1)/6)*.17),.246,.153,()=>document.querySelector<HTMLButtonElement>(`[data-pocket="${n}"]`)!.click(),n,color==='white'?0xe3d8bc:0x1b3038)}
   this.addKey('Bet on rift zero',v(.70,1.008,-.92),1.58,.17,()=>document.querySelector<HTMLButtonElement>('[data-pocket="0"]')!.click(),0,0x765185)
-  ;(['white','black','odd','even','low','high'] as const).forEach((c,i)=>this.addKey(c==='low'?'1–18':c==='high'?'19–36':c,v(.04+i*.265,1.008,.59),.246,.19,()=>document.querySelector<HTMLButtonElement>(`[data-outside="${c}"]`)!.click(),c,c==='white'?0xe3d8bc:0x294747))
+  ;(['white','black','odd','even','low','high'] as const).forEach((c,i)=>this.addKey(c==='low'?'1–18':c==='high'?'19–36':c,v(.18+i%3*.50,1.008,.37+Math.floor(i/3)*.19),.47,.17,()=>document.querySelector<HTMLButtonElement>(`[data-outside="${c}"]`)!.click(),c,c==='white'?0xe3d8bc:0x294747))
   ;[25,100,500,1000].forEach((amount,i)=>{const p=v(-.75+i*.25,1.035,.86);this.mesh(new T.CylinderGeometry(.12,.12,.035,24),mat([0xd4c7ab,0x4c8092,0xb46879,0xc7a256][i],.25,.5),p);this.addKey(String(amount),p.clone().add(v(0,.023,0)),.24,.18,()=>{const input=document.getElementById('stake') as HTMLInputElement;input.value=String(amount);input.dispatchEvent(new Event('input'))},undefined,[0xa99a7e,0x385f74,0x89485c,0x997335][i])})
   this.addKey('Edit stake',v(-.38,1.014,.65),.58,.15,()=>this.amount())
   this.addKey('SPIN',v(.65,1.02,.82),.56,.24,()=>document.getElementById('place-bet')!.click(),undefined,0xa6874b)
  }
  private amount(){const dialog=this.room.querySelector<HTMLDialogElement>('.roulette-amount-modal')!,input=dialog.querySelector('input')!;input.value=String(this.stake);dialog.showModal();input.focus()}
  private bind(){
-  this.room.querySelector<HTMLButtonElement>('[data-room-center]')!.onclick=()=>{if(this.busy)return;this.yaw=this.pitch=0;this.matFocus=false}
+  this.room.querySelector<HTMLButtonElement>('[data-room-center]')!.onclick=()=>{if(this.cameraLocked)return;this.yaw=this.pitch=0;this.matFocus=false}
   this.room.querySelector<HTMLButtonElement>('[data-room-history]')!.onclick=()=>document.getElementById('open-roulette-history')!.click()
   this.room.querySelector<HTMLButtonElement>('[data-room-rules]')!.onclick=()=>{const d=this.room.querySelector<HTMLDialogElement>('.roulette-room-modal')!;d.querySelector('[data-room-modal-content]')!.innerHTML=rules('roulette');d.querySelectorAll('details').forEach(detail=>detail.open=true);d.showModal()}
   this.room.querySelector<HTMLButtonElement>('[data-close-room-modal]')!.onclick=()=>this.room.querySelector<HTMLDialogElement>('.roulette-room-modal')!.close()
@@ -82,12 +82,12 @@ export class RouletteRoom{
   this.room.querySelector<HTMLButtonElement>('[data-room-bets]')!.onclick=()=>document.body.classList.toggle('roulette-mat-open')
   document.querySelectorAll<HTMLButtonElement>('[data-pocket],[data-outside]').forEach(b=>b.addEventListener('click',()=>{if(!this.busy)document.body.classList.remove('roulette-mat-open')}))
   const amount=this.room.querySelector<HTMLDialogElement>('.roulette-amount-modal')!;amount.querySelector<HTMLButtonElement>('[data-cancel-room-amount]')!.onclick=()=>amount.close();amount.querySelector('form')!.onsubmit=e=>{e.preventDefault();if(this.busy)return;const input=document.getElementById('stake') as HTMLInputElement;input.value=amount.querySelector('input')!.value;input.dispatchEvent(new Event('input'));amount.close()}
-  this.canvas.addEventListener('pointerdown',e=>{if(this.active||this.busy)return;this.drag={x:e.clientX,y:e.clientY,yaw:this.yaw,pitch:this.pitch};this.canvas.setPointerCapture(e.pointerId)})
-  this.canvas.addEventListener('pointermove',e=>{if(!this.drag||this.active||this.busy)return;this.yaw=T.MathUtils.clamp(this.drag.yaw+(e.clientX-this.drag.x)*.002,-.5,.5);this.pitch=T.MathUtils.clamp(this.drag.pitch+(e.clientY-this.drag.y)*.0015,-.28,.65)})
-  this.canvas.addEventListener('lostpointercapture',()=>this.drag=undefined);this.canvas.addEventListener('keydown',e=>{if(e.key==='Home'&&!this.busy){this.yaw=this.pitch=0;e.preventDefault()}})
+  this.canvas.addEventListener('pointerdown',e=>{if(this.cameraLocked)return;this.drag={x:e.clientX,y:e.clientY,yaw:this.yaw,pitch:this.pitch};this.canvas.setPointerCapture(e.pointerId)})
+  this.canvas.addEventListener('pointermove',e=>{if(!this.drag||this.cameraLocked)return;this.yaw=T.MathUtils.clamp(this.drag.yaw+(e.clientX-this.drag.x)*.002,-.5,.5);this.pitch=T.MathUtils.clamp(this.drag.pitch+(e.clientY-this.drag.y)*.0015,-.28,.65)})
+  this.canvas.addEventListener('lostpointercapture',()=>this.drag=undefined);this.canvas.addEventListener('keydown',e=>{if(e.key==='Home'&&!this.cameraLocked){this.yaw=this.pitch=0;e.preventDefault()}})
   window.addEventListener('pagehide',e=>{if(!e.persisted)this.dispose()},{once:true})
  }
- setState(coins:number,stake:number,choice:RouletteChoice,busy:boolean){this.coins=coins;this.stake=stake;this.choice=choice;this.busy=busy
+ setState(coins:number,stake:number,choice:RouletteChoice,busy:boolean){this.coins=coins;this.stake=stake;this.choice=choice;this.busy=busy;if(!this.active){this.cameraLocked=busy;this.canvas.dataset.lookLocked=String(busy)}
   const name=typeof choice==='number'?choice===0?'The rift · 0':'Square '+choice:({white:'White court',black:'Black court',odd:'Odd',even:'Even',low:'1–18',high:'19–36'})[choice]
   this.room.querySelector('[data-room-choice]')!.textContent=`${casinoCoins(stake)} coins · ${name}`;this.room.querySelector('[data-room-odds]')!.textContent=`${(winProbability('roulette',choice)*100).toFixed(2).replace(/\.00$/,'')}% chance · ${grossMultiplier('roulette',choice)}× gross`
   const gross=stake*grossMultiplier('roulette',choice);this.room.querySelector('[data-room-return]')!.textContent=casinoCoins(gross-Math.max(0,gross-stake)*.01)+' coins'
@@ -97,7 +97,7 @@ export class RouletteRoom{
  }
  land(result:number){this.result=result;this.rotation=this.rotor.rotation.y;const angle=ROULETTE_ORDER.indexOf(result)*step+step/2-this.rotation;this.ball.position.set(-1.03+Math.cos(angle)*.435,1.173,-.45-Math.sin(angle)*.435);this.canvas.dataset.result=String(result)}
  async spin(round:CasinoRound){
-  this.active=true;this.drag=undefined;this.matFocus=false;this.coinOwner='tray';this.wagerCoins.visible=false;this.canvas.dataset.lookLocked='true';document.body.classList.remove('roulette-mat-open');this.room.dataset.phase='exchange';this.canvas.dataset.camera='seat';this.spinAt=performance.now();this.result=round.result;this.won=round.won;this.rarity=winProbability('roulette',round.choice)<.025?3:winProbability('roulette',round.choice)<.1?2:1;this.rotation=this.rotor.rotation.y;this.endRotation=this.rotation+tau*5+.37;this.ballStart=0;this.ballEnd=ROULETTE_ORDER.indexOf(round.result)*step+step/2-this.endRotation;this.room.querySelector('.roulette-room-announcement')!.textContent='Your wager crosses the felt.';await new Promise<void>(r=>this.complete=r)
+  this.active=true;this.cameraLocked=true;this.animationCheckpoint=0;this.drag=undefined;this.matFocus=false;this.coinOwner='tray';this.wagerCoins.visible=false;this.canvas.dataset.lookLocked='true';document.body.classList.remove('roulette-mat-open');this.room.dataset.phase='exchange';this.canvas.dataset.camera='seat';this.spinAt=performance.now();this.result=round.result;this.won=round.won;this.rarity=winProbability('roulette',round.choice)<.025?3:winProbability('roulette',round.choice)<.1?2:1;this.rotation=this.rotor.rotation.y;this.endRotation=this.rotation+tau*5+.37;this.ballStart=0;this.ballEnd=ROULETTE_ORDER.indexOf(round.result)*step+step/2-this.endRotation;this.room.querySelector('.roulette-room-announcement')!.textContent='Your wager crosses the felt.';await new Promise<void>(r=>this.complete=r)
  }
  private posePeople(now:number,p:number,payoutMs:number){
   const h=Math.min(1,p/.24),lerp=(a:T.Vector3,b:T.Vector3,t:number)=>a.clone().lerp(b,ease(Math.max(0,Math.min(1,t))))
@@ -127,20 +127,24 @@ export class RouletteRoom{
  private tick=(now:number)=>{
   if(this.disposed)return;this.raf=requestAnimationFrame(this.tick);if(document.visibilityState!=='visible'||now-this.last<(this.active?24:50))return
   const gl=this.renderer.getContext() as WebGL2RenderingContext;if(this.fence){if(gl.clientWaitSync(this.fence,0,0)===gl.TIMEOUT_EXPIRED)return;gl.deleteSync(this.fence);this.fence=null}const delta=Math.min(.1,(now-this.last)/1000||.016);this.last=now
-  const duration=this.reduced?1300:11000,elapsed=this.active?now-this.spinAt:0,p=Math.min(1,elapsed/duration)
+  const duration=this.reduced?1300:11000;let elapsed=this.active?now-this.spinAt:0,p=Math.min(1,elapsed/duration)
+  // Important physical actions must get a rendered frame even on a slow GPU.
+  const checkpoints=[.05,.16,.38,.80,.93,1]
+  if(this.active&&this.animationCheckpoint<checkpoints.length&&p>=checkpoints[this.animationCheckpoint]){p=checkpoints[this.animationCheckpoint++];elapsed=p*duration;this.spinAt=now-elapsed}
   if(this.active){
    const move=ease(Math.max(0,Math.min(1,(p-.24)/.13))),returning=p>.90?ease((p-.90)/.10):0;this.camBlend=move*(1-returning)
    const roll=Math.max(0,Math.min(1,(p-.34)/.46)),slow=1-Math.pow(1-roll,3);this.rotor.rotation.y=T.MathUtils.lerp(this.rotation,this.endRotation,slow)
    const ballProgress=Math.max(0,Math.min(1,(p-.34)/.46)),ballEase=1-Math.pow(1-ballProgress,2.4),angle=T.MathUtils.lerp(tau*9,this.ballEnd,ballEase),drop=ease(Math.max(0,Math.min(1,(p-.56)/.24))),radius=T.MathUtils.lerp(.715,.435,drop)
    this.ball.position.set(-1.03+Math.cos(angle)*radius,1.173+(1-drop)*.055+(!this.reduced&&p>.56&&p<.80?Math.abs(Math.sin(p*160))*(1-drop)*.04:0),-.45-Math.sin(angle)*radius)
    if(p>=.80&&this.room.dataset.phase==='spin'){this.room.dataset.phase='landed';this.canvas.dataset.result=String(this.result);this.room.querySelector('.roulette-room-announcement')!.textContent=(this.result===0?'The rift · 0':String(this.result))+(this.won?' · The table pays.':' · The next turn is yours.');if(this.won){this.burstAt=now;this.canvas.dataset.winTier=String(this.rarity)}}
+   if(p===1){this.cameraLocked=false;this.canvas.dataset.lookLocked='false';this.room.querySelector<HTMLButtonElement>('[data-room-center]')!.disabled=false}
    if(p===1&&(!this.won||elapsed>=duration+(this.reduced?200:2200))){this.active=false;this.camBlend=0;this.room.dataset.phase='idle';this.canvas.dataset.camera='seat';this.rotation=this.endRotation;this.canvas.dataset.lookLocked='false';this.wagerCoins.visible=false;const done=this.complete;this.complete=undefined;done?.()}
   }
-  const portrait=this.camera.aspect<1,seat=v(0,1.50,1.72),over=v(-1.03,portrait?4.9:3.55,-.449)
+  const portrait=this.camera.aspect<1,seat=v(0,1.50,1.72),over=v(-1.03,portrait?4.2:3.05,-.449)
   const breath=this.reduced?0:Math.sin(now*.0012)*.0015;seat.y+=breath
   const direction=this.look.clone().sub(seat).applyEuler(new T.Euler(-this.pitch,-this.yaw,0,'YXZ')),seatLook=seat.clone().add(direction)
   this.matBlend=T.MathUtils.damp(this.matBlend,this.matFocus&&!this.active?1:0,10,delta);if(this.matBlend<.002)this.matBlend=0
-  seat.lerp(v(.70,portrait?3.4:2.15,.72),this.matBlend);seatLook.lerp(v(.70,1.01,-.12),this.matBlend)
+  seat.lerp(v(.70,portrait?3.6:2.15,.72),this.matBlend);seatLook.lerp(v(.70,1.01,-.12),this.matBlend)
   this.camera.position.copy(seat.lerp(over,this.camBlend));this.camera.up.set(0,1,0).lerp(v(0,0,-1),this.camBlend).normalize();this.camera.lookAt(seatLook.lerp(this.spinLook,this.camBlend));this.camera.updateMatrixWorld()
   this.canvas.dataset.lookYaw=this.yaw.toFixed(3);this.canvas.dataset.lookPitch=this.pitch.toFixed(3);this.canvas.dataset.eyeHeight=this.camera.position.y.toFixed(3);this.canvas.dataset.view=this.matFocus&&!this.active?'mat':'first-person'
   this.posePeople(now,this.active?p:0,elapsed-duration)

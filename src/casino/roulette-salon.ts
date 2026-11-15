@@ -1,3 +1,4 @@
+import {batchStatic} from './scene/static-batch.ts'
 import * as T from 'three'
 import {box,mesh,v} from './scene/geometry.ts'
 import {materials} from './scene/materials.ts'
@@ -25,5 +26,6 @@ export function buildSalon(world:T.Scene){
  for(const r of[.60,.88]){const ring=mesh(new T.TorusGeometry(r,.024,10,56),m.brass,world,[0,3.2,-2.3]);ring.rotation.x=Math.PI/2}mesh(new T.CylinderGeometry(.018,.018,.95,10),m.darkGold,world,[0,3.72,-2.3]);for(let i=0;i<12;i++){const a=i*Math.PI/6;mesh(new T.CylinderGeometry(.022,.022,.22,8),m.gold,world,[Math.cos(a)*.83,3.05,-2.3+Math.sin(a)*.83]);mesh(new T.SphereGeometry(.045,10,8),new T.MeshStandardMaterial({color:0xffe7bc,emissive:0xffc984,emissiveIntensity:2}),world,[Math.cos(a)*.83,2.91,-2.3+Math.sin(a)*.83])}
  const pendant=new T.PointLight(0xffdfac,10,8);pendant.position.set(0,2.85,-2.3);world.add(pendant)
  const shadow=document.createElement('canvas');shadow.width=shadow.height=64;const sc=shadow.getContext('2d')!,g=sc.createRadialGradient(32,32,2,32,32,32);g.addColorStop(0,'#0009');g.addColorStop(1,'#0000');sc.fillStyle=g;sc.fillRect(0,0,64,64);const map=new T.CanvasTexture(shadow);for(const [x,z,w,d]of[[0,0,4.6,3.3],[-2.4,-.6,1.3,1.1],[2.4,-.7,1.3,1.1]])mesh(new T.PlaneGeometry(w,d),new T.MeshBasicMaterial({map,transparent:true,depthWrite:false}),world,[x,.024,z]).rotation.x=-Math.PI/2
+ batchStatic(world)
  return m
 }

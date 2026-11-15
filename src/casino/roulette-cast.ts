@@ -1,3 +1,4 @@
+import {batchStatic} from './scene/static-batch.ts'
 import * as T from 'three'
 import {Arm} from './scene/rig.ts'
 import {materials,type Materials} from './scene/materials.ts'
@@ -32,6 +33,7 @@ export class ClubGuest{
   const hair=mesh(new T.SphereGeometry(1,26,16,0,Math.PI*2,0,Math.PI*.48),new T.MeshStandardMaterial({color:style===1?0x342620:style===2?0x9e8b71:0x252524,roughness:.9}),this.head,[0,.035,-.016]);hair.scale.set(.151,.181,.145);hair.rotation.x=-.12
   if(style===1){for(const side of[-1,1]){const glasses=mesh(new T.TorusGeometry(.039,.003,6,20),m.darkGold,this.head,[side*.056,.032,.143]);glasses.scale.y=.66}box(this.head,[.035,.004,.006],[0,.032,.145],m.darkGold,.001)}
   if(dealer){box(this.root,[.105,.045,.012],[.13,1.22,.165],m.brass,.005);for(const side of[-1,1]){const bow=box(this.root,[.065,.035,.03],[side*.035,1.32,.193],m.ebony,.008);bow.rotation.z=side*.2}}
+  batchStatic(this.root);batchStatic(this.head,new Set(this.blink))
   this.left=new Arm(this.root,m,true);this.right=new Arm(this.root,m,false)
   if(!dealer){box(this.root,[.54,.12,.50],[0,.65,-.04],m.leather,.05);box(this.root,[.54,.62,.1],[0,.99,-.26],m.leather,.06);for(const side of[-1,1])limb(this.root,v(side*.23,.6,-.2),v(side*.26,.04,-.22),.022,m.brass)}
  }
