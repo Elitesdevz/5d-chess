@@ -1,3 +1,4 @@
+import {clickMatchSquare,matchSquare} from './helpers/match-board.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
@@ -26,7 +27,7 @@ test('guest landing plays Pip locally and gates account features',async t=>{
  await page.getByRole('button',{name:'Not now'}).click()
  await page.getByRole('button',{name:'Focus player'}).click()
  await page.waitForTimeout(150)
- const square=async(x,y)=>{const box=await page.locator('#scene').boundingBox(),scale=Number((await page.locator('#scale').innerText()).replace('%',''))/100;await page.locator('#scene').click({position:{x:box.width/2+((x+.5-7)*32+.16*((y+.5-7)*32-2))*scale,y:box.height/2+((y+.5-7)*32-2)*.82*scale}})}
+ const square=async(x,y)=>clickMatchSquare(page,x,y,2)
  await square(4,10);await square(5,8);await page.getByRole('button',{name:'Lock orders'}).click()
  await page.getByRole('button',{name:'Begin next round'}).waitFor()
  assert.equal(await page.locator('.outcome').count(),2)

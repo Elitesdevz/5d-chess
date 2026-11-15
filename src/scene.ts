@@ -10,6 +10,7 @@ import {COLORS, drawPiece,drawReliefPiece,equippedEffect} from './art.ts'
 
 interface Camera extends Point {scale: number}
 interface Display {
+  history?: boolean
   objectives?: readonly Coord[]
   state: State
   moves: readonly Candidate[]
@@ -56,6 +57,9 @@ export class Scene {
   private panVelocity: Point = {x: 0, y: 0}
   private lastFrame = 0
   private pulse = 1
+  private rosterHTML=''
+  private rosterHost?:HTMLElement
+  private animationReturn?:Camera
   private mini?: HTMLCanvasElement
   private miniMap?: {x: number; y: number; scale: number}
 
@@ -64,7 +68,49 @@ export class Scene {
     this.projection=angled?ANGLED_VIEW:FLAT_VIEW
     this.canvas.dataset.view=angled?'angled':'flat'
     if(this.rich)try{localStorage.setItem('5d-match-view/v1',angled?'angled':'flat')}catch{}
-    this.fit()
+    this.focus()
+  }
+  setRoster(html:string){
+    if(html===this.rosterHTML)return
+    this.rosterHTML=html
+    if(!this.rosterHost){this.rosterHost=document.createElement('div');this.rosterHost.className='board-rosters';this.rosterHost.setAttribute('aria-label','Board players');this.canvas.parentElement!.append(this.rosterHost)}
+    this.rosterHost.replaceChildren();this.request()
+  }
+  private drawRosters(){
+    if(!this.rosterHost||!this.rosterHTML)return
+    const nodes=[...this.layout.nodes.values()].filter(n=>n.front)
+    if(this.rosterHost.childElementCount!==nodes.length){this.rosterHost.innerHTML=nodes.map(()=>`<div class="board-roster">${this.rosterHTML}</div>`).join('')}
+    nodes.forEach((node,i)=>{
+      const d=this.dimensions(node.size),point=project({x:node.x+d.width/2+16-this.camera.x,y:node.y-d.height/2-this.camera.y},this.projection),host=this.rosterHost!.children[i] as HTMLElement
+      let x=this.width/2+point.x*this.camera.scale,y=this.height/2+point.y*this.camera.scale
+      if(this.width<600){const bottom=project({x:node.x-d.width/2-this.camera.x,y:node.y+d.height/2+34-this.camera.y},this.projection);x=this.width/2+bottom.x*this.camera.scale;y=this.height/2+bottom.y*this.camera.scale;host.style.setProperty('--roster-width',Math.max(180,Math.min(260,d.width*this.camera.scale))+'px')}
+      host.dataset.universe=String(node.u.id);host.dataset.time=String(node.t)
+      host.style.transform=`translate(${x}px,${y}px)`;host.hidden=x>this.width||x+155<0||y>this.height||y+220<0||this.camera.scale<.4
+    })
+  }
+  /** Frame only boards participating in this resolution, never the whole history. */
+  frameAnimation(follow=true){
+    const animation=this.view.animation;if(!animation)return
+    const nodes=[...this.layout.nodes.values()];if(!nodes.length)return
+    const nearest=(p:Point)=>nodes.reduce((a,b)=>Math.hypot(a.x-p.x,a.y-p.y)<Math.hypot(b.x-p.x,b.y-p.y)?a:b)
+    const primary=nearest(this.camera),front=nodes.find(n=>n.front&&n.u.id===primary.u.id)
+    this.animationReturn={...this.camera,...(follow&&front?{x:this.camera.x+front.x-primary.x,y:this.camera.y+front.y-primary.y}:{})}
+    const involved=new Set<Node>()
+    if(animation.travel)for(const t of animation.travel){if(t.points.length){involved.add(nearest(t.points[0]));involved.add(nearest(t.points[t.points.length-1]))}}
+    else for(const o of animation.outcomes)for(const c of [o.move.from,{...o.move.to,u:o.branch??o.move.to.u}]){const n=this.layout.nodes.get(boardKey(c));if(n)involved.add(n)}
+    if(!involved.size)return
+    const points=[...involved].flatMap(n=>{const d=this.dimensions(n.size);return [{x:n.x-d.width/2-12,y:n.y-d.height/2-24},{x:n.x+d.width/2+12,y:n.y+d.height/2+44}]})
+    const minX=Math.min(...points.map(p=>p.x)),maxX=Math.max(...points.map(p=>p.x)),minY=Math.min(...points.map(p=>p.y)),maxY=Math.max(...points.map(p=>p.y))
+    const bounds=projectedBounds(maxX-minX,maxY-minY,this.projection),area=this.availableArea(),scale=Math.min(this.camera.scale,(area.width-32)/bounds.width,(area.height-32)/bounds.height)
+    const offset=unproject({x:(this.width-area.width)/(2*scale),y:(this.height-area.height)/(2*scale)},this.projection)
+    this.center({x:(minX+maxX)/2+offset.x,y:(minY+maxY)/2+offset.y,scale:Math.max(MIN_SCALE,scale)})
+  }
+  finishAnimation(){if(this.animationReturn){this.center(this.animationReturn);this.animationReturn=undefined}}
+  private availableArea(){
+    const area=this.canvas.getBoundingClientRect(),panel=document.getElementById('sidebar')?.getBoundingClientRect()
+    const overlap=panel&&panel.left<area.right&&panel.right>area.left&&panel.top<area.bottom&&panel.bottom>area.top
+    const rosterSpace=this.rosterHTML&&this.width>=600?154:0
+    return {width:(overlap&&panel!.left>area.left+this.width*.5?Math.max(140,panel!.left-area.left-18):this.width)-rosterSpace,height:overlap&&panel!.left<=area.left+12?Math.max(140,panel!.top-area.top-12):this.height}
   }
   private drawMan(ctx:CanvasRenderingContext2D,kind:Parameters<typeof drawPiece>[1],player:Player,x:number,y:number,size:number){
     if(!this.rich){drawPiece(ctx,kind,player,x,y,size);return}
@@ -79,8 +125,8 @@ export class Scene {
     private callbacks: {pick(c?: Coord): void; hover(c?: Coord): void; scale(scale: number): void;
       describe(c: Coord): void; rift(a: number, b: number, usableFrom: number): void}) {
     this.rich=!!canvas.closest('.match-screen')
-    let angled=this.rich
-    try{if(this.rich&&localStorage.getItem('5d-match-view/v1')==='flat')angled=false}catch{}
+    let angled=false
+    try{if(this.rich&&localStorage.getItem('5d-match-view/v1')==='angled')angled=true}catch{}
     this.projection=angled?ANGLED_VIEW:FLAT_VIEW
     canvas.dataset.view=angled?'angled':'flat'
     this.ctx = canvas.getContext('2d')!
@@ -103,7 +149,12 @@ export class Scene {
   }
 
   update(view: Display) {
-    if (view.state !== this.view.state) this.layout = layoutOf(view.state)
+    if (view.state !== this.view.state) {
+      const old=[...this.layout.nodes.values()].filter(n=>n.front).sort((a,b)=>Math.hypot(a.x-this.camera.x,a.y-this.camera.y)-Math.hypot(b.x-this.camera.x,b.y-this.camera.y))[0]
+      const next=layoutOf(view.state)
+      if((view.history||this.view.history)&&!view.animation&&old){const node=[...next.nodes.values()].find(n=>n.front&&n.u.id===old.u.id);if(node){this.camera.x+=node.x-old.x;this.camera.y+=node.y-old.y;this.motion=undefined}}
+      this.layout=next
+    }
     if (view.moves !== this.view.moves) {
       this.targets.clear()
       this.targetBoards.clear()
@@ -264,6 +315,7 @@ export class Scene {
   }
 
   private down(e: PointerEvent) {
+    this.animationReturn=undefined
     if (e.button !== 0 && e.button !== 1) return
     this.canvas.setPointerCapture(e.pointerId)
     this.motion = undefined
@@ -343,6 +395,7 @@ export class Scene {
   }
 
   zoom(factor: number, anchor = {x: this.width / 2, y: this.height / 2}, smooth = false) {
+    this.animationReturn=undefined
     this.motion = undefined
     const w = this.world(anchor)
     const scale = clamp(this.camera.scale * factor, MIN_SCALE, MAX_SCALE)
@@ -381,8 +434,9 @@ export class Scene {
     if (!node) return
     const d = this.dimensions(node.size)
     const bounds=projectedBounds(d.width,d.height,this.projection)
-    const scale = clamp(Math.min((this.width - 48) / bounds.width, (this.height - 154) / bounds.height), .2, this.rich?2.5:1.62)
-    this.center({x: node.x, y: node.y + 2, scale}, smooth)
+    const area=this.availableArea(),scale = clamp(Math.min((area.width - 48) / bounds.width, (area.height - 110) / bounds.height), .2, this.rich?2.5:1.62)
+    const offset=unproject({x:(this.width-area.width)/(2*scale),y:(this.height-area.height)/(2*scale)},this.projection)
+    this.center({x: node.x+offset.x, y: node.y + 2+offset.y, scale}, smooth)
   }
 
   focusPlayer(player?: Player, smooth = true) {
@@ -404,6 +458,7 @@ export class Scene {
   }
 
   private key(e: KeyboardEvent) {
+    this.animationReturn=undefined
     const key = e.key.toLowerCase()
     const panKey = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)
     if (panKey && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
@@ -523,6 +578,7 @@ export class Scene {
       if (move.path) this.drawPath(move, COLORS[move.player], .54, true)
     }
     if (selectedPreview && this.overlays.paths) this.drawPath(selectedPreview, pathColors.gold, .93, false)
+    this.drawRosters()
     this.drawMinimap()
     if (this.view.animation) {
       const {outcomes, started, duration} = this.view.animation

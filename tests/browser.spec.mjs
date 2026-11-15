@@ -1,3 +1,4 @@
+import {clickMatchSquare,matchSquare} from './helpers/match-board.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
@@ -62,10 +63,7 @@ test('four players create a branch and Rift in one scene, then reload, replay, e
   const focusPlayer = () => page.getByRole('button',{name:'Focus player',exact:true}).click()
   async function clickSquare(x,y) {
     await focusPlayer()
-    const box = await canvas.boundingBox()
-    const scale = Number((await page.locator('#scale').textContent()).replace('%',''))/100
-    await canvas.click({position:{x:box.width/2+(x+.5-7)*32*scale,
-      y:box.height/2+((y+.5-7)*32-2)*scale}})
+    await clickMatchSquare(page,x,y,4)
   }
   async function handoff(color) {
     const screen = page.getByRole('dialog')
@@ -94,7 +92,7 @@ test('four players create a branch and Rift in one scene, then reload, replay, e
   await waitText('#turn','Red to plan')
   if (process.env.QA_SCREENSHOT) await page.screenshot({path:process.env.QA_SCREENSHOT})
   assert.equal(await page.locator('#scene').count(),1)
-  assert.equal(await page.locator('#viewport').evaluate(el => el.getBoundingClientRect().right<=document.querySelector('#sidebar').getBoundingClientRect().left),true)
+  assert.equal(await page.locator('#viewport').evaluate(el => el.getBoundingClientRect().right>document.querySelector('#sidebar').getBoundingClientRect().left),true)
   await page.locator('.layer-control summary').click()
   const riftsOverlay = page.getByRole('button',{name:'Temporal Rifts'})
   await riftsOverlay.click()
@@ -187,7 +185,7 @@ test('four players create a branch and Rift in one scene, then reload, replay, e
   assert.deepEqual(errors,[])
 })
 
-test('docked match controls stay clear of the board and adapt after resizing', async t => {
+test('floating match controls move and adapt after resizing', async t => {
   const base = await server(t)
   const browser = await chromium.launch({headless:true, executablePath:process.env.CHROMIUM_EXECUTABLE || undefined,
     args:['--no-sandbox','--disable-dev-shm-usage']})
@@ -201,7 +199,7 @@ test('docked match controls stay clear of the board and adapt after resizing', a
   await page.mouse.down()
   await page.mouse.move(100, 250)
   await page.mouse.up()
-  assert.equal(await page.locator('#sidebar').evaluate(el => el.style.left), '')
+  assert.notEqual(await page.locator('#sidebar').evaluate(el => el.style.left), '')
   assert.equal(await page.locator('.round-panel').evaluate(el => ['auto','scroll'].includes(getComputedStyle(el).overflowY)),true)
   assert.equal(await page.locator('#faction-label').textContent(),'Red')
   for (const width of [768,393,320]) {

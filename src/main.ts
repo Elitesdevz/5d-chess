@@ -1,10 +1,12 @@
+import {type Profile} from './account-model.ts'
+import {profileHref} from './profile-model.ts'
 import {setCosmetics} from './art.ts'
 import {chooseAiPlan} from './ai.ts'
 import {renderGuestNav} from './shell.ts'
 import {initShell} from './shell.ts'
 import {requiredBoards,optionalAllowance} from './rules.ts'
 import {awareness, nextPlayable, threatSquares} from './awareness.ts'
-import {initMatchUI, setMatchHeader, collapseControls,updateMatchUI,updateSelectionInfo} from './ui.ts'
+import {initMatchUI, setMatchHeader, collapseControls,updateMatchUI,updateSelectionInfo,renderMatchPlayers} from './ui.ts'
 import {Scene} from './scene.ts'
 import {COLORS, NAMES, pieceIcon} from './art.ts'
 import {
@@ -21,8 +23,9 @@ const file = element<HTMLInputElement>('import-file')
 const factionNames: Record<Player, string> = {red: 'Red', blue: 'Blue', yellow: 'Yellow', green: 'Green'}
 const seats: Record<Player, string> = {red: 'South', blue: 'West', yellow: 'North', green: 'East'}
 const motion = matchMedia('(prefers-reduced-motion: reduce)')
+let localIdentity:Profile|undefined
 const guestMatch = !new URLSearchParams(location.search).has('local')
-void initShell({redirectHome:guestMatch}).then(data=>{if(data.profile)setCosmetics(Object.fromEntries(['red','blue','yellow','green'].map(p=>[p,data.profile!.loadout]))); else if(guestMatch) renderGuestNav(() => loginPrompt())})
+void initShell({redirectHome:guestMatch}).then(data=>{localIdentity=data.profile??undefined;if(data.profile)setCosmetics(Object.fromEntries(['red','blue','yellow','green'].map(p=>[p,data.profile!.loadout]))); else if(guestMatch) renderGuestNav(() => loginPrompt());update()})
 const requestedCount = new URLSearchParams(location.search).get('players')
 let localMode: PlayerCount = new URLSearchParams(location.search).has('local') && ['2', '3', '4'].includes(requestedCount ?? '')
   ? Number(requestedCount) as PlayerCount : guestMatch ? 2 : 4
@@ -108,7 +111,7 @@ function syncScene() {
   const p = planner(session)
   updateSelectionInfo(shown(),selected,preview())
   const info = p && planning() ? awareness(shown(), p, session.draft) : undefined
-  scene.update({state: shown(), moves: choices, selected, preview: preview(), queued: draftForScene, animation,
+  scene.update({state: shown(), history:frame!==null, moves: choices, selected, preview: preview(), queued: draftForScene, animation,
     playable: info?.playable, checked: info && threatSquares(info.threats)})
 }
 function clearSelection() {
@@ -122,7 +125,7 @@ function update() {
   draftForScene = currentDraft()
   syncScene()
   const s = shown()
-  element('mode-label').textContent = guestMatch ? 'YOU VS PIP · LIVE' : `${playerCount(s) === 2 ? 'TWO' : playerCount(s) === 3 ? 'THREE' : 'FOUR'}-PLAYER · ${s.movement?.toUpperCase() ?? 'LEGACY'} · LOCAL`
+  element('mode-label').textContent = guestMatch ? 'LIVE · GUEST MATCH' : `${playerCount(s) === 2 ? 'TWO' : playerCount(s) === 3 ? 'THREE' : 'FOUR'}-PLAYER · ${s.movement?.toUpperCase() ?? 'LEGACY'} · LOCAL`
   const playing = planner(session)
   const presentTime = present(s)
   const past = frame !== null
@@ -134,8 +137,7 @@ function update() {
   element('metrics').innerHTML = `<span><i class="tiny-dot"></i> Present <b>T${presentTime}</b></span>
     <span><b>${s.universes.length}</b> ${s.universes.length === 1 ? 'universe' : 'universes'}</span>
     <span><b>${s.rifts.length}</b> ${s.rifts.length === 1 ? 'rift' : 'rifts'}</span>`
-  element('factions').innerHTML = (s.movement === 'classic' ? turnOrder(s) : players(s)).map(p => `<span class="faction ${s.eliminated.includes(p) ? 'dead' : ''} ${playing === p && statePhase === 'PLANNING' ? 'active' : ''}" style="--faction:${COLORS[p]}" title="${seats[p]}${s.eliminated.includes(p) ? ' · Eliminated' : ''}">
-    <i></i><span>${name(p)}</span></span>`).join('')
+  renderMatchPlayers(scene,s,element('factions'),(s.movement==='classic'?turnOrder(s):players(s)).map(p=>({player:p,name:p==='red'?(localIdentity?.name??(guestMatch?'You':'Red')):name(p),self:p==='red',rating:p==='red'?localIdentity?.rating.value:undefined,avatar:p==='red'?localIdentity?.loadout.icon:undefined,frame:p==='red'?localIdentity?.loadout.frame:undefined,href:p==='red'&&localIdentity?profileHref(localIdentity.name):undefined,detail:guestMatch?(p==='yellow'?'AI · Easy':'Guest'):seats[p]})))
   element('live-label').textContent = past ? '◌ REPLAY' : '● LIVE'
   element('history-label').textContent = !last ? 'Opening position' :
     past ? frame === 0 ? 'Opening position' : `After round ${frame} of ${last}` : `${last} ${last === 1 ? 'round' : 'rounds'} resolved`
@@ -287,13 +289,12 @@ function animateRound(roundIndex: number, end: () => void) {
   const duration = motion.matches ? 260 : result.travel ? Math.max(1200, Math.min(8000, (result.ticks ?? 0) * 180)) : 1600
   animation = {outcomes: result.outcomes, started: performance.now(), duration, result: result.state, travel: result.travel, ticks: result.ticks}
   update()
-  if (result.outcomes.length) scene.fit()
+  if (result.outcomes.length) scene.frameAnimation(frame===null)
   window.setTimeout(() => {
     animation = undefined
     end()
     update()
-    if (!result.outcomes.length) scene.focusPlayer(planner(session))
-    else if (result.state.universes.length < 6) scene.fit()
+    scene.finishAnimation()
   }, duration + 30)
 }
 
@@ -332,8 +333,7 @@ function goTo(n: number | null) {
   clearSelection()
   caption = ''
   update()
-  if (frame !== null) scene.fit()
-  else scene.focusPlayer(planner(session))
+
 }
 
 function loginPrompt() {
