@@ -2,7 +2,7 @@ import {setCosmetics} from './art.ts'
 import {initShell} from './shell.ts'
 import {requiredBoards} from './rules.ts'
 import {awareness, nextPlayable, threatSquares} from './awareness.ts'
-import {initMatchUI, setMatchHeader, collapseControls} from './ui.ts'
+import {initMatchUI, setMatchHeader, collapseControls,updateMatchUI,updateSelectionInfo} from './ui.ts'
 import {Scene} from './scene.ts'
 import {COLORS, NAMES, pieceIcon} from './art.ts'
 import {
@@ -103,6 +103,7 @@ function currentDraft(): Candidate[] {
 let draftForScene: Candidate[] = []
 function syncScene() {
   const p = planner(session)
+  updateSelectionInfo(shown(),selected,preview())
   const info = p && planning() ? awareness(shown(), p, session.draft) : undefined
   scene.update({state: shown(), moves: choices, selected, preview: preview(), queued: draftForScene, animation,
     playable: info?.playable, checked: info && threatSquares(info.threats)})
@@ -118,7 +119,7 @@ function update() {
   draftForScene = currentDraft()
   syncScene()
   const s = shown()
-  element('mode-label').textContent = `${playerCount(s) === 2 ? 'TWO' : playerCount(s) === 3 ? 'THREE' : 'FOUR'}-PLAYER · ${s.movement?.toUpperCase() ?? 'LEGACY'}`
+  element('mode-label').textContent = `${playerCount(s) === 2 ? 'TWO' : playerCount(s) === 3 ? 'THREE' : 'FOUR'}-PLAYER · ${s.movement?.toUpperCase() ?? 'LEGACY'} · LOCAL`
   const playing = planner(session)
   const presentTime = present(s)
   const past = frame !== null
@@ -144,6 +145,7 @@ function update() {
     'Autosave enabled · Stored on this device')
   element('save-status').textContent = status
   paintPanel()
+  updateMatchUI(scene,s,planning()?playing:undefined,planning()?session.draft:[])
   paintCaption()
 }
 
@@ -153,11 +155,11 @@ function paintCaption() {
   const m = preview()
   const box = element('map-caption')
   if (m) {
-    const tags = [m.branch ? 'BRANCH' : m.castle ? 'CASTLE' : 'MOVE', m.rift ? 'RIFT' : '', m.capture ? 'CAPTURE' : '', m.needsVacancy ? 'REQUIRES VACANCY' : ''].filter(Boolean)
+    const tags = [m.branch ? 'BRANCH' : m.castle ? 'CASTLE' : 'MOVE', m.rift ? 'RIFT' : '', m.capture ? shown().movement==='live'&&!m.enPassant?'TRADE · BOTH LOST':'CAPTURE' : '', m.needsVacancy ? 'REQUIRES VACANCY' : ''].filter(Boolean)
     const route = m.route.map(u => `U${u}`).join(' → ')
     box.innerHTML = `<b>${tags.join(' · ')}</b><span>${orderText(m)}${m.route.length > 1 ? ` <em>via ${route}</em>` : ''}</span>`
   } else {
-    box.textContent = caption
+    box.textContent = caption || 'Drag to pan · Scroll or pinch to zoom'
   }
 }
 
@@ -203,8 +205,8 @@ function paintPanel() {
   turn.innerHTML = `<div class="turn" style="--faction:${COLORS[p]}"><div class="turn-icon">${pieceIcon('K', p, 33)}</div>
     <div><h3>${name(p)} to plan</h3><p>${session.locked.length} of ${alive.length} players ready</p></div></div>`
   controls.innerHTML = `<div class="budget">
-      <div><span>MAIN ORDERS</span><b>${budget.main - main}<small> / ${budget.main}</small></b></div>
-      <div><span>OPTIONAL ORDER</span><b>${1 - extra}<small> / 1</small></b></div>
+      <div><span>REQUIRED LEFT</span><b>${budget.main - main}<small> / ${budget.main}</small></b></div>
+      <div><span>OPTIONAL LEFT</span><b>${s.universes.some(u=>!isMain(u,present(s))&&frontier(u).cells.some(q=>q?.player===p)&&(s.movement!=='classic'||boardTurn(s,u)===p))?1-extra:0}<small> / 1</small></b></div>
     </div>
     <div class="order-title"><h4>Queued orders <span>${session.draft.length}</span></h4><button class="text-button" data-action="clear" ${session.draft.length ? '' : 'disabled'}>Clear</button></div>
     ${draftForScene.length ? `<ol class="order-list">${draftForScene.map((o, i) => `<li>${pieceIcon(o.piece.kind, p, 21)}
@@ -218,7 +220,7 @@ function paintPanel() {
     <div class="planning-links"><button class="text-button" data-action="undo" ${session.draft.length ? '' : 'disabled'}>↶ Undo</button>
     <button class="text-button" data-action="pass" ${session.draft.length || requiredBoards(s, p, session.draft).length ? 'disabled' : ''}>Pass round</button></div>`
   const info = awareness(s, p, session.draft)
-  activity.innerHTML = ((info.remaining.length || info.kingLost) ? '<p class="check-notice">Advisory check: your king is threatened. Review the red highlights.</p>' : '') + (requiredBoards(s, p, session.draft).length ? `<p class="required-notice">${requiredBoards(s, p, session.draft).length} Present boards still need a move.</p>` : '')
+  activity.innerHTML = ((info.remaining.length || info.kingLost) ? '<p class="check-notice">Advisory check: your king is threatened. Review the red highlights.</p>' : '') + (requiredBoards(s, p, session.draft).length ? `<p class="required-notice">${requiredBoards(s, p, session.draft).length} Present ${requiredBoards(s,p,session.draft).length===1?'board still needs':'boards still need'} a move.</p>` : '')
 }
 
 function outcomeText(o: Outcome) {
@@ -461,7 +463,7 @@ element('viewport').querySelectorAll<HTMLButtonElement>('[data-overlay]').forEac
     scene.setOverlay(control.dataset.overlay!, enabled)
   }
 })
-initMatchUI()
+initMatchUI(scene)
 button('help').onclick = () => modal(`<p class="eyebrow">FIELD GUIDE</p><h2>How to play</h2>
   <div class="guide">
     <p><b>${liveState(session).movement === 'classic' ? 'Take turns.' : 'Plan in private.'}</b> ${liveState(session).movement === 'classic' ? 'The player order is shuffled once and repeats. Board outlines show their owners. Play every owned Present board, then submit your turn.' : liveState(session).movement === 'live' ? 'Plan one move on each playable Present board and lock your orders. Every faction plans against the same snapshot; the units travel after everyone locks.' : 'Select one of your pieces, choose a highlighted square, and lock your orders. Pass the device to the next faction.'}</p>

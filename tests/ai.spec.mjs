@@ -15,6 +15,7 @@ test('five AI characters, playable Classic/Live duels, private plans and visible
  const browser=await chromium.launch({headless:true,args:['--no-sandbox']})
  t.after(async()=>{app.drain();await browser.close();await new Promise(r=>{server.close(r);server.closeAllConnections()});store.close();await rm(dir,{recursive:true,force:true})})
  const context=await browser.newContext({viewport:{width:1440,height:950},reducedMotion:'reduce'}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message))
+ await context.addInitScript(()=>localStorage.setItem('5d-match-view/v1','flat'))
  await context.request.post(base+'/api/signup',{data:{username:'Player',password:'p',confirm:'p'}})
  await page.goto(base+'/chess/lobby.html');await page.locator('.home-deal').first().waitFor();await page.getByRole('button',{name:/Play with AI/}).click()
  await page.locator('.ai-card').nth(4).waitFor();assert.equal(await page.locator('.ai-card').count(),5)

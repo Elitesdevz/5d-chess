@@ -23,6 +23,7 @@ test('account and lobby flow uses the multiplayer server', async t => {
     await new Promise(resolve => setTimeout(resolve, 30))
   }
   const page = await browser.newPage()
+  await page.addInitScript(()=>localStorage.setItem('5d-match-view/v1','flat'))
   await page.goto(base + '/chess/login.html')
   await page.getByLabel('Username').fill('Alice')
   await page.getByLabel('Password', {exact:true}).fill('secret')
@@ -58,6 +59,7 @@ test('account and lobby flow uses the multiplayer server', async t => {
   const guests = []
   for (const name of ['Bob', 'Carol', 'Dana']) {
     const context = await browser.newContext()
+    await context.addInitScript(()=>localStorage.setItem('5d-match-view/v1','flat'))
     t.after(() => context.close())
     const signup = await context.request.post(base + '/api/signup', {data:{username:name,password:'p',confirm:'p'}})
     assert.equal(signup.status(),201)
