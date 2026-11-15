@@ -1,0 +1,32 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import {createServer} from 'node:http'
+import {mkdtemp,rm} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+import {chromium} from 'playwright'
+import {ChessStore} from '../server/storage.ts'
+import {createApplication} from '../server/application.ts'
+import {wallet} from '../server/economy.ts'
+import {CASE_DESCRIPTIONS,caseOdds} from '../src/case-presentation.ts'
+import {CRATES} from '../src/collection.ts'
+test('case archive descriptions are unique and odds round without rounding tiny probabilities to zero',()=>{assert.equal(new Set(CRATES.map(c=>CASE_DESCRIPTIONS[c.id])).size,CRATES.length);assert.ok(CRATES.every(c=>CASE_DESCRIPTIONS[c.id]?.length>30));assert.equal(caseOdds(123456),'12.35%');assert.equal(caseOdds(1),'＜0.01%');assert.equal(caseOdds(0),'0%')})
+test('3D roulette controls, camera, persisted result, mobile mat and inspector work with the real server',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'roulette-room-')),store=new ChessStore(dir),app=createApplication(store),server=createServer(app.handle);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({headless:true,args:['--no-sandbox','--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}),context=await browser.newContext({viewport:{width:1440,height:960}}),page=await context.newPage(),errors=[]
+ t.after(async()=>{app.drain();await browser.close();await new Promise(r=>{server.close(r);server.closeAllConnections()});store.close();await rm(dir,{recursive:true,force:true})});page.on('pageerror',e=>errors.push(e.message))
+ await context.request.post(base+'/api/signup',{data:{username:'RoulettePlayer',password:'p',confirm:'p'}});store.transaction(u=>wallet(u.users.get('RoulettePlayer')).coins=20000)
+ await page.goto(base+'/chess/roulette.html');await page.locator('.roulette-room.scene-ready').waitFor({timeout:45000});await page.waitForFunction(()=>Number(document.querySelector('#roulette-canvas').dataset.frame)>2);await page.screenshot({path:'/tmp/roulette-room-seat.png'})
+ await page.locator('[data-table-bet="17"]').click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-choice'),'17');await page.getByRole('button',{name:'500',exact:true}).click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-stake'),'500')
+ await page.getByRole('button',{name:'Rules',exact:true}).click();await page.locator('.roulette-room-modal[open]').waitFor();assert.match(await page.locator('.roulette-room-modal').innerText(),/1%/);await page.getByRole('button',{name:'Close roulette information'}).click()
+ await page.getByRole('button',{name:'Place bet & spin',exact:true}).click();await page.locator('.roulette-room[data-phase=spin]').waitFor();await page.waitForTimeout(1500);await page.screenshot({path:'/tmp/roulette-room-wheel.png'});await page.locator('.roulette-room[data-phase=idle]').waitFor({timeout:30000});assert.equal(await page.locator('#roulette-canvas').getAttribute('data-camera'),'seat')
+ const settled=await(await context.request.get(base+'/api/casino')).json();assert.equal(settled.recent.length,1);assert.equal(await page.locator('#roulette-canvas').getAttribute('data-result'),String(settled.recent[0].result));await page.locator('#round-result:not([hidden])').waitFor();assert.match(await page.locator('#round-result').innerText(),/Credited/)
+ await page.reload();await page.locator('.roulette-room.scene-ready').waitFor({timeout:45000});assert.deepEqual(await(await context.request.get(base+'/api/casino')).json(),settled)
+ await page.getByRole('button',{name:'History',exact:true}).click();await page.locator('#roulette-history-dialog[open]').waitFor();await page.getByRole('button',{name:'Close roulette history'}).click()
+ for(const width of [390,320]){const frame=Number(await page.locator('#roulette-canvas').getAttribute('data-frame'));await page.setViewportSize({width,height:844});await page.waitForFunction(n=>Number(document.querySelector('#roulette-canvas').dataset.frame)>n+1,frame);await page.getByRole('button',{name:'Betting mat',exact:true}).click();await page.locator('[data-pocket="12"]').click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-choice'),'12');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.getByRole('button',{name:'Edit stake',exact:true}).click();await page.locator('.roulette-amount-modal input').fill('125');await page.getByRole('button',{name:'Set stake',exact:true}).click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-stake'),'125');const frame2=Number(await page.locator('#roulette-canvas').getAttribute('data-frame'));await page.waitForFunction(n=>Number(document.querySelector('#roulette-canvas').dataset.frame)>n,frame2);await page.screenshot({path:`/tmp/roulette-room-${width}.png`})}
+ // Force presentation fixtures only: real settlement was verified above.
+ const profile=(await(await context.request.get(base+'/api/me')).json()).profile
+ await page.route('**/api/casino/bet',async route=>{const bet=route.request().postDataJSON(),gross=bet.stake*(bet.choice===0?49:36),tax=(gross-bet.stake)*.01,round={...bet,id:'visual-'+bet.sequence,result:bet.choice,won:true,gross,profit:gross-bet.stake,tax,credited:gross-tax,net:gross-tax-bet.stake,created:Date.now()};await route.fulfill({json:{...settled,profile:{...profile,coins:20000+round.net},coins:20000+round.net,nextSequence:bet.sequence+1,recent:[round],round}})})
+ await page.setViewportSize({width:1280,height:900})
+ for(const [choice,tier]of [[17,'2'],[0,'3']]){await page.getByRole('button',{name:'Betting mat',exact:true}).click();await page.locator(`[data-pocket="${choice}"]`).click();await page.getByRole('button',{name:'Place bet & spin',exact:true}).click();await page.waitForFunction(tier=>document.querySelector('#roulette-canvas').dataset.winTier===tier,tier,{timeout:20000});assert.equal(await page.locator('#roulette-canvas').getAttribute('data-win-glow'),'true');await page.locator('.roulette-room[data-phase=idle]').waitFor({timeout:20000})}
+ await page.goto(base+'/chess/collection.html#shop');await page.locator('[data-crate-pool=skin-bronze]').click();assert.match(await page.locator('.crate-catalog-dialog').innerText(),/hands of the artisans/);assert.ok(await page.locator('.case-rarity-group').count()>0);assert.deepEqual(errors,[])
+})
