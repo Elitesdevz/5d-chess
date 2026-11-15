@@ -6,11 +6,13 @@ import {rouletteArena,rouletteHeading,rouletteWager,animateRoulette,setRouletteS
 import {encounterTrigger,encounterQuestion} from './encounter.ts'
 import {dayKey} from '../collection.ts'
 import {rules} from './casino-panels.ts'
+import type {RouletteRoom} from './roulette-room.ts'
 import type {DiceScene,TableAction} from './dice-scene.ts'
 
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T
 const game=document.body.dataset.casino as CasinoGame
 let state:CasinoView,profile:Profile,choice:RouletteChoice=game==='dice'?1:'white',busy=false,rolling=false,pending:CasinoBet|undefined,awaitingThrow:CasinoRound|undefined,scene:DiceScene|undefined,storageKey='',requestKey='',phase='idle'
+let rouletteRoom:RouletteRoom|undefined
 let soul:EloGamblingView|undefined,tableMode:'normal'|'offer'|'elo'='normal',coinStake=100,normalRolls=0,encounterBusy=false,resetTimer=0
 let projectionFrame=0,presentationCoins=0,dialogueTimer=0,impatienceTimer=0,resultTimer=0
 const title=(c:RouletteChoice)=>typeof c==='number'?game==='dice'?`Face ${c}`:c===0?'The rift · 0':`Square ${c}`:c==='white'?'White court':c==='black'?'Black court':c==='low'?'1–18':c==='high'?'19–36':c==='odd'?'Odd squares':'Even squares'
@@ -25,7 +27,7 @@ function diceRoom(){
 }
 function renderLayout(){el('casino-root').innerHTML=game==='dice'?diceRoom():`${rouletteHeading()}<div class="casino-layout royal-layout">${rouletteArena()}${rouletteWager()}</div><dialog id="roulette-history-dialog" class="table-modal roulette-history-modal"><button id="close-roulette-history" type="button" class="modal-close" aria-label="Close roulette history">×</button><div class="ledger-heading"><div><h2>Your roulette history</h2><p>Past results do not predict the next draw.</p></div><div id="roulette-ledger"></div></div><div id="round-history"></div></dialog>`}
 function setPhase(value:string){phase=value;clearTimeout(impatienceTimer);if(value==='ready')impatienceTimer=window.setTimeout(()=>{if(phase==='ready')say(['“The die will not throw itself.”','“Take your time. Fortune is patient.”','“Still deciding? The ivory is yours.”'][Math.floor(Math.random()*3)])},18000);if(game==='dice')document.querySelector('.silent-room')!.setAttribute('data-phase',value);updateScene()}
-function updateScene(){if(game==='dice'){scene?.setMode(tableMode,stake(),eloQuote(),soul?.reason);scene?.setState(presentationCoins,stake(),Number(choice),busy||encounterBusy)}}
+function updateScene(){if(game==='dice'){scene?.setMode(tableMode,stake(),eloQuote(),soul?.reason);scene?.setState(presentationCoins,stake(),Number(choice),busy||encounterBusy)}else rouletteRoom?.setState(presentationCoins,stake(),choice,busy)}
 function updateChoice(){
  el('chosen-label').textContent=title(choice)
  document.querySelectorAll<HTMLElement>('[data-pocket],[data-outside],[data-face],[data-control^="face-"]').forEach(b=>{
@@ -78,7 +80,7 @@ async function throwDie(){
 }
 async function present(round:CasinoRound,recovered=false){
  safeStore(storageKey,round)
- if(game==='roulette'){if(!recovered)await animateRoulette(round.result);await reveal(round);return}
+ if(game==='roulette'){if(!recovered){if(rouletteRoom)await rouletteRoom.spin(round);else await animateRoulette(round.result)}else rouletteRoom?.land(round.result);await reveal(round);return}
  awaitingThrow=round;setTableMode(round.currency==='elo'?'elo':'normal');choice=round.choice;el<HTMLInputElement>('stake').value=String(round.stake);updateChoice();lock(true);renderHistory()
  if(!recovered){setPhase('exchange');scene?.lockCamera(true);say('Your offer crosses the table.');await scene?.exchange()}
  scene?.lockCamera(true);scene?.ready();setPhase('ready');say(recovered?'Your offer is saved. The die is yours to throw.':'“Your move.”');el('roll-die').hidden=false;el<HTMLButtonElement>('roll-die').disabled=false
@@ -222,6 +224,7 @@ async function init(){
   el('close-roulette-history').onclick=()=>el<HTMLDialogElement>('roulette-history-dialog').close()
   document.querySelectorAll<HTMLButtonElement>('[data-adjust]').forEach(b=>b.onclick=()=>{if(busy)return;const limit=Math.max(1,Math.min(state.maxStake,Math.floor(state.coins)));el<HTMLInputElement>('stake').value=String(Math.max(1,Math.min(limit,b.dataset.adjust==='max'?limit:b.dataset.adjust==='half'?Math.floor(stake()/2):stake()*2)));updateChoice()})
   el('repeat-wager').onclick=()=>{if(busy)return;const last=state.recent.find(r=>r.game==='roulette');if(last){choice=last.choice;el<HTMLInputElement>('stake').value=String(last.stake);updateChoice();el('place-bet').focus()}}
+  try{const {RouletteRoom}=await import('./roulette-room.ts');rouletteRoom=new RouletteRoom(el('casino-root'));updateScene()}catch{document.body.classList.add('roulette-scene-unavailable')}
  }
  if(game==='dice'){
   lock(true);try{const {DiceScene}=await import('./dice-scene.ts');scene=new DiceScene(el<HTMLCanvasElement>('dice-canvas'));updateScene();document.querySelector('.silent-room')!.classList.add('scene-ready');el('encounter-fallback').inert=true;el('wager-form').inert=true;el('wager-form').setAttribute('aria-hidden','true')}
