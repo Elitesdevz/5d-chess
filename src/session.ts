@@ -5,13 +5,15 @@ import {legalMoves, routeKey} from './moves.ts'
 
 export const SAVE_KEY = 'four-player-multiverse-chess/v1'
 export interface Session {
+  /** Journal entries before this boundary use the pre-UI-Polish Live rules. */
+  liveRulesFrom?: number
   frames: State[]
   results: Resolution[]
   journal: Order[][]
   locked: Order[][]
   draft: Order[]
 }
-export const newSession = (count: PlayerCount = 4, movement?: Movement, order = movement === 'classic' ? shuffledPlayers(count) : undefined): Session => ({frames: [initialState(count, movement, order)], results: [], journal: [], locked: [], draft: []})
+export const newSession = (count: PlayerCount = 4, movement?: Movement, order = movement === 'classic' ? shuffledPlayers(count) : undefined): Session => ({liveRulesFrom: 0, frames: [initialState(count, movement, order)], results: [], journal: [], locked: [], draft: []})
 export const liveState = (s: Session) => s.frames[s.frames.length - 1]
 export const planner = (s: Session) => survivors(liveState(s)).length <= 1 ? undefined : liveState(s).movement === 'classic' ? liveState(s).turn : survivors(liveState(s))[s.locked.length]
 
@@ -40,7 +42,7 @@ export function commit(s: Session): Resolution | undefined {
 }
 
 export const encode = (s: Session) => JSON.stringify({
-  format: SAVE_KEY, playerCount: playerCount(s.frames[0]), movement: s.frames[0].movement, turnOrder: s.frames[0].turnOrder, journal: s.journal, locked: s.locked, draft: s.draft.map(cleanOrder)
+  format: SAVE_KEY, liveRulesFrom: s.liveRulesFrom ?? 0, playerCount: playerCount(s.frames[0]), movement: s.frames[0].movement, turnOrder: s.frames[0].turnOrder, journal: s.journal, locked: s.locked, draft: s.draft.map(cleanOrder)
 })
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const natural = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= 0
@@ -80,11 +82,14 @@ export function decode(text: string): Session {
   if (raw.turnOrder !== undefined && (!Array.isArray(raw.turnOrder) || raw.turnOrder.length !== players(base).length ||
       new Set(raw.turnOrder).size !== raw.turnOrder.length || raw.turnOrder.some(p => !players(base).includes(p as Player)))) throw new Error('Invalid player order')
   const s = newSession(count, raw.movement as Movement | undefined, raw.turnOrder as Player[] | undefined)
+  if (raw.liveRulesFrom !== undefined && (!natural(raw.liveRulesFrom) || raw.liveRulesFrom > raw.journal.length)) throw new Error('Invalid Live rules boundary')
+  // Rebuild old history exactly, then use current rules for future rounds.
+  s.liveRulesFrom = (raw.liveRulesFrom ?? raw.journal.length) as number
   for (const row of raw.journal) {
     const snapshot = liveState(s)
     if (survivors(snapshot).length <= 1) throw new Error('Orders after the game ended')
     const batch = orders(row, snapshot.movement ? 512 : 20, snapshot)
-    const result = resolveRound(snapshot, batch)
+    const result = resolveRound(snapshot, batch, {legacyLive: s.journal.length < s.liveRulesFrom!})
     if (result.rejected.length) throw new Error(`Invalid orders in round ${snapshot.round}`)
     s.journal.push(batch)
     s.results.push(result)

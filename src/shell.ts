@@ -55,12 +55,22 @@ function renderEconomyNav(){
  if(!purse){purse=document.createElement('div');purse.className='header-wallet';purse.setAttribute('role','group');purse.setAttribute('aria-label','Coin balance');purse.innerHTML=`<span class="wallet-seal">${icon('coin')}</span><span class="wallet-copy"><small>COINS</small><strong data-coins>0</strong></span>`;header.insertBefore(purse,header.querySelector('.header-actions')??header.querySelector('#account-area'))}
  nav.innerHTML=`<a class="home-nav-link" href="/chess/lobby.html" aria-label="Home" title="Home">${icon('home')}<span>Home</span></a><a href="/chess/collection.html#shop" aria-label="Shop" title="Shop">${icon('shop')}<span>Shop</span></a><a href="/chess/collection.html#inventory" aria-label="Inventory" title="Inventory">${icon('inventory')}<span>Inventory</span></a><a href="/chess/collection.html#market" aria-label="Market" title="Market">${icon('market')}<span>Market</span></a><a class="casino-nav-link" href="/chess/roulette.html" aria-label="Roulette" title="Roulette">${icon('wheel')}<span>Roulette</span></a><a class="casino-nav-link" href="/chess/dice.html" aria-label="Dice" title="Dice">${icon('dice')}<span>Dice</span></a><button class="stocks-nav-button" type="button" aria-label="Stocks" title="Stocks">${icon('chart')}<span>Stocks</span></button>`
  if(document.body.classList.contains('match-screen')){
-  const menu=document.createElement('details');menu.className='match-explore';menu.innerHTML='<summary aria-label="Explore other sections">Explore ⌄</summary><div class="match-explore-links"></div>'
+  const menu=document.createElement('details');menu.className='match-explore';menu.innerHTML='<summary role="button" aria-label="Explore other sections">Explore ⌄</summary><div class="match-explore-links"></div>'
   const host=menu.querySelector('div')!;for(const node of [...nav.children])if(!node.classList.contains('home-nav-link'))host.append(node)
   nav.replaceChildren(menu)
  }
  markCurrentNav()
 
+}
+export function renderGuestNav(promptLogin:()=>void){
+ renderEconomyNav()
+ const header=document.querySelector<HTMLElement>('.app-topbar')!
+ header.classList.add('guest-header')
+ header.querySelector('.header-wallet')?.remove()
+ const nav=header.querySelector<HTMLElement>('.economy-nav')!
+ header.querySelectorAll<HTMLElement>('.economy-nav a, .economy-nav button, .match-home').forEach(item=>item.addEventListener('click',event=>{event.preventDefault();promptLogin()}))
+ const actions=header.querySelector<HTMLElement>('.header-actions')!
+ const start=document.createElement('button');start.type='button';start.className='button primary guest-start';start.textContent='Start new game';start.onclick=()=>document.getElementById('new')?.click();actions.append(start)
 }
 export function updateNoticeCount(count:number){document.querySelectorAll<HTMLElement>('[data-notification-count]').forEach(el=>{el.hidden=!count;el.textContent=String(count)})}
 export async function fetchNotices(){const data=await api<{items:Notice[];unread:number}>('/notifications');updateNoticeCount(data.unread);renderNotificationPanel(data.items);return data}

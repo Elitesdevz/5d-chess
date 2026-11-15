@@ -10,7 +10,7 @@ test('case slots rotate deterministically with exact categories, permanent stock
  assert.equal(new Set(offers.map(o=>o.id)).size,15);assert.deepEqual(caseOffers(nextReset(now)-1),offers)
  assert.deepEqual(weeklyCases(nextWeek(now)-1),weeklyCases(now));assert.notDeepEqual(weeklyCases(nextWeek(now)),weeklyCases(now))
  assert.deepEqual(weeklyCases(now).map(c=>c.setChance===1000000?'sets':c.type),['icon','skin','shape','mixed','frame','sets'])
- assert.equal(weeklyItems(now).length,4);assert.ok(weeklyItems(now).every(i=>i.price>=700));assert.equal(seasonalItems(now).length,3);assert.ok(seasonalItems(now).every(i=>i.monthly))
+ assert.equal(weeklyItems(now).length,6);assert.ok(weeklyItems(now).every(i=>i.price>=700));assert.equal(seasonalItems(now).length,5);assert.ok(seasonalItems(now).every(i=>i.monthly||['movement','capture'].includes(i.type)))
  const expired=CASES.find(c=>!offers.some(o=>o.id===c.id));assert.throws(()=>buyCrate(user('A'),expired.id,now),/rotated out/)
  const daily=offers.find(o=>o.window==='daily');assert.throws(()=>buyCrate(user('A'),daily.id,now,undefined,'bad-day',daily.price),/offer has changed/)
  const u=user('B'),drop=buyCrate(u,'skin-bronze',now);assert.ok(KINDS.includes(drop.kind));assert.equal(drop.setId,undefined);assert.equal(u.wallet.coins,999840)

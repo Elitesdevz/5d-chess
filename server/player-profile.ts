@@ -1,6 +1,6 @@
 import {BIO_LIMIT,type ShowcaseSkin,type PlayerCard,type ProfileEditor,type HistoryEntry,type HistoryPage} from '../src/profile-model.ts'
 import {KINDS,PLAYERS,type Player} from '../src/model.ts'
-import {itemById,covers} from '../src/collection.ts'
+import {itemById,covers,setById,SETS,planSet} from '../src/collection.ts'
 import type {CasinoState} from '../src/casino-model.ts'
 import type {Account} from './accounts.ts'
 import {profile} from './accounts.ts'
@@ -9,24 +9,24 @@ import type {ChessStore,UnitOfWork} from './storage.ts'
 import type {Reply} from './model.ts'
 import {fail} from './http.ts'
 
-function available(account:Account,itemId:string,kind?:ShowcaseSkin['kind']){return account.wallet?.inventory.some(o=>covers(o,itemId,kind)&&!o.pending&&!o.listed)??false}
+function available(account:Account,itemId:string,kind?:ShowcaseSkin['kind']){const set=setById(itemId);return set?planSet(account.wallet?.inventory??[],set).complete:account.wallet?.inventory.some(o=>covers(o,itemId,kind)&&!o.pending&&!o.listed)??false}
 export function profileCard(store:ChessStore,account:Account,viewer:string):PlayerCard{
  const rank=store.leaderboard().find(p=>p.name===account.name),identity=account.publicIdentity
- return {name:account.name,avatar:account.wallet?.loadout.icon??'default',frame:account.wallet?.loadout.frame,rating:Math.round(account.rating?.value??1200),games:account.rating?.games??0,rank:rank?.rank??0,bio:identity?.bio??'',showcase:(identity?.showcase??[]).filter(s=>itemById(s.itemId)?.type==='skin'&&available(account,s.itemId,s.kind)),owner:account.name===viewer,record:store.profileRecord(account.name)}
+ return {name:account.name,avatar:account.wallet?.loadout.icon??'default',frame:account.wallet?.loadout.frame,rating:Math.round(account.rating?.value??1200),games:account.rating?.games??0,rank:rank?.rank??0,bio:identity?.bio??'',showcase:(identity?.showcase??[]).filter(s=>!!(itemById(s.itemId)||setById(s.itemId))&&available(account,s.itemId,s.kind)),owner:account.name===viewer,record:store.profileRecord(account.name)}
 }
 function editor(account:Account):ProfileEditor{
  const identity=account.publicIdentity,w=wallet(account),usable=w.inventory.filter(o=>!o.pending&&!o.listed),ids=[...new Set(usable.map(o=>o.itemId))]
- return {bio:identity?.bio??'',showcase:(identity?.showcase??[]).filter(s=>available(account,s.itemId,s.kind)),revision:identity?.revision??0,avatar:w.loadout.icon,frame:w.loadout.frame??'default',icons:ids.filter(id=>itemById(id)?.type==='icon'),frames:ids.filter(id=>itemById(id)?.type==='frame'),skins:ids.filter(id=>itemById(id)?.type==='skin').map(itemId=>({itemId,kinds:KINDS.filter(k=>available(account,itemId,k))}))}
+ return {bio:identity?.bio??'',showcase:(identity?.showcase??[]).filter(s=>available(account,s.itemId,s.kind)),revision:identity?.revision??0,avatar:w.loadout.icon,frame:w.loadout.frame??'default',icons:ids.filter(id=>itemById(id)?.type==='icon'),frames:ids.filter(id=>itemById(id)?.type==='frame'),skins:[...ids.filter(id=>!!itemById(id)).map(itemId=>({itemId,kinds:['skin','shape'].includes(itemById(itemId)!.type)?KINDS.filter(k=>available(account,itemId,k)):[...KINDS]})),...SETS.filter(set=>planSet(usable,set).complete).map(set=>({itemId:set.id,kinds:[...KINDS]}))]}
 }
 function save(account:Account,data:Record<string,unknown>){
  if(!Number.isSafeInteger(data.revision)||data.revision!==(account.publicIdentity?.revision??0))fail(409,'Your profile changed in another tab. Reload the editor before saving.')
  if(typeof data.bio!=='string'||data.bio.length>BIO_LIMIT||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(data.bio))fail(400,`Description must be plain text of at most ${BIO_LIMIT} characters`)
- if(!Array.isArray(data.showcase)||data.showcase.length>3)fail(400,'Choose up to three different skins')
+ if(!Array.isArray(data.showcase)||data.showcase.length>3)fail(400,'Choose up to three different items')
  const showcase:ShowcaseSkin[]=[]
  for(const raw of data.showcase){
-  if(!raw||typeof raw!=='object'||typeof raw.itemId!=='string'||itemById(raw.itemId)?.type!=='skin'||!KINDS.includes(raw.kind)||!PLAYERS.includes(raw.color))fail(400,'Choose valid skins, piece types and faction colors')
-  if(showcase.some(s=>s.itemId===raw.itemId))fail(400,'Choose three different skin designs')
-  if(!available(account,raw.itemId,raw.kind))fail(409,'A showcased skin is no longer available in your inventory')
+  if(!raw||typeof raw!=='object'||typeof raw.itemId!=='string'||!(itemById(raw.itemId)||setById(raw.itemId))||!KINDS.includes(raw.kind)||!PLAYERS.includes(raw.color))fail(400,'Choose valid items, piece types and faction colors')
+  if(showcase.some(s=>s.itemId===raw.itemId))fail(400,'Choose three different items')
+  if(!available(account,raw.itemId,raw.kind))fail(409,'A showcased item is no longer available in your inventory')
   showcase.push({itemId:raw.itemId,kind:raw.kind,color:raw.color})
  }
  // Validate the entire appearance on a copy before changing any live fields.

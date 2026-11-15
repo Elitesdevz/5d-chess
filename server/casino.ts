@@ -67,7 +67,7 @@ export function casinoBet(account:Account,accounts:Account[],input:unknown,now=D
   owner??=ensureCasinoOwner(accounts)
   wallet(owner).coins=owner===account?(next+tax)/10000:(treasury+tax)/10000
   notify(owner,{
-   kind:'casino',code:'',game:bet.game,
+   kind:'casino',code:'',game:bet.game,permanent:true,
    title:`${account.name} won ${casinoCoins(round.profit)} coins`,
    detail:`${account.name} won ${casinoCoins(round.profit)} coins of profit at ${bet.game==='dice'?'Dice':'Roulette'}. You received ${casinoCoins(round.tax)} coins (1% of profit).`,
   })

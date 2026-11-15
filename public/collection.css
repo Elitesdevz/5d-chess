@@ -469,3 +469,115 @@
 @media(max-width:600px){.shop-main .monthly-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.shop-rail .weekly-panel{padding:14px}.shop-rail .featured-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.shop-rail .featured-card{display:flex!important;flex-direction:column;text-align:center;padding:10px!important;min-height:0}.shop-rail .feature-art-button{width:100%!important;height:65px}.shop-rail .featured-card .item-picture{height:65px!important;width:100%}.shop-rail .featured-card>strong{font-size:13px!important;margin:6px 0!important}.shop-rail .featured-card>.button{width:100%;margin-top:7px}.shop-rail .etc-set{display:flex}.shop-main .section-title{flex-wrap:wrap}.shop-main .section-title h2{font-size:22px}}
 
 .shop-rail .featured-card>.feature-art-button{grid-column:1;grid-row:1/4}.shop-rail .featured-card>.rarity-label{grid-column:2;grid-row:1}.shop-rail .featured-card>strong{grid-column:2;grid-row:2;position:relative;z-index:1}.shop-rail .featured-card>[data-buy]{grid-column:2;grid-row:3}.shop-rail .item-picture,.shop-main .seasonal-direct .item-picture{min-height:0!important}.shop-main .seasonal-direct .feature-art-button{height:90px!important;flex:0 0 90px}.shop-main .seasonal-direct .item-picture{height:86px!important}.shop-main .seasonal-direct .rarity-label{margin-top:5px}
+/* Shop categories sit between the page title and collection navigation. */
+.shop-filters { display:flex; align-items:center; justify-content:center; flex:1; flex-wrap:wrap; gap:5px; min-width:0; }
+.shop-filters button { border:1px solid transparent; border-radius:7px; background:transparent; color:#b9cbbd; padding:8px 9px; font:inherit; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.shop-filters button:hover { background:#78945720; color:#ecf4df; }
+.shop-filters button[aria-pressed=true] { color:#d8eabf; background:#78945730; border-color:#9bbd7855; }
+.shop-filters button:focus-visible { outline:2px solid #bad292; outline-offset:2px; }
+.shop-filter-empty { padding:28px; margin:0; border:1px solid #809b7055; border-radius:12px; color:#b9cbbd; background:#1b2a31; }
+#shop .featured-card[hidden], #shop .crate-card[hidden], #shop section[hidden], #shop div[hidden], #shop h3[hidden] { display:none!important; }
+@media(max-width:1000px) { .collection-heading:has(.shop-filters:not([hidden])) { flex-wrap:wrap; } .shop-filters { order:3; flex-basis:100%; justify-content:flex-start; } }
+@media(max-width:600px) { .shop-filters { order:0; width:100%; justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; } .shop-filters button { flex:none; } }
+/* Inventory: a focused workspace for choosing, previewing and managing a look. */
+.inventory-section-label { color:#a8c596; font-size:10px; font-weight:700; letter-spacing:1.7px; }
+.inventory-subtabs { gap:4px; padding:5px; margin:0 0 20px; width:max-content; max-width:100%; border:1px solid #66847345; border-radius:11px; background:#14242a; }
+.inventory-subtabs button { border:1px solid transparent; border-radius:7px; background:transparent; color:#b5c8bd; padding:10px 15px; font-weight:650; }
+.inventory-subtabs button:hover { color:#eff6e6; background:#496c5138; }
+.inventory-subtabs button[aria-pressed=true] { border-color:#98b88766; background:#405b4b; color:#f1f8e9; }
+.inventory-tab-count { display:inline-grid; place-items:center; min-width:20px; height:20px; margin-left:5px; border-radius:10px; background:#b9d496; color:#17291f; font-size:10px; }
+.inventory-attention { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; padding:13px 16px; border:1px solid #d6b97877; border-radius:10px; background:#6d542c35; color:#f0dba8; font-size:13px; }
+.inventory-attention button { padding:5px; border:0; background:none; color:#f3dfa9; font-weight:700; cursor:pointer; }
+.inventory-layout { grid-template-columns:126px minmax(260px,.82fr) minmax(0,1.5fr); gap:14px; align-items:start; }
+.equipment-slot-column { position:sticky; top:20px; min-width:0; }
+.inventory-section-label { padding:5px 9px 12px; }
+.equipment-slots { position:static; gap:5px; }
+.equipment-slots button { min-height:55px; padding:9px 10px; border:1px solid transparent; border-radius:9px; background:#192b30d9; color:#b9c9bf; font-size:12px; cursor:pointer; }
+.equipment-slots button:hover { background:#2c4744; }
+.equipment-slots button[aria-pressed=true] { background:#345047; border-color:#a0c383; color:#eff8e7; box-shadow:inset 3px 0 #b6d495; }
+.equipment-preview,.inventory-armory { border:1px solid #718f7b55; border-radius:16px; background:linear-gradient(145deg,#20343af7,#18282ff9); box-shadow:0 14px 35px #0002; }
+.equipment-preview { min-height:0; padding:16px; }
+.equipment-preview .preview-canvas { min-height:225px; border-radius:11px; border-color:#8ea98633; background:radial-gradient(circle at 50% 38%,#3b5a49,#152622 72%); }
+.equipment-preview .preview-colors { margin:12px 0 5px; }
+.equipment-preview h2 { margin:12px 0 6px; font-size:18px; }
+.equipment-preview .look-summary { gap:6px; margin:10px 0 0; }
+.look-summary > span { padding:10px 5px; background:#14272d; }
+.equip-actions { gap:7px; margin-top:12px; }
+.inventory-armory { padding:18px; }
+.inventory-armory .inventory-layers { margin-bottom:16px; }
+.inventory-armory .section-title { margin:0 0 3px; }
+.inventory-armory .section-title h2 { font-size:21px; }
+.inventory-hint { margin:0 0 14px; color:#a9beb3; font-size:12px; line-height:1.5; }
+.inventory-tools { gap:8px; }
+.inventory-tools input,.inventory-tools select { min-width:0; border-color:#78978355; border-radius:8px; background:#14252b; }
+.inventory-filter-row { display:flex; justify-content:flex-end; min-height:8px; }
+#inventory-clear-filters { margin:4px 0; color:#c5dda9; font-size:11px; }
+.inventory-grid { gap:9px; }
+.owned-card { padding:10px; gap:5px; border:1px solid #738f7044; border-top:2px solid var(--rarity); border-radius:10px; background:#1c3034; }
+.owned-card:has(.preview-item[aria-pressed=true]) { border-color:#bad995; background:#2c493f; box-shadow:0 0 0 1px #bad99566; }
+.owned-card .preview-item { border-radius:6px; }
+.owned-card .item-picture { min-height:72px; }
+.owned-card .item-picture svg { width:68px; height:68px; }
+.owned-card strong { color:#edf4e8; font-size:12px; line-height:1.35; }
+.owned-card .copy-tag { color:#b2c4b6; font-size:10px; }
+.owned-card .copy-tag.pending { color:#f1d491; }
+.owned-card .manage-copy-link { align-self:start; margin-top:auto; padding:6px 0 2px; border:0; background:none; color:#b6d4a8; font-size:10px; cursor:pointer; }
+.owned-card .manage-copy-link:hover { text-decoration:underline; }
+.inventory-empty { padding:24px; color:#aec2b5; line-height:1.5; }
+.inventory-empty strong { display:block; color:#ebf4e8; font-size:15px; }
+.inventory-subtabs button:focus-visible,.equipment-slots button:focus-visible,.preview-item:focus-visible,.manage-copy-link:focus-visible { outline:2px solid #c1dfa1; outline-offset:2px; }
+@media(min-width:951px) { .inventory-armory { max-height:max(460px,calc(100dvh - 250px)); } }
+@media(max-width:950px) { .inventory-layout { grid-template-columns:112px minmax(0,1fr); } .equipment-slot-column { position:static; } .inventory-armory { grid-column:1/-1; } }
+@media(max-width:600px) { .inventory-subtabs { display:flex; flex-wrap:nowrap; width:100%; overflow-x:auto; box-sizing:border-box; } .inventory-subtabs button { flex:none; white-space:nowrap; font-size:11px; padding:10px 12px; } .inventory-layout { display:flex; flex-direction:column; gap:12px; } .equipment-slot-column,.equipment-preview,.inventory-armory { width:100%; box-sizing:border-box; } .inventory-section-label { padding:4px 2px 8px; } .equipment-slots { display:flex; overflow-x:auto; padding:2px 2px 6px; } .equipment-slots button { min-width:67px; min-height:66px; justify-content:center; } .equipment-preview { position:static; } .equipment-preview .preview-canvas { min-height:185px; } .equipment-preview .preview-canvas > svg { width:145px; height:145px; } .inventory-armory { max-height:none; } .inventory-grid { overflow:visible; } .inventory-tools { grid-template-columns:1fr 1fr; } .inventory-attention { align-items:flex-start; } }
+/* Put started sets first and show missing pieces as silhouettes. */
+.set-group-heading { grid-column:1/-1; margin:14px 0 0; color:#b6c9bc; font-size:12px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+.set-group-heading:first-child { margin-top:0; }
+.set-unstarted .set-card-art { filter:grayscale(1) brightness(.12); opacity:.75; }
+.set-unstarted { border-top-color:#56665f; }
+.set-piece-grid .missing { opacity:.55; filter:grayscale(1) brightness(.08); }
+.set-piece-grid .unavailable { opacity:.48; filter:grayscale(.8); border-style:dashed; }
+.set-collection-tools { flex-wrap:wrap; gap:12px; }
+.set-collection-tools label:first-child { flex:1; min-width:190px; }
+.set-collection-tools input[type=search] { width:100%; box-sizing:border-box; }
+.set-collection-tools select { min-width:145px; }
+@media(max-width:600px) { .set-collection-tools { flex-direction:row; align-items:end; } .set-collection-tools label:first-child { flex-basis:100%; } .set-collection-tools label:not(:first-child) { flex:1; min-width:0; } .set-collection-tools select { min-width:0; width:100%; } }
+.collection-heading > .inventory-subtabs { margin:0 auto; }
+@media(max-width:1000px) { .collection-heading:has(> .inventory-subtabs:not([hidden])) { flex-wrap:wrap; } .collection-heading > .inventory-subtabs { order:3; } }
+@media(max-width:600px) { .collection-heading > .inventory-subtabs { order:3; } }
+.inventory-layers { flex-wrap:wrap; }
+.inventory-layers button { min-width:72px; }
+.effect-stage .effect-art { width:min(220px,90%); height:170px; }
+.effect-stage .effect-preview-mark { position:absolute; right:10px; bottom:10px; width:80px; height:54px; padding:3px; border:1px solid #8ea98655; border-radius:8px; background:#14252be8; }
+.effect-stage .effect-preview-mark .effect-art { width:100%; height:100%; }
+/* Compact inventory tiles use the available shelf width. */
+#inventory-grid { grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:8px; }
+#inventory-grid .owned-card { padding:8px; gap:3px; }
+#inventory-grid .preview-item { gap:4px; }
+#inventory-grid .owned-card .item-picture { min-height:58px; height:58px; }
+#inventory-grid .owned-card .item-picture svg { width:56px; height:56px; }
+#inventory-grid .owned-card .item-picture > .framed-avatar { width:56px; height:56px; }
+#inventory-grid .owned-card strong { font-size:11px; }
+#inventory-grid .owned-card .manage-copy-link { padding-top:4px; }
+#inventory-grid .preview-item[aria-pressed=true] { outline-offset:2px; }
+@media(max-width:600px) { #inventory-grid { grid-template-columns:repeat(auto-fill,minmax(94px,1fr)); gap:7px; } #inventory-grid .owned-card { padding:7px; } #inventory-grid .owned-card .item-picture { min-height:50px; height:50px; } #inventory-grid .owned-card .item-picture svg { width:48px; height:48px; } }
+/* Two rows per page, without a nested scrolling shelf. */
+@media(min-width:601px) { .inventory-armory { max-height:none; } #inventory-grid { overflow:visible; min-height:0; padding:2px; margin:0; } }
+.inventory-pagination { display:flex; align-items:center; justify-content:center; gap:16px; margin-top:14px; }
+.inventory-pagination span { color:#b9cbbf; font-size:12px; font-variant-numeric:tabular-nums; }
+.inventory-pagination .button { min-width:88px; min-height:34px; padding:7px 12px; font-size:11px; }
+@media(min-width:951px) and (max-height:850px) {
+  .collection-page:has(#inventory:not([hidden])) { padding-top:10px; padding-bottom:10px; }
+  .collection-heading:has(> #inventory-subtabs:not([hidden])) { padding:10px 18px; margin-bottom:10px; }
+  .inventory-armory { padding:12px; }
+  .inventory-armory .inventory-layers { margin-bottom:8px; }
+  .inventory-layers button { padding:8px 10px; }
+  .inventory-hint { margin-bottom:7px; }
+  #inventory-grid .owned-card .item-picture { min-height:46px; height:46px; }
+  #inventory-grid .owned-card .item-picture svg { width:44px; height:44px; }
+  #inventory-grid .owned-card { padding:6px; }
+  .inventory-pagination { margin-top:8px; }
+  .equipment-slots button { min-height:45px; padding:5px 9px; }
+  .equipment-preview .preview-canvas { min-height:170px; }
+  .equipment-preview .preview-canvas > svg { width:150px; height:150px; }
+  .equipment-preview .preview-colors { margin:8px 0 2px; }
+}

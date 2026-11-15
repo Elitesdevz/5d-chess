@@ -5,7 +5,7 @@ import {sourceBudget} from './resolve.ts'
 import {requiredBoards} from './rules.ts'
 import {Scene} from './scene.ts'
 import {NAMES,pieceIcon} from './art.ts'
-import {api,getSession,initShell} from './shell.ts'
+import {api,getSession,initShell,refreshRating} from './shell.ts'
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T
 const esc=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!))
 let puzzle=puzzleById(Number(new URLSearchParams(location.search).get('lesson')))||PUZZLES[0],state=puzzle.setup()
@@ -36,11 +36,13 @@ async function syncPending(){
  saving=true
  try{
   if(!accountLoaded){const remote=await api<{completed:number[]}>('/puzzles');completed=new Set([...remote.completed,...pending.keys()]);accountLoaded=true}
+  let earned=0
   for(const [id,orders]of pending){
-   const saved=await api<{completed:number[]}>(`/puzzles/${id}/solve`,{orders})
-   saved.completed.forEach(n=>completed.add(n));pending.delete(id);persist()
+   const saved=await api<{completed:number[];reward:number}>(`/puzzles/${id}/solve`,{orders})
+   earned+=saved.reward; saved.completed.forEach(n=>completed.add(n));pending.delete(id);persist()
   }
-  saveMessage('Progress saved to your account.');renderProgress()
+  if(earned)void refreshRating().catch(()=>{})
+  saveMessage(earned?`Progress saved. +${earned} coins earned.`:'Progress saved to your account.');renderProgress()
  }catch{persist();saveMessage(storageAvailable?'Saved on this browser. Account sync will retry when you reconnect.':'Account sync unavailable. Keep this tab open to retry.')}finally{saving=false}
 }
 function sync(){scene.update({state:attempt?.result?.state??state,moves:locked()?[]:choices,queued:locked()?[]:[...draft,...enemyCandidates()],selected:locked()?undefined:selected,preview:locked()?undefined:hover,objectives:locked()?[]:puzzle.targets,playable:locked()?[]:requiredBoards(state,puzzle.player,draft),animation})}
@@ -51,7 +53,7 @@ function pick(c?:Coord){
  if(c&&pieceAt(state,c)?.player===puzzle.player){
   const u=state.universes.find(u=>u.id===c.u)!
   if(frontier(u).t!==c.t){feedback('Only the latest board in a universe can supply an order. Select its frontier piece.');return}
-  if(!sourceBudget(state,c,draft.filter(o=>boardKey(o.from)!==boardKey(c)))){feedback('You already used your optional source. Remove that order before choosing another optional board.');return}
+  if(!sourceBudget(state,c,draft.filter(o=>boardKey(o.from)!==boardKey(c)))){feedback('Your optional allowance is full. Remove an optional order before choosing another board.');return}
   selected=c;choices=legalMoves(state,c);hover=undefined;routeChoices=[];render();return
  }
  selected=undefined;choices=[];hover=undefined;routeChoices=[];render()

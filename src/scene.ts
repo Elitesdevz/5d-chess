@@ -527,7 +527,7 @@ export class Scene {
     if (this.view.animation) {
       const {outcomes, started, duration} = this.view.animation
       const p = clamp((now - started) / duration, 0, 1)
-      if (this.view.animation.travel) this.drawTravel(this.view.animation.travel, p * ((this.view.animation.ticks ?? 1)+(outcomes.some(o=>o.captures.length&&equippedEffect(o.move.player,'capture')!=='default')?1.8:0)))
+      if (this.view.animation.travel) this.drawTravel(this.view.animation.travel, p * ((this.view.animation.ticks ?? 1)+(outcomes.some(o=>o.captures.length&&equippedEffect(o.move.player,'capture',o.move.piece.kind)!=='default')?1.8:0)))
       else this.drawAnimation(outcomes, p)
       if (p < 1) this.request()
     }
@@ -778,7 +778,7 @@ export class Scene {
       const at = travelPosition(trace.points, Math.min(tick, trace.endTick))
       if (trace.collision && tick >= trace.endTick) {
         const attack=this.view.animation?.outcomes.find(o=>o.captures.some(c=>c.piece.player===trace.piece.player&&c.piece.kind===trace.piece.kind&&coordKey(c.at)===coordKey(trace.to)))
-        if(attack&&drawCapture(ctx,equippedEffect(attack.move.player,'capture'),at,(tick-trace.endTick)/1.8,()=>this.drawMan(ctx,trace.piece.kind,trace.piece.player,0,0,32),reduced.matches))continue
+        if(attack&&drawCapture(ctx,equippedEffect(attack.move.player,'capture',attack.move.piece.kind),at,(tick-trace.endTick)/1.8,()=>this.drawMan(ctx,trace.piece.kind,trace.piece.player,0,0,32),reduced.matches))continue
 
         const fade = Math.max(0, 1 - (tick - trace.endTick) / 1.5)
         if (fade) {
@@ -789,7 +789,7 @@ export class Scene {
       }
       const instant=trace.endTick===0&&trace.distance>0
       const tail=instant?trace.points[0]:travelPosition(trace.points,Math.max(0,Math.min(tick,trace.endTick)-.65))
-      if(tick<trace.endTick||instant&&tick<1)drawMovement(ctx,equippedEffect(trace.piece.player,'movement'),[tail,at],at,instant?performance.now()/1000:tick,(x,y,alpha)=>{ctx.save();ctx.globalAlpha=alpha;this.drawMan(ctx,trace.piece.kind,trace.piece.player,x,y,32);ctx.restore()},reduced.matches)
+      if(tick<trace.endTick||instant&&tick<1)drawMovement(ctx,equippedEffect(trace.piece.player,'movement',trace.piece.kind),[tail,at],at,instant?performance.now()/1000:tick,(x,y,alpha)=>{ctx.save();ctx.globalAlpha=alpha;this.drawMan(ctx,trace.piece.kind,trace.piece.player,x,y,32);ctx.restore()},reduced.matches)
       this.drawMan(ctx, trace.piece.kind, trace.piece.player, at.x, at.y, 32)
     }
   }
@@ -803,7 +803,7 @@ export class Scene {
         return this.view.animation?.result ? {...c, u, t: frontier(getUniverse(this.view.animation.result, u)!).t} : c
       }
       const end = this.squarePoint(arrival(move.to))
-      const captureEffect=equippedEffect(move.player,'capture'),captureArrival=captures.length&&captureEffect!=='default'?.58:1/1.15
+      const captureEffect=equippedEffect(move.player,'capture',move.piece.kind),captureArrival=captures.length&&captureEffect!=='default'?.58:1/1.15
       if (status === 'applied') {
         const parts = move.castle ? [move, {...move.castle, path: [move.castle.from, move.castle.to]}] : [move]
         for (const leg of parts) {
@@ -813,7 +813,7 @@ export class Scene {
           const b = this.squarePoint(path[Math.min(path.length - 1, Math.ceil(position))])
           const k = position % 1
           const at={x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k}
-          if(p<captureArrival)drawMovement(ctx,equippedEffect(leg.piece.player,'movement'),[a,at],at,p,(x,y,alpha)=>{ctx.save();ctx.globalAlpha=alpha;this.drawMan(ctx,leg.piece.kind,leg.piece.player,x,y,33);ctx.restore()},reduced.matches)
+          if(p<captureArrival)drawMovement(ctx,equippedEffect(leg.piece.player,'movement',leg.piece.kind),[a,at],at,p,(x,y,alpha)=>{ctx.save();ctx.globalAlpha=alpha;this.drawMan(ctx,leg.piece.kind,leg.piece.player,x,y,33);ctx.restore()},reduced.matches)
           this.drawMan(ctx,leg.piece.kind,leg.piece.player,at.x,at.y,33)
         }
       }

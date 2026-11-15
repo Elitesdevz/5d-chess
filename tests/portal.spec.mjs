@@ -199,6 +199,6 @@ test('account and lobby flow uses the multiplayer server', async t => {
   await page.getByRole('button',{name:'Account menu'}).click()
   await page.getByRole('button',{name:'Log out',exact:true}).click()
   await page.waitForURL(base+'/chess/')
-  assert.equal(await page.locator('#factions .faction').count(),4)
+  assert.equal(await page.locator('#factions .faction').count(),2)
 
 })

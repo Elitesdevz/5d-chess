@@ -15,7 +15,7 @@ export function sourceBudget(s: State, from: Coord, orders: readonly Order[]): '
   const t = present(s)
   const main = orders.filter(o => isMain(getUniverse(s, o.from.u)!, t)).length
   if (isMain(u, t)) return main < moveBudget(s).main ? 'main' : null
-  return orders.length - main < 1 ? 'optional' : null
+  return orders.length - main < moveBudget(s).optional ? 'optional' : null
 }
 
 function validate(s: State, orders: readonly Order[]) {
@@ -204,7 +204,7 @@ function resolveFrozen(s: State, valid: Candidate[], rejected: Resolution['rejec
     outcomes, rejected, eliminated}
 }
 
-export function resolveRound(s: State, orders: readonly Order[], options: {partial?: boolean} = {}): Resolution {
+export function resolveRound(s: State, orders: readonly Order[], options: {partial?: boolean; legacyLive?: boolean} = {}): Resolution {
   const {valid, rejected} = validate(s, orders)
   if (survivors(s).length <= 1) return {state: s, outcomes: [], rejected, eliminated: []}
   if (s.movement && !options.partial) {
@@ -213,5 +213,5 @@ export function resolveRound(s: State, orders: readonly Order[], options: {parti
     }
   }
   if (s.movement && rejected.length) return {state: s, outcomes: [], rejected, eliminated: []}
-  return s.movement === 'live' ? resolveLive(s, valid, rejected) : resolveFrozen(s, valid, rejected)
+  return s.movement === 'live' ? resolveLive(s, valid, rejected, options.legacyLive) : resolveFrozen(s, valid, rejected)
 }

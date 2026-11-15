@@ -5,3 +5,4 @@
 @media(prefers-reduced-motion:reduce){.glitch-title::before{animation:none}.showcase-art>svg{transition:none}.showcase-piece:hover .showcase-art>svg{transform:none}}
 
 body[data-page=profile]{background:radial-gradient(ellipse at 70% 0,#28433366,transparent 60%),#10191c}body[data-page=profile] .app-topbar{position:relative;z-index:20}.profile-page [hidden],.profile-editor [hidden]{display:none!important}
+.showcase-art canvas,.editor-skin-art canvas { display:block; width:100%; max-width:280px; height:auto; }

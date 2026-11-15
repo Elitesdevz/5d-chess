@@ -1,6 +1,6 @@
 import {checks} from './awareness.ts'
 import {aiOpponent,type AiId} from './ai-model.ts'
-import {FORWARD,boardKey,boardTurn,frontier,index,isMain,pieceAt,present,survivors,type Candidate,type Kind,type Order,type Player,type State} from './model.ts'
+import {FORWARD,boardKey,boardTurn,frontier,index,isMain,moveBudget,pieceAt,present,survivors,type Candidate,type Kind,type Order,type Player,type State} from './model.ts'
 import {legalMoves,orderKey} from './moves.ts'
 import {requiredBoards} from './rules.ts'
 import {resolveRound} from './resolve.ts'
@@ -22,7 +22,7 @@ function evaluation(s:State,player:Player){
 function heuristic(s:State,m:Candidate,id:AiId,seed:string){
  const rank=aiOpponent(id)!.rank,target=pieceAt(s,m.to),spatial=m.from.u===m.to.u&&m.from.t===m.to.t
  let score=0
- if(target&&target.player!==m.player){score+=target.kind==='K'?100_000:VALUE[target.kind]*(id==='brass'?1.3:1);if(s.movement==='live')score-=m.piece.kind==='K'?200_000:VALUE[m.piece.kind]*.85}
+ if(target&&target.player!==m.player){score+=target.kind==='K'?100_000:VALUE[target.kind]*(id==='brass'?1.3:1)}
  if(m.piece.kind==='K')score-=18
  if(m.castle)score+=45
  const centre=(x:number,y:number)=>Math.abs(x-6.5)+Math.abs(y-6.5)
@@ -41,7 +41,7 @@ function heuristic(s:State,m:Candidate,id:AiId,seed:string){
  const noise=[42,10,3,2,.5][rank-1]
  return score+(hash(seed+orderKey(m))-.5)*noise
 }
-/** Full legal plans: compulsory Present sources first, at most one optional source. */
+/** Full legal plans: compulsory Present sources first, then the mode’s optional allowance. */
 function plans(s:State,player:Player,id:AiId,seed:string,limit:number){
  if(!survivors(s).includes(player)||(s.movement==='classic'&&s.turn!==player))return [[]] as Order[][]
  const threats=aiOpponent(id)!.rank>=3?checks(s,player):[]
@@ -60,15 +60,17 @@ function plans(s:State,player:Player,id:AiId,seed:string,limit:number){
  }
  const main=boards.filter(b=>b.main),optional=boards.filter(b=>!b.main&&!isMain(s.universes.find(u=>u.id===b.moves[0].from.u)!,present(s))).flatMap(b=>b.moves)
  optional.sort((a,b)=>heuristic(s,b,id,seed)-heuristic(s,a,id,seed))
- const base=main.map(b=>b.moves[0]),extra=optional[0]
- if(extra&&heuristic(s,extra,id,seed)>20)base.push(extra)
+ const base=main.map(b=>b.moves[0]),optionalBest=[...Map.groupBy(optional,m=>boardKey(m.from)).values()].map(moves=>moves[0]),cap=moveBudget(s).optional
+ for(const extra of optionalBest)if(base.length-main.length<cap&&heuristic(s,extra,id,seed)>20)base.push(extra)
  const variants:Order[][]=[base.map(clean)]
  for(const board of main)for(const alt of board.moves.slice(1,limit)){
   const variant=base.map(m=>boardKey(m.from)===board.key?alt:m)
   variants.push(variant.map(clean));if(variants.length>=limit)return variants
  }
- if(extra&&!base.includes(extra))variants.push([...base,extra].map(clean))
- if(base.includes(extra))variants.push(base.filter(m=>m!==extra).map(clean))
+ for(const extra of optionalBest){
+  if(!base.includes(extra)&&base.length-main.length<cap)variants.push([...base,extra].map(clean))
+  if(base.includes(extra))variants.push(base.filter(m=>m!==extra).map(clean))
+ }
  return variants.slice(0,limit)
 }
 /** Bounded public-position search. Never receives an opponent's submitted orders. */

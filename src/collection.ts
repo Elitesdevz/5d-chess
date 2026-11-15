@@ -42,7 +42,7 @@ const itemIndex=new Map(ITEMS.map(item=>[item.id,item]))
 export const itemById=(id:string)=>itemIndex.get(id)
 export const DEFAULT_ICON='default'
 export interface OwnedItem {kind?:Kind;uid:string;itemId:string;acquired:number;pending:boolean;listed?:string}
-export interface Loadout {movement?:string;capture?:string;icon:string;frame?:string;shape?:string;shapes?:Partial<Record<Kind,string>>;pieces:Partial<Record<Kind,string>>}
+export interface Loadout {movement?:string;capture?:string;movements?:Partial<Record<Kind,string>>;captures?:Partial<Record<Kind,string>>;icon:string;frame?:string;shape?:string;shapes?:Partial<Record<Kind,string>>;pieces:Partial<Record<Kind,string>>}
 export const STARTER_COINS=480
 export const PAID_SPIN_PRICE=300
 export interface Wallet {cases?:{uid:string;caseId:string;acquired:number}[];starterGranted?:boolean;coins:number;inventory:OwnedItem[];loadout:Loadout;lastSpin?:string;shopSeen?:boolean}
@@ -101,7 +101,7 @@ export function caseOffers(now=Date.now()){
  const weekly=weeklyCases(now),pool=CASES.filter(c=>!c.monthly&&!c.permanent&&!weekly.includes(c)),random=seeded('daily-case:'+dayKey(now));let n=random()*pool.reduce((sum,c)=>sum+(c.weight??100),0);const daily=pool.find(c=>(n-=c.weight??100)<0)??pool[0]
  return [...CASES.filter(c=>c.permanent).map(c=>({id:c.id,price:c.price,window:'permanent',key:'permanent'})),...weekly.map(c=>({id:c.id,price:c.price,window:'weekly',key:weekKey(now)})),{id:daily.id,price:Math.floor(daily.price*.85),window:'daily',key:dayKey(now)},...CASES.filter(c=>c.monthly).map(c=>({id:c.id,price:c.price,window:'seasonal',key:monthKey(now)}))]
 }
-export function seasonalItems(now=Date.now()){const random=seeded('season:'+monthKey(now)),types:ItemType[]=['skin','shape','icon'];return types.map(type=>{const pool=ITEMS.filter(i=>i.monthly&&i.type===type);return pool[Math.floor(random()*pool.length)]})}
+export function seasonalItems(now=Date.now()){const random=seeded('season:'+monthKey(now)),types:ItemType[]=['skin','shape','icon','movement','capture'];return types.map(type=>{const pool=ITEMS.filter(i=>i.type===type&&(i.monthly||type==='movement'||type==='capture'));return pool[Math.floor(random()*pool.length)]})}
 // Integer weights total 1,000,000. Within a rarity every item is equally likely.
 export const CRATE_ODDS:readonly (readonly number[])[]=[[699000,240000,55000,5900,99,1],[250000,400000,270000,74000,5900,100],[50000,180000,420000,300000,49000,1000]]
 export interface SpinReward {label:string;weight:number;visualWeight:number;cadence:'fixed'|'daily'|'weekly'|'seasonal';coins?:number;rarity?:Rarity;itemId?:string;caseId?:string;setId?:string}
@@ -114,7 +114,7 @@ export function spinRewards(now=Date.now()):SpinReward[]{
   const chosen=(['uncommon','rare','epic','legendary','mythic'] as Rarity[]).map(r=>shuffled.find(i=>i.rarity===r)!),raw=[7000,2400,550,49,1],weights=raw.map(w=>Math.floor(w/10000*budget));weights[0]+=budget-weights.reduce((s,w)=>s+w,0)
   return chosen.map((item,i)=>({label:item.name,itemId:item.id,rarity:item.rarity,weight:weights[i],visualWeight:[10,9,7,5,4][i],cadence}))
  }
- const daily=make('daily','wheel-day:'+dayKey(now),GENERAL_ITEMS,100000),weekly=make('weekly','wheel-week:'+weekKey(now),GENERAL_ITEMS,60000),seasonal=make('seasonal','wheel-month:'+monthKey(now),ITEMS.filter(i=>i.monthly),40000)
+ const daily=make('daily','wheel-day:'+dayKey(now),GENERAL_ITEMS,100000),weekly=make('weekly','wheel-week:'+weekKey(now),GENERAL_ITEMS,60000),seasonal=make('seasonal','wheel-month:'+monthKey(now),ITEMS.filter(i=>i.monthly||i.type==='movement'||i.type==='capture'),40000)
  daily[0]={label:caseOffers(now).find(o=>o.window==='daily')!.id.replaceAll('-',' ')+' case',caseId:caseOffers(now).find(o=>o.window==='daily')!.id,weight:daily[0].weight,visualWeight:10,cadence:'daily'}
  weekly[0]={label:weeklyCases(now)[0].name,caseId:weeklyCases(now)[0].id,weight:weekly[0].weight,visualWeight:10,cadence:'weekly'}
  // Expensive rotating cases get proportionately smaller chances. Keep each
@@ -146,7 +146,7 @@ export function weeklyItems(now=Date.now()){
  const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
  for(let i=shuffled.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[shuffled[i],shuffled[j]]=[shuffled[j],shuffled[i]]}
  // A premium and an accessible find of every type, then interleave the edit.
- return (['skin','icon','frame','shape'] as const).map(type=>shuffled.find(i=>i.type===type&&['rare','epic','legendary'].includes(i.rarity))!)
+ return (['skin','icon','frame','shape','movement','capture'] as const).map(type=>shuffled.find(i=>i.type===type&&['rare','epic','legendary'].includes(i.rarity))!)
 }
 
 /** Four deterministic offers per Amsterdam day, including a guaranteed animated frame. */
@@ -170,7 +170,7 @@ function apportion(rows:{item:Collectible;raw:number;setId?:string}[],total:numb
  return out.filter(r=>r.weight>0)
 }
 export function crateTickets(crate:Crate):CaseTicket[]{
- const monthly=crate.monthly,pool=monthly==='exclusive'?ITEMS.filter(i=>i.monthly):monthly?ITEMS.filter(i=>!i.exclusive&&(!i.monthly||i.monthly===monthly)):GENERAL_ITEMS.filter(i=>crate.effectsOnly?['movement','capture'].includes(i.type):crate.type==='mixed'||i.type===crate.type),weights=CRATE_ODDS[crate.tier]
+ const monthly=crate.monthly,pool=monthly==='exclusive'?ITEMS.filter(i=>i.monthly||i.type==='movement'||i.type==='capture'):monthly?ITEMS.filter(i=>!i.exclusive&&(!i.monthly||i.monthly===monthly)):GENERAL_ITEMS.filter(i=>crate.effectsOnly?['movement','capture'].includes(i.type):crate.type==='mixed'||i.type===crate.type),weights=CRATE_ODDS[crate.tier]
  const raw=(items:Collectible[])=>items.map(item=>{const rarity=items.filter(i=>i.rarity===item.rarity),same=rarity.filter(i=>!!i.monthly===!!item.monthly),group=monthly&&monthly!=='exclusive'&&rarity.some(i=>i.monthly)&&rarity.some(i=>!i.monthly)?item.monthly?.65:.35:1;return {item,raw:weights[RARITIES.indexOf(item.rarity)]*group/same.length}})
  const sets=SETS.filter(s=>!s.exclusive&&pool.some(i=>i.id===s.itemId)),setRows=raw(sets.map(s=>itemById(s.itemId)!)).map(r=>({...r,setId:sets.find(s=>s.itemId===r.item.id)!.id})),chance=setRows.length?crate.setChance??0:0
  return [...apportion(raw(pool),1000000-chance),...apportion(setRows,chance)]

@@ -144,7 +144,10 @@ export function present(s: State): number {
 export const isMain = (u: Universe, t: number) => u.active && frontier(u).t === t
 export function moveBudget(s: State) {
   const t = present(s)
-  return {main: s.movement ? s.universes.filter(u => isMain(u, t)).length : Math.min(playerCount(s), s.universes.filter(u => isMain(u, t)).length), optional: 1}
+  const presentBoards = s.universes.filter(u => isMain(u, t)).length
+  // Classic is bounded only by available source boards and their turn owners.
+  // Live scales with the Present, never with a stockpile of inactive timelines.
+  return {main: s.movement ? presentBoards : Math.min(playerCount(s), presentBoards), optional: s.movement === 'classic' ? s.universes.length - presentBoards : s.movement === 'live' ? Math.min(3, Math.max(1, presentBoards)) : 1}
 }
 export const survivors = (s: State) => s.draw ? [] : players(s).filter(p => !s.eliminated.includes(p))
 export function activation(universes: readonly Universe[], eliminated: readonly Player[], count: PlayerCount = 4): Universe[] {

@@ -14,9 +14,9 @@ export function updateSelectionInfo(s:State,selected?:Coord,move?:Candidate){
  if(!p||!selected)return
  const speed=p.kind==='K'||p.kind==='N'?'Instant arrival':p.kind==='R'||p.kind==='P'?'Fast · 3 tiles/tick':'Measured · 1.5 tiles/tick'
  const geometry={R:'One axis',B:'Two equal axes',Q:'Up to four equal axes',N:'Two and one',P:'Forward movement',K:'One step per axis'}[p.kind]
- const warning=move?.capture&&s.movement==='live'&&!move.enPassant?(p.kind==='K'?'King collision · Your faction would be eliminated':'Trade · Both pieces are lost'):move?.enPassant?'En passant · Adjacent pawn removed':move?.castle?'Castle · King and rook together':move?.branch?'Historical arrival · Creates a new branch':move?.needsVacancy?'Friendly arrival · Departure required':''
+ const warning=move?.capture&&s.movement==='live'&&!move.enPassant?'Capture · Stops on contact; opposing movers can trade':move?.enPassant?'En passant · Adjacent pawn removed':move?.castle?'Castle · King and rook together':move?.branch?'Historical arrival · Creates a new branch':move?.needsVacancy?'Friendly arrival · Departure required':''
  host.innerHTML=`<span class="selection-piece">${pieceIcon(p.kind,p.player,32)}</span><div><strong>${NAMES[p.kind]}</strong><span>${coordName(selected,s)} · ${s.movement==='live'?speed:geometry}</span></div>`
- if(warning){const note=document.createElement('p');note.className=p.kind==='K'&&move?.capture?'selection-warning':'';note.textContent=warning;host.append(note)}
+ if(warning){const note=document.createElement('p');note.className='';note.textContent=warning;host.append(note)}
 }
 export function updateMatchUI(scene:Scene,s:State,player:Player|undefined,orders:readonly Order[]){
  const nav=document.getElementById('board-navigator');if(!nav)return
@@ -34,7 +34,7 @@ export function updateMatchUI(scene:Scene,s:State,player:Player|undefined,orders
   button.title=`Universe ${u.id}, time ${b.t}${owner?', '+owner+' to move':''} · ${status}`;button.onclick=()=>scene.focusBoard(u.id,b.t)
   return button
  }))
- document.querySelectorAll<HTMLElement>('[data-capture-legend]').forEach(el=>el.textContent=s.movement==='live'?'Trade':'Capture')
+ document.querySelectorAll<HTMLElement>('[data-capture-legend]').forEach(el=>el.textContent='Capture')
 }
 /** Docked on desktop, expandable planning sheet on mobile. */
 export function initMatchUI(scene?:Scene){
@@ -50,7 +50,7 @@ export function initMatchUI(scene?:Scene){
   const refresh=()=>{const angled=scene.getPerspective();button.setAttribute('aria-pressed',String(angled));button.setAttribute('aria-label',angled?'Use top-down view':'Use angled 2.5D view');button.innerHTML=angled?'◇ <span>2.5D</span>':'▦ <span>Top view</span>'}
   refresh();button.onclick=()=>{scene.setPerspective(!scene.getPerspective());refresh()}
   const canvas=document.getElementById('scene')!;let w=0,h=0
-  new ResizeObserver(()=>{const r=canvas.getBoundingClientRect();if(Math.abs(w-r.width)>2||Math.abs(h-r.height)>2){w=r.width;h=r.height;requestAnimationFrame(()=>scene.fit())}}).observe(canvas)
+  new ResizeObserver(()=>{const r=canvas.getBoundingClientRect();if(Math.abs(w-r.width)>2||Math.abs(h-r.height)>2){w=r.width;h=r.height;requestAnimationFrame(()=>innerWidth<=1000?scene.focusPlayer(undefined,false):scene.fit())}}).observe(canvas)
  }
  document.addEventListener('click',event=>{for(const menu of document.querySelectorAll<HTMLDetailsElement>('.match-menu,.layer-control,.match-explore'))if(!menu.contains(event.target as Node)||(event.target as Element).closest('.match-menu-items button,.match-explore-links a'))menu.open=false})
  document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;for(const menu of document.querySelectorAll<HTMLDetailsElement>('.match-menu[open],.layer-control[open],.match-explore[open]')){menu.open=false;menu.querySelector<HTMLElement>('summary')?.focus()}})

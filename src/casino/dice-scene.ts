@@ -127,6 +127,8 @@ export class DiceScene {
    right=track(t,[[0,this.throwHandStart],[.08,this.throwHandStart.clone().add(v(this.throwMotion.x*.035,.055,this.throwMotion.z*.035))],[.17,this.throwHandStart.clone().add(v(this.throwMotion.x*.10,.025,this.throwMotion.z*.10))],[.32,this.throwHandStart.clone().add(v(this.throwMotion.x*.16,-.035,this.throwMotion.z*.16))],[1,v(.44,.95,.86)]])
    rc=t<.18?.65:.12
   }
+  // Start on the first rendered frame so a slow GPU cannot skip a reaction.
+  if(this.reactionKind!=='none'&&this.reactionStart===0)this.reactionStart=now
   const reaction=T.MathUtils.clamp((now-this.reactionStart)/(this.reduced?180:this.reactionKind==='banish'?1900:2600),0,1)
   if(this.reactionKind==='payout'){
    dl=Math.sin(Math.PI*reaction)*.55
@@ -225,8 +227,8 @@ export class DiceScene {
  }
  highlight(id:string|undefined){for(const c of this.table.controls)(c.edge.material as T.MeshStandardMaterial).emissive.set(c.id===id?0x5b3a12:0x000000)}
  setMood(value:number){this.mood=value;this.people.setMood(value);this.canvas.dataset.dealerMood=value.toFixed(2)}
- async reward(){this.gold.start(performance.now());this.wager.scale.setScalar(1.25);this.wager.visible=true;this.reactionKind='payout';this.phase='payout';this.reactionStart=performance.now();this.canvas.dataset.reaction='payout';this.lockCamera(true);await new Promise<void>(resolve=>this.reactionResolve=resolve)}
- async banish(){this.reactionKind='banish';this.phase='banish';this.reactionStart=performance.now();this.canvas.dataset.reaction='banish';this.lockCamera(true);await new Promise<void>(resolve=>this.reactionResolve=resolve)}
+ async reward(){this.gold.start(performance.now());this.wager.scale.setScalar(1.25);this.wager.visible=true;this.reactionKind='payout';this.phase='payout';this.reactionStart=0;this.canvas.dataset.reaction='payout';this.lockCamera(true);await new Promise<void>(resolve=>this.reactionResolve=resolve)}
+ async banish(){this.reactionKind='banish';this.phase='banish';this.reactionStart=0;this.canvas.dataset.cutscene='banish';this.canvas.dataset.reaction='banish';this.lockCamera(true);await new Promise<void>(resolve=>this.reactionResolve=resolve)}
  diagnostics(){return {phase:this.phase,coinOwner:this.coinOwner,dieOwner:this.dieOwner,look:this.getLook(),throwMotion:this.throwMotion,launch:this.startPosition.toArray(),landing:this.landing.toArray(),goldActive:this.gold.active,drawCalls:this.renderer.info.render.calls,triangles:this.renderer.info.render.triangles}}
  dispose(){
   if(this.disposed)return;this.disposed=true;cancelAnimationFrame(this.ticker);this.resize.disconnect();this.finish?.();this.finish=undefined;this.reactionResolve?.();this.reactionResolve=undefined

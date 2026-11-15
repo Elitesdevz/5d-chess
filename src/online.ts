@@ -3,7 +3,7 @@ import {profileHref} from './profile-model.ts'
 import {type Loadout} from './collection.ts'
 import {setCosmetics} from './art.ts'
 import {initShell,refreshAccount} from './shell.ts'
-import {requiredBoards} from './rules.ts'
+import {requiredBoards,optionalAllowance} from './rules.ts'
 import {awareness, nextPlayable, threatSquares} from './awareness.ts'
 import {initMatchUI, setMatchHeader, collapseControls,updateMatchUI,updateSelectionInfo} from './ui.ts'
 import {Scene} from './scene.ts'
@@ -155,9 +155,10 @@ function render() {
     const budget = moveBudget(room.state)
     if(room.state.movement)budget.main=requiredBoards(room.state,seat!).length
     const main = draft.filter(o => isMain(getUniverse(room!.state, o.from.u)!, present(room!.state))).length
+    const optional=optionalAllowance(room.state,seat!,draft)
     const count = document.createElement('p')
     count.className = 'budget'
-    count.innerHTML = `<span><small>REQUIRED LEFT</small><b>${budget.main-main}<em> / ${budget.main}</em></b></span><span><small>OPTIONAL LEFT</small><b>${room.state.universes.some(u=>!isMain(u,present(room!.state))&&frontier(u).cells.some(q=>q?.player===seat)&&(room!.state.movement!=='classic'||boardTurn(room!.state,u)===seat))?1-(draft.length-main):0}<em> / 1</em></b></span>`
+    count.innerHTML = `<span><small>REQUIRED LEFT</small><b>${budget.main-main}<em> / ${budget.main}</em></b></span><span><small>OPTIONAL LEFT</small><b>${optional.left}<em> / ${optional.total}</em></b></span>`
     panel.append(count)
     if(!draft.length&&!routes.length){const empty=document.createElement('div');empty.className='empty';empty.innerHTML='<span>◇</span><p>Select a piece to plan a move.</p>';panel.append(empty)}
     for (const [i, order] of draft.entries()) {

@@ -72,6 +72,15 @@ export function resolveDuplicate(account:EconomicAccount,id:unknown,refund:unkno
 }
 export function equip(account:EconomicAccount,slot:unknown,id:unknown){
  const w=wallet(account)
+ const effectMatch=typeof slot==='string'?/^(movement|capture)-([KQRBNP])$/.exec(slot):null
+ if(effectMatch){
+  const type=effectMatch[1] as 'movement'|'capture',kind=effectMatch[2] as Kind,key=type==='movement'?'movements':'captures'
+  if(id==='default'){(w.loadout[key]??={})[kind]='default';return}
+  const owned=w.inventory.find(i=>i.uid===id)??reject(404,'Item not found')
+  if(owned.listed||owned.pending)reject(409,'Keep this item or cancel its listing before equipping it')
+  if(itemById(owned.itemId)?.type!==type)reject(400,'This item cannot be equipped in that slot')
+  ;(w.loadout[key]??={})[kind]=owned.itemId;return
+ }
  const shapeKind=typeof slot==='string'&&slot.startsWith('shape-')&&KINDS.includes(slot.slice(6) as Kind)?slot.slice(6) as Kind:undefined
  if(slot!=='movement'&&slot!=='capture'&&slot!=='icon'&&slot!=='frame'&&slot!=='shape'&&!shapeKind&&!KINDS.includes(slot as Kind))reject(400,'Unknown equipment slot')
  if(shapeKind){
@@ -102,7 +111,7 @@ function unequipIfMissing(w:Wallet,itemId:string){
  if(w.loadout.icon===itemId&&!usable())w.loadout.icon='default'
  if(w.loadout.frame===itemId&&!usable())delete w.loadout.frame
  for(const effect of ['movement','capture'] as const)if(w.loadout[effect]===itemId&&!usable())delete w.loadout[effect]
- for(const k of KINDS){if(w.loadout.pieces[k]===itemId&&!usable(k))delete w.loadout.pieces[k];if((w.loadout.shapes?.[k]??w.loadout.shape)===itemId&&!usable(k)){if(w.loadout.shape===itemId)(w.loadout.shapes??={})[k]='default';else if(w.loadout.shapes)delete w.loadout.shapes[k]}}
+ for(const k of KINDS){for(const key of ['movements','captures'] as const)if(w.loadout[key]?.[k]===itemId&&!usable())w.loadout[key]![k]='default';if(w.loadout.pieces[k]===itemId&&!usable(k))delete w.loadout.pieces[k];if((w.loadout.shapes?.[k]??w.loadout.shape)===itemId&&!usable(k)){if(w.loadout.shape===itemId)(w.loadout.shapes??={})[k]='default';else if(w.loadout.shapes)delete w.loadout.shapes[k]}}
  if(w.loadout.shape===itemId&&!w.inventory.some(i=>i.itemId===itemId&&!i.kind&&!i.listed&&!i.pending)){for(const k of KINDS)if((w.loadout.shapes?.[k]??w.loadout.shape)===itemId&&usable(k))(w.loadout.shapes??={})[k]=itemId;delete w.loadout.shape}
 }
 export function equipDesign(account:EconomicAccount,itemId:unknown){

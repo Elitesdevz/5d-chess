@@ -11,7 +11,7 @@ import {economyApi} from './economy-api.ts'
 import {gameApi} from './game-api.ts'
 import {eloApi} from './elo-gambling.ts'
 import {casinoApi} from './casino-api.ts'
-import {ensureAccount} from './accounts.ts'
+import {ensureAccount,pruneNotices} from './accounts.ts'
 import {staticFile} from './static.ts'
 import {STORAGE_SCHEMA} from './storage.ts'
 
@@ -19,9 +19,12 @@ export function createApplication(store: ChessStore) {
   const ai=new AiScheduler(store)
   ai.kick()
   const limiter = new LoginLimiter()
+  const cleanNotices=()=>{for(const row of store.leaderboard())store.transaction(unit=>{const account=unit.users.get(row.name);if(account)pruneNotices(account)})}
+  cleanNotices()
+  const noticeTimer=setInterval(cleanNotices,60*1000);noticeTimer.unref()
   let draining = false
   return {
-    drain: () => {draining = true;ai.stop()},
+    drain: () => {draining = true;ai.stop();clearInterval(noticeTimer)},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       try {
         if (draining) {json(res, 503, {error: 'Server restarting. Please try again.'}, {'retry-after': '1'}); return}
