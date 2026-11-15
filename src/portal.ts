@@ -1,3 +1,5 @@
+import {type AI_OPPONENTS} from './ai-model.ts'
+import {pieceIcon} from './art.ts'
 import {profileHref} from './profile-model.ts'
 import {itemById} from './collection.ts'
 import {itemArt} from './rewards.ts'
@@ -86,6 +88,21 @@ async function lobby(){
   if(!session.profile){error('lobby-error','The home page needs the matching updated game server.');return}
   let profile:Profile=session.profile
   let count=profile.settings.players,movement:Movement=profile.settings.movement,place:'online'|'local'='online',showAll=false
+  let aiBusy=false,aiResetTimer:ReturnType<typeof setTimeout>|undefined
+  const loadAi=async()=>{
+    try{
+      const data=await api<{opponents:((typeof AI_OPPONENTS)[number]&{wins:number;nextReward:number;active?:string})[];reset:number;now:number}>('/games/ai')
+      clearTimeout(aiResetTimer);aiResetTimer=setTimeout(()=>{if(!el('ai').hidden)void loadAi()},Math.max(1000,data.reset-data.now+100))
+      const cards=data.opponents.map(bot=>{
+        const card=document.createElement('article');card.className='ai-card';card.dataset.ai=bot.id;card.style.setProperty('--ai-color',bot.color)
+        card.innerHTML=`<div class="ai-card-top"><span class="ai-rank">${String(bot.rank).padStart(2,'0')} / 05</span><span class="ai-difficulty">${bot.difficulty}</span></div><div class="ai-portrait">${pieceIcon(bot.piece,'yellow',72)}</div><h3>${bot.name}</h3><p class="ai-title">${bot.title}</p><p class="ai-style">${bot.style}</p><div class="ai-prize"><strong>+${bot.nextReward}<small> coins</small></strong><span>${bot.wins?'Next win · '+bot.wins+' won today':'First win today'}</span></div>`
+        const button=document.createElement('button');button.className='button primary block';button.textContent=bot.active?'Continue duel':'Challenge '+bot.name
+        button.onclick=async()=>{if(aiBusy)return;if(bot.active){online(bot.active);return}aiBusy=true;button.disabled=true;button.textContent='Preparing table…';error('ai-error','');try{const room=await api<{code:string}>('/games',{ai:bot.id,movement:el<HTMLSelectElement>('ai-movement').value,playerCount:2});online(room.code)}catch(cause){error('ai-error',cause instanceof Error?cause.message:'Could not start duel');aiBusy=false;button.disabled=false;button.textContent='Challenge '+bot.name}}
+        card.append(button);return card
+      });el('ai-opponents').replaceChildren(...cards)
+    }catch(cause){error('ai-error',cause instanceof Error?cause.message:'Opponents unavailable. Try again.')}
+  }
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!el('ai').hidden)void loadAi()})
   let games:Games={available:[],mine:[],limit:50},notices:Notice[]=[],leaderboardRequest=0
   const localURL=()=>`/chess/?local=1&players=${count}&movement=${movement}`
   const updateLocalLinks=()=>document.querySelectorAll<HTMLAnchorElement>('.mode-choice a').forEach(link=>{const url=new URL(link.href);url.searchParams.set('movement',el<HTMLSelectElement>('local-movement').value);link.href=url.toString()})
@@ -143,12 +160,13 @@ async function lobby(){
     showAll=false;renderGames()
     void loadLeaderboard().catch(cause=>{el('leaderboard').textContent=cause.message??'Could not load leaderboard'})
   }
-  const titles:Record<string,[string,string]>={make:['Create game','Choose the game details, then share its four-letter code.'],join:['Find a game','Join an open game or use an invite code.'],continue:['Continue game','Pick up where you left off. Finished games stay available for review.'],local:['Local play','Play together on one device.'],settings:['Settings','Make 5D Chess your own.'],notifications:['Notifications','Updates from your games and ratings.']}
+  const titles:Record<string,[string,string]>={ai:['Play with AI','Five characters, from your first steps to temporal tactics.'],make:['Create game','Choose the game details, then share its four-letter code.'],join:['Find a game','Join an open game or use an invite code.'],continue:['Continue game','Pick up where you left off. Finished games stay available for review.'],local:['Local play','Play together on one device.'],settings:['Settings','Make 5D Chess your own.'],notifications:['Notifications','Updates from your games and ratings.']}
   const renderView=(view:string)=>{
     if(!['home',...Object.keys(titles)].includes(view))view='home'
     document.querySelectorAll<HTMLElement>('.lobby-view').forEach(v=>v.hidden=v.id!==view)
     el('flow-header').hidden=view==='home'
     if(titles[view]){el('flow-title').textContent=titles[view][0];el('flow-description').textContent=titles[view][1]}
+    if(view==='ai'){el<HTMLSelectElement>('ai-movement').value=movement;void loadAi()}
     if(view==='make'){el<HTMLSelectElement>('game-players').value=String(count);el<HTMLSelectElement>('game-movement').value=movement;rewardHint()}
     if(view==='local'){el<HTMLSelectElement>('local-movement').value=movement;updateLocalLinks()}
     document.title=`${view==='home'?'Home':titles[view][0]} · 5D Chess`

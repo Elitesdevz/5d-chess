@@ -1,3 +1,4 @@
+import {aiOpponent,type AiId,type AiReward} from './ai-model.ts'
 import {profileHref} from './profile-model.ts'
 import {type Loadout} from './collection.ts'
 import {setCosmetics} from './art.ts'
@@ -14,7 +15,7 @@ import {sourceBudget} from './resolve.ts'
 
 type Room = {code: string; title: string; seats: Partial<Record<Player, string>>; seat?: Player;
   state: State; results: Resolution[]; journal: Order[][]; locked: Record<Player, boolean>;
-  waiting: boolean; finished: boolean; rated?:boolean; deadline?:number;drawOffer?:{by:Player;accepted:Player[]};endReason?:string;cosmetics?:Partial<Record<Player,Loadout>>}
+  waiting: boolean; finished: boolean; ai?:{id:AiId;nextReward:number;thinking:boolean;error?:string;reward?:AiReward;drawReply?:string};rated?:boolean; deadline?:number;drawOffer?:{by:Player;accepted:Player[]};endReason?:string;cosmetics?:Partial<Record<Player,Loadout>>}
 const element = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const code = new URLSearchParams(location.search).get('code')?.toUpperCase()
 if (!code || !/^[A-Z]{4}$/.test(code)) location.replace('/chess/lobby.html')
@@ -89,8 +90,8 @@ function render() {
   document.title = `${room.title} · 5D Chess`
   const seat = room.seat
   const s = shown()
-  element('online-mode').textContent = s.movement ? `${s.movement.toUpperCase()} · ${room.rated?'RATED':'UNRATED'}` : 'ONLINE MATCH'
-  element('phase').textContent = animation ? 'RESOLVING' : room.finished ? 'FINISHED' : room.waiting ? 'WAITING' : frame !== null ? 'REPLAY' :
+  element('online-mode').textContent = s.movement ? `${room.ai?'AI DUEL · ':''}${s.movement.toUpperCase()} · ${room.rated?'RATED':'UNRATED'}` : 'ONLINE MATCH'
+  element('phase').textContent = animation ? 'RESOLVING' : room.finished ? 'FINISHED' : room.waiting ? 'WAITING' : room.ai?.thinking ? 'AI THINKING' : frame !== null ? 'REPLAY' :
     room.state.movement === 'classic' && room.state.turn !== seat ? 'WAITING TURN' : seat && room.locked[seat] ? 'LOCKED' : 'PLANNING'
   setMatchHeader(seat, `${room.code} · ${element('phase').textContent?.toLowerCase()}`)
   element('metrics').textContent = `Present T${present(s)} · ${s.universes.length} universes · ${s.rifts.length} rifts`
@@ -100,7 +101,7 @@ function render() {
     span.className = `${player === seat ? 'self' : ''} ${room!.locked[player] ? 'locked' : ''}`
     if (room!.state.movement === 'classic' && room!.state.turn === player) span.classList.add('turn-owner')
     span.textContent = `${room!.state.movement === 'classic' && room!.state.turn === player ? '▶ ' : ''}${names[player]}: `
-    if(room!.seats[player]){const link=document.createElement('a');link.className='player-profile-link';link.href=profileHref(room!.seats[player]!);link.textContent=room!.seats[player]!;span.append(link)}else span.append('Open')
+    if(room!.seats[player]){const link=document.createElement('a');link.className='player-profile-link';link.href=room!.ai&&player==='yellow'?'/chess/lobby.html#ai':profileHref(room!.seats[player]!);link.textContent=room!.seats[player]!;span.append(link)}else span.append('Open')
     if(room!.locked[player])span.append(' ✓')
     return span
   }))
@@ -170,7 +171,7 @@ function render() {
       panel.append(cycle, select)
     }
     const lock = document.createElement('button'); lock.className = 'button primary block'; lock.textContent = submitting ? 'Submitting…' : room.state.movement === 'classic' ? 'Submit turn' : draft.length ? 'Lock orders' : seat && requiredBoards(room.state, seat).length ? 'Plan required moves' : 'Lock in a pass'
-    lock.disabled = submitting
+    lock.disabled = submitting || !!room.ai?.thinking
     lock.onclick = () => {
       if (room?.seat && requiredBoards(room.state, room.seat, draft).length) { message('Play every required Present board before submitting.', true); nextPlayable(scene, requiredBoards(room.state, room.seat, draft)); return }
       if (room?.seat && (awareness(room.state, room.seat, draft).remaining.length || awareness(room.state, room.seat, draft).kingLost)) {
@@ -184,9 +185,16 @@ function render() {
     panel.append(lock)
     if (seat && requiredBoards(room.state, seat, draft).length) { const note = document.createElement('p'); note.className = 'required-notice'; note.textContent = `${requiredBoards(room.state, seat, draft).length} Present boards still need a move.`; panel.append(note) }
   }
+  if(room.ai){
+    const bot=aiOpponent(room.ai.id)!,note=document.createElement('p');note.className='online-message ai-match-note'
+    note.textContent=room.ai.error??(room.finished?room.ai.reward?`Victory · +${room.ai.reward.coins} coins. Next win today: ${room.ai.nextReward} coins.`:'No coins this time. Every rematch is a fresh chance.':room.ai.thinking?`${bot.name} is planning… You can prepare your moves.`:`${bot.name} · ${bot.difficulty} · ${bot.title}`)
+    if(room.ai.reward)note.classList.add('ai-victory');panel.append(note)
+    if(room.ai.drawReply){const reply=document.createElement('p');reply.className='online-message';reply.textContent=room.ai.drawReply==='declined'?`${bot.name} declines the draw. There is still a game to play.`:`${bot.name} accepts the draw.`;panel.append(reply)}
+    if(room.finished){const again=document.createElement('a');again.className='button primary block';again.href='/chess/lobby.html#ai';again.textContent='Choose your next challenge';panel.append(again)}
+  }
   if(!room.waiting&&!room.finished&&seat&&survivors(room.state).includes(seat)){
     const status=document.createElement('p');status.className='online-message'
-    if(room.deadline){const hours=Math.max(0,Math.ceil((room.deadline-Date.now())/3_600_000));status.textContent=`${room.locked[seat]?'Orders locked · Round deadline':room.state.movement==='classic'&&room.state.turn!==seat?'Current player’s deadline':'Your order deadline'} in ${hours}h · 48-hour inactivity limit.`;status.title=new Date(room.deadline).toLocaleString();panel.append(status)}
+    if(room.deadline&&!room.ai?.thinking){const hours=Math.max(0,Math.ceil((room.deadline-Date.now())/3_600_000));status.textContent=`${room.locked[seat]?'Orders locked · Round deadline':room.state.movement==='classic'&&room.state.turn!==seat?'Current player’s deadline':'Your order deadline'} in ${hours}h · 48-hour inactivity limit.`;status.title=new Date(room.deadline).toLocaleString();panel.append(status)}
     const actions=document.createElement('div');actions.className='planning-links'
     const add=(label:string,path:string,action?:string)=>{const button=document.createElement('button');button.className='text-button';button.textContent=label;button.disabled=submitting;button.onclick=()=>{if(path==='resign'&&!confirm('Resign this game? Your faction will be eliminated.'))return;void matchAction(path,action)};actions.append(button)}
     if(room.drawOffer){

@@ -10,7 +10,7 @@ export function aiDaily(account:Account,now=Date.now()):AiDaily {
 }
 export function aiCatalog(store:ChessStore,account:Account,now=Date.now()){
  const daily=aiDaily(account,now),active=store.activeAiRooms(account.name)
- return {opponents:AI_OPPONENTS.map(bot=>({...bot,wins:daily.wins[bot.id]??0,nextReward:aiPrize(bot.id,daily.wins[bot.id]??0),active:active.find(room=>room.ai===bot.id)?.code})),reset:nextReset(now),day:daily.day}
+ return {opponents:AI_OPPONENTS.map(bot=>({...bot,wins:daily.wins[bot.id]??0,nextReward:aiPrize(bot.id,daily.wins[bot.id]??0),active:active.find(room=>room.ai===bot.id)?.code})),reset:nextReset(now),now,day:daily.day}
 }
 /** The only AI payout path: actual persisted victory, once, in the room transaction. */
 export function settleAiReward(room:Room,account:Account,now=Date.now()){

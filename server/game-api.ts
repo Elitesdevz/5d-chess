@@ -1,5 +1,5 @@
-import {aiCatalog,aiNeedsPlan} from './ai-games.ts'
-import {aiOpponent} from '../src/ai-model.ts'
+import {aiCatalog,aiNeedsPlan,aiDaily} from './ai-games.ts'
+import {aiOpponent,aiPrize} from '../src/ai-model.ts'
 import {aiAcceptsDraw} from '../src/ai.ts'
 import {maintainRoom,maintainGames,resetDeadline,eliminate,finishUpdate} from './game-lifecycle.ts'
 import {randomBytes} from 'node:crypto'
@@ -24,7 +24,7 @@ function roomView(unit: UnitOfWork, room: Room, viewer: string) {
   const active = survivors(room.state)
   return {code: room.code, title: room.title, seats: room.seats, seat, state: room.state,
     journal: room.journal, results: room.results, locked: Object.fromEntries(PLAYERS.map(p => [p, !!room.locked[p]])),
-    waiting: Object.keys(room.seats).length < playerCount(room.state), finished: active.length <= 1, created: room.created, ai:room.ai?{id:room.ai.id,thinking:aiNeedsPlan(room),error:room.ai.error,reward:room.ai.reward,drawReply:room.ai.drawReply}:undefined,rated: !room.ai && room.state.movement === 'live' && !!room.rated, deadline:room.deadline,drawOffer:room.drawOffer,endReason:room.endReason,ratingChanges: room.ratingChanges,cosmetics:Object.fromEntries(Object.entries(room.seats).filter(([p])=>p!==room.ai?.player).map(([p,name])=>[p,structuredClone(wallet(unit.users.get(name!)!).loadout)]))}
+    waiting: Object.keys(room.seats).length < playerCount(room.state), finished: active.length <= 1, created: room.created, ai:room.ai?{id:room.ai.id,nextReward:aiPrize(room.ai.id,aiDaily(unit.users.get(room.owner)!).wins[room.ai.id]??0),thinking:aiNeedsPlan(room),error:room.ai.error,reward:room.ai.reward,drawReply:room.ai.drawReply}:undefined,rated: !room.ai && room.state.movement === 'live' && !!room.rated, deadline:room.deadline,drawOffer:room.drawOffer,endReason:room.endReason,ratingChanges: room.ratingChanges,cosmetics:Object.fromEntries(Object.entries(room.seats).filter(([p])=>p!==room.ai?.player).map(([p,name])=>[p,structuredClone(wallet(unit.users.get(name!)!).loadout)]))}
 }
 function orders(value: unknown, seat: Player, state: State): Order[] {
   if (!Array.isArray(value) || value.length > (state.movement ? Math.min(512, state.universes.length + 1) : 5)) fail(400, 'Invalid orders')
