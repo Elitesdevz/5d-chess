@@ -276,3 +276,7 @@ body:has(.dashboard-page),body:has(.collection-page) { background:radial-gradien
 @media(prefers-reduced-motion:reduce){.deal-tower *,.deal-tower *::before,.deal-tower *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 .deal-tower{min-height:430px}
 @media(max-width:700px){.deal-tower{min-height:470px}}
+/* Reset legacy card placement inside the newer two-column home wrappers. */
+@media(min-width:701px) and (max-width:1180px){.dashboard{height:auto;grid-template-rows:auto auto}.dashboard>.play-home-column{grid-row:1/3}.dashboard>.activity-home-column{grid-column:2;grid-row:1;grid-template-rows:minmax(430px,1fr) auto}.dashboard>.right-home-column{grid-column:2;grid-row:2}.dashboard .activity-and-deals>.leaderboard-card,.dashboard .right-home-column>.notifications-card{grid-column:auto;grid-row:auto}}
+.deal-tower[data-compact=true]{--tower-header:40px;--tower-shop:40px}.deal-tower[data-compact=true] .deal-tower-stage{inset:12px 0}.dashboard .home-deals .deal-tower[data-compact=true] .deal-tower-art{flex-basis:40px}.dashboard .home-deals .deal-tower[data-compact=true] .deal-tower-art>svg,.dashboard .home-deals .deal-tower[data-compact=true] .deal-tower-art>.framed-avatar{width:39px;height:39px}.dashboard .home-deals .deal-tower[data-compact=true] .home-deal{gap:3px;padding:7px 5px}
+@media(min-width:701px) and (max-width:1180px){.dashboard>.play-home-column{align-self:start}.dashboard .play-home-column>.puzzle-card{flex:0 0 auto;min-height:100px}}

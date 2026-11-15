@@ -29,7 +29,7 @@ export class HomeDeals {
  private pause:HTMLButtonElement;
  constructor(private root:HTMLElement){
   const cap=(text:string,heading=false)=>`<div class="deal-tower-cap deal-tower-cube">${[0,1,2,3].map(i=>`<div class="deal-tower-face deal-tower-cap-face" style="--face:${i}"${i?' aria-hidden="true"':''}>${heading&&i===0?`<h2>${text}</h2>`:`<span>${text}</span>`}<small>${heading?'THE COLLECTION':'FIND YOUR NEXT FAVOURITE'}</small></div>`).join('')}<i class="deal-tower-lid"></i><i class="deal-tower-floor"></i></div>`
-  root.innerHTML=`<div class="deal-tower-aura" aria-hidden="true"></div><button class="deal-tower-pause" type="button" aria-label="Pause deals rotation" aria-pressed="false">${pauseGlyph}</button><div class="deal-tower-stage"><div class="deal-tower-structure"><header class="deal-tower-section deal-tower-header">${cap('DEAL',true)}</header>${[0,1,2].map(i=>`<div class="deal-tower-section deal-tower-slot" data-deal-slot="${i}"><div class="deal-tower-rotor deal-tower-cube"><div class="deal-tower-loading">${icon('inventory')}<span>Curating…</span></div></div><button class="deal-tower-turn" type="button" aria-label="Next product in slot ${i+1}" disabled>↻</button></div>`).join('')}<a class="deal-tower-section deal-tower-shop" href="${shop}" aria-label="Open the shop">${cap('SHOP')}<span class="deal-tower-shop-arrow" aria-hidden="true">↗</span></a></div></div><span class="sr-only" data-deals-status role="status"></span>`
+  root.innerHTML=`<div class="deal-tower-aura" aria-hidden="true"></div><button class="deal-tower-pause" type="button" aria-label="Pause deals rotation" aria-pressed="false">${pauseGlyph}</button><div class="deal-tower-stage"><div class="deal-tower-structure"><header class="deal-tower-section deal-tower-header">${cap('DEAL',true)}</header>${[0,1,2].map(i=>`<div class="deal-tower-section deal-tower-slot" role="group" aria-label="Product slot ${i+1}" data-deal-slot="${i}"><div class="deal-tower-rotor deal-tower-cube"><div class="deal-tower-loading">${icon('inventory')}<span>Curating…</span></div></div><button class="deal-tower-turn" type="button" aria-label="Next product in slot ${i+1}" disabled>↻</button></div>`).join('')}<a class="deal-tower-section deal-tower-shop" href="${shop}" aria-label="Open the shop">${cap('SHOP')}<span class="deal-tower-shop-arrow" aria-hidden="true">↗</span></a></div></div><span class="sr-only" data-deals-status role="status"></span>`
   this.pause=root.querySelector('.deal-tower-pause')!
   this.slots=Array.from(root.querySelectorAll<HTMLElement>('.deal-tower-slot')).map((element,index)=>({element,faces:[],quarter:0,hovered:false,index}))
   const signal=this.events.signal
@@ -39,8 +39,8 @@ export class HomeDeals {
    slot.element.addEventListener('pointerleave',()=>{slot.hovered=false;this.schedule(slot)},{signal})
    slot.element.querySelector('button')!.addEventListener('click',()=>this.turn(slot,true),{signal})
   })
-  root.addEventListener('focusin',()=>{this.focused=true;this.sync()},{signal})
-  root.addEventListener('focusout',()=>queueMicrotask(()=>{this.focused=root.contains(document.activeElement);this.sync()}),{signal})
+  root.addEventListener('focusin',e=>{this.focused=e.target!==this.pause;this.sync()},{signal})
+  root.addEventListener('focusout',()=>queueMicrotask(()=>{this.focused=root.contains(document.activeElement)&&document.activeElement!==this.pause;this.sync()}),{signal})
   document.addEventListener('visibilitychange',()=>this.sync(),{signal})
   this.motion.addEventListener('change',()=>{if(this.motion.matches)this.slots.forEach(s=>s.animation?.finish());this.sync()},{signal})
   window.addEventListener('pagehide',e=>{if(!e.persisted)this.dispose()},{signal})
@@ -61,7 +61,7 @@ export class HomeDeals {
   this.root.dataset.ready='true';this.root.querySelector('[data-deals-status]')!.textContent='Twelve shop picks. Hover to hold a product, or use the arrows to turn each section.'
  }
  unavailable(){if(this.loaded)return;this.root.dataset.ready='false';this.root.querySelector('[data-deals-status]')!.textContent='Offers are unavailable. You can still open the shop.';this.root.querySelectorAll('.deal-tower-loading span').forEach(n=>n.textContent='Visit the shop')}
- private fit(){const width=Math.max(40,(this.root.clientWidth-18)*.77);this.root.style.setProperty('--tower-width',width+'px')}
+ private fit(){this.root.dataset.compact=String(this.root.clientHeight<490);const width=Math.max(40,(this.root.clientWidth-18)*.77);this.root.style.setProperty('--tower-width',width+'px')}
  private canRun(){return !this.disposed&&this.loaded&&this.visible&&document.visibilityState==='visible'&&!this.paused&&!this.focused&&!this.motion.matches}
  private clearTimer(slot:Slot){if(slot.timer!==undefined){clearTimeout(slot.timer);slot.timer=undefined}}
  private schedule(slot:Slot,first=false){
