@@ -1,4 +1,5 @@
 import * as T from 'three'
+import {batchStatic} from './scene/static-batch.ts'
 import {box,v} from './scene/geometry.ts'
 import {label,type Materials} from './scene/materials.ts'
 import {casinoCoins} from '../casino-model.ts'
@@ -7,14 +8,14 @@ export const CHIP_VALUES=[1,25,100,500,1000] as const
 /** Furniture and denomination stacks; wagering and settlement stay in the existing controller. */
 export class RouletteConsole {
  readonly root=new T.Group();readonly wallet=new T.Group();readonly wager=new T.Group()
- readonly stakePosition=v(-.28,1.075,.99);readonly returnPosition=v(.55,1.075,.99);readonly spinPosition=v(1.30,1.045,.97)
+ readonly stakePosition=v(-.38,1.045,.93);readonly returnPosition=v(.30,1.045,.93);readonly spinPosition=v(.92,1.045,.93)
  readonly chipPosition=v(-1.08,1.08,.64)
  private stakeLabel:ReturnType<typeof label>;private returnLabel:ReturnType<typeof label>
  private stackMeshes:T.Mesh[][]=[];private wagerMeshes:T.Mesh[]=[];private textures:ReturnType<typeof label>[]=[]
  private lastStake=-1;private lastReturn=-1;private lastCoins=-1
  readonly spin:T.Mesh;readonly chipEdge:T.Mesh
  constructor(world:T.Scene,private m:Materials){
-  world.add(this.root);this.wallet.position.set(-1.08,1.005,.59);this.wager.position.set(-.67,1.005,.62);this.root.add(this.wallet,this.wager)
+  world.add(this.root);this.wallet.position.set(-.98,1.005,.52);this.wager.position.set(-.67,1.005,.52);this.root.add(this.wallet,this.wager)
   this.chipEdge=box(this.wallet,[.82,.022,.55],[0,.008,0],m.darkGold.clone(),.04)
   box(this.wallet,[.79,.025,.52],[0,.017,0],m.ebony,.035)
   box(this.wager,[.24,.025,.36],[.18,.017,0],m.darkGold,.03)
@@ -25,11 +26,11 @@ export class RouletteConsole {
    this.stackMeshes.push(stack)
   }
   for(let i=0;i<8;i++)this.wagerMeshes.push(this.pokerChip(this.wager,.18,.054+i*.021,0,2,i===7))
-  this.stakeLabel=this.plate('AMOUNT BET',this.stakePosition,.74)
-  this.returnLabel=this.plate('WIN RETURN',this.returnPosition,.78)
+  this.stakeLabel=this.plate('AMOUNT BET',this.stakePosition,.60)
+  this.returnLabel=this.plate('WIN RETURN',this.returnPosition,.64)
   const spin=new T.Group();spin.position.copy(this.spinPosition);this.root.add(spin)
-  box(spin,[.52,.035,.31],[0,0,0],m.darkGold.clone(),.035)
-  this.spin=box(spin,[.49,.038,.28],[0,.015,0],m.ebony.clone(),.025)
+  box(spin,[.47,.035,.31],[0,0,0],m.darkGold.clone(),.035)
+  this.spin=box(spin,[.44,.038,.28],[0,.015,0],m.ebony.clone(),.025)
   this.writing(spin,'SPIN',.39,.12,v(0,.036,-.015))
   this.writing(spin,'↻',.16,.055,v(0,.036,.078),'#a89260')
  }
@@ -49,7 +50,7 @@ export class RouletteConsole {
   // Ivory edge inserts and concentric inlays make denominations recognisable as real chips.
   for(let j=0;j<8;j++){const a=j*Math.PI/4;const insert=new T.Mesh(new T.BoxGeometry(.035,.020,.008),this.m.ivory);insert.position.set(Math.sin(a)*.098,0,Math.cos(a)*.098);insert.rotation.y=a;body.add(insert)}
   if(top){const ring=new T.Mesh(new T.TorusGeometry(.078,.0025,4,32),this.m.ivory);ring.rotation.x=-Math.PI/2;ring.position.y=.011;body.add(ring);this.writing(body,String(CHIP_VALUES[d]),.13,.065,v(0,.012,0),'#fff2d3')}
-  return body
+  batchStatic(body);return body
  }
  update(coins:number,stake:number,returns:number,busy:boolean){
   if(stake!==this.lastStake){this.stakeLabel.update(casinoCoins(stake));this.wagerMeshes.forEach((chip,i)=>chip.visible=i<Math.min(8,Math.max(1,Math.ceil(Math.log2(stake+1)))));this.lastStake=stake}
