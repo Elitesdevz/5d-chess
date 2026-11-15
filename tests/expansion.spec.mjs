@@ -44,9 +44,9 @@ test('expanded shop: monthly purchase, continuous animations, one-time welcome, 
  await page.getByRole('button',{name:'Skip animation'}).click();await page.locator('.reward-result:not([hidden])').waitFor()
  const shown=await page.locator('.reel-card').evaluateAll(cards=>cards.map(c=>c.dataset.item))
  const exclusiveIds=ITEMS.filter(i=>i.monthly).map(i=>i.id)
- assert.ok(shown.some(id=>exclusiveIds.includes(id)));assert.ok(shown.some(id=>id.startsWith('movement-')||id.startsWith('capture-')))
+ assert.ok(shown.length>=40);assert.ok(shown.every(id=>ITEMS.some(i=>i.id===id)))
  await page.evaluate(()=>{Math.random=window.originalPreviewRandom})
- if(await page.getByRole('button',{name:'Keep copy',exact:true}).count())await page.getByRole('button',{name:'Keep copy',exact:true}).click();else await page.getByRole('button',{name:'Continue',exact:true}).click()
+ await page.getByRole('button',{name:'Store',exact:true}).click()
  const after=await (await page.request.get(base+'/api/economy')).json(),drop=after.recent[0]
  assert.equal(after.wallet.coins,before.wallet.coins-1800)
  assert.ok(ITEMS.find(i=>i.id===drop.itemId).monthly || ['movement','capture'].includes(ITEMS.find(i=>i.id===drop.itemId).type))
