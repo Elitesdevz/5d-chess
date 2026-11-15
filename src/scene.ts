@@ -1,3 +1,4 @@
+import {ANGLED_VIEW,FLAT_VIEW,project,unproject,projectedBounds,type BoardProjection} from './board-view.ts'
 import {travelPosition} from './continuous.ts'
 import {BOARD, TIME, ROW, layoutOf, dimensions, squarePoint, type Point, type Layout, type BoardNode as Node} from './geometry.ts'
 import {
@@ -5,7 +6,7 @@ import {
   SIZE, boardBounds, boardKey, boardTurn, coordKey, frontier, getUniverse, index, insideState, isMain, pieceAt, playerCount, present, squares
 } from './model.ts'
 import {drawMovement,drawCapture} from './effects.ts'
-import {COLORS, drawPiece,equippedEffect} from './art.ts'
+import {COLORS, drawPiece,drawReliefPiece,equippedEffect} from './art.ts'
 
 interface Camera extends Point {scale: number}
 interface Display {
@@ -30,6 +31,8 @@ const colorOf = (m: Candidate) => m.rift ? pathColors.rift : m.branch ? pathColo
 const clamp = (x: number, min: number, max: number) => Math.min(max, Math.max(min, x))
 
 export class Scene {
+  private rich=false
+  private projection:BoardProjection=FLAT_VIEW
   private ctx: CanvasRenderingContext2D
   private layout: Layout
   private view: Display
@@ -56,11 +59,30 @@ export class Scene {
   private mini?: HTMLCanvasElement
   private miniMap?: {x: number; y: number; scale: number}
 
+  getPerspective(){return this.projection===ANGLED_VIEW}
+  setPerspective(angled:boolean){
+    this.projection=angled?ANGLED_VIEW:FLAT_VIEW
+    this.canvas.dataset.view=angled?'angled':'flat'
+    if(this.rich)try{localStorage.setItem('5d-match-view/v1',angled?'angled':'flat')}catch{}
+    this.fit()
+  }
+  private drawMan(ctx:CanvasRenderingContext2D,kind:Parameters<typeof drawPiece>[1],player:Player,x:number,y:number,size:number){
+    if(!this.rich){drawPiece(ctx,kind,player,x,y,size);return}
+    ctx.save();ctx.translate(x,y)
+    ctx.transform(1,0,-this.projection.shear/this.projection.tilt,1/this.projection.tilt,0,0)
+    drawReliefPiece(ctx,kind,player,0,-size*.035,size)
+    ctx.restore()
+  }
   setOverlay(name: string, enabled: boolean) { this.overlays[name] = enabled; this.request() }
 
   constructor(private canvas: HTMLCanvasElement, state: State,
     private callbacks: {pick(c?: Coord): void; hover(c?: Coord): void; scale(scale: number): void;
       describe(c: Coord): void; rift(a: number, b: number, usableFrom: number): void}) {
+    this.rich=!!canvas.closest('.match-screen')
+    let angled=this.rich
+    try{if(this.rich&&localStorage.getItem('5d-match-view/v1')==='flat')angled=false}catch{}
+    this.projection=angled?ANGLED_VIEW:FLAT_VIEW
+    canvas.dataset.view=angled?'angled':'flat'
     this.ctx = canvas.getContext('2d')!
     this.view = {state, moves: [], queued: []}
     this.layout = layoutOf(state)
@@ -162,10 +184,11 @@ export class Scene {
     if (!this.mini) return
     const ctx = this.mini.getContext('2d')!, {width, height} = this.layout
     const d = this.dimensions(BOARD), margin = 28
-    const left = Math.min(-d.width / 2 - margin, this.camera.x - this.width / (2 * this.camera.scale))
-    const right = Math.max(width + d.width / 2 + margin, this.camera.x + this.width / (2 * this.camera.scale))
-    const top = Math.min(-d.height / 2 - margin, this.camera.y - this.height / (2 * this.camera.scale))
-    const bottom = Math.max(height + d.height / 2 + margin, this.camera.y + this.height / (2 * this.camera.scale))
+    const corners=[this.world({x:0,y:0}),this.world({x:this.width,y:0}),this.world({x:this.width,y:this.height}),this.world({x:0,y:this.height})]
+    const left = Math.min(-d.width/2-margin,...corners.map(p=>p.x))
+    const right=Math.max(width+d.width/2+margin,...corners.map(p=>p.x))
+    const top=Math.min(-d.height/2-margin,...corners.map(p=>p.y))
+    const bottom=Math.max(height+d.height/2+margin,...corners.map(p=>p.y))
     const scale = Math.min(280 / (right - left), 160 / (bottom - top))
     const x = 150 - (left + right) / 2 * scale, y = 90 - (top + bottom) / 2 * scale
     this.miniMap = {x, y, scale}
@@ -178,8 +201,7 @@ export class Scene {
       ctx.fillRect(node.x - box.width / 2, node.y - box.height / 2, box.width, box.height)
     }
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2 / scale
-    ctx.strokeRect(this.camera.x - this.width / (2 * this.camera.scale), this.camera.y - this.height / (2 * this.camera.scale),
-      this.width / this.camera.scale, this.height / this.camera.scale)
+    ctx.beginPath();corners.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.stroke()
     ctx.restore()
   }
 
@@ -203,8 +225,8 @@ export class Scene {
   }
 
   private world(point: Point): Point {
-    return {x: this.camera.x + (point.x - this.width / 2) / this.camera.scale,
-      y: this.camera.y + (point.y - this.height / 2) / this.camera.scale}
+    const offset=unproject({x:(point.x-this.width/2)/this.camera.scale,y:(point.y-this.height/2)/this.camera.scale},this.projection)
+    return {x:this.camera.x+offset.x,y:this.camera.y+offset.y}
   }
 
   private dimensions(size: number) { return dimensions(this.view.state, size) }
@@ -315,8 +337,8 @@ export class Scene {
 
   private pan(x: number, y: number) {
     this.motion = undefined
-    this.camera.x -= x / this.camera.scale
-    this.camera.y -= y / this.camera.scale
+    const delta=unproject({x:x/this.camera.scale,y:y/this.camera.scale},this.projection)
+    this.camera.x-=delta.x;this.camera.y-=delta.y
     this.request()
   }
 
@@ -324,8 +346,8 @@ export class Scene {
     this.motion = undefined
     const w = this.world(anchor)
     const scale = clamp(this.camera.scale * factor, MIN_SCALE, MAX_SCALE)
-    const end = {scale, x: w.x - (anchor.x - this.width / 2) / scale,
-      y: w.y - (anchor.y - this.height / 2) / scale}
+    const delta=unproject({x:(anchor.x-this.width/2)/scale,y:(anchor.y-this.height/2)/scale},this.projection)
+    const end={scale,x:w.x-delta.x,y:w.y-delta.y}
     this.center(end, smooth)
   }
 
@@ -340,12 +362,13 @@ export class Scene {
     const d = this.dimensions(BOARD)
     const area = this.canvas.getBoundingClientRect()
     const panel = document.getElementById('sidebar')?.getBoundingClientRect()
-    const right = this.width > 1000 && panel && panel.left > area.left + this.width * .55
-      ? Math.min(this.width * .4, area.right - panel.left + 16) : 0
-    const bottom = this.width <= 1000 && panel ? 122 : 0
-    const scale = clamp(Math.min((this.width - right - 40) / (width + d.width + 52),
-      (this.height - bottom - 54) / (height + d.height + 102)), MIN_SCALE, 1.38)
-    this.center({x: width / 2 + right / (2 * scale), y: height / 2 + bottom / (2 * scale), scale})
+    const overlaps=panel&&panel.left<area.right&&panel.right>area.left&&panel.top<area.bottom&&panel.bottom>area.top
+    const right=overlaps&&panel.left>area.left+this.width*.55?Math.min(this.width*.4,area.right-panel.left+16):0
+    const bottom=overlaps&&panel.left<=area.left+8&&panel.right>=area.right-8?Math.min(this.height*.6,area.bottom-panel.top+12):0
+    const bounds=projectedBounds(width+d.width+52,height+d.height+102,this.projection)
+    const scale=clamp(Math.min((this.width-right-40)/bounds.width,(this.height-bottom-54)/bounds.height),MIN_SCALE,this.rich?2.6:1.38)
+    const offset=unproject({x:right/(2*scale),y:bottom/(2*scale)},this.projection)
+    this.center({x:width/2+offset.x,y:height/2+offset.y,scale})
   }
 
   focus(c = this.view.selected ?? this.inspected) {
@@ -357,7 +380,8 @@ export class Scene {
     const node = this.layout.nodes.get(boardKey({u, t}))
     if (!node) return
     const d = this.dimensions(node.size)
-    const scale = clamp(Math.min((this.width - 48) / d.width, (this.height - 154) / d.height), .2, 1.62)
+    const bounds=projectedBounds(d.width,d.height,this.projection)
+    const scale = clamp(Math.min((this.width - 48) / bounds.width, (this.height - 154) / bounds.height), .2, this.rich?2.5:1.62)
     this.center({x: node.x, y: node.y + 2, scale}, smooth)
   }
 
@@ -459,9 +483,10 @@ export class Scene {
       y: Number(this.panKeys.has('s') || this.panKeys.has('arrowdown')) - Number(this.panKeys.has('w') || this.panKeys.has('arrowup'))
     }
     const length = Math.hypot(direction.x, direction.y) || 1
+    const screenDirection=unproject(direction,this.projection)
     const response = 1 - Math.exp(-dt * (this.panKeys.size ? 14 : 10))
-    this.panVelocity.x += (direction.x / length * 540 - this.panVelocity.x) * response
-    this.panVelocity.y += (direction.y / length * 540 - this.panVelocity.y) * response
+    this.panVelocity.x += (screenDirection.x / length * 540 - this.panVelocity.x) * response
+    this.panVelocity.y += (screenDirection.y / length * 540 - this.panVelocity.y) * response
     if (Math.hypot(this.panVelocity.x, this.panVelocity.y) > 0.5) {
       this.camera.x += this.panVelocity.x * dt / this.camera.scale
       this.camera.y += this.panVelocity.y * dt / this.camera.scale
@@ -472,11 +497,13 @@ export class Scene {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
     const k = this.camera.scale * this.ratio
-    ctx.setTransform(k, 0, 0, k, this.canvas.width / 2 - this.camera.x * k, this.canvas.height / 2 - this.camera.y * k)
+    const camera=project(this.camera,this.projection)
+    ctx.setTransform(k,0,k*this.projection.shear,k*this.projection.tilt,this.canvas.width/2-camera.x*k,this.canvas.height/2-camera.y*k)
     const s = this.view.state
     const current = present(s)
     const selectedPreview = this.view.preview
-    const low = this.world({x: 0, y: 0}), high = this.world({x: this.width, y: this.height})
+    const corners=[this.world({x:0,y:0}),this.world({x:this.width,y:0}),this.world({x:0,y:this.height}),this.world({x:this.width,y:this.height})]
+    const low={x:Math.min(...corners.map(p=>p.x)),y:Math.min(...corners.map(p=>p.y))},high={x:Math.max(...corners.map(p=>p.x)),y:Math.max(...corners.map(p=>p.y))}
     if (this.overlays.axes) this.drawAxes(current, low, high)
     if (this.overlays.links || this.overlays.rifts) this.drawConnections(s, selectedPreview)
     for (const node of this.layout.nodes.values()) {
@@ -507,6 +534,7 @@ export class Scene {
   }
 
   private drawAxes(current: number, low: Point, high: Point) {
+    if(this.rich&&this.view.state.universes.length===1&&this.view.state.universes[0].boards.length===1)return
     const ctx = this.ctx
     const x = current * TIME
     const d = this.dimensions(BOARD)
@@ -617,31 +645,30 @@ export class Scene {
       ctx.shadowColor = ownerColor ?? accent ?? '#c6a46a30'
       ctx.shadowBlur = playable ? 6 : accent ? 11 : 14
     }
-    ctx.beginPath()
-    if (playerCount(this.view.state) === 3) {
-      const arm = 3 * tile - 8
-      const armEnd = 11 * tile + 8
-      ctx.moveTo(arm, -8)
-      ctx.lineTo(d.width + 8, -8)
-      ctx.lineTo(d.width + 8, d.height + 8)
-      ctx.lineTo(arm, d.height + 8)
-      ctx.lineTo(arm, armEnd)
-      ctx.lineTo(-8, armEnd)
-      ctx.lineTo(-8, arm)
-      ctx.lineTo(arm, arm)
-      ctx.closePath()
-    } else ctx.roundRect(-8, -8, d.width + 16, d.height + 16, 7)
-    ctx.fill(); ctx.stroke()
+    const frame=new Path2D(),count=playerCount(this.view.state)
+    if(count===3||(count===4&&this.rich)){
+      const a=3*tile-8,b=11*tile+8,w=d.width+8,h=d.height+8
+      frame.moveTo(a,-8);frame.lineTo(count===4?b:w,-8)
+      if(count===4){frame.lineTo(b,a);frame.lineTo(w,a);frame.lineTo(w,b);frame.lineTo(b,b);frame.lineTo(b,h)}else frame.lineTo(w,h)
+      frame.lineTo(a,h);frame.lineTo(a,b);frame.lineTo(-8,b);frame.lineTo(-8,a);frame.lineTo(a,a);frame.closePath()
+    }else frame.roundRect(-8,-8,d.width+16,d.height+16,this.rich?9:7)
+    if(this.rich){
+      ctx.save();ctx.translate(3,11);ctx.shadowColor='#00000080';ctx.shadowBlur=scale>.35?26:8;ctx.fillStyle='#0d1b1a';ctx.fill(frame);ctx.restore()
+      const rim=ctx.createLinearGradient(0,-8,d.width,d.height+8);rim.addColorStop(0,'#8b9a89');rim.addColorStop(.35,'#344c45');rim.addColorStop(1,'#142725');ctx.fillStyle=rim
+      ctx.shadowBlur=0;ctx.fill(frame);ctx.stroke(frame)
+    }else{ctx.fill(frame);ctx.stroke(frame)}
+
     if (!u.active) {
-      ctx.setLineDash([9, 7]); ctx.strokeStyle = '#b5c5d8'; ctx.lineWidth = 2.5; ctx.stroke(); ctx.setLineDash([])
+      ctx.setLineDash([9, 7]); ctx.strokeStyle = '#b5c5d8'; ctx.lineWidth = 2.5; ctx.stroke(frame); ctx.setLineDash([])
     }
     ctx.shadowBlur = 0
     {
       for (const square of squares(this.view.state)) {
         const {x, y} = square
         const sx = (x - d.minX) * tile, sy = (y - d.minY) * tile
-        ctx.fillStyle = (x + y) % 2 ? '#846449' : '#c7ad85'
+        ctx.fillStyle=this.rich?((x+y)%2?(front?'#668079':'#53645f'):(front?'#d3d5c2':'#a6b1a1')):((x+y)%2?'#846449':'#c7ad85')
         ctx.fillRect(sx, sy, tile, tile)
+        if(this.rich&&scale>.35){ctx.fillStyle='#ffffff12';ctx.fillRect(sx,sy,tile,1);ctx.fillStyle='#142a241a';ctx.fillRect(sx,sy+tile-1,tile,1)}
         const c = {u: u.id, t, x, y}
         const key = coordKey(c)
         const marked = this.targets.get(key)
@@ -667,6 +694,10 @@ export class Scene {
             }
           }
         }
+      }
+    }
+    for(const square of squares(this.view.state)){
+        const {x,y}=square,sx=(x-d.minX)*tile,sy=(y-d.minY)*tile,key=coordKey({u:u.id,t,x,y})
         const piece = b.cells[index(square)]
         if (piece && !this.animatedDepartures.has(key)) {
           const ghost = front && this.view.state.eliminated.includes(piece.player)
@@ -676,16 +707,15 @@ export class Scene {
             ctx.fillStyle = '#ff303066'; ctx.fillRect(sx, sy, tile, tile)
             ctx.strokeStyle = '#ff4f4f'; ctx.lineWidth = 2; ctx.strokeRect(sx + 1, sy + 1, tile - 2, tile - 2)
           }
-          drawPiece(ctx, piece.kind, piece.player, sx + tile / 2, sy + tile / 2 + .4, tile * .98)
+          this.drawMan(ctx,piece.kind,piece.player,sx+tile/2,sy+tile/2+.4,tile*(this.rich?.94:.98))
           ctx.shadowBlur = 0
           if (ghost) ctx.globalAlpha /= .27
         }
       }
-    }
     if (scale > .38) {
       // Coordinates sit just outside the playable area.
-      ctx.fillStyle = '#b7a180'
-      ctx.font = '10px ui-monospace, monospace'
+      ctx.fillStyle=this.rich?'#a8b8a6':'#b7a180'
+      ctx.font = this.rich?`${Math.min(28,11/(scale*this.projection.tilt))}px ui-monospace, monospace`:'10px ui-monospace, monospace'
       ctx.textAlign = 'center'
       for (let i = 0; i <= d.maxX - d.minX; i++) {
         const col = String.fromCharCode(97 + i)
@@ -695,8 +725,8 @@ export class Scene {
         ctx.fillText(String(d.maxY - d.minY + 1 - i), -20, (i + .61) * tile)
       }
       for (const [player, x, y, dir] of [
-        ['yellow', d.width / 2, 3, 0], ['red', d.width / 2, d.height - 3, 0],
-        ['blue', 3, d.height / 2, 1], ['green', d.width - 3, d.height / 2, 1]
+        ['yellow', (7-d.minX)*tile, 3, 0], ['red', (7-d.minX)*tile, d.height - 3, 0],
+        ['blue', 3, (7-d.minY)*tile, 1], ['green', d.width - 3, (7-d.minY)*tile, 1]
       ] as const) {
         if ((player === 'green' && d.maxX < 13) || (player === 'blue' && d.minX > 0)) continue
         ctx.strokeStyle = COLORS[player] + 'ad'
@@ -708,10 +738,10 @@ export class Scene {
     if (scale > .20 && this.overlays.labels) {
       ctx.globalAlpha = 1
       ctx.textAlign = 'center'
-      ctx.font = '650 12px ui-monospace, monospace'
+      ctx.font=this.rich?`600 ${Math.min(30,11/(scale*this.projection.tilt))}px ui-monospace, monospace`:'650 12px ui-monospace, monospace'
       ctx.fillStyle = now ? '#ddc18b' : '#b0a18a'
       const marker = u.owners?.length ? `  ·  ${u.owners.length > 1 ? 'SHARED ' : ''}${u.owners.join('/').toUpperCase()}` : u.creator ? `  ·  ${u.creator.toUpperCase()}` : ''
-      ctx.fillText(`U${u.id}  /  T${t}${front ? now ? '   ·   PRESENT' : u.active ? '   ·   FUTURE' : '   ·   INACTIVE' : '   ·   HISTORY'}${marker}`, d.width / 2, d.height + 29)
+      ctx.fillText(this.rich?`U${u.id} · T${t}  /  ${owner?owner.toUpperCase()+' TO MOVE':front?now?'PRESENT':u.active?'FUTURE':'INACTIVE':'HISTORY'}`:`U${u.id}  /  T${t}${front ? now ? '   ·   PRESENT' : u.active ? '   ·   FUTURE' : '   ·   INACTIVE' : '   ·   HISTORY'}${marker}`,d.width/2,d.height+(this.rich?19+14/(scale*this.projection.tilt):29))
     }
     ctx.restore()
   }
@@ -725,8 +755,9 @@ export class Scene {
     ctx.globalAlpha = alpha
     ctx.strokeStyle = color
     ctx.fillStyle = color
-    ctx.lineWidth = 3.4
-    if (dashed) ctx.setLineDash([6, 7])
+    const ink=this.rich?1/this.camera.scale:1
+    ctx.lineWidth=this.rich?2*ink:3.4
+    if(dashed)ctx.setLineDash(this.rich?[5*ink,5*ink]:[6,7])
     ctx.beginPath()
     ctx.moveTo(points[0].x, points[0].y)
     for (const p of points.slice(1)) ctx.lineTo(p.x, p.y)
@@ -736,7 +767,7 @@ export class Scene {
     const angle = Math.atan2(end.y - prior.y, end.x - prior.x)
     ctx.setLineDash([])
     ctx.beginPath(); ctx.moveTo(end.x, end.y)
-    for (const n of [-.5, .5]) ctx.lineTo(end.x - 11 * Math.cos(angle + n), end.y - 11 * Math.sin(angle + n))
+    for (const n of [-.5, .5]) ctx.lineTo(end.x - (this.rich?8*ink:11)*Math.cos(angle+n),end.y - (this.rich?8*ink:11)*Math.sin(angle+n))
     ctx.closePath(); ctx.fill()
     ctx.restore()
   }
@@ -747,7 +778,7 @@ export class Scene {
       const at = travelPosition(trace.points, Math.min(tick, trace.endTick))
       if (trace.collision && tick >= trace.endTick) {
         const attack=this.view.animation?.outcomes.find(o=>o.captures.some(c=>c.piece.player===trace.piece.player&&c.piece.kind===trace.piece.kind&&coordKey(c.at)===coordKey(trace.to)))
-        if(attack&&drawCapture(ctx,equippedEffect(attack.move.player,'capture'),at,(tick-trace.endTick)/1.8,()=>drawPiece(ctx,trace.piece.kind,trace.piece.player,0,0,32),reduced.matches))continue
+        if(attack&&drawCapture(ctx,equippedEffect(attack.move.player,'capture'),at,(tick-trace.endTick)/1.8,()=>this.drawMan(ctx,trace.piece.kind,trace.piece.player,0,0,32),reduced.matches))continue
 
         const fade = Math.max(0, 1 - (tick - trace.endTick) / 1.5)
         if (fade) {
@@ -758,8 +789,8 @@ export class Scene {
       }
       const instant=trace.endTick===0&&trace.distance>0
       const tail=instant?trace.points[0]:travelPosition(trace.points,Math.max(0,Math.min(tick,trace.endTick)-.65))
-      if(tick<trace.endTick||instant&&tick<1)drawMovement(ctx,equippedEffect(trace.piece.player,'movement'),[tail,at],at,instant?performance.now()/1000:tick,(x,y,alpha)=>{ctx.save();ctx.globalAlpha=alpha;drawPiece(ctx,trace.piece.kind,trace.piece.player,x,y,32);ctx.restore()},reduced.matches)
-      drawPiece(ctx, trace.piece.kind, trace.piece.player, at.x, at.y, 32)
+      if(tick<trace.endTick||instant&&tick<1)drawMovement(ctx,equippedEffect(trace.piece.player,'movement'),[tail,at],at,instant?performance.now()/1000:tick,(x,y,alpha)=>{ctx.save();ctx.globalAlpha=alpha;this.drawMan(ctx,trace.piece.kind,trace.piece.player,x,y,32);ctx.restore()},reduced.matches)
+      this.drawMan(ctx, trace.piece.kind, trace.piece.player, at.x, at.y, 32)
     }
   }
 
@@ -782,11 +813,11 @@ export class Scene {
           const b = this.squarePoint(path[Math.min(path.length - 1, Math.ceil(position))])
           const k = position % 1
           const at={x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k}
-          if(p<captureArrival)drawMovement(ctx,equippedEffect(leg.piece.player,'movement'),[a,at],at,p,(x,y,alpha)=>{ctx.save();ctx.globalAlpha=alpha;drawPiece(ctx,leg.piece.kind,leg.piece.player,x,y,33);ctx.restore()},reduced.matches)
-          drawPiece(ctx,leg.piece.kind,leg.piece.player,at.x,at.y,33)
+          if(p<captureArrival)drawMovement(ctx,equippedEffect(leg.piece.player,'movement'),[a,at],at,p,(x,y,alpha)=>{ctx.save();ctx.globalAlpha=alpha;this.drawMan(ctx,leg.piece.kind,leg.piece.player,x,y,33);ctx.restore()},reduced.matches)
+          this.drawMan(ctx,leg.piece.kind,leg.piece.player,at.x,at.y,33)
         }
       }
-      if(captureEffect!=='default')for(const c of captures){const at=this.squarePoint(arrival(c.at));if(p<captureArrival)drawPiece(ctx,c.piece.kind,c.piece.player,at.x,at.y,32);else drawCapture(ctx,captureEffect,at,(p-captureArrival)/(1-captureArrival),()=>drawPiece(ctx,c.piece.kind,c.piece.player,0,0,32),reduced.matches)}
+      if(captureEffect!=='default')for(const c of captures){const at=this.squarePoint(arrival(c.at));if(p<captureArrival)this.drawMan(ctx,c.piece.kind,c.piece.player,at.x,at.y,32);else drawCapture(ctx,captureEffect,at,(p-captureArrival)/(1-captureArrival),()=>this.drawMan(ctx,c.piece.kind,c.piece.player,0,0,32),reduced.matches)}
       if ((captures.length || status !== 'applied' || move.branch) && p > .45) {
         ctx.save()
         ctx.globalAlpha = (1 - p) * 1.8
