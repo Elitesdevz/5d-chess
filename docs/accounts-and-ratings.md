@@ -10,7 +10,7 @@ Every page shares the logo, coin balance, Shop / Inventory / Market navigation a
 
 ## Merged Elo
 
-One visible rating starts at 1200 and covers all movement modes and player counts. Every newly created online game is Elo-eligible, including private games. Local games are not eligible. The first ten games are labeled provisional, without changing K. Development accounts receive the new merged rating without converting old pool ratings.
+One visible rating starts at 1200 and covers Live games at every player count, including three-player and private games. Classic and local games do not change Elo. Classic still awards completion coins through the same once-only settlement, without updating rating game counts or pools. The first ten games are labeled provisional, without changing K. Development accounts receive the new merged rating without converting old pool ratings.
 
 Duels use standard pairwise logistic Elo with K = 32 and a 400-point scale. Multiplayer uses normalized pairwise comparisons with a total K of 40: K = 34 (85%) for finishing order and K = 6 (15%) for elimination performance. Elimination performance compares credited elimination totals between each pair. If nobody earns elimination credit, finishing order gets the full K = 40. Changes are balanced to sum to zero after integer rounding. Thus a four-player match does not multiply the available rating swing by three.
 

@@ -236,7 +236,7 @@ test('online check warning and movable camera minimap are available without chan
   await page.route('**/api/games/TEST',route=>route.fulfill({json:{code:'TEST',title:'Check review',seats:{red:'Alice',yellow:'Bob'},seat:'red',state:snapshot,results:[],journal:[],locked:{},waiting:false,finished:false}}))
   await page.goto(base+'/chess/online.html?code=TEST')
   await page.getByRole('button',{name:'Lock in a pass'}).click()
-  await page.getByRole('heading',{name:'Your king is still threatened'}).waitFor()
+  await page.getByRole('heading',{name:'Advisory check: your king is threatened'}).waitFor()
   await page.getByRole('button',{name:'Review moves'}).click()
   const mini=page.locator('.minimap')
   const before=await mini.boundingBox(), handle=await page.locator('.minimap-handle').boundingBox()

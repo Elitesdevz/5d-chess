@@ -29,6 +29,7 @@ test('ratings, notifications and settings are private, durable and settled atomi
  assert.equal((await call('/settings',{...prefs,avatar:'icon-singularity'},alice)).data.profile.loadout.icon,'default')
  assert.equal((await call('/settings',{...prefs,players:7},alice)).status,400)
  const room=(await call('/games',{title:'Rated duel',playerCount:2,movement:'classic',rated:true},alice)).data
+ assert.equal(room.rated,false)
  await call(`/games/${room.code}/join`,{},bob)
  const notifications=(await call('/notifications',undefined,alice)).data
  assert.ok(notifications.items.some(n=>n.kind==='join'))
@@ -49,17 +50,17 @@ test('ratings, notifications and settings are private, durable and settled atomi
  const responses=await Promise.all([call(`/games/${room.code}/orders`,{orders:[order]},alice),call(`/games/${room.code}/orders`,{orders:[order]},alice)])
  assert.deepEqual(responses.map(r=>r.status).sort(),[200,409])
  const winner=(await call('/me',undefined,alice)).data.profile,loser=(await call('/me',undefined,bob)).data.profile
- assert.equal(winner.rating.value,1216);assert.equal(loser.rating.value,1184)
- assert.equal(winner.rating.games,1);assert.equal('ratings' in winner,false);assert.equal(winner.coins,600);assert.equal(loser.coins,540)
+ assert.equal(winner.rating.value,1200);assert.equal(loser.rating.value,1200)
+ assert.equal(winner.rating.games,0);assert.equal('ratings' in winner,false);assert.equal(winner.coins,600);assert.equal(loser.coins,540)
  const board=(await call('/leaderboard?pool=classic-duel',undefined,alice)).data
  assert.equal(board.players[0].name,'Alice');assert.equal(board.players[1].name,'Bob')
  const feed=(await call('/notifications',undefined,alice)).data.items
- assert.equal(feed.filter(n=>n.kind==='rating').length,1)
+ assert.equal(feed.filter(n=>n.kind==='rating').length,0)
  assert.ok(feed.some(n=>n.kind==='result'))
  await stop();await start()
  assert.deepEqual((await call('/me',undefined,alice)).data.profile,winner)
  assert.deepEqual((await call('/me',undefined,alice)).data.profile.settings,{...prefs,avatar:'default'})
- assert.equal((await call('/notifications',undefined,alice)).data.items.filter(n=>n.kind==='rating').length,1)
+ assert.equal((await call('/notifications',undefined,alice)).data.items.filter(n=>n.kind==='rating').length,0)
  // Rewards and the market share durable SQL transactions.
  assert.equal((await call('/economy')).status,401)
  const newcomer=(await call('/signup',{username:'Newcomer',password:'p',confirm:'p'})).cookie

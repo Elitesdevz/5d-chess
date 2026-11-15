@@ -66,7 +66,7 @@ function gameRow(game:Game,action:string,click:()=>void){
   const copy=document.createElement('div'),title=document.createElement('strong'),detail=document.createElement('small'),button=document.createElement('button')
   title.textContent=game.title
   const movement=game.movement==='classic'?'Classic':game.movement==='live'?'Live':'Legacy live'
-  detail.textContent=`${game.code} · ${game.players}/${game.maxPlayers} players · ${movement} · ${game.rated?'Rated':'Casual'}${game.finished?' · Finished':game.myTurn?' · Your move':` · Round ${game.round}`}`
+  detail.textContent=`${game.code} · ${game.players}/${game.maxPlayers} players · ${movement} · ${game.rated?'Rated':'Unrated · no Elo changes'}${game.finished?' · Finished':game.myTurn?' · Your move':` · Round ${game.round}`}`
   copy.append(title,detail);button.className='button';button.textContent=action;button.onclick=click;row.append(copy,button);return row
 }
 const relative=(time:number)=>{const seconds=Math.max(0,Math.floor((Date.now()-time)/1000));return seconds<60?'Just now':seconds<3600?`${Math.floor(seconds/60)}m ago`:seconds<86400?`${Math.floor(seconds/3600)}h ago`:`${Math.floor(seconds/86400)}d ago`}
@@ -79,6 +79,8 @@ function noticeRow(notice:Notice,open:()=>void){
 }
 async function lobby(){
   const puzzle=el<HTMLDialogElement>('puzzle-soon');el('open-puzzle').onclick=()=>puzzle.showModal();el('close-puzzle').onclick=()=>puzzle.close()
+  const rewardHint=()=>{el('game-reward-hint').textContent=el<HTMLSelectElement>('game-movement').value==='classic'?'Unrated · Earn coins, no Elo changes.':'Rated · Completed Live games award Elo and coins.'}
+  el('game-movement').addEventListener('change',rewardHint);rewardHint()
   const session=await getSession().catch(()=>null)
   if(!session?.user){location.replace('/chess/login.html');return}
   if(!session.profile){error('lobby-error','The home page needs the matching updated game server.');return}
@@ -91,7 +93,7 @@ async function lobby(){
     const filtered=games.available.filter(g=>showAll||(g.maxPlayers===count&&g.movement===movement))
     el('available-games').replaceChildren(...filtered.map(g=>gameRow(g,'Join',()=>{el<HTMLInputElement>('join-code').value=g.code;el<HTMLFormElement>('join-form').requestSubmit()})))
     if(!filtered.length)el('available-games').textContent=showAll?'No open games right now. Create one and invite friends.':'No matching games yet. Create a game, or show all open games.'
-    el('game-filter').textContent=showAll?'All player counts and movement modes.':`${count} players · ${movement==='classic'?'Classic':'Live'}`
+    el('game-filter').textContent=showAll?'All player counts and movement modes.':`${count} players · ${movement==='classic'?'Classic · Unrated, no Elo changes':'Live · Rated'}`
     el('show-all-games').hidden=showAll
     el('my-games').replaceChildren(...[...games.mine].sort((a,b)=>Number(a.finished)-Number(b.finished)||Number(b.myTurn)-Number(a.myTurn)).map(g=>gameRow(g,g.finished?'Review':'Continue',()=>online(g.code))))
     if(!games.mine.length)el('my-games').textContent='No games yet. Create one or find an open seat.'
@@ -132,7 +134,7 @@ async function lobby(){
     document.querySelectorAll<HTMLElement>('[data-place]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.place===place)))
     document.querySelectorAll<HTMLElement>('[data-players]').forEach(b=>b.setAttribute('aria-pressed',String(Number(b.dataset.players)===count)))
     document.querySelectorAll<HTMLElement>('[data-movement]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.movement===movement)))
-    el('movement-hint').textContent=movement==='classic'?'Take turns in a fixed player order.':'Everyone plans, then the pieces travel.'
+    el('movement-hint').textContent=movement==='classic'?'Unrated · Earn coins, no Elo changes. Take turns in a fixed player order.':'Everyone plans, then the pieces travel.'
     el('find-label').textContent=place==='online'?'Find game':'Play locally'
     document.querySelector<HTMLElement>('.home-actions [data-view="make"]')!.hidden=place==='local'
     const resume=document.querySelector<HTMLButtonElement>('.home-actions [data-view="continue"]')!
@@ -147,7 +149,7 @@ async function lobby(){
     document.querySelectorAll<HTMLElement>('.lobby-view').forEach(v=>v.hidden=v.id!==view)
     el('flow-header').hidden=view==='home'
     if(titles[view]){el('flow-title').textContent=titles[view][0];el('flow-description').textContent=titles[view][1]}
-    if(view==='make'){el<HTMLSelectElement>('game-players').value=String(count);el<HTMLSelectElement>('game-movement').value=movement}
+    if(view==='make'){el<HTMLSelectElement>('game-players').value=String(count);el<HTMLSelectElement>('game-movement').value=movement;rewardHint()}
     if(view==='local'){el<HTMLSelectElement>('local-movement').value=movement;updateLocalLinks()}
     document.title=`${view==='home'?'Home':titles[view][0]} · 5D Chess`
   }

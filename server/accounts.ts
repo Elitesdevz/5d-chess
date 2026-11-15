@@ -6,7 +6,7 @@ import {type Resolution,type State,type Player,playerCount,players,survivors} fr
 import {type Notice,type Preferences,type Profile,type Rating,type RatingPool,POOLS,poolFor} from '../src/account-model.ts'
 export interface Account extends EconomicAccount {publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
 export interface RatingChange {before: number; after: number; delta: number}
-export interface RatedRoom {code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
+export interface RatedRoom {code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
 export function ensureAccount(account: Account) {
   account.rating ??= {value:1200,games:0}
   wallet(account)
@@ -31,7 +31,7 @@ export function notify(account: Account, notice: Omit<Notice,'id'|'created'|'rea
   u.notifications.length=Math.min(u.notifications.length,100)
 }
 export function startRatings(room: RatedRoom, accounts: Account[]) {
-  if (!room.rated || room.ratingStart || Object.keys(room.seats).length!==playerCount(room.state)) return
+  if (room.state.movement !== 'live' || !room.rated || room.ratingStart || Object.keys(room.seats).length!==playerCount(room.state)) return
   const pool=poolFor(room.state.movement,playerCount(room.state))
   room.ratingStart=Object.fromEntries(players(room.state).map(p=>[p,ensureAccount(accounts.find(a=>a.name===room.seats[p])!).rating.value]))
   room.statsStart=Object.fromEntries(players(room.state).map(p=>[p,ensureAccount(accounts.find(a=>a.name===room.seats[p])!).ratings[pool].value]))
@@ -76,24 +76,25 @@ export function mergedChanges(ratings:readonly number[],placements:readonly numb
  return placement.map((d,i)=>d+elimination[i])
 }
 export function settleRatings(room: RatedRoom, accounts: Account[]): boolean {
-  if (!room.rated || room.ratingSettled || !room.ratingStart || !room.results.length || survivors(room.state).length>1) return false
+  const rated = room.state.movement === 'live' && !!room.rated
+  if ((!rated && room.state.movement !== 'classic') || room.rewardsSettled || room.ratingSettled || (rated && !room.ratingStart) || !room.results.length || survivors(room.state).length>1) return false
   const seats=players(room.state),pool=poolFor(room.state.movement,playerCount(room.state))
-  if (seats.some(p=>room.ratingStart![p]===undefined || !accounts.some(a=>a.name===room.seats[p]))) return false
+  if (seats.some(p=>(rated && room.ratingStart![p]===undefined) || !accounts.some(a=>a.name===room.seats[p]))) return false
   const placements=seats.map(p=>{const eliminated=room.results.findIndex(r=>r.eliminated.includes(p));return eliminated<0?room.results.length:eliminated})
   const eliminations=eliminationCredits(room)
-  const deltas=mergedChanges(seats.map(p=>room.ratingStart![p]!),placements,seats.map(p=>eliminations[p]??0))
+  const deltas=rated ? mergedChanges(seats.map(p=>room.ratingStart![p]!),placements,seats.map(p=>eliminations[p]??0)) : seats.map(()=>0)
   const stats=eloChanges(seats.map(p=>room.statsStart?.[p]??1200),placements)
   room.ratingChanges={}
   for(const [i,p]of seats.entries()){
     const account=ensureAccount(accounts.find(a=>a.name===room.seats[p])!),rating=account.rating
     const before=rating.value
-    rating.value+=deltas[i];rating.games++
-    account.ratings[pool].value+=stats[i];account.ratings[pool].games++
+    if(rated){rating.value+=deltas[i];rating.games++;account.ratings[pool].value+=stats[i];account.ratings[pool].games++}
     const coins=60+(survivors(room.state).includes(p)?40:0)+Math.floor((eliminations[p]??0)*20)
     wallet(account).coins+=coins
-    room.ratingChanges[p]={before,after:rating.value,delta:deltas[i]}
-    notify(account,{kind:'rating',code:room.code,title:`Rating ${deltas[i]>=0?'+':''}${deltas[i]}`,detail:`${room.title}: ${Math.round(before)} → ${Math.round(rating.value)} Elo. +${coins} coins.`})
+    if(rated)room.ratingChanges[p]={before,after:rating.value,delta:deltas[i]}
+    notify(account,{kind:rated?'rating':'result',code:room.code,title:rated?`Rating ${deltas[i]>=0?'+':''}${deltas[i]}`:'Classic reward',detail:rated?`${room.title}: ${Math.round(before)} → ${Math.round(rating.value)} Elo. +${coins} coins.`:`${room.title}: +${coins} coins. Unrated; your Elo is unchanged.`})
   }
+  room.rewardsSettled=true
   room.ratingSettled=true
   return true
 }

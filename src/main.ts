@@ -218,7 +218,7 @@ function paintPanel() {
     <div class="planning-links"><button class="text-button" data-action="undo" ${session.draft.length ? '' : 'disabled'}>↶ Undo</button>
     <button class="text-button" data-action="pass" ${session.draft.length || requiredBoards(s, p, session.draft).length ? 'disabled' : ''}>Pass round</button></div>`
   const info = awareness(s, p, session.draft)
-  activity.innerHTML = ((info.remaining.length || info.kingLost) ? '<p class="check-notice">Check threat remains. Review the red highlights.</p>' : '') + (requiredBoards(s, p, session.draft).length ? `<p class="required-notice">${requiredBoards(s, p, session.draft).length} Present boards still need a move.</p>` : '')
+  activity.innerHTML = ((info.remaining.length || info.kingLost) ? '<p class="check-notice">Advisory check: your king is threatened. Review the red highlights.</p>' : '') + (requiredBoards(s, p, session.draft).length ? `<p class="required-notice">${requiredBoards(s, p, session.draft).length} Present boards still need a move.</p>` : '')
 }
 
 function outcomeText(o: Outcome) {
@@ -303,7 +303,7 @@ function lock(confirmed = false) {
   }
   const safety = awareness(shown(), p, session.draft)
   if (!confirmed && (safety.remaining.length || safety.kingLost)) {
-    modal('<p class="eyebrow">CHECK WARNING</p><h2>Your king is still threatened</h2><p>Your visible plan does not remove every direct or time-travel check. Hidden opponent orders may change the result.</p><div class="dialog-row"><button class="button" data-dialog="close">Review moves</button><button class="button primary" data-dialog="confirm-check">Submit anyway</button></div>')
+    modal('<p class="eyebrow">CHECK WARNING</p><h2>Advisory check: your king is threatened</h2><p>Your visible plan does not remove every direct or time-travel check. Hidden opponent orders may change the result.</p><div class="dialog-row"><button class="button" data-dialog="close">Review moves</button><button class="button primary" data-dialog="confirm-check">Submit anyway</button></div>')
     return
   }
   clearSelection()
@@ -468,7 +468,7 @@ button('help').onclick = () => modal(`<p class="eyebrow">FIELD GUIDE</p><h2>How 
     <p><b>Move through four dimensions.</b> Rooks use one axis, bishops two, and queens up to four. Sliding distances must match on every axis used. Knights jump two along one axis and one along another. Kings step at most one on each axis.</p>
     <p><b>Follow the tree.</b> Parent–child edges count as one universe step. Queens, bishops, and knights may use one purple Rift per move. Pawns push toward the center or down to child universes. They capture diagonally in space or along one child edge plus one time step.</p>
     <p><b>Rewrite the past.</b> A blue arrival forks a historical board. Its original future remains intact. ${liveState(session).movement === 'live' ? 'Moves into the same past board share one new timeline, supported by every contributing faction.' : ''} ${liveState(session).movement ? 'The earliest active frontier is the Present. Play all eligible Present boards; a past branch can move it backward. One future or inactive source is optional.' : 'Active frontiers at the Present advance each round, even if everyone passes. A future or inactive frontier can supply one optional order.'}</p>
-    <p><b>Capture a king.</b> ${liveState(session).movement === 'live' ? 'Rooks and pawns travel fastest; bishops and queens are slower. Kings and knights arrive instantly. Physical collisions remove both pieces, including friendly pieces. Use an instant knight to intercept an attack. ' : liveState(session).movement === 'classic' ? 'Moves resolve immediately after a player submits. ' : 'An enemy that moves away successfully escapes. Orders that claim the same resulting square fail together. '}Capturing any king eliminates its faction. Red highlights warn about direct and time-travel check; checkmate is not enforced.</p>
+    <p><b>Capture a king.</b> ${liveState(session).movement === 'live' ? 'Rooks and pawns travel fastest; bishops and queens are slower. Kings and knights arrive instantly. Physical collisions remove both pieces, including friendly pieces. Dimensional travel cannot hit troops on intervening boards; collisions apply at arrival or along shared dimensional connections. Use an instant knight to intercept an attack. ' : liveState(session).movement === 'classic' ? 'Moves resolve immediately after a player submits. ' : 'An enemy that moves away successfully escapes. Orders that claim the same resulting square fail together. '}Capturing any king eliminates its faction. Red highlights warn about direct and time-travel check; checkmate is not enforced.</p>
     <p><b>Navigate.</b> Drag, WASD, or arrow keys to pan. Scroll, pinch, or use +/− to zoom. Alt + arrows moves a square cursor, Shift + arrows moves between board nodes, and Enter selects.</p>
   </div><button class="button primary block" data-dialog="close">Back to the board</button>`)
 

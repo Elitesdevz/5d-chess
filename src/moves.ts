@@ -72,7 +72,7 @@ function pawn(
   } else if (!t && !x && !y && down && u >= 1 && u <= max && !target) {
     if (u === 2) {
       const middle = {...from, u: route.nodes[1]}
-      if (!getBoard(s, middle) || pieceAt(s, middle)) return
+      if (!getBoard(s, middle) || (s.movement !== 'live' && pieceAt(s, middle))) return
       path.push(middle)
     }
   } else if (!t && !u && forward === 1 && sideways === 1) {
@@ -138,7 +138,7 @@ function testRoute(s: State, from: Coord, to: Coord, piece: Piece, route: Route,
   for (let i = 1; i < axes[0]; i++) {
     const c = {x: from.x + Math.sign(dx) * i, y: from.y + Math.sign(dy) * i,
       t: from.t + Math.sign(dt) * i, u: du ? route.nodes[i] : from.u}
-    if (!insideState(s, c) || !getBoard(s, c) || pieceAt(s, c)) return
+    if (!insideState(s, c) || !getBoard(s, c) || ((s.movement !== 'live' || sameBoard(from, to)) && pieceAt(s, c))) return
     path.push(c)
   }
   return candidate(s, from, to, piece, route, [...path, to])

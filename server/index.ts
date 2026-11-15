@@ -1,3 +1,4 @@
+import {maintainGames} from './game-lifecycle.ts'
 import {createServer} from 'node:http'
 import type {Socket} from 'node:net'
 import {dailyValuation} from './elo-gambling.ts'
@@ -15,6 +16,9 @@ function refreshValuation(){
   midnightTimer.unref()
 }
 refreshValuation()
+const maintain=()=>{try{store.transaction(unit=>maintainGames(store,unit))}catch{console.error('Game deadline check deferred')}}
+maintain()
+const gameTimer=setInterval(maintain,60_000);gameTimer.unref()
 const application = createApplication(store)
 const server = createServer(application.handle)
 const sockets = new Set<Socket>()
@@ -28,6 +32,7 @@ function shutdown(): void {
   if (stopping) return
   stopping = true
   clearTimeout(midnightTimer)
+  clearInterval(gameTimer)
   application.drain()
   // Finish responses before closing storage. Transactions themselves never await.
   server.close(()=>{store.close()})
