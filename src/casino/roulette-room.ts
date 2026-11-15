@@ -100,7 +100,7 @@ export class RouletteRoom{
   this.room.querySelectorAll<HTMLButtonElement>('[data-chip-plus],[data-chip-minus]').forEach(b=>b.onclick=()=>this.changeChip(Number(b.dataset.chipPlus??b.dataset.chipMinus),b.dataset.chipPlus===undefined?-1:1))
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!this.room.querySelector('dialog[open]'))this.focus('seat')},{signal:this.inputEvents.signal})
   let swipe:{x:number;y:number}|undefined
-  this.room.addEventListener('touchstart',e=>{if(e.touches.length===1)swipe={x:e.touches[0].clientX,y:e.touches[0].clientY}},{passive:true})
+  this.room.addEventListener('touchstart',e=>{if(!this.room.querySelector('dialog[open]')&&e.touches.length===1)swipe={x:e.touches[0].clientX,y:e.touches[0].clientY}},{passive:true})
   this.room.addEventListener('touchend',e=>{const t=e.changedTouches[0];if(swipe&&t&&t.clientY-swipe.y>75&&Math.abs(t.clientX-swipe.x)<70)this.focus('seat');swipe=undefined},{passive:true})
   this.room.querySelector<HTMLButtonElement>('[data-room-bets]')!.onclick=()=>document.body.classList.toggle('roulette-mat-open')
   document.querySelectorAll<HTMLButtonElement>('[data-pocket],[data-outside]').forEach(b=>b.addEventListener('click',()=>{if(!this.busy)document.body.classList.remove('roulette-mat-open')}))
@@ -131,7 +131,7 @@ export class RouletteRoom{
  private posePeople(now:number,p:number,payoutMs:number){
   const h=Math.min(1,p/.24),lerp=(a:T.Vector3,b:T.Vector3,t:number)=>a.clone().lerp(b,ease(Math.max(0,Math.min(1,t))))
   const path=(t:number,points:[number,T.Vector3][])=>{for(let i=1;i<points.length;i++)if(t<=points[i][0])return lerp(points[i-1][1],points[i][1],(t-points[i-1][0])/(points[i][0]-points[i-1][0]));return points[points.length-1][1].clone()}
-  const restL=v(-.46,1.02,1.02),restR=v(.46,1.02,1.02),tray=v(-.45,1.07,.98),exchange=v(.14,1.08,.15),dealerL=v(-.15,1.04,-.83),dealerR=v(.40,1.04,-.83),rack=v(-.45,1.12,-.92)
+  const restL=v(-.46,1.02,1.02),restR=v(.46,1.02,1.02),tray=this.furniture.pickup(),exchange=v(.14,1.08,.15),dealerL=v(-.15,1.04,-.83),dealerR=v(.40,1.04,-.83),rack=v(-.45,1.12,-.92)
   let left=restL,right=restR,dl=dealerL,dr=dealerR,lean=0,dealerLean=0,curl=.16,owner='tray'
   if(this.active&&p<.24){lean=Math.sin(h*Math.PI)*.93;dealerLean=Math.sin(h*Math.PI)*1.12;curl=h>.18&&h<.65?.85:.17
    right=path(h,[[0,restR],[.18,tray],[.28,tray],[.55,exchange],[.65,exchange],[1,restR]])
@@ -150,9 +150,17 @@ export class RouletteRoom{
   this.coinOwner=owner
  }
  private fit(){const w=Math.max(1,this.canvas.clientWidth),h=Math.max(1,this.canvas.clientHeight);this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.furniture.layout(w<h);for(const k of this.keys){if(k.zone==='chips'){k.position.set(w<h?-.48:-.88,1.1,w<h?.43:.55);k.width=w<h?.6:1.05;k.depth=w<h?.4:.58}else if(k.zone==='mat'){k.position.set(w<h?.35:.70,1.02,-.12);k.width=w<h?1.1:1.8}else if(k.button.classList.contains('roulette-spin-key')){k.position.copy(this.furniture.spinPosition).add(v(0,.04,0));k.width=w<h?.40:.47;k.depth=w<h?.26:.31}}this.camera.fov=this.camera.aspect<1?74:62;this.camera.updateProjectionMatrix()}
- private projectKeys(){const rect=this.canvas.getBoundingClientRect();for(const k of this.keys){const p=k.position.clone().project(this.camera),left=k.position.clone().add(v(-k.width/2,0,0)).project(this.camera),right=k.position.clone().add(v(k.width/2,0,0)).project(this.camera),front=k.position.clone().add(v(0,0,k.depth/2)).project(this.camera),back=k.position.clone().add(v(0,0,-k.depth/2)).project(this.camera)
-   const width=Math.max(12,Math.abs(right.x-left.x)*rect.width/2),height=Math.max(12,Math.abs(front.y-back.y)*rect.height/2);k.button.style.left=(p.x+1)*rect.width/2+'px';k.button.style.top=(1-p.y)*rect.height/2+'px';k.button.style.width=width*.94+'px';k.button.style.height=height*.94+'px';k.button.hidden=this.active||k.mode!==this.focusMode||p.z>1||(p.x+1)*rect.width/2+width/2<0||(p.x+1)*rect.width/2-width/2>rect.width||(1-p.y)*rect.height/2+height/2<0||(1-p.y)*rect.height/2-height/2>rect.height
-  }}
+ private projectKeys(){
+  const rect=this.canvas.getBoundingClientRect()
+  for(const k of this.keys){
+   const p=k.position.clone().project(this.camera),left=k.position.clone().add(v(-k.width/2,0,0)).project(this.camera),right=k.position.clone().add(v(k.width/2,0,0)).project(this.camera),front=k.position.clone().add(v(0,0,k.depth/2)).project(this.camera),back=k.position.clone().add(v(0,0,-k.depth/2)).project(this.camera)
+   const width=Math.max(12,Math.abs(right.x-left.x)*rect.width/2)*.94,height=Math.max(12,Math.abs(front.y-back.y)*rect.height/2)*.94,x=(p.x+1)*rect.width/2,y=(1-p.y)*rect.height/2
+   // Keep hit targets inside the canvas: focusing a clipped button must never scroll the room.
+   const x0=Math.max(0,x-width/2),x1=Math.min(rect.width,x+width/2),y0=Math.max(0,y-height/2),y1=Math.min(rect.height,y+height/2)
+   k.button.style.left=(x0+x1)/2+'px';k.button.style.top=(y0+y1)/2+'px';k.button.style.width=Math.max(0,x1-x0)+'px';k.button.style.height=Math.max(0,y1-y0)+'px'
+   k.button.hidden=this.active||k.mode!==this.focusMode||p.z>1||x1<=x0||y1<=y0
+  }
+ }
  private tick=(now:number)=>{
   if(this.disposed)return;this.raf=requestAnimationFrame(this.tick);if(document.visibilityState!=='visible'||now-this.last<(this.active?24:50))return
   const gl=this.renderer.getContext() as WebGL2RenderingContext;if(this.fence){if(gl.clientWaitSync(this.fence,0,0)===gl.TIMEOUT_EXPIRED)return;gl.deleteSync(this.fence);this.fence=null}const delta=Math.min(.1,(now-this.last)/1000||.016);this.last=now

@@ -55,7 +55,7 @@ export class RouletteConsole {
   const colors=[0xded5bb,0x548b7e,0x426e91,0xa75365,0xb98b43],body=new T.Mesh(new T.CylinderGeometry(.102,.102,.019,32),new T.MeshStandardMaterial({color:colors[d],roughness:.38,metalness:.12}));body.position.set(x,y,z);parent.add(body)
   // Ivory edge inserts and concentric inlays make denominations recognisable as real chips.
   for(let j=0;j<8;j++){const a=j*Math.PI/4;const insert=new T.Mesh(new T.BoxGeometry(.035,.020,.008),this.m.ivory);insert.position.set(Math.sin(a)*.098,0,Math.cos(a)*.098);insert.rotation.y=a;body.add(insert)}
-  if(top){const ring=new T.Mesh(new T.TorusGeometry(.078,.0025,4,32),this.m.ivory);ring.rotation.x=-Math.PI/2;ring.position.y=.011;body.add(ring);this.writing(body,String(CHIP_VALUES[d]),.13,.065,v(0,.012,0),'#fff2d3')}
+  if(top){const ring=new T.Mesh(new T.TorusGeometry(.078,.0025,4,32),this.m.ivory);ring.rotation.x=-Math.PI/2;ring.position.y=.011;body.add(ring);this.writing(body,String(CHIP_VALUES[d]),.13,.065,v(0,.012,0),d===0?'#243d35':'#fff2d3')}
   batchStatic(body);return body
  }
  update(coins:number,stake:number,returns:number,busy:boolean,counts:readonly number[]){
@@ -64,6 +64,7 @@ export class RouletteConsole {
   if(coins!==this.lastCoins){this.stackMeshes.forEach((stack,d)=>{const count=Math.min(6,Math.max(0,Math.ceil(coins/CHIP_VALUES[d]/6)));stack.forEach((chip,i)=>{chip.visible=i>=6-count;chip.position.y=.047+(i-(6-count))*.021})});this.lastCoins=coins}
   ;(this.spin.material as T.MeshStandardMaterial).color.setHex(busy?0x080c0d:0x183d30)
  }
+ pickup(){this.wager.updateWorldMatrix(true,false);return this.wager.localToWorld(v(.18,this.wagerMeshes[7].position.y+.045,0))}
  highlight(on:boolean){(this.chipEdge.material as T.MeshStandardMaterial).emissive.setHex(on?0x806333:0)}
  dispose(){this.textures.forEach(t=>t.map.dispose())}
 }
