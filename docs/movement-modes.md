@@ -54,7 +54,7 @@ Units have a swept collision diameter of 17 world pixels (smaller than a square)
 - A piece that has arrived stays physical at its destination for the rest of the batch. Two early arrivals can annihilate each other and leave the square free for a later third arrival.
 - Exactly simultaneous multi-piece contacts remove all units participating in that contact. Results do not depend on request ordering.
 - Captured kings eliminate their faction at batch completion. Check remains advisory; it never forbids a move or performs checkmate detection.
-- Dimensional flights are intangible to troops on intervening boards. They collide with normal units only after reaching their destination board. Dimensional travellers can collide on a shared logical time corridor or universe connection, including opposing traffic. Crossings of unrelated drawn paths have no effect. Historical arrivals affect the new branch, not the original past.
+- Live dimensional routes ignore troop blockers on intervening boards and flights are intangible to those troops. Spatial and Classic sliding blockers remain unchanged. They collide with normal units only after reaching their destination board. Dimensional travellers can collide on a shared logical time corridor or universe connection, including opposing traffic. Crossings of unrelated drawn paths have no effect. Historical arrivals affect the new branch, not the original past.
 - En passant still captures the original stationary pawn if it has not left; it does not capture a different arrival. Pawns promote on surviving arrival.
 
 This is a deterministic logical-tick simulation, not a wall-clock server timer. Rooms persist final positions and travel events atomically; reconnecting clients can replay the same result.

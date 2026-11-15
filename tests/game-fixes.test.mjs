@@ -27,6 +27,16 @@ test('swapping faction labels cannot change dimensional durations or kill a king
  const{s,orders}=bias();s.universes.push({...s.universes[0],id:10,parent:0,creator:'green',boards:[{t:2,cells:Array(196).fill(null),enPassant:[]}]});const reversed=resolveRound({...s,universes:[...s.universes].reverse()},[...orders].reverse());assert.deepEqual(times(reversed),times(results[0]))
 })
 function sparse(){const s=initialState(2,'live');const cells=Array(196).fill(null);return {...s,universes:[{...s.universes[0],boards:[{t:0,cells,enPassant:[]}]}]}}
+test('Live dimensional routes pass intervening occupied boards while spatial and Classic blockers remain',()=>{
+ const s=sparse(),empty=Array(196).fill(null),middle=[...empty],now=[...empty]
+ middle[index(c(5,5))]={player:'yellow',kind:'K',moved:true};now[index(c(5,5))]={player:'red',kind:'R',moved:true}
+ s.universes[0].boards=[{t:0,cells:empty,enPassant:[]},{t:1,cells:middle,enPassant:[]},{t:2,cells:now,enPassant:[]}]
+ const order=move(s,c(5,5,2),c(5,5,0)),r=resolveRound(s,[order],{partial:true})
+ assert.equal(r.outcomes[0].status,'applied');assert.deepEqual(r.eliminated,[])
+ assert.equal(legalMoves({...s,movement:'classic',turn:'red'},c(5,5,2),c(5,5,0)).length,0)
+ now[index(c(5,6))]={player:'yellow',kind:'P',moved:true}
+ assert.equal(legalMoves(s,c(5,5,2),c(5,7,2)).length,0)
+})
 test('dimensional arrival still trades with an occupied destination',()=>{
  const s=sparse(),now=[...s.universes[0].boards[0].cells],old=[...now]
  now[index(c(5,5))]={player:'red',kind:'R',moved:true};old[index(c(5,5))]={player:'yellow',kind:'B',moved:true}
