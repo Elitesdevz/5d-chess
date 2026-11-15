@@ -93,6 +93,7 @@ export function gameApi(store: ChessStore, unit: UnitOfWork, me: string, path: s
       const result = resolveRound(room.state, batch)
       if (result.rejected.length) fail(400, result.rejected[0].reason)
       room.state = result.state
+      if(survivors(room.state).length<=1)room.finishedAt??=Date.now()
       room.journal.push(batch)
       room.results.push(result)
       room.locked = {}

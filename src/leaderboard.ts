@@ -1,3 +1,4 @@
+import {profileHref} from './profile-model.ts'
 import {api,getSession,initShell} from './shell.ts'
 import {framedAvatar} from './cosmetic-art.ts'
 interface Player {name:string;avatar:string;frame?:string;rating:number;games:number;rank:number}
@@ -8,7 +9,7 @@ function render(){
  const search=el<HTMLInputElement>('leaderboard-search').value.trim().toLocaleLowerCase(),filtered=rows.filter(p=>p.name.toLocaleLowerCase().includes(search)),pages=Math.max(1,Math.ceil(filtered.length/100));page=Math.min(page,pages-1)
  const table=document.createElement('table');table.innerHTML='<thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Rated games</th><th scope="col">Elo</th></tr></thead><tbody></tbody>'
  for(const p of filtered.slice(page*100,(page+1)*100)){
-  const row=document.createElement('tr');row.classList.toggle('self',p.name===name);row.innerHTML=`<td></td><td><span class="rank-player"><span class="small-avatar">${framedAvatar(p.avatar,p.frame)}</span><strong></strong></span></td><td></td><td></td>`
+  const row=document.createElement('tr');row.classList.toggle('self',p.name===name);row.innerHTML=`<td></td><td><a class="rank-player player-profile-link" href="${profileHref(p.name)}"><span class="small-avatar">${framedAvatar(p.avatar,p.frame)}</span><strong></strong></a></td><td></td><td></td>`
   row.cells[0].textContent=String(p.rank);row.querySelector('strong')!.textContent=p.name;row.cells[2].textContent=String(p.games);row.cells[3].textContent=String(p.rating);table.tBodies[0].append(row)
  }
  el('full-ranking-table').replaceChildren(table);if(!filtered.length){const empty=document.createElement('p');empty.className='card-empty';empty.textContent='No players match your search.';el('full-ranking-table').append(empty)}

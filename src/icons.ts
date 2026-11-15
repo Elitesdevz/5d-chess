@@ -1,4 +1,5 @@
 const paths: Record<string,string> = {
+ signal:'<path d="M2 12h4l3-7 5 14 3-7h5M4 4h3m10 16h3M3 20l3-2m12-12 3-2"/>',
  puzzle:'<path d="M4 3h6a3 3 0 1 0 6 0h5v6a3 3 0 1 0 0 6v6h-6a3 3 0 1 0-6 0H3v-6a3 3 0 1 0 0-6V3Z"/>',
  trail:'<path d="M2 20 12 10M3 13l4-4m6 11 4-4M2 7l3-3"/><circle cx="17" cy="7" r="5"/><path d="m15 7 2-2 2 2-2 2Z"/>',
  capture:'<path d="m13 1-2 8H5l6 6-2 8 10-13h-6l3-7M3 3l3 3m15 12-3-2M1 17l5-2"/>',
