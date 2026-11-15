@@ -28,7 +28,7 @@ class Hand {
  }
  pose(curl:number){for(const finger of this.fingers)finger.forEach((b,j)=>b.rotation.x=curl*(j===0?.65:1.15));this.thumb.rotation.z=-.2-curl*.7}
 }
-class Arm {
+export class Arm {
  readonly hand:Hand
  private upper:T.Mesh;private lower:T.Mesh;private elbow:T.Mesh;private cuff:T.Mesh
  constructor(parent:T.Object3D,materials:Materials,left:boolean,dealer=false){
@@ -63,12 +63,10 @@ function eye(material:T.Material){
  const s=new T.Shape();s.moveTo(-.043,0);s.quadraticCurveTo(0,.013,.043,.001);s.quadraticCurveTo(.004,-.008,-.043,0)
  return new T.Mesh(new T.ShapeGeometry(s,16),material)
 }
-export class People {
- readonly player=new T.Group();readonly dealer=new T.Group()
- readonly left:Arm;readonly right:Arm;readonly keeperLeft:Arm;readonly keeperRight:Arm
- private torso:T.Mesh;private head:T.Group;private smile=new T.Group();private soul=false;private mood=0;private mouth?:T.Mesh;private teeth:T.Mesh[]=[];private eyes:T.Mesh[]=[];private brows:T.Mesh[]=[]
- constructor(scene:T.Scene,privateMaterials:Materials){
-  const m=privateMaterials;scene.add(this.player,this.dealer)
+export class PlayerRig {
+ readonly player=new T.Group()
+ readonly left:Arm;readonly right:Arm;readonly torso:T.Mesh
+ constructor(scene:T.Scene,m:Materials){scene.add(this.player)
   this.torso=box(this.player,[.5,.48,.28],[0,.92,1.46],m.sleeve,.08)
   box(this.player,[.17,.35,.292],[0,.98,1.45],m.shirt,.025)
   box(this.player,[.43,.16,.34],[0,.61,1.45],m.trousers,.065)
@@ -79,6 +77,20 @@ export class People {
    box(this.player,[.19,.027,.35],[side*.25,.025,1.2],m.ebony,.009)
   }
   this.left=new Arm(this.player,m,true);this.right=new Arm(this.player,m,false)
+ }
+ pose(lean:number,left:T.Vector3,right:T.Vector3,curlLeft=.2,curlRight=.2){
+  this.torso.rotation.x=-lean*.35;this.torso.position.z=1.46-lean*.3
+  this.left.pose(v(-.25,1.15,1.36-lean*.43),left,v(-.85,.84,1.6),curlLeft)
+  this.right.pose(v(.25,1.15,1.36-lean*.43),right,v(.85,.84,1.6),curlRight)
+ }
+}
+export class People {
+ readonly player:T.Group;readonly dealer=new T.Group()
+ readonly left:Arm;readonly right:Arm;readonly keeperLeft:Arm;readonly keeperRight:Arm
+ private torso:T.Mesh;private head:T.Group;private smile=new T.Group();private soul=false;private mood=0;private mouth?:T.Mesh;private teeth:T.Mesh[]=[];private eyes:T.Mesh[]=[];private brows:T.Mesh[]=[]
+ constructor(scene:T.Scene,privateMaterials:Materials){
+  const m=privateMaterials;scene.add(this.dealer)
+  const rig=new PlayerRig(scene,m);this.player=rig.player;this.torso=rig.torso;this.left=rig.left;this.right=rig.right
   const robePoints=[v(.31,.33),v(.39,.43),v(.31,.78),v(.29,1.07),v(.25,1.25),v(.12,1.32)].map(p=>new T.Vector2(p.x,p.y))
   const robe=mesh(new T.LatheGeometry(robePoints,32),m.robe,this.dealer,[0,0,-1.3]);robe.scale.z=.72
   this.head=hood(m.robe);this.head.position.set(0,1.59,-1.105);this.dealer.add(this.head)
