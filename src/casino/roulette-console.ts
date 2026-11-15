@@ -37,7 +37,7 @@ export class RouletteConsole {
  layout(portrait:boolean){
   this.wallet.position.set(portrait?-.53:-.98,1.005,portrait?.30:.52);this.wallet.scale.setScalar(portrait?.60:1)
   this.wager.position.set(portrait?-.35:-.67,1.005,portrait?.50:.52);this.wager.scale.setScalar(portrait?.60:1)
-  this.plates.forEach((plate,i)=>{plate.position.set(portrait?(i===0?-.22:.22):(i===0?-.38:.30),1.045,portrait?.78:.93);plate.scale.setScalar(portrait?.65:1)})
+  this.plates.forEach((plate,i)=>{plate.position.set(portrait?(i===0?-.185:.185):(i===0?-.38:.30),1.045,portrait?.78:.93);plate.scale.setScalar(portrait?.55:1)})
   this.spinPosition.set(portrait?0:.92,1.045,portrait?1.09:.93);this.spinGroup.position.copy(this.spinPosition);this.spinGroup.scale.setScalar(portrait?.85:1)
  }
  private writing(parent:T.Object3D,text:string,w:number,h:number,pos:T.Vector3,color='#edcf90'){
@@ -58,8 +58,8 @@ export class RouletteConsole {
   if(top){const ring=new T.Mesh(new T.TorusGeometry(.078,.0025,4,32),this.m.ivory);ring.rotation.x=-Math.PI/2;ring.position.y=.011;body.add(ring);this.writing(body,String(CHIP_VALUES[d]),.13,.065,v(0,.012,0),'#fff2d3')}
   batchStatic(body);return body
  }
- update(coins:number,stake:number,returns:number,busy:boolean){
-  if(stake!==this.lastStake){this.stakeLabel.update(casinoCoins(stake));this.wagerMeshes.forEach((chip,i)=>chip.visible=i<Math.min(8,Math.max(1,Math.ceil(Math.log2(stake+1)))));this.lastStake=stake}
+ update(coins:number,stake:number,returns:number,busy:boolean,counts:readonly number[]){
+  if(stake!==this.lastStake){this.stakeLabel.update(casinoCoins(stake));const count=Math.min(8,Math.max(1,counts.reduce((sum,n)=>sum+n,0)));this.wagerMeshes.forEach((chip,i)=>{chip.visible=i>=8-count;chip.position.y=.054+(i-(8-count))*.021});this.lastStake=stake}
   if(returns!==this.lastReturn){this.returnLabel.update(casinoCoins(returns));this.lastReturn=returns}
   if(coins!==this.lastCoins){this.stackMeshes.forEach((stack,d)=>{const count=Math.min(6,Math.max(0,Math.ceil(coins/CHIP_VALUES[d]/6)));stack.forEach((chip,i)=>{chip.visible=i>=6-count;chip.position.y=.047+(i-(6-count))*.021})});this.lastCoins=coins}
   ;(this.spin.material as T.MeshStandardMaterial).color.setHex(busy?0x080c0d:0x183d30)
