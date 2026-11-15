@@ -123,7 +123,7 @@ export async function initDailySpin(){
   preview.innerHTML=`<p class="eyebrow">A LITTLE LUCK, EVERY DAY</p><h2>Your turn of fortune.</h2><div class="wheel-preview-art">${wheelSVG(state?.spinRewards??SPIN_REWARDS)}</div><p>25 rewards: 10 fixed, five daily, five weekly and five seasonal. Coins, individual cosmetics, complete Sets and unopened cases. Free every day at Netherlands midnight.</p><div class="actions"><button class="button" type="button" data-close>Maybe later</button><button class="button primary" type="button" data-play>${state?.spinReady?'Take free spin':'See next spin'}</button></div>`
   document.body.append(preview);preview.showModal();preview.onclose=()=>preview.remove();preview.querySelector<HTMLButtonElement>('[data-close]')!.onclick=()=>preview.close();preview.querySelector<HTMLButtonElement>('[data-play]')!.onclick=()=>{preview.close();if(state&&(state.spinReady||Date.now()+clockOffset>=state.reset))void play(false);else button.focus()}
  }
- button.onclick=()=>void play(false)
+ button.onclick=()=>host.querySelector<HTMLButtonElement>('.spin-thumb')!.click()
  again.onclick=()=>{
   if(!state||busy)return
   const confirmation=document.createElement('dialog');confirmation.className='transaction-dialog spin-confirm'

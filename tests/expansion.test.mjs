@@ -36,7 +36,7 @@ test('monthly exclusives stay out of all general crates and weekly offers; exact
   assert.equal(tickets.reduce((s,t)=>s+t.weight,0),1000000,crate.id)
   assert.ok(tickets.every(t=>Number.isInteger(t.weight)&&t.weight>0))
   if(!crate.monthly)assert.ok(tickets.every(t=>!t.item.monthly))
-  else if(crate.monthly==='exclusive')assert.ok(tickets.every(t=>t.item.monthly))
+  else if(crate.monthly==='exclusive')assert.ok(tickets.every(t=>t.item.monthly||['movement','capture'].includes(t.item.type)))
   else{assert.ok(tickets.some(t=>t.item.monthly));assert.ok(tickets.some(t=>!t.item.monthly));assert.ok(tickets.every(t=>!t.item.monthly||t.item.monthly===crate.monthly))}
  }
  const edit=weeklyItems();assert.ok(edit.every(i=>!i.monthly));assert.deepEqual(edit.slice(0,4).map(i=>i.type),['skin','icon','frame','shape'])
@@ -44,7 +44,7 @@ test('monthly exclusives stay out of all general crates and weekly offers; exact
  assert.equal(monthKey(now),'2026-11');assert.equal(monthKey(next),'2026-12')
  const u=user('Monthly');assert.throws(()=>buyCrate(u,'monthly-eclipse',next,monthKey(now)),/seasonal collection has changed/)
  assert.equal(wallet(u).coins,100000)
- for(let i=0;i<20;i++){const drop=buyCrate(u,'monthly-eclipse',now,monthKey(now));assert.ok(ITEMS.find(item=>item.id===drop.itemId).monthly)}
+ for(let i=0;i<20;i++){const drop=buyCrate(u,'monthly-eclipse',now,monthKey(now));assert.ok(ITEMS.find(item=>item.id===drop.itemId).monthly||['movement','capture'].includes(ITEMS.find(item=>item.id===drop.itemId).type))}
 })
 
 test('every shape set has six distinct silhouettes, composes with skins, and keeps all faction colors',()=>{

@@ -36,9 +36,9 @@ test('all 30 tutorial puzzles are playable, explained, saved and revisitable thr
   if(id===13)await page.screenshot({path:'/tmp/chess-puzzles-interception.png'})
   if(id===26){await page.getByRole('button',{name:'Need a hint?',exact:true}).click();await page.getByRole('button',{name:'Need a hint?',exact:true}).click();await page.getByRole('button',{name:'Show a worked plan',exact:true}).click();assert.equal(await page.locator('.queued-puzzle-order').count(),2);await page.getByRole('button',{name:'Remove order 2'}).click();await page.locator('#test-plan').click();assert.match(await page.locator('#puzzle-feedback').innerText(),/Present/);await page.locator('#worked-plan').click();await page.locator('#test-plan').click();await page.locator('#puzzle-feedback.success').waitFor()}else await worked(page)
  }
- await page.getByText('Progress saved to your account.',{exact:true}).waitFor();await page.reload();await page.locator('#course-count').getByText('30 / 30',{exact:true}).waitFor()
+ await page.getByText(/Progress saved[.]? (?:to your account|\+\d+ coins earned)/).waitFor();await page.reload();await page.locator('#course-count').getByText('30 / 30',{exact:true}).waitFor()
  const progress=await(await context.request.get(base+'/api/puzzles')).json();assert.equal(progress.completed.length,30)
- const me=await(await context.request.get(base+'/api/me')).json();assert.equal(me.profile.coins,480);assert.equal(me.profile.rating.games,0)
+ const me=await(await context.request.get(base+'/api/me')).json();assert.equal(me.profile.coins,1230);assert.equal(me.profile.rating.games,0)
  await page.locator('#open-course').click();assert.equal(await page.locator('.course-lesson.completed').count(),30);await page.getByRole('button',{name:/One shared past/}).click();await page.getByRole('heading',{name:'One shared past',exact:true}).waitFor()
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(100);await page.screenshot({path:'/tmp/chess-puzzles-mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
  await worked(page);await page.locator('#open-course').click();await page.getByRole('button',{name:/Your first complete operation/}).click();await worked(page)
@@ -53,7 +53,7 @@ test('guest progress survives reload and signed-in offline solves retry account 
  const signed=await member.newPage();await signed.route('**/api/puzzles/1/solve',route=>route.abort())
  await signed.goto(base+'/chess/puzzles.html?lesson=1');await worked(signed);await signed.getByText('Saved on this browser. Account sync will retry when you reconnect.',{exact:true}).waitFor()
  assert.equal((await(await member.request.get(base+'/api/puzzles')).json()).completed.length,0)
- await signed.unroute('**/api/puzzles/1/solve');await signed.reload();await signed.getByText('Progress saved to your account.',{exact:true}).waitFor();assert.equal((await(await member.request.get(base+'/api/puzzles')).json()).completed.length,1)
+ await signed.unroute('**/api/puzzles/1/solve');await signed.reload();await signed.getByText(/Progress saved[.]? (?:to your account|\+\d+ coins earned)/).waitFor();assert.equal((await(await member.request.get(base+'/api/puzzles')).json()).completed.length,1)
  // A failed initial progress read must recover, rather than replacing account progress with an empty cache.
  const p=PUZZLES[8];await member.request.post(base+'/api/puzzles/9/solve',{data:{orders:p.solution(p.setup())}})
  await signed.route('**/api/puzzles',route=>route.abort());await signed.reload();await signed.getByText('Saved on this browser. Account sync will retry when you reconnect.',{exact:true}).waitFor()

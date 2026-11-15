@@ -14,7 +14,7 @@ One faction submits at a time. The island shows whose device/seat is planning; t
 
 A player can source a move only from a frontier whose owner is that player, during their global turn. Playing a board advances that board's owner to the next surviving faction in the stored order. Unplayed boards keep their owner. An arrival into a different frontier may advance its position but does not consume or change its owner's turn. A newly forked board belongs to the player after the faction that made the fork.
 
-The player submits one order from **every playable owned board at the Present**, plus at most one optional order from a future or inactive frontier they own. If none of their Present boards has a legal geometric move, that requirement is exempt; a pass can then move the global turn onward. This is not checkmate/stalemate detection. No board is advanced just because a different board was played.
+The player submits one order from **every playable owned board at the Present**, plus any number of optional orders from future or inactive frontiers they own (one per source board). If none of their Present boards has a legal geometric move, that requirement is exempt; a pass can then move the global turn onward. This is not checkmate/stalemate detection. No board is advanced just because a different board was played.
 
 ## Present
 
@@ -22,7 +22,7 @@ The Present is the **minimum time coordinate of all active frontiers**. It is de
 
 - Creating an active branch in the past can move the Present backward immediately.
 - The Present advances only after every active frontier at that time advances (or becomes inactive).
-- All playable Present boards are compulsory for their eligible faction. Future/inactive sources remain optional and limited to one per plan.
+- All playable Present boards are compulsory for their eligible faction. Future/inactive sources remain optional. Live allows one optional order per active Present board, capped at three per plan; inactive/future timelines do not increase the cap.
 - Live advances an immobile Present board automatically when no surviving faction has any legal geometric move there, so an empty/frozen board cannot trap the Present forever.
 - A Classic board waiting for a different owner remains at its time and keeps the Present there until that owner plays it. Global turns continue in the stored order.
 
@@ -50,7 +50,7 @@ The server records display polylines with these logical event times. The client 
 Units have a swept collision diameter of 17 world pixels (smaller than a square). The resolver solves continuous contact between trajectory segments, including contacts between tick boundaries. Adjacent stationary pieces do not touch.
 
 - A knight or king is at its destination at tick zero. It can therefore intercept a slower slider that crosses its square later.
-- Any physical collision removes both pieces, including friendly pieces. Avoid crossing friendly routes. The two legs of one castle are exempt from colliding with each other.
+- Two opposing moving pieces that collide are both removed. Friendly moving pieces bounce toward distinct, clear, unoccupied squares within three tiles; if no suitable landing is available, they return toward their previous squares. They remain in motion while bouncing. A moving piece that hits a stationary piece captures it and stops on its square, including a friendly piece. The two legs of one castle are exempt from colliding with each other.
 - A piece that has arrived stays physical at its destination for the rest of the batch. Two early arrivals can annihilate each other and leave the square free for a later third arrival.
 - Exactly simultaneous multi-piece contacts remove all units participating in that contact. Results do not depend on request ordering.
 - Captured kings eliminate their faction at batch completion. Check remains advisory; it never forbids a move or performs checkmate detection.
@@ -82,3 +82,7 @@ Only Live is rated, including three-player Live. Classic remains eligible for co
 Every started online game has a persisted 48-hour order deadline. Live players who have locked are safe; only remaining unlocked factions forfeit at expiry. Classic forfeits only its current player. A new resolved round/turn starts a fresh deadline. Polls and draw votes do not extend it. Existing active games without a deadline receive a full grace period when first maintained. The server checks deadlines at startup, every minute, and when games are read.
 
 Resignation eliminates that faction. Remaining players receive a fresh planning window and replan because the departure can change legal captures and board obligations. A draw offer includes the proposer’s consent and requires every other surviving player to accept. Any survivor may decline; resolving a turn or a resignation clears the offer. Agreed draws tie the remaining players for placement while preserving earlier eliminations. Results and rewards settle atomically and once only.
+
+### Instant initiative
+
+Live resolves king arrivals first, then knight arrivals, then ordinary travelling pieces depart. Within each instant phase, arrivals are simultaneous. A king capturing a pawn or knight at its source removes it before its queued move starts, and survives. A knight similarly captures a departing pawn before normal travel. A king’s completed arrival is stationary when knights arrive, so a knight may still capture it at its new square. Instant captures and cancelled departures are recorded at tick zero; the order of submitted factions does not change initiative. Old saved Live history retains its original resolver.

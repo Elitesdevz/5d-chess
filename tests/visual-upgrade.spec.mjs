@@ -41,7 +41,7 @@ test('visual upgrade: code slots, notification dropdowns, daily deals and respon
  await page.screenshot({path:'.playwright/wheel-preview.png'})
  await page.locator('.wheel-preview-dialog [data-close]').click()
  await page.screenshot({path:'.playwright/home-desktop.png',fullPage:true})
- await page.locator('.spin-now').click();await page.locator('.reward-dialog[open]').waitFor()
+ await page.locator('.spin-now').click();await page.getByRole('button',{name:'Take free spin'}).click();await page.locator('.reward-dialog[open]').waitFor()
  await page.screenshot({path:'.playwright/wheel-spinning.png'})
  await page.getByRole('button',{name:'Skip animation'}).click();await page.locator('.reward-result').waitFor({state:'visible'});await page.keyboard.press('Escape')
  await page.goto(base+'/chess/collection.html#shop');await page.locator('[data-daily-buy]').first().waitFor()

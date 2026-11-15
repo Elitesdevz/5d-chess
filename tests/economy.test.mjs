@@ -38,7 +38,7 @@ test('Dutch daily and weekly resets handle spring and autumn daylight saving',()
  assert.equal(nextReset(spring)-spring,23*3600000);assert.equal(nextReset(autumn)-autumn,25*3600000)
  assert.equal(weekKey(Date.parse('2026-11-15T23:30:00Z')),'2026-11-16')
  assert.equal(new Date(nextWeek(Date.parse('2026-11-14T12:00:00Z'))).toISOString(),'2026-11-15T23:00:00.000Z')
- const a=weeklyItems(spring),b=weeklyItems(spring+10000);assert.deepEqual(a,b);assert.equal(new Set(a.map(i=>i.id)).size,4)
+ const a=weeklyItems(spring),b=weeklyItems(spring+10000);assert.deepEqual(a,b);assert.equal(new Set(a.map(i=>i.id)).size,6)
 })
 test('daily spin and purchases are persisted once per request; insufficient balance cannot mint items',()=>{
  const u=user('A'),now=Date.parse('2026-11-14T12:00:00Z')

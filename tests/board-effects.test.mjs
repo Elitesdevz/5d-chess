@@ -17,3 +17,12 @@ test('animation slots enforce ownership and type, reconcile escrow, and transfer
  const listing=listItem(a,listings,move.uid,250);assert.equal(a.wallet.loadout.movement,undefined);assert.equal(a.wallet.loadout.capture,'capture-void');assert.throws(()=>equip(a,'movement',move.uid),/listing/)
  cancelListing(a,listings,listing.id);equip(a,'movement',move.uid);const sale=listItem(a,listings,move.uid,250);buyListing(b,[a,b],listings,sale.id);equip(b,'movement',move.uid);assert.equal(b.wallet.loadout.movement,'movement-time');assert.equal(b.wallet.coins,9750);equip(b,'movement','default');assert.equal(b.wallet.loadout.movement,undefined)
 })
+
+test('one animation copy can equip multiple piece kinds and clears when unavailable',()=>{
+ const a=user('A'),listings=[],move=grant(a,itemById('movement-time'),'crate')
+ equip(a,'movement-K',move.uid);equip(a,'movement-P',move.uid)
+ assert.deepEqual(a.wallet.loadout.movements,{K:'movement-time',P:'movement-time'})
+ assert.throws(()=>equip(a,'capture-K',move.uid),/cannot be equipped/)
+ equip(a,'movement-P','default');assert.equal(a.wallet.loadout.movements.P,'default')
+ listItem(a,listings,move.uid,250);assert.equal(a.wallet.loadout.movements.K,'default')
+})

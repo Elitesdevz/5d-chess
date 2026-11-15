@@ -62,7 +62,7 @@ test('signed-in match header keeps wallet and profiles readable while app naviga
  assert.deepEqual(errors,[])
 })
 
-test('online selection explicitly warns before a suicidal Live king capture',async t=>{
+test('online selection explains stationary captures with the current Live rules',async t=>{
  const{browser,base}=await fixture(t),page=await browser.newPage({viewport:{width:1440,height:960},reducedMotion:'reduce'}),s=initialState(2,'live'),cells=Array(196).fill(null)
  for(const[x,y,player,kind]of[[6,6,'red','K'],[6,5,'yellow','P'],[10,3,'yellow','K']])cells[y*14+x]={player,kind,moved:true}
  s.universes[0].boards[0].cells=cells
@@ -71,7 +71,7 @@ test('online selection explicitly warns before a suicidal Live king capture',asy
  await page.goto(base+'/chess/online.html?code=TEST');await page.getByRole('button',{name:'Focus player',exact:true}).click();await clickSquare(page,6,6,2)
  const box=await page.locator('#scene').boundingBox(),scale=Number((await page.locator('#scale').innerText()).replace('%',''))/100,dy=(5+.5-7)*32-2,dx=(6+.5-7)*32
  await page.locator('#scene').hover({position:{x:box.width/2+(dx+.16*dy)*scale,y:box.height/2+dy*.82*scale}})
- await page.getByText('King collision · Your faction would be eliminated',{exact:true}).waitFor()
+ await page.getByText('Capture · Stops on contact; opposing movers can trade',{exact:true}).waitFor()
 })
 
 test('angled picking stays aligned after cursor-centred zoom and a physical board pan',async t=>{

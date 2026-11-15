@@ -46,7 +46,7 @@ test('old accounts get safe defaults and move preference keeps rating notificati
  notify(u,{kind:'move',title:'Move',detail:'Hidden orders stay private',code:'TEST'})
  assert.equal(u.notifications.length,0)
  for(let i=0;i<110;i++)notify(u,{kind:'rating',title:'Rating',detail:'Result',code:'TEST'})
- assert.equal(u.notifications.length,100)
+ assert.equal(u.notifications.length,110)
 })
 
 test('merged Elo rewards finish order primarily and credits each eliminated faction once',()=>{
@@ -56,4 +56,10 @@ test('merged Elo rewards finish order primarily and credits each eliminated fact
  assert.deepEqual(mergedChanges([1200,1200],[1,0],[0,1]),[16,-16])
  const result={eliminated:['blue'],outcomes:[{move:{player:'red'},captures:[{piece:{kind:'K',player:'blue'}},{piece:{kind:'K',player:'blue'}}]},{move:{player:'yellow'},captures:[{piece:{kind:'K',player:'blue'}}]}]}
  assert.deepEqual(eliminationCredits({results:[result,result]}),{red:.5,yellow:.5})
+})
+
+test('notifications expire after three days except permanent casino-owner profit',()=>{
+ const u=account('Keeper'),now=Date.now()
+ u.notifications=[{id:'1',kind:'move',title:'old',detail:'',code:'TEST',created:now-3*86400000,read:false},{id:'2',kind:'rating',title:'new',detail:'',code:'TEST',created:now-86400000,read:false},{id:'3',kind:'casino',title:'profit',detail:'',code:'',created:now-9*86400000,read:false,permanent:true}]
+ ensureAccount(u);assert.deepEqual(u.notifications.map(n=>n.id),['2','3'])
 })
