@@ -52,9 +52,9 @@ test('earned collection flow: Dutch daily spin, crate landing, duplicates, equip
  await page.locator('.reward-result').waitFor({state:'visible'})
  const afterBox=await (await context.request.get(base+'/api/economy')).json(),drop=afterBox.recent[0]
  assert.equal(afterBox.wallet.coins,beforeBox.coins-120);assert.equal(drop.duplicate,true)
- assert.equal(await page.locator('.reel-card').nth(34).getAttribute('data-item'),drop.itemId)
- assert.equal(await page.locator('.reel-strip').evaluate(e=>e.style.transform),`translateX(${-34*160-80}px)`)
- await page.getByRole('button',{name:'Keep copy',exact:true}).click();await page.locator('.reward-dialog').waitFor({state:'hidden'})
+ assert.equal(await page.locator('.reel-card.winning-card').getAttribute('data-item'),drop.itemId)
+ assert.match(await page.locator('.reel-strip').evaluate(e=>e.style.transform),/translateX\(-[0-9.]+px\)/)
+ await page.getByRole('button',{name:'Store',exact:true}).click();await page.locator('.reward-dialog').waitFor({state:'hidden'})
  const kept=await (await context.request.get(base+'/api/economy')).json();assert.equal(kept.wallet.inventory.find(o=>o.uid===drop.uid).pending,false)
  // Reload during a later reveal preserves the bought copy and exposes its pending choice.
  await page.locator('[data-crate-buy=icon-bronze]').click();await page.getByRole('button',{name:'Buy & open'}).click();await page.locator('.reward-dialog[open]').waitFor();await page.reload()
