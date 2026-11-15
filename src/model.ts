@@ -29,6 +29,7 @@ export interface Universe {
 }
 export interface Rift { readonly a: number; readonly b: number; readonly usableFrom: number }
 export interface State {
+  readonly draw?: boolean
   readonly movement?: Movement
   readonly turnOrder?: readonly Player[]
   readonly turn?: Player
@@ -145,7 +146,7 @@ export function moveBudget(s: State) {
   const t = present(s)
   return {main: s.movement ? s.universes.filter(u => isMain(u, t)).length : Math.min(playerCount(s), s.universes.filter(u => isMain(u, t)).length), optional: 1}
 }
-export const survivors = (s: State) => players(s).filter(p => !s.eliminated.includes(p))
+export const survivors = (s: State) => s.draw ? [] : players(s).filter(p => !s.eliminated.includes(p))
 export function activation(universes: readonly Universe[], eliminated: readonly Player[], count: PlayerCount = 4): Universe[] {
   const ordered = [...universes].sort((a, b) => a.created - b.created || a.id - b.id)
   const active = new Set<number>([0])

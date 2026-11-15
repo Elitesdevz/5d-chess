@@ -14,7 +14,7 @@ import {sourceBudget} from './resolve.ts'
 
 type Room = {code: string; title: string; seats: Partial<Record<Player, string>>; seat?: Player;
   state: State; results: Resolution[]; journal: Order[][]; locked: Record<Player, boolean>;
-  waiting: boolean; finished: boolean;cosmetics?:Partial<Record<Player,Loadout>>}
+  waiting: boolean; finished: boolean; rated?:boolean; deadline?:number;drawOffer?:{by:Player;accepted:Player[]};endReason?:string;cosmetics?:Partial<Record<Player,Loadout>>}
 const element = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T
 const code = new URLSearchParams(location.search).get('code')?.toUpperCase()
 if (!code || !/^[A-Z]{4}$/.test(code)) location.replace('/chess/lobby.html')
@@ -89,7 +89,7 @@ function render() {
   document.title = `${room.title} · 5D Chess`
   const seat = room.seat
   const s = shown()
-  element('online-mode').textContent = s.movement ? `${s.movement.toUpperCase()} · ONLINE` : 'ONLINE MATCH'
+  element('online-mode').textContent = s.movement ? `${s.movement.toUpperCase()} · ${room.rated?'RATED':'UNRATED'}` : 'ONLINE MATCH'
   element('phase').textContent = animation ? 'RESOLVING' : room.finished ? 'FINISHED' : room.waiting ? 'WAITING' : frame !== null ? 'REPLAY' :
     room.state.movement === 'classic' && room.state.turn !== seat ? 'WAITING TURN' : seat && room.locked[seat] ? 'LOCKED' : 'PLANNING'
   setMatchHeader(seat, `${room.code} · ${element('phase').textContent?.toLowerCase()}`)
@@ -179,12 +179,34 @@ function render() {
       } else void submit()
     }
     if (seat && (awareness(room.state, seat, draft).remaining.length || awareness(room.state, seat, draft).kingLost)) {
-      const warning = document.createElement('p'); warning.className = 'check-notice'; warning.textContent = 'Check threat remains. Review the red highlights.'; panel.append(warning)
+      const warning = document.createElement('p'); warning.className = 'check-notice'; warning.textContent = 'Advisory check: your king is threatened. Review the red highlights.'; panel.append(warning)
     }
     panel.append(lock)
     if (seat && requiredBoards(room.state, seat, draft).length) { const note = document.createElement('p'); note.className = 'required-notice'; note.textContent = `${requiredBoards(room.state, seat, draft).length} Present boards still need a move.`; panel.append(note) }
   }
+  if(!room.waiting&&!room.finished&&seat&&survivors(room.state).includes(seat)){
+    const status=document.createElement('p');status.className='online-message'
+    if(room.deadline){const hours=Math.max(0,Math.ceil((room.deadline-Date.now())/3_600_000));status.textContent=`${room.locked[seat]?'Orders locked · Round deadline':room.state.movement==='classic'&&room.state.turn!==seat?'Current player’s deadline':'Your order deadline'} in ${hours}h · 48-hour inactivity limit.`;status.title=new Date(room.deadline).toLocaleString();panel.append(status)}
+    const actions=document.createElement('div');actions.className='planning-links'
+    const add=(label:string,path:string,action?:string)=>{const button=document.createElement('button');button.className='text-button';button.textContent=label;button.disabled=submitting;button.onclick=()=>{if(path==='resign'&&!confirm('Resign this game? Your faction will be eliminated.'))return;void matchAction(path,action)};actions.append(button)}
+    if(room.drawOffer){
+      const offer=document.createElement('p');offer.className='online-message';offer.textContent=`${room.seats[room.drawOffer.by]} offers a draw · ${room.drawOffer.accepted.length}/${survivors(room.state).length} agreed. Every surviving player must agree.`;panel.append(offer)
+      if(!room.drawOffer.accepted.includes(seat))add('Accept draw','draw','accept')
+      add(room.drawOffer.by===seat?'Withdraw offer':'Decline draw','draw','decline')
+    }else add('Offer draw','draw','offer')
+    add('Resign','resign');panel.append(actions)
+  }
   sync()
+}
+async function matchAction(path:string,action?:string){
+  if(submitting)return
+  submitting=true;render()
+  try{
+    const response=await fetch(`/api/games/${code}/${path}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action})}),data=await response.json()
+    if(!response.ok)throw Error(data.error||'Could not update match')
+    draft=[];clear();applyRoom(data as Room);render();void refreshAccount().catch(()=>{})
+  }catch(cause){message(cause instanceof Error?cause.message:'Could not update match',true)}
+  finally{submitting=false;render()}
 }
 function applyRoom(next: Room) {
   const before = room
@@ -193,6 +215,7 @@ function applyRoom(next: Room) {
   if (before && next.results.length > before.results.length) {
     const result = next.results.at(-1)!
     void refreshAccount().catch(()=>{})
+    if(!result.outcomes.length){draft=[];clear();frame=null;return}
     const duration = matchMedia('(prefers-reduced-motion: reduce)').matches ? 260 : result.travel ? Math.max(1200, Math.min(8000, (result.ticks ?? 0) * 180)) : 1600
     animation = {outcomes: result.outcomes, started: performance.now(), duration, result: next.state, travel: result.travel, ticks: result.ticks}
     requestAnimationFrame(() => scene.fit())

@@ -1,10 +1,11 @@
+import {maintainRoom,maintainGames,resetDeadline,eliminate,finishUpdate} from './game-lifecycle.ts'
 import {randomBytes} from 'node:crypto'
 import {type Order, type Player, type State, type PlayerCount, type Movement, initialState, playerCount, players, survivors, shuffledPlayers, PLAYERS} from '../src/model.ts'
 import {requiredBoards} from '../src/rules.ts'
 import {legalMoves, routeKey} from '../src/moves.ts'
 import {resolveRound, sourceBudget} from '../src/resolve.ts'
 import {wallet} from './economy.ts'
-import {startRatings, settleRatings, gameNotices, notify} from './accounts.ts'
+import {startRatings, gameNotices, notify} from './accounts.ts'
 import {hash, verify} from './security.ts'
 import {fail, string, passwordValue} from './http.ts'
 import type {Room, Reply} from './model.ts'
@@ -20,7 +21,7 @@ function roomView(unit: UnitOfWork, room: Room, viewer: string) {
   const active = survivors(room.state)
   return {code: room.code, title: room.title, seats: room.seats, seat, state: room.state,
     journal: room.journal, results: room.results, locked: Object.fromEntries(PLAYERS.map(p => [p, !!room.locked[p]])),
-    waiting: Object.keys(room.seats).length < playerCount(room.state), finished: active.length <= 1, created: room.created, rated: !!room.rated, ratingChanges: room.ratingChanges,cosmetics:Object.fromEntries(Object.entries(room.seats).map(([p,name])=>[p,structuredClone(wallet(unit.users.get(name!)!).loadout)]))}
+    waiting: Object.keys(room.seats).length < playerCount(room.state), finished: active.length <= 1, created: room.created, rated: room.state.movement === 'live' && !!room.rated, deadline:room.deadline,drawOffer:room.drawOffer,endReason:room.endReason,ratingChanges: room.ratingChanges,cosmetics:Object.fromEntries(Object.entries(room.seats).map(([p,name])=>[p,structuredClone(wallet(unit.users.get(name!)!).loadout)]))}
 }
 function orders(value: unknown, seat: Player, state: State): Order[] {
   if (!Array.isArray(value) || value.length > (state.movement ? Math.min(512, state.universes.length + 1) : 5)) fail(400, 'Invalid orders')
@@ -41,7 +42,7 @@ function orders(value: unknown, seat: Player, state: State): Order[] {
 
 export function gameApi(store: ChessStore, unit: UnitOfWork, me: string, path: string, method: string, data: Record<string, unknown>): Reply | undefined {
   if (!path.startsWith('/api/games')) return
-  if (path === '/api/games' && method === 'GET') return {status: 200, value: {available: store.availableRooms(), mine: store.memberRooms(me), limit: maxGames}}
+  if (path === '/api/games' && method === 'GET') {maintainGames(store,unit);unit.flush(); return {status: 200, value: {available: store.availableRooms(), mine: store.memberRooms(me), limit: maxGames}}}
   if (path === '/api/games' && method === 'POST') {
     const title = string(data.title || `${me}'s game`, 'game name', 60)
     const password = passwordValue(data.password, true)
@@ -57,13 +58,14 @@ export function gameApi(store: ChessStore, unit: UnitOfWork, me: string, path: s
     while (!!unit.rooms.get(code))
     const salt = password ? randomBytes(16).toString('hex') : undefined
     const room: Room = {code, title, owner: me, password: password && salt ? hash(password, salt) : undefined,
-      salt, rated: true, seats: {red: me}, state: initialState(count, movement, movement === 'classic' ? shuffledPlayers(count) : undefined), journal: [], results: [], locked: {}, created: Date.now()}
+      salt, rated: movement === 'live', seats: {red: me}, state: initialState(count, movement, movement === 'classic' ? shuffledPlayers(count) : undefined), journal: [], results: [], locked: {}, created: Date.now()}
     unit.rooms.add(room.code,room)
     return {status: 201, value: roomView(unit,room,me)}
   }
-  const match = /^\/api\/games\/([A-Z]{4})(?:\/(join|orders))?$/.exec(path)
+  const match = /^\/api\/games\/([A-Z]{4})(?:\/(join|orders|resign|draw))?$/.exec(path)
   if (!match) fail(404, 'Not found')
   const room = unit.rooms.get(match[1]) ?? fail(404, 'Game not found')
+  maintainRoom(unit,room)
   if (match[2] === 'join' && method === 'POST') {
     if (Object.values(room.seats).includes(me)) return {status: 200, value: roomView(unit,room,me)}
     if (Object.keys(room.seats).length >= playerCount(room.state)) fail(409, 'Game is full')
@@ -72,11 +74,35 @@ export function gameApi(store: ChessStore, unit: UnitOfWork, me: string, path: s
     const existing=Object.values(room.seats)
     room.seats[seat] = me
     startRatings(room,roomAccounts(unit,room))
+    if(Object.keys(room.seats).length===playerCount(room.state))resetDeadline(room)
     for(const name of existing){const target=unit.users.get(name!);if(target)notify(target,{kind:'join',code:room.code,title:`${me} joined`,detail:`${room.title}: ${Object.keys(room.seats).length}/${playerCount(room.state)} seats filled.`})}
     if (Object.keys(room.seats).length===playerCount(room.state)) gameNotices(room,roomAccounts(unit,room),me,true)
     return {status: 200, value: roomView(unit,room,me)}
   }
   if (!Object.values(room.seats).includes(me)) fail(403, 'Join this game first')
+  if (['resign','draw'].includes(match[2]) && method === 'POST') {
+    const seat=PLAYERS.find(p=>room.seats[p]===me)!
+    if(Object.keys(room.seats).length<playerCount(room.state))fail(409,'The game has not started')
+    if(!survivors(room.state).includes(seat)||survivors(room.state).length<=1)fail(409,'You are not an active player')
+    if(match[2]==='resign')eliminate(unit,room,[seat],`${me} resigned`)
+    else {
+      if(data.action==='offer'){
+        if(room.drawOffer)fail(409,'A draw offer is already open')
+        room.drawOffer={by:seat,accepted:[seat]}
+      }else if(data.action==='accept'){
+        if(!room.drawOffer)fail(409,'There is no draw offer')
+        if(!room.drawOffer.accepted.includes(seat))room.drawOffer.accepted.push(seat)
+        if(survivors(room.state).every(p=>room.drawOffer!.accepted.includes(p))){
+          room.state={...room.state,draw:true,round:room.state.round+1}
+          room.journal.push([]);room.results.push({state:room.state,outcomes:[],rejected:[],eliminated:[]})
+          room.locked={};room.endReason='Draw agreed by all surviving players';finishUpdate(unit,room)
+        }
+      }else if(data.action==='decline'){delete room.drawOffer}
+      else fail(400,'Choose offer, accept or decline')
+      gameNotices(room,roomAccounts(unit,room),me,true)
+    }
+    return {status:200,value:roomView(unit,room,me)}
+  }
   if (match[2] === 'orders' && method === 'POST') {
     if (Object.keys(room.seats).length < playerCount(room.state)) fail(409, `Waiting for ${playerCount(room.state)} players`)
     const seat = PLAYERS.find(p => room.seats[p] === me)!
@@ -97,7 +123,8 @@ export function gameApi(store: ChessStore, unit: UnitOfWork, me: string, path: s
       room.journal.push(batch)
       room.results.push(result)
       room.locked = {}
-      settleRatings(room,roomAccounts(unit,room))
+      resetDeadline(room)
+      finishUpdate(unit,room)
       gameNotices(room,roomAccounts(unit,room),me,true)
     } else {room.locked = locks;gameNotices(room,roomAccounts(unit,room),me,false)}
     return {status: 200, value: roomView(unit,room,me)}

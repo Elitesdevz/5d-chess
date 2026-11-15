@@ -32,7 +32,7 @@ export function squarePoint(s: State, c: Coord, layout = layoutOf(s)): Point {
   return {x: c.t * TIME + (c.x - d.minX + .5) * d.tile - d.width / 2,
     y: (layout.rows.get(c.u) ?? 0) * ROW + (c.y - d.minY + .5) * d.tile - d.height / 2}
 }
-/** The renderer and simulation consume this exact polyline in world pixels. */
+/** Display polyline only. Combat distances and collisions use logical coordinates. */
 export function moveGeometry(s: State, move: Candidate) {
   const layout = layoutOf(s)
   const points = move.path.map(c => squarePoint(s, c, layout))

@@ -1,12 +1,12 @@
-# Development movement rules
+# Movement rules
 
-`main` keeps the established simultaneous resolver and only receives the board UI milestone. The rules below are implemented on `development`. Deploy the development frontend and Node game server together to use them online; pushing development does not replace the production Pi server.
+These rules apply to the deployed frontend and Node game server.
 
 ## Creating and restoring games
 
-New local games and new games created by the development lobby choose **Live** (default) or **Classic**, with 2, 3, or 4 players. Anonymous players can use Match → New match; logged-in players also have the lobby's local-game selector. Mode is immutable for an existing game.
+New local games and new games created by the lobby choose **Live** (default) or **Classic**, with 2, 3, or 4 players. Anonymous players can use Match → New match; logged-in players also have the lobby's local-game selector. Mode is immutable for an existing game.
 
-Classic generates a shuffled order once at creation, stores it in the initial state and saves, and repeats it while skipping eliminated factions. Reloading never reshuffles it. Local mode-specific autosaves are separate. Saves and API rooms without a movement field retain the original resolver, including the original pass and collision rules. This is intentional compatibility with production clients and existing journals. The lobby always sends an explicit mode for a new development game.
+Classic generates a shuffled order once at creation, stores it in the initial state and saves, and repeats it while skipping eliminated factions. Reloading never reshuffles it. Local mode-specific autosaves are separate. Saves and API rooms without a movement field retain the original resolver, including the original pass and collision rules. This is intentional compatibility with production clients and existing journals. The lobby always sends an explicit mode for a new game.
 
 ## Classic
 
@@ -41,9 +41,9 @@ Everyone plans against the same snapshot and locks their required Present orders
 | King | Instant | Instant |
 | Knight | Instant | Instant |
 
-A tile is 32 world pixels. `src/geometry.ts` is shared by renderer and server: board dimensions, history scaling, timeline columns, tree rows, and path polylines have one definition. A dimensional segment is a segment that changes time or universe. Duration is its displayed Euclidean distance divided by the applicable speed. Each trace records the piece, speeds, total distance, timed world points, destination, and any collision time. The client may shorten very long playback for usability while preserving every relative event time.
+Combat uses logical 32-unit tiles, independent of rendered board sizes, timeline rows or spacing. Spatial distance uses square coordinates. Dimensional distance additionally counts time steps and parent–child/rift connections; each traversed connection has unit length. Simultaneous historical branches are allocated by destination, not faction order.
 
-Spatial movement occurs on the new frontier board, so ordinary moves do not incorrectly pay a full timeline-column travel cost just because the round advanced. Historical destinations are allocated before geometry is measured; shared branches and tree reflow therefore use the exact layout shown during playback.
+The server records display polylines with these logical event times. The client animates the traces without changing their results. Reflowing timelines or swapping faction identities cannot change flight duration or create a collision.
 
 ### Collisions
 
@@ -54,7 +54,7 @@ Units have a swept collision diameter of 17 world pixels (smaller than a square)
 - A piece that has arrived stays physical at its destination for the rest of the batch. Two early arrivals can annihilate each other and leave the square free for a later third arrival.
 - Exactly simultaneous multi-piece contacts remove all units participating in that contact. Results do not depend on request ordering.
 - Captured kings eliminate their faction at batch completion. Check remains advisory; it never forbids a move or performs checkmate detection.
-- Corporeal stationary blockers are the affected frontier/branch positions; immutable nonparticipating history is not edited by a flight passing its visual projection. Moving units can collide between boards.
+- Dimensional flights are intangible to troops on intervening boards. They collide with normal units only after reaching their destination board. Dimensional travellers can collide on a shared logical time corridor or universe connection, including opposing traffic. Crossings of unrelated drawn paths have no effect. Historical arrivals affect the new branch, not the original past.
 - En passant still captures the original stationary pawn if it has not left; it does not capture a different arrival. Pawns promote on surviving arrival.
 
 This is a deterministic logical-tick simulation, not a wall-clock server timer. Rooms persist final positions and travel events atomically; reconnecting clients can replay the same result.
@@ -65,7 +65,7 @@ In Live, all orders in a batch targeting the same historical board `(universe, t
 
 The branch records every contributing faction in `owners`. It consumes one timeline allocation for each owner. Activation is the union of owners' allocations: the branch remains active while any surviving owner has it in their allocation, and becomes inactive only when none does. Eliminating one owner does not deactivate a shared branch still supported by another.
 
-Arrival order and collisions are resolved on that single branch. The tests include three factions jumping from different boards to the same empty square: two collide and the later third survives.
+Arrival order and collisions are resolved on that single branch. Equal-length routes arrive simultaneously: the three-arrival regression removes all three pieces instead of selecting a survivor based on timeline spacing.
 
 ## Board awareness
 
@@ -74,3 +74,11 @@ The shared UI includes a movable minimap with a camera rectangle, click/keyboard
 ## Validation
 
 `npm test` covers legacy rules, compulsory Present moves, fixed turns and per-board owners, save replay, physical interceptions between ticks, shared ownership, the three-arrival collision case, all player counts, API validation, and persistence across server restart. `npm run test:browser` covers local creation, Live multiplayer rounds, Classic online turns, the old journal flow, minimap movement, check warning review, mobile layouts and branch/replay/save transfer.
+
+## Online match lifecycle
+
+Only Live is rated, including three-player Live. Classic remains eligible for completion coins but never changes Elo or rating-pool statistics, regardless of a client-supplied rated flag. Already settled games are not recalculated.
+
+Every started online game has a persisted 48-hour order deadline. Live players who have locked are safe; only remaining unlocked factions forfeit at expiry. Classic forfeits only its current player. A new resolved round/turn starts a fresh deadline. Polls and draw votes do not extend it. Existing active games without a deadline receive a full grace period when first maintained. The server checks deadlines at startup, every minute, and when games are read.
+
+Resignation eliminates that faction. Remaining players receive a fresh planning window and replan because the departure can change legal captures and board obligations. A draw offer includes the proposer’s consent and requires every other surviving player to accept. Any survivor may decline; resolving a turn or a resignation clears the offer. Agreed draws tie the remaining players for placement while preserving earlier eliminations. Results and rewards settle atomically and once only.

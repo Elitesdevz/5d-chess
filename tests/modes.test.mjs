@@ -77,7 +77,7 @@ test('unplayed Classic boards retain their owner and pin the Present',()=>{
  assert.equal(r.state.turn,'yellow')
 })
 
-test('three arrivals share one past branch: the first two collide, the later third survives',()=>{
+test('equal logical routes share one past branch and all three arrivals collide',()=>{
  const base=setup([[3,0,'red','K'],[4,0,'blue','K'],[5,0,'yellow','K']],'live',3)
  const old=base.universes[0].boards[0]
  const root={...base.universes[0],boards:[old,{...old,t:1},{...old,t:2}]}
@@ -91,8 +91,8 @@ test('three arrivals share one past branch: the first two collide, the later thi
  assert.equal(r.state.universes.length,5)
  const branch=r.state.universes.at(-1)
  assert.deepEqual(branch.owners,['red','blue','yellow'])
- assert.equal(r.outcomes.filter(o=>o.status==='collided').length,2)
- assert.equal(frontier(branch).cells[index(c(7,7))]?.player,'red')
+ assert.equal(r.outcomes.filter(o=>o.status==='collided').length,3)
+ assert.equal(frontier(branch).cells[index(c(7,7))],null)
 })
 
 test('new movement sessions round-trip their fixed order, plans and journals',async()=>{

@@ -5,14 +5,15 @@ import {
 import {layoutOf, moveGeometry, squarePoint} from './geometry.ts'
 import {requiredBoards} from './rules.ts'
 
-/** Speeds are board tiles/tick. A dimensional tile is the same 32 world pixels. Zero means instant. */
+/** Speeds are logical tiles/tick. Zero means instant; display spacing is irrelevant. */
 export const SPEEDS: Record<Kind, {normal: number; dimensional: number}> = {
   R: {normal: 3, dimensional: 4}, P: {normal: 3, dimensional: 4},
   B: {normal: 1.5, dimensional: 2}, Q: {normal: 1.5, dimensional: 2},
   K: {normal: 0, dimensional: 0}, N: {normal: 0, dimensional: 0}
 }
 type Draft = {t: number; cells: (Piece | null)[]; enPassant: EnPassant[]}
-interface Body {piece: Piece; at: Coord; points: TravelPoint[]; alive: boolean; out?: Outcome; trace?: Travel; draft?: Draft}
+interface Segment {space: string; start: number; end: number; a: number[]; b: number[]}
+interface Body {segments: Segment[]; piece: Piece; at: Coord; points: TravelPoint[]; alive: boolean; out?: Outcome; trace?: Travel; draft?: Draft}
 const EPS = 1e-7
 export function travelPosition(points: readonly TravelPoint[], tick: number) {
   let previous = points[0]
@@ -25,26 +26,30 @@ export function travelPosition(points: readonly TravelPoint[], tick: number) {
   }
   return {x: previous.x, y: previous.y}
 }
-/** Earliest swept-disc contact, including collisions between ticks and after arrival. */
+/** Physics uses logical board/connection coordinates, never rendered timeline rows. */
 function contact(a: Body, b: Body, end: number): number | undefined {
-  const stops = [...new Set([0, end + 1, ...a.points.map(p => p.tick), ...b.points.map(p => p.tick)])].sort((x, y) => x - y)
-  const radius = 17 // less than one tile: adjacent pieces never touch
-  for (let i = 0; i < stops.length - 1; i++) {
-    const start = stops[i], span = stops[i + 1] - start
-    const A = travelPosition(a.points, start), B = travelPosition(b.points, start)
-    const C = travelPosition(a.points, start + span), D = travelPosition(b.points, start + span)
-    const x = A.x - B.x, y = A.y - B.y
-    const vx = (C.x - D.x - x) / span, vy = (C.y - D.y - y) / span
-    const c = x * x + y * y - radius * radius
-    if (c <= EPS) return start
-    const v = vx * vx + vy * vy, dot = x * vx + y * vy
-    if (v < EPS) continue
-    const discriminant = dot * dot - v * c
-    if (discriminant < 0) continue
-    const t = (-dot - Math.sqrt(discriminant)) / v
-    if (t >= -EPS && t <= span + EPS) return start + Math.max(0, t)
+  let earliest = Infinity
+  for (const A of a.segments) for (const B of b.segments) {
+    if (A.space !== B.space) continue
+    const start = Math.max(A.start, B.start), stop = Math.min(A.end, B.end, end + 1)
+    if (stop < start) continue
+    const position = (s: Segment, t: number) => s.a.map((v, i) => v + (s.b[i] - v) * (Number.isFinite(s.end) && s.end > s.start ? (t - s.start) / (s.end - s.start) : 0))
+    const x = position(A, start).map((v, i) => v - position(B, start)[i])
+    const velocity = (s: Segment) => s.a.map((v, i) => Number.isFinite(s.end) && s.end > s.start ? (s.b[i] - v) / (s.end - s.start) : 0)
+    const v = velocity(A).map((n, i) => n - velocity(B)[i])
+    const c = x.reduce((n, v) => n + v * v, 0) - 17 ** 2
+    if (c <= EPS) { earliest = Math.min(earliest, start); continue }
+    const speed = v.reduce((n, v) => n + v * v, 0), dot = x.reduce((n, value, i) => n + value * v[i], 0)
+    if (speed < EPS) continue
+    const d = dot * dot - speed * c
+    if (d < 0) continue
+    const t = (-dot - Math.sqrt(d)) / speed
+    if (t >= -EPS && t <= stop - start + EPS) earliest = Math.min(earliest, start + Math.max(0, t))
   }
+  return Number.isFinite(earliest) ? earliest : undefined
 }
+const local = (c: Coord) => [c.x * 32, c.y * 32, 0, 0]
+const boardSpace = (c: Coord) => `board:${c.u}:${c.t}`
 
 export function resolveLive(s: State, valid: Candidate[], rejected: Resolution['rejected']): Resolution {
   const outcomes: Outcome[] = valid.map(move => ({move, status: 'applied', captures: []}))
@@ -57,7 +62,8 @@ export function resolveLive(s: State, valid: Candidate[], rejected: Resolution['
   }
   const groups = Map.groupBy(outcomes.filter(o => o.move.branch), o => boardKey(o.move.to))
   let id = Math.max(...s.universes.map(u => u.id)) + 1
-  for (const group of groups.values()) {
+  // Allocate simultaneous branches by destination, never by faction processing order.
+  for (const [,group] of [...groups].sort(([a],[b])=>a.localeCompare(b))) {
     const first = group[0].move, board = clone(getBoard(s, first.to)!)
     const owners = players(s).filter(p => group.some(o => o.move.player === p))
     const branch: Universe = {id: id++, parent: first.to.u, divergence: first.to.t, creator: owners[0], owners, created: s.round, active: true, boards: [board]}
@@ -87,15 +93,38 @@ export function resolveLive(s: State, valid: Candidate[], rejected: Resolution['
       const speeds = SPEEDS[leg.piece.kind]
       const geometry = moveGeometry(staged, {...m, from: path[0], to, path})
       const points: TravelPoint[] = []
-      let tick = 0
-      for (const segment of geometry) {
-        const speed = segment.dimensional ? speeds.dimensional : speeds.normal
-        if (speed) tick += segment.distance / (32 * speed)
+      const segments: Segment[] = []
+      const dimensional = !sameBoard(m.from, m.to)
+      let tick = 0, distance = 0
+      for (const [i, segment] of geometry.entries()) {
+        if (i) {
+          const from = leg.path[i - 1], dest = leg.path[i]
+          const a = local(from), b = local(dest)
+          let space = boardSpace(to)
+          if (dimensional) {
+            a[2] = from.t * 32; b[2] = dest.t * 32
+            if (from.u === dest.u) space = `time:${from.u}`
+            else {
+              const low = Math.min(from.u, dest.u), high = Math.max(from.u, dest.u)
+              space = `edge:${low}:${high}`
+              a[3] = from.u === low ? 0 : 32; b[3] = dest.u === low ? 0 : 32
+            }
+          }
+          const length = Math.hypot(...a.map((v, j) => b[j] - v))
+          const speed = dimensional ? speeds.dimensional : speeds.normal
+          const start = tick
+          distance += length
+          if (speed) tick += length / (32 * speed)
+          if (tick > start) segments.push({space, start, end: tick, a, b})
+        }
         points.push({...segment.point, tick})
       }
-      const trace: Travel = {piece: leg.piece, from: leg.from, to, points, distance: geometry.reduce((sum, segment) => sum + segment.distance, 0), normalSpeed: speeds.normal, dimensionalSpeed: speeds.dimensional, endTick: tick}
+      // During dimensional flight only other travellers on the same connection
+      // are corporeal. At arrival the unit becomes a normal board occupant.
+      segments.push({space: boardSpace(to), start: tick, end: Infinity, a: local(to), b: local(to)})
+      const trace: Travel = {piece: leg.piece, from: leg.from, to, points, distance, normalSpeed: speeds.normal, dimensionalSpeed: speeds.dimensional, endTick: tick}
       travel.push(trace)
-      bodies.push({piece: leg.piece, at: to, points, alive: true, out, trace, draft: target})
+      bodies.push({piece: leg.piece, at: to, points, segments, alive: true, out, trace, draft: target})
     }
   }
   for (const [u, draft] of [...drafts, ...branches.map(b => [b.id, b.boards[0] as Draft] as const)]) {
@@ -103,7 +132,7 @@ export function resolveLive(s: State, valid: Candidate[], rejected: Resolution['
       const piece = draft.cells[i]
       if (!piece) continue
       const at = {x: i % 14, y: Math.floor(i / 14), u, t: draft.t}
-      bodies.push({piece, at, points: [{...squarePoint(staged, at, layout), tick: 0}], alive: true, draft})
+      bodies.push({piece, at, segments: [{space: boardSpace(at), start: 0, end: Infinity, a: local(at), b: local(at)}], points: [{...squarePoint(staged, at, layout), tick: 0}], alive: true, draft})
     }
   }
   const ticks = Math.max(0, ...travel.map(t => t.endTick)), dead = new Set<Player>()
