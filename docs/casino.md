@@ -19,3 +19,9 @@ Dice also supports an alternate, consent-based Elo table. Elo wagers have no pro
 Drag throws use release direction and speed to set their visible flight, bounce and spin. A final flick overrides the earlier wind-up; slow drags use displacement, and Space still throws forward. Release outside the canvas completes a captured throw. Motion cannot alter the server-set face or payout. Wins add a bounded gold coin/sparkle flourish around the handover, with a quiet reduced-motion alternative.
 
 The blank green key on the Elo table returns to coin wagers and closes Elo offers until the next Dutch midnight. It calls the existing server decision endpoint with refusal, so the daily lock survives reload and cannot be reopened by a client trigger. It is disabled while a saved wager or presentation is in progress.
+
+## Royal Table room
+
+Roulette opens in a lit 3D club with a dealer, patrons, physical betting squares, chip denominations and a spin key. The same existing wager form and API own selection, validation, durable requests, tax and settlement. Projected HTML hit targets preserve keyboard access; a larger betting-mat sheet and custom-stake dialog support small screens. Rules and receipt history remain available from the room toolbar. If WebGL cannot start, the original 2D roulette interface remains playable.
+
+After a settled server reply, the camera travels from the seat to the wheel. Rotor and counter-rotating ball ease into the exact awarded pocket; the ball drops and bounces into place. The camera returns to the previous seated view and releases look controls. Wins add a luminous ring, coins, particles and a light pulse: outside bets receive the lightest treatment, straight numbers a stronger one, and the 2% rift wager the largest. These effects never affect probability or money. Reloaded receipts show the settled result without another draw or debit. Reduced motion shortens the camera sequence.

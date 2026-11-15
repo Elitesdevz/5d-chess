@@ -43,7 +43,7 @@ test('earned collection flow: Dutch daily spin, crate landing, duplicates, equip
  await page.locator('.crate-catalog-dialog [data-close]').click()
  await page.locator('[data-crate-filter=icon]').click()
  await page.locator('[data-crate-pool=icon-bronze]').click()
- assert.match(await page.locator('.crate-catalog-dialog .odds-grid').textContent(),/0.0001%/)
+ assert.match(await page.locator('.crate-catalog-dialog .odds-grid').textContent(),/＜0.01%/)
  await page.locator('.crate-catalog-dialog [data-close]').click()
  for(const offer of (await (await context.request.get(base+'/api/economy')).json()).caseOffers.filter(o=>CRATES.find(c=>c.id===o.id).type==='icon'))assert.match(await page.locator(`[data-crate-buy="${offer.id}"]`).textContent(),new RegExp(offer.price.toLocaleString()))
  const beforeBox=(await (await context.request.get(base+'/api/economy')).json()).wallet
