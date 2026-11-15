@@ -5,11 +5,11 @@ import {setCosmetics} from './art.ts'
 import {initShell,refreshAccount} from './shell.ts'
 import {requiredBoards} from './rules.ts'
 import {awareness, nextPlayable, threatSquares} from './awareness.ts'
-import {initMatchUI, setMatchHeader, collapseControls} from './ui.ts'
+import {initMatchUI, setMatchHeader, collapseControls,updateMatchUI,updateSelectionInfo} from './ui.ts'
 import {Scene} from './scene.ts'
 import {COLORS, NAMES, pieceIcon} from './art.ts'
 import {type Candidate, type Coord, type Order, type Player, type Resolution, type State,
-  coordKey, coordName, getUniverse, initialState, isMain, moveBudget, pieceAt, playerCount, players, present, survivors, turnOrder, boardTurn} from './model.ts'
+  coordKey, coordName, frontier, getUniverse, initialState, isMain, moveBudget, pieceAt, playerCount, players, present, survivors, turnOrder, boardTurn} from './model.ts'
 import {legalMoves, routeKey} from './moves.ts'
 import {sourceBudget} from './resolve.ts'
 
@@ -57,6 +57,7 @@ const canPlan = () => !!room && frame === null && !animation && !room.waiting &&
 const preview = () => routes[routeIndex] ?? hover
 function sync() {
   if (!room) return
+  updateSelectionInfo(shown(),selected,preview())
   const info = canPlan() && room?.seat ? awareness(shown(), room.seat, draft) : undefined
   scene.update({state:shown(), animation, playable: info?.playable, checked: info && threatSquares(info.threats), moves:canPlan() ? choices : [], selected, preview:preview(), queued:draft})
 }
@@ -98,6 +99,7 @@ function render() {
   const seats = element('seats')
   seats.replaceChildren(...(room.state.movement === 'classic' ? turnOrder(room.state) : players(room.state)).map(player => {
     const span = document.createElement('span')
+    span.style.setProperty('--seat-color',COLORS[player])
     span.className = `${player === seat ? 'self' : ''} ${room!.locked[player] ? 'locked' : ''}`
     if (room!.state.movement === 'classic' && room!.state.turn === player) span.classList.add('turn-owner')
     span.textContent = `${room!.state.movement === 'classic' && room!.state.turn === player ? '▶ ' : ''}${names[player]}: `
@@ -115,7 +117,7 @@ function render() {
   const head = document.createElement('div')
   head.className = 'turn'
   const title = document.createElement('h3')
-  title.textContent = seat ? `${names[seat]} faction` : 'Spectating'
+  title.textContent = seat ? `${names[seat]} · Your army` : 'Spectating'
   const identity = document.createElement('div')
   identity.append(title)
   if (seat) {
@@ -151,15 +153,17 @@ function render() {
     const p = document.createElement('p'); p.className = 'online-message'; p.textContent = `${names[room.state.turn!]} is playing. Board outlines show each board’s owner.`; panel.append(p)
   } else if (canPlan()) {
     const budget = moveBudget(room.state)
+    if(room.state.movement)budget.main=requiredBoards(room.state,seat!).length
     const main = draft.filter(o => isMain(getUniverse(room!.state, o.from.u)!, present(room!.state))).length
     const count = document.createElement('p')
-    count.className = 'online-message'
-    count.textContent = `Main orders: ${budget.main - main}/${budget.main} · Optional: ${1 - (draft.length - main)}/1`
+    count.className = 'budget'
+    count.innerHTML = `<span><small>REQUIRED LEFT</small><b>${budget.main-main}<em> / ${budget.main}</em></b></span><span><small>OPTIONAL LEFT</small><b>${room.state.universes.some(u=>!isMain(u,present(room!.state))&&frontier(u).cells.some(q=>q?.player===seat)&&(room!.state.movement!=='classic'||boardTurn(room!.state,u)===seat))?1-(draft.length-main):0}<em> / 1</em></b></span>`
     panel.append(count)
+    if(!draft.length&&!routes.length){const empty=document.createElement('div');empty.className='empty';empty.innerHTML='<span>◇</span><p>Select a piece to plan a move.</p>';panel.append(empty)}
     for (const [i, order] of draft.entries()) {
-      const row = document.createElement('div'); row.className = 'game-row'
-      const label = document.createElement('span'); label.textContent = `${coordName(order.from, shown())} → ${coordName(order.to, shown())}`
-      const remove = document.createElement('button'); remove.className = 'text-button'; remove.textContent = 'Remove'
+      const row = document.createElement('div'); row.className = 'game-row queued-match-order'
+      const label = document.createElement('span'); label.innerHTML=`${pieceIcon(order.piece.kind,seat!,23)}<b>${NAMES[order.piece.kind]}<small>${coordName(order.from,shown())} → ${coordName(order.to,shown())}</small></b>`;label.onclick=()=>scene.focusBoard(order.from.u,order.from.t)
+      const remove = document.createElement('button'); remove.className = 'text-button'; remove.textContent = '×';remove.setAttribute('aria-label','Remove order '+(i+1))
       remove.onclick = () => {draft.splice(i, 1); render()}
       row.append(label, remove); panel.append(row)
     }
@@ -183,7 +187,7 @@ function render() {
       const warning = document.createElement('p'); warning.className = 'check-notice'; warning.textContent = 'Advisory check: your king is threatened. Review the red highlights.'; panel.append(warning)
     }
     panel.append(lock)
-    if (seat && requiredBoards(room.state, seat, draft).length) { const note = document.createElement('p'); note.className = 'required-notice'; note.textContent = `${requiredBoards(room.state, seat, draft).length} Present boards still need a move.`; panel.append(note) }
+    if (seat && requiredBoards(room.state, seat, draft).length) { const note = document.createElement('p'); note.className = 'required-notice'; note.textContent = `${requiredBoards(room.state, seat, draft).length} Present ${requiredBoards(room.state,seat,draft).length===1?'board still needs':'boards still need'} a move.`; panel.append(note) }
   }
   if(room.ai){
     const bot=aiOpponent(room.ai.id)!,note=document.createElement('p');note.className='online-message ai-match-note'
@@ -204,6 +208,7 @@ function render() {
     }else add('Offer draw','draw','offer')
     add('Resign','resign');panel.append(actions)
   }
+  updateMatchUI(scene,s,canPlan()?seat:undefined,canPlan()?draft:[])
   sync()
 }
 async function matchAction(path:string,action?:string){
@@ -286,7 +291,7 @@ element('viewport').querySelectorAll<HTMLButtonElement>('[data-overlay]').forEac
   scene.setOverlay(button.dataset.overlay!, enabled)
 })
 void initShell()
-initMatchUI()
+initMatchUI(scene)
 element('review-check').onclick = () => element<HTMLDialogElement>('check-dialog').close()
 element('submit-check').onclick = () => { element<HTMLDialogElement>('check-dialog').close(); void submit() }
 void load()

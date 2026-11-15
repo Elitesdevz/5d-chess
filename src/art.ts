@@ -29,7 +29,7 @@ const vectorCache=new Map<string,PieceVector>()
 export function pieceVectors(kind:Kind,player:Player,skinId?:string,shapeId?:string):PieceVector{
  const skin=itemById(skinId??loadouts[player]?.pieces[kind]??''),design=designFor(skin),shapeItem=itemById(shapeId??(skinId===undefined?loadouts[player]?.shapes?.[kind]??loadouts[player]?.shape:undefined)??''),customShape=shapeItem?.type==='shape'?shapePath(shapeItem.motif,kind):undefined,key=`${kind}:${player}:${skin?.id??'default'}:${shapeItem?.id??'default'}`
  const cached=vectorCache.get(key);if(cached)return cached
- if(!design)return {shape:customShape??silhouette[kind],base:COLORS[player],rim:'#33271e',detail:'#33271e',layers:[] as {d:string;fill?:string;stroke?:string;width:number;opacity:number}[]}
+ if(!design){const v={shape:customShape??silhouette[kind],base:COLORS[player],rim:'#33271e',detail:'#33271e',layers:[] as {d:string;fill?:string;stroke?:string;width:number;opacity:number}[]};vectorCache.set(key,v);return v}
  const colors=pigments(COLORS[player],design)
  const facets:Inlay[]=[{d:'M0 0h7L9 24H0Z',fill:'light',opacity:.18},{d:'M19 0h5v24h-7Z',fill:'ink',opacity:.18}]
  const vector:PieceVector={shape:customShape??(design.family==='classic'?silhouette[kind]:alternateShapes[design.family][kind]),base:colors.body,rim:design.material==='dark'?colors.faction:['legendary','mythic'].includes(skin!.rarity)?colors.gold:colors.shade,detail:design.material==='dark'?colors.ivory:colors.ink,layers:[...facets,...design.inlays].map(l=>({d:l.d,fill:l.fill?colors[l.fill]:undefined,stroke:l.stroke?colors[l.stroke]:undefined,width:l.width??.4,opacity:l.opacity??1}))}
@@ -43,6 +43,31 @@ export function drawPiece(ctx: CanvasRenderingContext2D, kind: Kind, player: Pla
  for(const layer of vector.layers){ctx.globalAlpha=layer.opacity;if(layer.fill){ctx.fillStyle=layer.fill;ctx.fill(path(layer.d))}if(layer.stroke){ctx.strokeStyle=layer.stroke;ctx.lineWidth=layer.width;ctx.stroke(path(layer.d))}}
  ctx.restore();ctx.lineWidth=.55;ctx.strokeStyle=vector.rim;ctx.stroke(shape)
  ctx.lineWidth=.7;ctx.strokeStyle=vector.detail;ctx.stroke(path(detail[kind]));ctx.restore()
+}
+const reliefCache=new Map<PieceVector,HTMLCanvasElement>()
+/** Raised, lit game figurines. All equipped silhouettes, skins and inlays are preserved. */
+export function drawReliefPiece(ctx:CanvasRenderingContext2D,kind:Kind,player:Player,x:number,y:number,size:number){
+ const vector=pieceVectors(kind,player)
+ let sprite=reliefCache.get(vector)
+ if(!sprite){
+  sprite=document.createElement('canvas');sprite.width=160;sprite.height=160
+  const c=sprite.getContext('2d')!;c.scale(5,5);c.translate(4,3)
+  c.fillStyle='#07171452';c.beginPath();c.ellipse(13.5,22,8.5,2.5,0,0,Math.PI*2);c.fill()
+  const base=c.createLinearGradient(5,18,20,23);base.addColorStop(0,'#e2e7ce');base.addColorStop(.28,vector.base);base.addColorStop(1,'#253c36')
+  c.fillStyle='#172b27';c.beginPath();c.ellipse(12,21.1,7.7,2.2,0,0,Math.PI*2);c.fill()
+  c.fillStyle=base;c.beginPath();c.ellipse(12,20.3,7.7,2.1,0,0,Math.PI*2);c.fill();c.strokeStyle='#ffffff50';c.lineWidth=.35;c.stroke()
+  c.translate(0,-1);const shape=path(vector.shape)
+  c.save();c.translate(.9,1.6);c.fillStyle='#20352f';c.strokeStyle='#132b23';c.lineWidth=1;c.fill(shape);c.stroke(shape);c.restore()
+  c.fillStyle=vector.base;c.strokeStyle='#21362b';c.lineWidth=1.1;c.lineJoin='round';c.fill(shape);c.stroke(shape)
+  c.save();c.clip(shape)
+  for(const layer of vector.layers){c.globalAlpha=layer.opacity;if(layer.fill){c.fillStyle=layer.fill;c.fill(path(layer.d))}if(layer.stroke){c.strokeStyle=layer.stroke;c.lineWidth=layer.width;c.stroke(path(layer.d))}}
+  c.globalAlpha=1
+  const light=c.createLinearGradient(4,3,20,19);light.addColorStop(0,'#ffffff85');light.addColorStop(.38,'#ffffff08');light.addColorStop(.66,'#00000000');light.addColorStop(1,'#122b2970');c.fillStyle=light;c.fillRect(0,0,24,24)
+  c.restore();c.strokeStyle=vector.rim;c.lineWidth=.4;c.stroke(shape);c.strokeStyle=vector.detail;c.lineWidth=.65;c.lineCap='round';c.stroke(path(detail[kind]))
+  if(reliefCache.size>=96)reliefCache.delete(reliefCache.keys().next().value!)
+  reliefCache.set(vector,sprite)
+ }
+ ctx.drawImage(sprite,x-size/2,y-size/2,size,size)
 }
 let svgId=0
 export function pieceIcon(kind: Kind, player: Player, size = 24, skinId?:string,shapeId?:string) {
