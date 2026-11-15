@@ -181,7 +181,7 @@ export class RouletteRoom{
   const breath=this.reduced?0:Math.sin(now*.0012)*.0015;seat.y+=breath
   const direction=this.look.clone().sub(seat).applyEuler(new T.Euler(-this.pitch,-this.yaw,0,'YXZ')),seatLook=seat.clone().add(direction)
   this.matBlend=T.MathUtils.damp(this.matBlend,this.focusMode==='mat'&&!this.active?1:0,10,delta);if(this.matBlend<.002)this.matBlend=0
-  seat.lerp(v(.70,portrait?3.6:2.45,.72),this.matBlend);seatLook.lerp(v(.70,1.01,-.12),this.matBlend)
+  seat.lerp(v(.70,portrait?3.9:2.45,.72),this.matBlend);seatLook.lerp(v(.70,1.01,-.12),this.matBlend)
   this.chipBlend=T.MathUtils.damp(this.chipBlend,this.focusMode==='chips'&&!this.active?1:0,10,delta);if(this.chipBlend<.002)this.chipBlend=0
   seat.lerp(v(portrait?-.48:-.90,portrait?2.25:2.05,portrait?.32:.621),this.chipBlend);seatLook.lerp(v(portrait?-.48:-.90,1.04,portrait?.57:.62),this.chipBlend)
   this.camera.position.copy(seat.lerp(over,this.camBlend));this.camera.up.set(0,1,0).lerp(v(0,0,-1),Math.max(this.camBlend,this.chipBlend)).normalize();this.camera.lookAt(seatLook.lerp(this.spinLook,this.camBlend));this.camera.updateMatrixWorld()
