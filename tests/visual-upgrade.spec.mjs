@@ -24,7 +24,7 @@ test('visual upgrade: code slots, notification dropdowns, daily deals and respon
  await page.locator('.header-wallet [data-coins]').waitFor();assert.equal(await page.locator('.economy-nav .header-wallet').count(),0);assert.equal(await page.locator('.economy-nav').getByRole('link',{name:'Home',exact:true}).count(),1)
  const purse=await page.locator('.header-wallet').boundingBox(),account=await page.locator('#account-area').boundingBox();assert.ok(purse.x+purse.width<=account.x+1,'wallet and account stay separate');assert.match(await page.locator('[data-coins]').textContent(),/50/)
  const play=await page.locator('.play-card').boundingBox(),ai=await page.locator('#ai-only').boundingBox(),puzzle=await page.locator('.puzzle-card').boundingBox(),column=await page.locator('.play-home-column').boundingBox();assert.ok(play.y+play.height-ai.y-ai.height<30);assert.ok(puzzle.y>=play.y+play.height);assert.ok(puzzle.y+puzzle.height<=column.y+column.height+1)
- await page.getByRole('button',{name:'Solve puzzle'}).click();await page.getByRole('heading',{name:'Coming soon',exact:true}).waitFor();await page.locator('#close-puzzle').click();assert.equal(await page.locator('#puzzle-soon').isVisible(),false)
+ await page.getByRole('button',{name:'Start tutorial'}).click();await page.waitForURL(/puzzles.html/);await page.getByRole('heading',{name:'One small step',exact:true}).waitFor();await page.goto(base+'/chess/lobby.html');await page.locator('.home-deal').first().waitFor()
  await page.locator('#quick-code').fill('aBcD')
  assert.deepEqual(await page.locator('.slot-display b').allTextContents(),['A','B','C','D'])
  await page.locator('.header-bell').click();await page.locator('#notification-popover .popover-notice.unread').waitFor()

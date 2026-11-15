@@ -80,7 +80,9 @@ function noticeRow(notice:Notice,open:()=>void){
   row.onclick=open;return row
 }
 async function lobby(){
-  const puzzle=el<HTMLDialogElement>('puzzle-soon');el('open-puzzle').onclick=()=>puzzle.showModal();el('close-puzzle').onclick=()=>puzzle.close()
+  let nextPuzzle=1
+  el('open-puzzle').onclick=()=>{location.href='/chess/puzzles.html?lesson='+nextPuzzle}
+  void api<{completed:number[];next:number}>('/puzzles').then(progress=>{nextPuzzle=progress.next;document.querySelector('.puzzle-number b')!.textContent=String(nextPuzzle);el('open-puzzle').innerHTML=(progress.completed.length===30?'Review tutorial':progress.completed.length?'Continue tutorial':'Start tutorial')+' '+icon('play');el('open-puzzle').title=progress.completed.length+' of 30 lessons completed'}).catch(()=>{})
   const rewardHint=()=>{el('game-reward-hint').textContent=el<HTMLSelectElement>('game-movement').value==='classic'?'Unrated · Earn coins, no Elo changes.':'Rated · Completed Live games award Elo and coins.'}
   el('game-movement').addEventListener('change',rewardHint);rewardHint()
   const session=await getSession().catch(()=>null)

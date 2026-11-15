@@ -1,3 +1,4 @@
+import {puzzleApi} from './puzzles.ts'
 import {AiScheduler} from './ai-scheduler.ts'
 import type {IncomingMessage, ServerResponse} from 'node:http'
 import type {ChessStore} from './storage.ts'
@@ -36,7 +37,8 @@ export function createApplication(store: ChessStore) {
           if (auth) return auth
           const me = user(unit,req) ?? fail(401,'Log in first')
           const account = ensureAccount(unit.users.get(me) ?? fail(401,'Log in first'))
-          return playerProfileApi(store,unit,account,url,method,data)
+          return puzzleApi(account,path,method,data)
+            ?? playerProfileApi(store,unit,account,url,method,data)
             ?? accountApi(store,account,path,method,data)
             ?? economyApi(unit,account,path,method,data)
             ?? eloApi(unit,store,account,path,method,data)
