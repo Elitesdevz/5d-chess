@@ -36,7 +36,7 @@ test('account and lobby flow uses the multiplayer server', async t => {
   assert.equal(await page.locator('#home').isVisible(), true)
   assert.equal(await page.locator('[data-place=online]').getAttribute('aria-pressed'), 'true')
   assert.equal(await page.locator('#account-rating').textContent(),'1200 ELO')
-  assert.equal(await page.locator('#ai-only').isDisabled(),true)
+  assert.equal(await page.locator('#ai-only').isDisabled(),false)
   await page.getByRole('button',{name:'Find game',exact:true}).click()
   const invite = await page.locator('.join-entry').boundingBox()
   const available = await page.locator('.open-games').boundingBox()

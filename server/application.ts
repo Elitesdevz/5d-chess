@@ -1,3 +1,4 @@
+import {AiScheduler} from './ai-scheduler.ts'
 import type {IncomingMessage, ServerResponse} from 'node:http'
 import type {ChessStore} from './storage.ts'
 import {body, checkOrigin, fail, json} from './http.ts'
@@ -14,10 +15,12 @@ import {staticFile} from './static.ts'
 import {STORAGE_SCHEMA} from './storage.ts'
 
 export function createApplication(store: ChessStore) {
+  const ai=new AiScheduler(store)
+  ai.kick()
   const limiter = new LoginLimiter()
   let draining = false
   return {
-    drain: () => {draining = true},
+    drain: () => {draining = true;ai.stop()},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       try {
         if (draining) {json(res, 503, {error: 'Server restarting. Please try again.'}, {'retry-after': '1'}); return}
@@ -43,6 +46,7 @@ export function createApplication(store: ChessStore) {
         })
         // Send success only after the SQL commit succeeds.
         json(res,reply.status,reply.value,reply.headers)
+        ai.kick()
       } catch (error) {
         const code = (error as {code?: string}).code
         const busy = code === 'ERR_SQLITE_ERROR' && /locked|busy/i.test((error as Error).message)

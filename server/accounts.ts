@@ -1,10 +1,11 @@
+import type {AiDaily} from '../src/ai-model.ts'
 import type {PublicIdentity} from '../src/profile-model.ts'
 import type {EloGamblingState} from '../src/casino-model.ts'
 import {wallet,type EconomicAccount} from './economy.ts'
 import {randomBytes} from 'node:crypto'
 import {type Resolution,type State,type Player,playerCount,players,survivors} from '../src/model.ts'
 import {type Notice,type Preferences,type Profile,type Rating,type RatingPool,POOLS,poolFor} from '../src/account-model.ts'
-export interface Account extends EconomicAccount {publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
+export interface Account extends EconomicAccount {aiDaily?:AiDaily; publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
 export interface RatingChange {before: number; after: number; delta: number}
 export interface RatedRoom {code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
 export function ensureAccount(account: Account) {

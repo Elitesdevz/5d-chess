@@ -1,9 +1,10 @@
+import type {AiId,AiReward} from '../src/ai-model.ts'
 import type {Account, RatedRoom} from './accounts.ts'
 import type {Listing} from '../src/collection.ts'
 import type {Order, Player, State, Resolution} from '../src/model.ts'
 
 export interface Login {user: string; expires: number}
-export type Room = {deadline?:number; drawOffer?:{by:Player; accepted:Player[]}; endReason?:string; finishedAt?:number;code: string; title: string; owner: string; password?: string; salt?: string;
+export type Room = {ai?:{seed?:string;id:AiId;player:Player;reward?:AiReward;error?:string;failures?:number;retryAt?:number;drawReply?:string}; deadline?:number; drawOffer?:{by:Player; accepted:Player[]}; endReason?:string; finishedAt?:number;code: string; title: string; owner: string; password?: string; salt?: string;
   seats: Partial<Record<Player, string>>; state: State; journal: Order[][]; results: Resolution[];
   locked: Partial<Record<Player, Order[]>>; created: number} & RatedRoom
 export interface LegacyDatabase {

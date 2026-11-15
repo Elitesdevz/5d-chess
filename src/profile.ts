@@ -19,7 +19,7 @@ function renderCard(){
 }
 function entryHTML(e:HistoryEntry){
  const masked=e.kind==='anomaly',image=icon(masked?'signal':e.kind==='match'?'knight':e.kind==='dice'?'dice':'wheel'),title=masked?'<span class="glitch-title" data-text="?????">?????</span>':e.href?`<a class="history-game-link" href="${e.href}">${esc(e.title)}</a>`:esc(e.title)
- const opponent=e.opponents?.length?e.opponents.map(name=>`<a class="player-profile-link" href="${profileHref(name)}">${esc(name)}</a>`).join('<span class="opponent-divider"> · </span>'):''
+ const opponent=e.opponents?.length?e.opponents.map(name=>`<a class="player-profile-link" href="${e.ai?'/chess/lobby.html#ai':profileHref(name)}">${esc(name)}</a>`).join('<span class="opponent-divider"> · </span>'):''
  return `<article class="profile-history-row ${masked?'history-anomaly':''}" data-history-kind="${e.kind}"><span class="history-symbol">${image}</span><div class="history-details"><h3>${title}</h3><p>${masked?'<span class="glitch-static" aria-hidden="true"></span>':`${esc(e.status)}${e.movement?' · '+esc(e.movement==='classic'?'Classic':e.movement==='live'?'Live':e.movement):''}${e.players?' · '+e.players+' players':''}`}</p>${opponent?`<div class="history-opponents">${opponent}</div>`:''}</div><div class="history-outcome"><strong class="${e.delta>0?'positive':e.delta<0?'negative':'neutral'}">${e.kind==='match'&&!e.delta?e.rated?'—':'Unrated':delta(e.delta)}${e.kind==='match'&&!e.delta?'':` <small>${e.unit==='elo'?'Elo':'coins'}</small>`}</strong><time datetime="${new Date(e.created).toISOString()}">${new Date(e.created).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})}</time></div></article>`
 }
 async function loadHistory(reset=false){
