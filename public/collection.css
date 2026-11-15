@@ -469,3 +469,13 @@
 @media(max-width:600px){.shop-main .monthly-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.shop-rail .weekly-panel{padding:14px}.shop-rail .featured-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.shop-rail .featured-card{display:flex!important;flex-direction:column;text-align:center;padding:10px!important;min-height:0}.shop-rail .feature-art-button{width:100%!important;height:65px}.shop-rail .featured-card .item-picture{height:65px!important;width:100%}.shop-rail .featured-card>strong{font-size:13px!important;margin:6px 0!important}.shop-rail .featured-card>.button{width:100%;margin-top:7px}.shop-rail .etc-set{display:flex}.shop-main .section-title{flex-wrap:wrap}.shop-main .section-title h2{font-size:22px}}
 
 .shop-rail .featured-card>.feature-art-button{grid-column:1;grid-row:1/4}.shop-rail .featured-card>.rarity-label{grid-column:2;grid-row:1}.shop-rail .featured-card>strong{grid-column:2;grid-row:2;position:relative;z-index:1}.shop-rail .featured-card>[data-buy]{grid-column:2;grid-row:3}.shop-rail .item-picture,.shop-main .seasonal-direct .item-picture{min-height:0!important}.shop-main .seasonal-direct .feature-art-button{height:90px!important;flex:0 0 90px}.shop-main .seasonal-direct .item-picture{height:86px!important}.shop-main .seasonal-direct .rarity-label{margin-top:5px}
+/* Shop categories sit between the page title and collection navigation. */
+.shop-filters { display:flex; align-items:center; justify-content:center; flex:1; flex-wrap:wrap; gap:5px; min-width:0; }
+.shop-filters button { border:1px solid transparent; border-radius:7px; background:transparent; color:#b9cbbd; padding:8px 9px; font:inherit; font-size:11px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.shop-filters button:hover { background:#78945720; color:#ecf4df; }
+.shop-filters button[aria-pressed=true] { color:#d8eabf; background:#78945730; border-color:#9bbd7855; }
+.shop-filters button:focus-visible { outline:2px solid #bad292; outline-offset:2px; }
+.shop-filter-empty { padding:28px; margin:0; border:1px solid #809b7055; border-radius:12px; color:#b9cbbd; background:#1b2a31; }
+#shop .featured-card[hidden], #shop .crate-card[hidden], #shop section[hidden], #shop div[hidden], #shop h3[hidden] { display:none!important; }
+@media(max-width:1000px) { .collection-heading:has(.shop-filters:not([hidden])) { flex-wrap:wrap; } .shop-filters { order:3; flex-basis:100%; justify-content:flex-start; } }
+@media(max-width:600px) { .shop-filters { order:0; width:100%; justify-content:flex-start; flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; } .shop-filters button { flex:none; } }

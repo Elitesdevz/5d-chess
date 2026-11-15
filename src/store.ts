@@ -60,6 +60,7 @@ function renderEffects(){
  el('animation-grid').querySelectorAll<HTMLButtonElement>('[data-effect-copies]').forEach(b=>b.onclick=()=>manageCopies(b.dataset.effectCopies!))
 }
 const shopKeys=new Map<string,string>()
+let shopFilter='all'
 let showWelcome=false,shopVisited=false,crateFilter='all',inventoryTab='equipment',setSearch='',setsOnlyComplete=false,setLimit=18
 const art=(item:Collectible,player:Player='red')=>item.type==='skin'?skinSetIcon(item.id,player):item.type==='shape'?skinSetIcon('default',player,item.id):itemArt(item)
 function mountShop(id:string,key:string,draw:()=>string){if(shopKeys.get(id)===key)return;el(id).innerHTML=draw();shopKeys.set(id,key)}
@@ -75,6 +76,32 @@ function inspectCrate(id:string){
 const percentWeight=(n:number)=>`${(n/10000).toFixed(4).replace(/\.?0+$/,'')}%`
 function pieceChoice(item:Collectible){return ['skin','shape'].includes(item.type)?`<label>Piece type<select data-purchase-kind>${KINDS.map(k=>`<option value="${k}" ${slot===k||slot==='icon'&&k==='N'?'selected':''}>${NAMES[k]}</option>`).join('')}</select></label><p class="pool-note">One piece only. Collect all six for a complete Set.</p>`:''}
 function directCard(id:string){const item=itemById(id)!;return `<article class="featured-card" style="--rarity:${RARITY_COLORS[item.rarity]}"><button class="feature-art-button" type="button" data-inspect="${id}"><span class="item-picture">${itemArt(item)}</span></button><small class="rarity-label">${item.rarity} · ${ITEM_LABELS[item.type]}</small><strong>${item.name}</strong><button type="button" class="button" data-buy="${id}">${item.price.toLocaleString()} coins</button></article>`}
+function applyShopFilter(){
+ const all=shopFilter==='all', boxes=shopFilter==='boxes'
+ document.querySelectorAll<HTMLElement>('#shop [data-crate-card]').forEach(card=>{card.hidden=!(all||boxes)||((all||boxes)&&crateFilter!=='all'&&(card.parentElement?.id==='general-crates'||card.parentElement?.id==='weekly-cases')&&card.dataset.category!==crateFilter)})
+ document.querySelectorAll<HTMLElement>('#daily-deal-items .featured-card, #seasonal-items .featured-card, #featured-items .featured-card').forEach(card=>{
+  const id=card.querySelector<HTMLElement>('[data-inspect]')?.dataset.inspect
+  const type=id?itemById(id)?.type:undefined
+  card.hidden=!all && !(shopFilter==='animation' ? type==='movement'||type==='capture' : shopFilter===type)
+ })
+ el('etc-pack').hidden=!(all||shopFilter==='sets')
+ const hasVisible=(selector:string)=>Array.from(document.querySelectorAll<HTMLElement>(selector)).some(card=>!card.hidden)
+ const dailyItems=hasVisible('#daily-deal-items .featured-card'),dailyCases=hasVisible('#daily-case [data-crate-card]')
+ document.querySelector<HTMLElement>('.daily-case-feature')!.hidden=!dailyCases
+ el('daily-deal-items').hidden=!dailyItems
+ el('daily-offers').hidden=!dailyItems&&!dailyCases
+ el('weekly-case-section').hidden=!hasVisible('#weekly-cases [data-crate-card]')
+ el('permanent-cases').hidden=!hasVisible('#general-crates [data-crate-card]')
+ const seasonalCases=hasVisible('#monthly-crates [data-crate-card]'),seasonalItems=hasVisible('#seasonal-items .featured-card')
+ el('seasonal-offers').hidden=!seasonalCases&&!seasonalItems
+ el('monthly-crates').hidden=!seasonalCases
+ el('seasonal-items').hidden=!seasonalItems
+ document.querySelector<HTMLElement>('.seasonal-direct-heading')!.hidden=!seasonalItems
+ el('weekly-direct').hidden=!hasVisible('#featured-items .featured-card')
+ el('starter-note').hidden=!showWelcome||!all
+ el('shop-filter-empty').hidden=all||!['daily-offers','weekly-case-section','seasonal-offers','permanent-cases','weekly-direct','etc-pack'].every(id=>el(id).hidden)
+ document.querySelectorAll<HTMLElement>('[data-shop-filter]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.shopFilter===shopFilter)))
+}
 function renderShop(){
  el('starter-note').hidden=!showWelcome
  mountShop('monthly-crates','monthly',()=>CRATES.filter(c=>c.monthly).map(crateCard).join(''))
@@ -90,15 +117,17 @@ function renderShop(){
  document.querySelectorAll<HTMLButtonElement>('[data-buy],[data-daily-buy]').forEach(b=>{const id=b.dataset.buy??b.dataset.dailyBuy!,price=b.dataset.buy?itemById(id)!.price:state.dailyDeals.find(d=>d.itemId===id)!.price;b.disabled=busy||state.wallet.coins<price})
  document.querySelectorAll<HTMLElement>('[data-owned]').forEach(b=>b.hidden=!state.wallet.inventory.some(o=>o.itemId===b.dataset.owned))
  document.querySelectorAll<HTMLElement>('[data-feature-type]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.featureType===featureType)))
+ applyShopFilter()
 }
 function bindShop(){
  document.addEventListener('click',event=>{
   const b=(event.target as Element).closest<HTMLElement>('button');if(!b)return
+  if(b.dataset.shopFilter){shopFilter=b.dataset.shopFilter;crateFilter='all';document.querySelectorAll<HTMLElement>('[data-crate-filter]').forEach(f=>f.setAttribute('aria-pressed',String(f.dataset.crateFilter==='all')));applyShopFilter();return}
   if(b.dataset.inspectSet){const set=setById(b.dataset.inspectSet)!;const dialog=document.createElement('dialog');dialog.className='transaction-dialog inspect-set-dialog';dialog.innerHTML=`<h2>${set.name}</h2><div class="set-preview-roster">${setArt(set)}</div><p>One complete Set reward contains every member below. All four faction colors are included.</p><div class="set-member-list">${setRequirements(set).map(r=>`<span>${itemArt(itemById(r.itemId)!,30,r.kind)}${NAMES[r.kind]} · ${itemById(r.itemId)!.name}</span>`).join('')}</div><button class="button" type="button" data-close>Close Set preview</button>`;document.body.append(dialog);dialog.showModal();dialog.querySelector<HTMLButtonElement>('[data-close]')!.onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();return}
   if(b.dataset.inspect){inspectItem(itemById(b.dataset.inspect)!);return}
   if(b.dataset.finish){const card=b.closest<HTMLElement>('[data-crate-card]')!;card.dataset.style=b.dataset.finish;card.querySelectorAll<HTMLElement>('[data-finish]').forEach(f=>f.setAttribute('aria-pressed',String(f===b)));return}
   if(b.dataset.cratePool){inspectCrate(b.dataset.cratePool);return}
-  if(b.dataset.crateFilter){crateFilter=b.dataset.crateFilter;document.querySelectorAll<HTMLElement>('[data-crate-filter]').forEach(f=>f.setAttribute('aria-pressed',String(f===b)));document.querySelectorAll<HTMLElement>('#general-crates [data-crate-card],#weekly-cases [data-crate-card]').forEach(c=>c.hidden=crateFilter!=='all'&&c.dataset.category!==crateFilter);return}
+  if(b.dataset.crateFilter){crateFilter=b.dataset.crateFilter;document.querySelectorAll<HTMLElement>('[data-crate-filter]').forEach(f=>f.setAttribute('aria-pressed',String(f===b)));document.querySelectorAll<HTMLElement>('#general-crates [data-crate-card],#weekly-cases [data-crate-card]').forEach(c=>c.hidden=crateFilter!=='all'&&c.dataset.category!==crateFilter);applyShopFilter();return}
   if(b.dataset.buySet){const set=setById(b.dataset.buySet)!;transaction('Acquire '+set.name+'?',`<div class="set-preview-roster">${setArt(set)}</div><p>${set.price.toLocaleString()} coins · ${setRequirements(set).length} individual cosmetics · All required skins and outlines included.</p>`,'Buy complete Set',async()=>{await submit('/economy/buy-set',{setId:set.id},'buy-set:'+set.id);message('collection-status','Complete Set added to Collections.')});return}
   if(b.dataset.crateBuy){
    const crate=CRATES.find(c=>c.id===b.dataset.crateBuy)!,month=state.month,finish=Number(b.closest<HTMLElement>('[data-crate-card]')?.dataset.style??0)
@@ -221,10 +250,12 @@ function route(){
  const view=['shop','inventory','market'].includes(location.hash.slice(1))?location.hash.slice(1):'shop'
  document.querySelectorAll<HTMLElement>('.collection-view').forEach(v=>v.hidden=v.id!==view)
  document.querySelectorAll<HTMLAnchorElement>('.collection-tabs a').forEach(a=>{if(a.hash==='#'+view)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current')})
+ el('shop-filters').hidden=view!=='shop'
  el('collection-title').textContent=view==='shop'?'Shop':view==='inventory'?'Inventory':'Market'
  el('collection-intro').textContent=view==='shop'?'Find your next signature piece.':view==='inventory'?'Your collection. Your pieces. Your style.':'A new home for every extra copy.'
  document.title=`${el('collection-title').textContent} · 5D Chess`
  if(view==='shop'&&!shopVisited){shopVisited=true;showWelcome=!state.wallet.shopSeen;el('starter-note').hidden=!showWelcome;void api('/economy/visit-shop',{}).then(()=>{state.wallet.shopSeen=true}).catch(report)}else if(view!=='shop'){showWelcome=false;el('starter-note').hidden=true}
+ if(view==='shop')applyShopFilter()
  if(view==='market')void loadMarket().catch(report)
 }
 async function init(){

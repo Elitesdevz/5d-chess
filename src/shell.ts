@@ -57,6 +57,16 @@ function renderEconomyNav(){
  markCurrentNav()
 
 }
+export function renderGuestNav(promptLogin:()=>void){
+ renderEconomyNav()
+ const header=document.querySelector<HTMLElement>('.app-topbar')!
+ header.classList.add('guest-header')
+ header.querySelector('.header-wallet')?.remove()
+ const nav=header.querySelector<HTMLElement>('.economy-nav')!
+ nav.querySelectorAll<HTMLElement>('a, button').forEach(item=>item.addEventListener('click',event=>{event.preventDefault();promptLogin()}))
+ const actions=header.querySelector<HTMLElement>('.header-actions')!
+ const start=document.createElement('button');start.type='button';start.className='button primary guest-start';start.textContent='Start new game';start.onclick=()=>document.getElementById('new')?.click();actions.append(start)
+}
 export function updateNoticeCount(count:number){document.querySelectorAll<HTMLElement>('[data-notification-count]').forEach(el=>{el.hidden=!count;el.textContent=String(count)})}
 export async function fetchNotices(){const data=await api<{items:Notice[];unread:number}>('/notifications');updateNoticeCount(data.unread);renderNotificationPanel(data.items);return data}
 export async function refreshRating(){
