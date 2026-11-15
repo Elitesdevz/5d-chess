@@ -3,7 +3,7 @@ import type {Listing} from '../src/collection.ts'
 import type {Order, Player, State, Resolution} from '../src/model.ts'
 
 export interface Login {user: string; expires: number}
-export type Room = {code: string; title: string; owner: string; password?: string; salt?: string;
+export type Room = {finishedAt?:number;code: string; title: string; owner: string; password?: string; salt?: string;
   seats: Partial<Record<Player, string>>; state: State; journal: Order[][]; results: Resolution[];
   locked: Partial<Record<Player, Order[]>>; created: number} & RatedRoom
 export interface LegacyDatabase {

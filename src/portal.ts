@@ -1,3 +1,4 @@
+import {profileHref} from './profile-model.ts'
 import {itemById} from './collection.ts'
 import {itemArt} from './rewards.ts'
 import {initDailySpin,type Economy} from './rewards.ts'
@@ -120,7 +121,7 @@ async function lobby(){
     const table=document.createElement('table');table.innerHTML='<thead><tr><th scope="col">#</th><th scope="col">Player</th><th scope="col">Elo</th></tr></thead><tbody></tbody>'
     for(const p of data.players){
       const row=document.createElement('tr');row.classList.toggle('self',p.name===profile.name)
-      row.innerHTML=`<td></td><td><span class="rank-player"><span class="small-avatar">${framedAvatar(p.avatar,p.frame)}</span><strong></strong></span></td><td></td>`
+      row.innerHTML=`<td></td><td><a class="rank-player player-profile-link" href="${profileHref(p.name)}"><span class="small-avatar">${framedAvatar(p.avatar,p.frame)}</span><strong></strong></a></td><td></td>`
       row.cells[0].textContent=String(p.rank);row.querySelector('strong')!.textContent=p.name;row.cells[2].textContent=String(p.rating);table.querySelector('tbody')!.append(row)
     }
     const full=document.createElement('a');full.href='/chess/leaderboard.html';full.className='full-leaderboard-link';full.textContent='Open full leaderboard';el('leaderboard').replaceChildren(table,full)

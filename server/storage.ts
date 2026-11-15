@@ -225,6 +225,14 @@ export class ChessStore {
   memberRooms(name: string): Array<RoomSummary & {myTurn: boolean}> {
     return (this.statement('SELECT r.summary AS payload,m.my_turn FROM rooms r JOIN room_members m ON m.room_code=r.code WHERE m.account_name=? ORDER BY r.id').all(name) as Array<Row & {my_turn: number}>).map(row => ({...JSON.parse(row.payload), myTurn: !!row.my_turn}))
   }
+  profileGameRows(name:string,before:number,beforeId:number,limit:number){
+    const time="COALESCE(json_extract(r.payload,'$.finishedAt'),json_extract(r.payload,'$.created'),0)"
+    return this.statement(`SELECT r.id,r.code,r.summary,${time} AS created,json_extract(r.payload,'$.seats') AS seats,COALESCE(json_extract(r.payload,'$.state.eliminated'),'[]') AS eliminated,COALESCE(json_extract(r.payload,'$.ratingChanges'),'{}') AS changes FROM rooms r JOIN room_members m ON m.room_code=r.code WHERE m.account_name=? AND (${time}<? OR (${time}=? AND r.id<?)) ORDER BY created DESC,r.id DESC LIMIT ?`).all(name,before,before,beforeId,limit) as {id:number;code:string;summary:string;created:number;seats:string;eliminated:string;changes:string}[]
+  }
+  profileRecord(name:string){
+    const rows=this.statement(`SELECT COALESCE(SUM(CASE WHEN json_array_length(r.payload,'$.state.eliminated')>=json_extract(r.summary,'$.maxPlayers') THEN 1 ELSE 0 END),0) AS draws,COALESCE(SUM(CASE WHEN NOT EXISTS(SELECT 1 FROM json_each(r.payload,'$.state.eliminated') e WHERE e.value=seat.key) THEN 1 ELSE 0 END),0) AS wins,COUNT(*) AS played FROM rooms r JOIN room_members m ON m.room_code=r.code JOIN json_each(r.payload,'$.seats') seat ON seat.value=m.account_name WHERE m.account_name=? AND r.finished=1`).get(name) as {played:number;wins:number;draws:number}
+    return {...rows,losses:rows.played-rows.wins-rows.draws}
+  }
   activeRooms(): number {return Number((this.statement('SELECT COUNT(*) AS count FROM rooms WHERE finished=0').get() as {count: number}).count)}
   metadataValue(key:string):unknown {const row=this.statement('SELECT value FROM metadata WHERE key=?').get(key) as {value:string}|undefined;return row?JSON.parse(row.value):undefined}
   putMetadata(key:string,value:unknown):void {this.requireWriter();this.statement('INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,JSON.stringify(value))}

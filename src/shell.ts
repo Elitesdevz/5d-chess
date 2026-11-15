@@ -1,3 +1,4 @@
+import {profileHref} from './profile-model.ts'
 import {noticeUrl} from './account-model.ts'
 import {type Notice,type Profile} from './account-model.ts'
 import {avatarArt,framedAvatar} from './cosmetic-art.ts'
@@ -26,9 +27,9 @@ export function renderAccount(profile:Profile){
   const host=document.getElementById('account-area')
   if(!host)return
   const open=host.querySelector('details')?.open??false
-  host.innerHTML=`<button type="button" class="header-bell" data-open-notifications aria-label="Notifications" aria-expanded="false" aria-controls="notification-popover">${icon('bell')}<span data-notification-count hidden></span></button><details class="account-menu"><summary role="button" aria-label="Account menu"><span class="profile-avatar">${framedAvatar(profile.loadout.icon,profile.loadout.frame)}</span><span class="account-copy"><strong id="account-name"></strong><small>${icon('chart')}<span id="account-rating"></span></small></span>${icon('menu','menu-icon')}</summary><div class="account-menu-items"><a href="/chess/lobby.html">${icon('home')}Home</a><button type="button" data-open-notifications>${icon('bell')}Notifications <span data-notification-count hidden></span></button><a href="/chess/lobby.html#settings">${icon('settings')}Settings</a><button id="logout" type="button">Log out</button><p id="account-error" role="alert" hidden></p></div></details>`
+  host.innerHTML=`<button type="button" class="header-bell" data-open-notifications aria-label="Notifications" aria-expanded="false" aria-controls="notification-popover">${icon('bell')}<span data-notification-count hidden></span></button><a class="account-profile-link" href="${profileHref(profile.name)}" aria-label="Your player profile"><span class="profile-avatar">${framedAvatar(profile.loadout.icon,profile.loadout.frame)}</span><span class="account-copy"><strong id="account-name"></strong><small>${icon('chart')}<span id="account-rating"></span></small></span></a><details class="account-menu"><summary role="button" aria-label="Account menu">${icon('menu','menu-icon')}</summary><div class="account-menu-items"><a href="${profileHref(profile.name)}">${icon('person')}Your profile</a><a href="/chess/lobby.html">${icon('home')}Home</a><button type="button" data-open-notifications>${icon('bell')}Notifications <span data-notification-count hidden></span></button><a href="/chess/lobby.html#settings">${icon('settings')}Settings</a><button id="logout" type="button">Log out</button><p id="account-error" role="alert" hidden></p></div></details>`
   host.querySelector('#account-name')!.textContent=profile.name
-  host.querySelector('summary')!.setAttribute('title',profile.name)
+  host.querySelector('summary')!.setAttribute('title','Account menu')
   host.querySelector('details')!.open=open
   renderEconomyNav()
   applyRating()
@@ -60,7 +61,7 @@ export function updateNoticeCount(count:number){document.querySelectorAll<HTMLEl
 export async function fetchNotices(){const data=await api<{items:Notice[];unread:number}>('/notifications');updateNoticeCount(data.unread);renderNotificationPanel(data.items);return data}
 export async function refreshRating(){
   const data=await api<SessionInfo>('/me');session=Promise.resolve(data)
-  if(data.profile){current=data.profile;applyRating();const avatar=document.querySelector('.account-menu .profile-avatar');if(avatar)avatar.innerHTML=framedAvatar(current.loadout.icon,current.loadout.frame)}
+  if(data.profile){current=data.profile;applyRating();const avatar=document.querySelector('.account-profile-link .profile-avatar');if(avatar)avatar.innerHTML=framedAvatar(current.loadout.icon,current.loadout.frame)}
 }
 export async function refreshAccount(){
   const data=await api<SessionInfo>('/me');session=Promise.resolve(data)

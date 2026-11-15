@@ -1,3 +1,4 @@
+import {profileHref} from './profile-model.ts'
 import {type Loadout} from './collection.ts'
 import {setCosmetics} from './art.ts'
 import {initShell,refreshAccount} from './shell.ts'
@@ -98,7 +99,9 @@ function render() {
     const span = document.createElement('span')
     span.className = `${player === seat ? 'self' : ''} ${room!.locked[player] ? 'locked' : ''}`
     if (room!.state.movement === 'classic' && room!.state.turn === player) span.classList.add('turn-owner')
-    span.textContent = `${room!.state.movement === 'classic' && room!.state.turn === player ? '▶ ' : ''}${names[player]}: ${room!.seats[player] || 'Open'}${room!.locked[player] ? ' ✓' : ''}`
+    span.textContent = `${room!.state.movement === 'classic' && room!.state.turn === player ? '▶ ' : ''}${names[player]}: `
+    if(room!.seats[player]){const link=document.createElement('a');link.className='player-profile-link';link.href=profileHref(room!.seats[player]!);link.textContent=room!.seats[player]!;span.append(link)}else span.append('Open')
+    if(room!.locked[player])span.append(' ✓')
     return span
   }))
   const last = room.results.length
@@ -119,8 +122,8 @@ function render() {
     icon.className = 'turn-icon'
     icon.style.setProperty('--faction', COLORS[seat])
     icon.innerHTML = pieceIcon('K', seat, 33)
-    const username = document.createElement('p')
-    username.textContent = room.seats[seat] || ''
+    const username = document.createElement('a')
+    username.className='player-profile-link';username.href=profileHref(room.seats[seat]!);username.textContent = room.seats[seat] || ''
     identity.append(username)
     head.append(icon)
   }
