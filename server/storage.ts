@@ -216,6 +216,7 @@ export class ChessStore {
     this.statement('DELETE FROM room_members WHERE room_code=?').run(room.code)
     for (const name of new Set(Object.values(room.seats))) if (name) {
       const seat = players(room.state).find(player => room.seats[player] === name)!
+      if(room.ai?.player===seat)continue
       const myTurn = Object.keys(room.seats).length === playerCount(room.state) && survivors(room.state).includes(seat)
         && !room.locked[seat] && (room.state.movement !== 'classic' || room.state.turn === seat)
       this.statement('INSERT INTO room_members(room_code,account_name,my_turn) VALUES(?,?,?)').run(room.code, name, Number(myTurn))
@@ -234,7 +235,10 @@ export class ChessStore {
     return {...rows,losses:rows.played-rows.wins-rows.draws}
   }
   activeRoomCodes(): string[] {return (this.statement('SELECT code FROM rooms WHERE finished=0').all() as {code:string}[]).map(row=>row.code)}
-  activeRooms(): number {return Number((this.statement('SELECT COUNT(*) AS count FROM rooms WHERE finished=0').get() as {count: number}).count)}
+  activeAiCount():number{return Number((this.statement("SELECT COUNT(*) AS count FROM rooms WHERE finished=0 AND json_type(payload,'$.ai') IS NOT NULL").get() as {count:number}).count)}
+  activeAiRooms(owner:string){return (this.statement("SELECT code,json_extract(payload,'$.ai.id') AS ai FROM rooms WHERE finished=0 AND owner=? AND json_type(payload,'$.ai') IS NOT NULL").all(owner) as {code:string;ai:string}[])}
+  pendingAiCodes():string[]{return (this.statement("SELECT code FROM rooms WHERE finished=0 AND json_type(payload,'$.ai') IS NOT NULL AND COALESCE(json_extract(payload,'$.ai.retryAt'),0)<=? AND ((json_extract(payload,'$.state.movement')='live' AND json_type(payload,'$.locked.yellow') IS NULL) OR (json_extract(payload,'$.state.movement')='classic' AND json_extract(payload,'$.state.turn')='yellow')) ORDER BY id").all(Date.now()) as {code:string}[]).map(r=>r.code)}
+  activeRooms(): number {return Number((this.statement("SELECT COUNT(*) AS count FROM rooms WHERE finished=0 AND json_type(payload,'$.ai') IS NULL").get() as {count: number}).count)}
   metadataValue(key:string):unknown {const row=this.statement('SELECT value FROM metadata WHERE key=?').get(key) as {value:string}|undefined;return row?JSON.parse(row.value):undefined}
   putMetadata(key:string,value:unknown):void {this.requireWriter();this.statement('INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,JSON.stringify(value))}
   leaderboard() {
