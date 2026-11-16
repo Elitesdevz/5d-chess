@@ -8,7 +8,7 @@ import {cleanUsage,usagePage,TELEMETRY_ACCOUNT_LIMIT,TELEMETRY_BYTES_PER_ACCOUNT
 import {fail} from './http.ts'
 
 export class UsageStore {
- private db:DatabaseSync;private closed=false;private warned=false
+ private observed=new Map<string,{coins:number|undefined;elo:number|undefined}>();private db:DatabaseSync;private closed=false;private warned=false
  constructor(path:string,privateLimit=TELEMETRY_BYTES_PER_ACCOUNT){
   this.limit=privateLimit;if(path!==':memory:'&&!existsSync(path)){const fd=openSync(path,'wx',0o600);closeSync(fd)}
   this.db=new DatabaseSync(path);this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=1000;
@@ -31,6 +31,7 @@ export class UsageStore {
    this.db.exec('COMMIT')
   }catch(error){this.db.exec('ROLLBACK');throw error}
  }
+ observe(account:string,coins:number|undefined,elo:number|undefined){const previous=this.observed.get(account);this.observed.set(account,{coins,elo});return previous}
  bestEffort(account:string,event:UsageEvent){try{this.append(account,[event],'server')}catch{if(!this.warned){this.warned=true;console.error('Usage telemetry is unavailable; gameplay continues.')}}}
  usage(account:string){return (this.db.prepare('SELECT bytes,events FROM usage_totals WHERE account=?').get(account) as {bytes:number;events:number}|undefined)??{bytes:0,events:0}}
  events(account:string){return (this.db.prepare('SELECT payload FROM usage_events WHERE account=? ORDER BY id').all(account) as {payload:string}[]).map(r=>JSON.parse(r.payload))}
@@ -50,8 +51,9 @@ export function usageApi(log:UsageStore,store:ChessStore,name:string,path:string
 }
 export function serverUsage(log:UsageStore,store:ChessStore,name:string|undefined,path:string,method:string,status:number,start:number,trace?:string,action?:string,before?:{coins?:number;elo?:number}){
  if(!name||path==='/api/telemetry'||!telemetryEligible(store,name))return
- const raw=store.accountJson(name);if(!raw)return;const account=JSON.parse(raw)
- const event:UsageEvent={id:randomUUID(),kind:'api',time:Date.now(),page:usagePage(path),method,status,duration:Date.now()-start,coins:account.wallet?.coins,elo:account.rating?.value,previousCoins:before?.coins,previousElo:before?.elo}
+ const raw=store.accountJson(name);if(!raw)return;const account=JSON.parse(raw),previous=log.observe(name,account.wallet?.coins,account.rating?.value)
+ if(method==='GET'&&status<400&&!action&&previous&&previous.coins===account.wallet?.coins&&previous.elo===account.rating?.value)return
+ const event:UsageEvent={id:randomUUID(),kind:'api',time:Date.now(),page:usagePage(path),method,status,duration:Date.now()-start,coins:account.wallet?.coins,elo:account.rating?.value,previousCoins:before?.coins??previous?.coins,previousElo:before?.elo??previous?.elo}
  if(trace&&/^[\w-]{8,80}$/.test(trace))event.requestId=trace;if(action&&/^[\w-]{8,80}$/.test(action))event.actionId=action
  log.bestEffort(name,event)
 }

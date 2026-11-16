@@ -25,7 +25,7 @@ export function recordBalance(profile:Profile){
 }
 function recentAction(){return Date.now()-lastActionAt<15000?lastAction:undefined}
 export function usageTrace(){return {id:eventId(),actionId:recentAction(),started:performance.now()}}
-export function recordApi(path:string,method:string,status:number,trace:ReturnType<typeof usageTrace>){record({kind:'api',page:usagePage('/api'+path),method,status,duration:Math.round(performance.now()-trace.started),requestId:trace.id,actionId:trace.actionId})}
+export function recordApi(path:string,method:string,status:number,trace:ReturnType<typeof usageTrace>){if(method==='GET'&&status>=200&&status<400&&!trace.actionId)return;record({kind:'api',page:usagePage('/api'+path),method,status,duration:Math.round(performance.now()-trace.started),requestId:trace.id,actionId:trace.actionId})}
 export async function flushUsage(beacon=false){
  if(!enabled||!queue.length)return
  const batch=queue.slice(0,TELEMETRY_BATCH_LIMIT),payload=JSON.stringify({events:batch})
