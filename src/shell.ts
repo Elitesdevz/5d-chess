@@ -1,3 +1,4 @@
+import {startUsage,recordBalance,usageTrace,recordApi} from './telemetry.ts'
 import {profileHref} from './profile-model.ts'
 import {noticeUrl} from './account-model.ts'
 import {type Notice,type Profile} from './account-model.ts'
@@ -6,11 +7,16 @@ import {icon} from './icons.ts'
 import {initBackdrop} from './backdrop.ts'
 export class ApiError extends Error {constructor(message:string,public status:number){super(message)}}
 export async function api<T>(path:string,data?:unknown):Promise<T> {
-  const response=await fetch(`/api${path}`,{method:data===undefined?'GET':'POST',headers:data===undefined?{}:{'content-type':'application/json'},body:data===undefined?undefined:JSON.stringify(data)})
+  const trace=usageTrace();let status=0
+  try{
+  const response=await fetch(`/api${path}`,{method:data===undefined?'GET':'POST',headers:{...(data===undefined?{}:{'content-type':'application/json'}),'x-client-trace':trace.id,...(trace.actionId?{'x-ui-action':trace.actionId}:{})},body:data===undefined?undefined:JSON.stringify(data)})
+  status=response.status
   let result:T&{error?:string}
   try{result=await response.json()}catch{throw new ApiError('Online play is unavailable. Please try again.',response.status)}
   if(!response.ok)throw new ApiError(result.error||'Request failed',response.status)
+  const profile=(result as {profile?:Profile}).profile;if(profile)void startUsage(profile)
   return result
+  }finally{recordApi(path,data===undefined?'GET':'POST',status,trace)}
 }
 export interface SessionInfo {user:string|null;profile?:Profile|null}
 let session:Promise<SessionInfo>|undefined,current:Profile|undefined
@@ -23,7 +29,7 @@ function applyRating(){
   document.querySelectorAll<HTMLElement>('[data-coins]').forEach(el=>{el.textContent=current!.coins>=100000?new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(current!.coins):current!.coins.toLocaleString(undefined,{maximumFractionDigits:4});el.parentElement!.title=`${current!.coins.toLocaleString(undefined,{maximumFractionDigits:4})} earned coins`})
 }
 export function renderAccount(profile:Profile){
-  current=profile
+  current=profile;void startUsage(profile);recordBalance(profile)
   const host=document.getElementById('account-area')
   if(!host)return
   const open=host.querySelector('details')?.open??false
