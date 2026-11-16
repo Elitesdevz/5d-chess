@@ -26,11 +26,11 @@ export function homeOffers(data:Economy):Offer[]{
 export class HomeDeals {
  private slots:Slot[]=[];private signature='';private loaded=false;private visible=false;private paused=false;private focused=false;private disposed=false
  private motion=matchMedia('(prefers-reduced-motion: reduce)');private size:ResizeObserver;private viewport:IntersectionObserver;private events=new AbortController()
- private pause:HTMLButtonElement;
+ private pause:HTMLButtonElement;private orbit:HTMLElement;private driftTimer?:ReturnType<typeof setTimeout>;private hovering=false
  constructor(private root:HTMLElement){
   const cap=(text:string,heading=false)=>`<div class="deal-tower-cap deal-tower-cube">${[0,1,2,3].map(i=>`<div class="deal-tower-face deal-tower-cap-face" style="--face:${i}"${i?' aria-hidden="true"':''}>${heading&&i===0?`<h2>${text}</h2>`:`<span>${text}</span>`}<small>${heading?'THE COLLECTION':'FIND YOUR NEXT FAVOURITE'}</small></div>`).join('')}<i class="deal-tower-lid"></i><i class="deal-tower-floor"></i></div>`
-  root.innerHTML=`<div class="deal-tower-aura" aria-hidden="true"></div><button class="deal-tower-pause" type="button" aria-label="Pause deals rotation" aria-pressed="false">${pauseGlyph}</button><div class="deal-tower-stage"><div class="deal-tower-structure"><header class="deal-tower-section deal-tower-header">${cap('DEAL',true)}</header>${[0,1,2].map(i=>`<div class="deal-tower-section deal-tower-slot" role="group" aria-label="Product slot ${i+1}" data-deal-slot="${i}"><div class="deal-tower-rotor deal-tower-cube"><div class="deal-tower-loading">${icon('inventory')}<span>Curating…</span></div></div><button class="deal-tower-turn" type="button" aria-label="Next product in slot ${i+1}" disabled>↻</button></div>`).join('')}<a class="deal-tower-section deal-tower-shop" href="${shop}" aria-label="Open the shop">${cap('SHOP')}<span class="deal-tower-shop-arrow" aria-hidden="true">↗</span></a></div></div><span class="sr-only" data-deals-status role="status"></span>`
-  this.pause=root.querySelector('.deal-tower-pause')!
+  root.innerHTML=`<div class="deal-tower-aura" aria-hidden="true"></div><button class="deal-tower-pause" type="button" aria-label="Pause deals rotation" aria-pressed="false">${pauseGlyph}</button><div class="deal-tower-sparks" aria-hidden="true"><i style="--spark:0"></i><i style="--spark:1"></i><i style="--spark:2"></i><i style="--spark:3"></i><i style="--spark:4"></i><i style="--spark:5"></i></div><div class="deal-tower-stage"><div class="deal-tower-orbit"><div class="deal-tower-structure"><header class="deal-tower-section deal-tower-header">${cap('DEAL',true)}</header>${[0,1,2].map(i=>`<div class="deal-tower-section deal-tower-slot" role="group" aria-label="Product slot ${i+1}" data-deal-slot="${i}"><div class="deal-tower-rotor deal-tower-cube"><div class="deal-tower-loading">${icon('inventory')}<span>Curating…</span></div></div><button class="deal-tower-turn" type="button" aria-label="Next product in slot ${i+1}" disabled>↻</button></div>`).join('')}<a class="deal-tower-section deal-tower-shop" href="${shop}" aria-label="Open the shop">${cap('SHOP')}<span class="deal-tower-shop-arrow" aria-hidden="true">↗</span></a></div></div></div><span class="sr-only" data-deals-status role="status"></span>`
+  this.pause=root.querySelector('.deal-tower-pause')!;this.orbit=root.querySelector('.deal-tower-orbit')!
   this.slots=Array.from(root.querySelectorAll<HTMLElement>('.deal-tower-slot')).map((element,index)=>({element,faces:[],quarter:0,hovered:false,index}))
   const signal=this.events.signal
   this.pause.addEventListener('click',()=>{this.paused=!this.paused;this.pause.setAttribute('aria-pressed',String(this.paused));this.pause.setAttribute('aria-label',this.paused?'Resume deals rotation':'Pause deals rotation');this.pause.innerHTML=this.paused?icon('play'):pauseGlyph;this.sync()},{signal})
@@ -39,6 +39,8 @@ export class HomeDeals {
    slot.element.addEventListener('pointerleave',()=>{slot.hovered=false;this.schedule(slot)},{signal})
    slot.element.querySelector('button')!.addEventListener('click',()=>this.turn(slot,true),{signal})
   })
+  root.addEventListener('pointerenter',e=>{if(e.pointerType!=='touch'){this.hovering=true;this.sync()}},{signal})
+  root.addEventListener('pointerleave',()=>{this.hovering=false;this.sync()},{signal})
   root.addEventListener('focusin',e=>{this.focused=e.target!==this.pause;this.sync()},{signal})
   root.addEventListener('focusout',()=>queueMicrotask(()=>{this.focused=root.contains(document.activeElement)&&document.activeElement!==this.pause;this.sync()}),{signal})
   document.addEventListener('visibilitychange',()=>this.sync(),{signal})
@@ -61,12 +63,12 @@ export class HomeDeals {
   this.root.dataset.ready='true';this.root.querySelector('[data-deals-status]')!.textContent='Twelve shop picks. Hover to hold a product, or use the arrows to turn each section.'
  }
  unavailable(){if(this.loaded)return;this.root.dataset.ready='false';this.root.querySelector('[data-deals-status]')!.textContent='Offers are unavailable. You can still open the shop.';this.root.querySelectorAll('.deal-tower-loading span').forEach(n=>n.textContent='Visit the shop')}
- private fit(){this.root.dataset.compact=String(this.root.clientHeight<490);const width=Math.max(40,(this.root.clientWidth-18)*.77);this.root.style.setProperty('--tower-width',width+'px')}
+ private fit(){this.root.dataset.compact=String(this.root.clientHeight<490);const width=Math.max(40,(this.root.clientWidth-18)*.71);this.root.style.setProperty('--tower-width',width+'px')}
  private canRun(){return !this.disposed&&this.loaded&&this.visible&&document.visibilityState==='visible'&&!this.paused&&!this.focused&&!this.motion.matches}
  private clearTimer(slot:Slot){if(slot.timer!==undefined){clearTimeout(slot.timer);slot.timer=undefined}}
  private schedule(slot:Slot,first=false){
   if(!this.canRun()||slot.hovered||slot.animation||slot.timer!==undefined)return
-  const delay=first?1400+slot.index*2250+Math.random()*550:3000+Math.random()*4900+slot.index*370
+  const delay=first?250+slot.index*470+Math.random()*180:350+Math.random()*900+slot.index*75
   slot.timer=setTimeout(()=>{slot.timer=undefined;if(this.canRun()&&!slot.hovered)this.turn(slot)},delay)
  }
  private turn(slot:Slot,manual=false){
@@ -74,14 +76,25 @@ export class HomeDeals {
   this.clearTimer(slot);const from=slot.quarter,to=from+(manual||Math.random()>.18?1:-1),rotor=slot.element.querySelector<HTMLElement>('.deal-tower-rotor')!
   slot.faces.forEach(face=>{face.inert=true;face.setAttribute('aria-hidden','true');face.tabIndex=-1});slot.element.dataset.turning='true'
   const pose=(quarter:number)=>`translateZ(calc(var(--tower-width) / -2)) rotateY(${-90*quarter}deg)`
-  const finish=()=>{rotor.style.transform=pose(to);slot.animation?.cancel();slot.animation=undefined;slot.quarter=to;const front=(to%4+4)%4;slot.faces[front].inert=false;slot.faces[front].removeAttribute('aria-hidden');slot.faces[front].tabIndex=0;slot.element.dataset.face=String(front);slot.element.dataset.turning='false';if(manual)this.root.querySelector('[data-deals-status]')!.textContent=slot.faces[front].querySelector('strong')!.textContent;this.schedule(slot)}
+  const finish=()=>{rotor.style.transform=pose(to);slot.animation?.cancel();slot.animation=undefined;slot.quarter=to;slot.element.dataset.turning='false';this.activateFace(slot);const front=Number(slot.element.dataset.face);if(manual)this.root.querySelector('[data-deals-status]')!.textContent=slot.faces[front].querySelector('strong')!.textContent;this.schedule(slot)}
   if(this.motion.matches||typeof rotor.animate!=='function'){finish();return}
-  slot.animation=rotor.animate([{transform:pose(from)},{transform:pose(to)}],{duration:1350+Math.random()*550,easing:'cubic-bezier(.32,.02,.18,1)',fill:'forwards'});slot.animation.onfinish=finish
+  slot.animation=rotor.animate([{transform:pose(from)},{transform:pose(to)}],{duration:1000+Math.random()*350,easing:'cubic-bezier(.32,.02,.18,1)',fill:'forwards'});slot.animation.onfinish=finish
+ }
+ private activateFace(slot:Slot){
+  if(slot.animation||!slot.faces.length)return
+  const matrix=new DOMMatrixReadOnly(getComputedStyle(this.orbit).transform),yaw=Math.atan2(matrix.m31,matrix.m11)*180/Math.PI
+  const front=((slot.quarter-Math.round(yaw/90))%4+4)%4
+  slot.faces.forEach((face,i)=>{face.inert=i!==front;face.tabIndex=i===front?0:-1;if(i===front)face.removeAttribute('aria-hidden');else face.setAttribute('aria-hidden','true')});slot.element.dataset.face=String(front)
+ }
+ private trackDrift(){
+  if(this.driftTimer!==undefined){clearTimeout(this.driftTimer);this.driftTimer=undefined}
+  this.slots.forEach(slot=>this.activateFace(slot))
+  if(this.canRun()&&!this.hovering)this.driftTimer=setTimeout(()=>this.trackDrift(),250)
  }
  private sync(){
   const stopped=this.disposed||!this.visible||document.visibilityState!=='visible'||this.paused
-  this.root.dataset.motion=this.motion.matches?'reduced':this.paused?'paused':'running';this.pause.hidden=this.motion.matches
+  this.root.dataset.motion=this.motion.matches?'reduced':this.paused?'paused':'running';this.pause.hidden=this.motion.matches;this.root.dataset.ambientRunning=String(!stopped&&!this.focused&&!this.hovering&&!this.motion.matches);this.trackDrift()
   this.slots.forEach(slot=>{if(!this.canRun())this.clearTimer(slot);if(stopped)slot.animation?.pause();else if(slot.animation?.playState==='paused')slot.animation.play();this.schedule(slot)})
  }
- dispose(){if(this.disposed)return;this.disposed=true;this.slots.forEach(slot=>{this.clearTimer(slot);slot.animation?.cancel()});this.events.abort();this.size.disconnect();this.viewport.disconnect()}
+ dispose(){if(this.disposed)return;this.disposed=true;this.slots.forEach(slot=>{this.clearTimer(slot);slot.animation?.cancel()});if(this.driftTimer!==undefined)clearTimeout(this.driftTimer);this.events.abort();this.size.disconnect();this.viewport.disconnect()}
 }
