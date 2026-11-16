@@ -7,7 +7,7 @@ import {type Resolution,type State,type Player,playerCount,players,survivors} fr
 import {type Notice,type Preferences,type Profile,type Rating,type RatingPool,POOLS,poolFor} from '../src/account-model.ts'
 export interface Account extends EconomicAccount {puzzleCompleted?:number[]; aiDaily?:AiDaily; publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
 export interface RatingChange {before: number; after: number; delta: number}
-export interface RatedRoom {code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
+export interface RatedRoom {legacyEloBackfill?:{batch:string;appliedAt:number;baseline:number};code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
 export function pruneNotices(account: Account, now=Date.now()) {
   if (account.notifications) account.notifications=account.notifications.filter(n=>n.permanent || (n.kind==='casino' && /received .* coins \(1% of profit\)/.test(n.detail)) || n.created>now-3*24*60*60*1000)
 }

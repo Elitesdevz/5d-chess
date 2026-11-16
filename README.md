@@ -75,3 +75,22 @@ npm run deploy
 | `src/session.ts` | Deterministic save journal and replay reconstruction |
 
 [5dcol](https://github.com/ForkKILLET/5dcol) informed the board-history model, geometric target generation, camera and preview workflow. This implementation uses its own engine and artwork.
+
+### First-user usage telemetry
+
+The first 100 **created account IDs**, including existing accounts, receive a private rolling usage record. `DATA_DIR/telemetry.sqlite` stores at most **10,000,000 UTF-8 JSON bytes per account**; each insert trims the oldest events for that account. This separate database does not change the main game database schema. No analytics data is sent to a third party.
+
+Client events capture button/link activation, safe selector/label, pointer position, non-text option changes, navigation, visibility, viewport, error type/source location, and reported coin/Elo balances. Server events record authenticated API route, method, status, duration and authoritative balances before/after. Request IDs and action IDs connect UI actions to server results. Events carry client time and server receive time in epoch milliseconds, plus a browser-tab session ID and sequence. Game-board square/canvas clicks and raw request bodies, passwords, cookies, session tokens, free-text fields, and error stacks are excluded.
+
+The client sends small authenticated batches every three seconds and on navigation, retains a bounded retry queue in session storage, and deduplicates retries on the server. Collection starts after the server verifies cohort eligibility. Telemetry failures do not turn successful gameplay requests into failures. Browser blocking/offline closure can still prevent delivery; this is a diagnostic event stream rather than a video replay.
+
+Operator access is through SSH, not a public log endpoint:
+
+```sh
+DATA_DIR=/home/pablo/chess-data node scripts/telemetry-admin.mjs summary
+DATA_DIR=/home/pablo/chess-data node scripts/telemetry-admin.mjs export ExactUsername /private/new-file.jsonl
+```
+
+Exports are chronological JSONL, created with mode `600` and never overwrite an existing file. The database file is also created with mode `600`. The main `storage-admin` backup covers game/account data; back up `telemetry.sqlite` separately with SQLite's backup API when retaining diagnostic history.
+
+Archived pre-mode games can be audited with `DATA_DIR=... node scripts/backfill-legacy-ratings.mjs`. The explicit `--apply` action makes a verified game-database backup, replays completed legacy games from 1200 in creation order using production scoring, adds only the resulting deltas to current balances, and writes an idempotent settlement ledger. It preserves gambling losses and coin balances.

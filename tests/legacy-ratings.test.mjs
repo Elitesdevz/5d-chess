@@ -16,3 +16,6 @@ test('legacy multiplayer replay uses finish order and shared production eliminat
  const results=Array.from({length:12},()=>({state,outcomes:[],rejected:[],eliminated:[]}));for(const [i,victim,killer]of [[5,'yellow','blue'],[8,'red','green'],[11,'blue','green']])results[i]={state,outcomes:[{move:{player:killer},captures:[{piece:{kind:'K',player:victim}}]}],rejected:[],eliminated:[victim]}
  const multi={...room('BBBB',2,'C','D','red'),state,results,seats:{red:'C',blue:'B',yellow:'A',green:'D'}};const plan=planLegacyRatings([last,multi,first]);assert.deepEqual(plan.games[1].deltas,[-8,7,-20,21]);assert.deepEqual(plan.games[2].deltas,[17,-17]);assert.deepEqual(plan.totals,{A:-4,D:-12,C:9,B:7})
 })
+test('a backfilled legacy result is displayed as rated without changing its movement rules',async()=>{
+ const {roomWasRated}=await import('../server/room-summary.ts');const game=room('ZZZZ',1,'A','B','red');assert.equal(roomWasRated(game),false);game.ratingSettled=true;game.legacyEloBackfill={batch:BATCH,appliedAt:100,baseline:1200};assert.equal(roomWasRated(game),true);assert.equal(game.state.movement,undefined);game.state.movement='classic';assert.equal(roomWasRated(game),false)
+})

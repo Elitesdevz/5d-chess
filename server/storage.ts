@@ -196,6 +196,7 @@ export class ChessStore {
     finally {this.inTransaction = false}
   }
   accountJson(name: string): string | undefined {return (this.statement('SELECT payload FROM accounts WHERE name=?').get(name) as Row | undefined)?.payload}
+  accountOrdinal(name:string):number|undefined {return (this.statement('SELECT id FROM accounts WHERE name=?').get(name) as {id:number}|undefined)?.id}
   accountName(name: string): string | undefined {return (this.statement('SELECT name FROM accounts WHERE name_key=?').get(name.toLowerCase()) as {name: string} | undefined)?.name}
   writeAccount(account: Account, json: string): void {
     this.requireWriter()
