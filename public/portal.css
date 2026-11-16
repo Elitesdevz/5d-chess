@@ -298,3 +298,5 @@ body[data-page=lobby] .dashboard .activity-and-deals>.home-deals{background:none
 @keyframes deal-tower-spark{0%,100%{opacity:0;transform:translate3d(0,12px,0) scale(.4)}40%{opacity:.8}70%{opacity:.25;transform:translate3d(5px,-38px,0) scale(1)}}
 .deal-tower[data-ambient-running=true] .deal-tower-orbit,.deal-tower[data-ambient-running=true] .deal-tower-structure,.deal-tower[data-ambient-running=true] .deal-tower-aura::before,.deal-tower[data-ambient-running=true] .deal-tower-sparks i{animation-play-state:running}
 @media(prefers-reduced-motion:reduce){.deal-tower-orbit,.deal-tower-structure,.deal-tower-sparks i,.deal-tower-aura::before{animation:none!important}.deal-tower-sparks i{opacity:.3}}
+/* The transparent orbit planes must not intercept the sculpted links behind them. */
+.deal-tower-orbit,.deal-tower-structure{pointer-events:none}.deal-tower-face.home-deal,.deal-tower-shop,.deal-tower-turn{pointer-events:auto}
