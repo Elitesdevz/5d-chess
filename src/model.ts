@@ -50,7 +50,7 @@ export interface Candidate extends Order {
   castle?: { from: Coord; to: Coord; piece: Piece }
   enPassant?: Coord
 }
-export interface Capture { at: Coord; piece: Piece }
+export interface Capture { at: Coord; piece: Piece; rewardCoins?:number }
 export interface Outcome {
   move: Candidate
   status: 'applied' | 'contested' | 'blocked' | 'collided'

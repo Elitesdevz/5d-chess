@@ -1,4 +1,5 @@
 import {aiNeedsPlan,settleAiReward} from './ai-games.ts'
+import {settleGameCoinNotices} from './game-rewards.ts'
 import {activation,nextPlayer,playerCount,survivors,type Player} from '../src/model.ts'
 import {gameNotices,settleRatings,notify} from './accounts.ts'
 import type {Room} from './model.ts'
@@ -9,6 +10,7 @@ export function finishUpdate(unit:UnitOfWork,room:Room,now=Date.now()) {
   if(survivors(room.state).length<=1){room.finishedAt??=now;delete room.deadline;delete room.drawOffer}
   if(room.ai)settleAiReward(room,unit.users.get(room.owner)!,now)
   else settleRatings(room,accounts(unit,room))
+  settleGameCoinNotices(room,name=>unit.users.get(name),now)
 }
 export function resetDeadline(room:Room,now=Date.now()) {
   room.deadline=now+TURN_LIMIT

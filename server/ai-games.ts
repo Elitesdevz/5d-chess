@@ -1,7 +1,7 @@
-import {AI_OPPONENTS,aiOpponent,aiPrize,type AiId,type AiDaily} from '../src/ai-model.ts'
+import {AI_OPPONENTS,aiPrize,type AiId,type AiDaily} from '../src/ai-model.ts'
 import {dayKey,nextReset} from '../src/collection.ts'
 import {survivors} from '../src/model.ts'
-import {notify,type Account} from './accounts.ts'
+import {type Account} from './accounts.ts'
 import {wallet} from './economy.ts'
 import type {Room} from './model.ts'
 import type {ChessStore} from './storage.ts'
@@ -22,6 +22,5 @@ export function settleAiReward(room:Room,account:Account,now=Date.now()){
  account.aiDaily={day:daily.day,wins:{...daily.wins,[room.ai.id]:wins+1}}
  wallet(account).coins+=coins
  room.ai.reward={coins,day:daily.day,win:wins+1}
- notify(account,{kind:'result',code:room.code,title:`You beat ${aiOpponent(room.ai.id)!.name}`,detail:`+${coins} coins. Next victory today: ${aiPrize(room.ai.id,wins+1)} coins. Your Elo is unchanged.`})
 }
 export const aiNeedsPlan=(room:Room)=>!!room.ai&&survivors(room.state).length>1&&(room.state.movement==='live'?!room.locked[room.ai.player]:room.state.turn===room.ai.player)

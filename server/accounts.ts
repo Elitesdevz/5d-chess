@@ -5,9 +5,9 @@ import {wallet,type EconomicAccount} from './economy.ts'
 import {randomBytes} from 'node:crypto'
 import {type Resolution,type State,type Player,playerCount,players,survivors} from '../src/model.ts'
 import {type Notice,type Preferences,type Profile,type Rating,type RatingPool,POOLS,poolFor} from '../src/account-model.ts'
-export interface Account extends EconomicAccount {puzzleCompleted?:number[]; aiDaily?:AiDaily; publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
+export interface Account extends EconomicAccount {puzzleCompleted?:number[]; aiDaily?:AiDaily;gameRewardDaily?:{day:string;coins:number;events:number}; publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
 export interface RatingChange {before: number; after: number; delta: number}
-export interface RatedRoom {legacyEloBackfill?:{batch:string;appliedAt:number;baseline:number};code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
+export interface RatedRoom {legacyEloBackfill?:{batch:string;appliedAt:number;baseline:number};gameRewardTotals?:Partial<Record<Player,number>>;gameSettlementCoins?:Partial<Record<Player,number>>;gameRewardNotified?:Partial<Record<Player,boolean>>;code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
 export function pruneNotices(account: Account, now=Date.now()) {
   if (account.notifications) account.notifications=account.notifications.filter(n=>n.permanent || (n.kind==='casino' && /received .* coins \(1% of profit\)/.test(n.detail)) || n.created>now-3*24*60*60*1000)
 }
@@ -96,6 +96,7 @@ export function settleRatings(room: RatedRoom, accounts: Account[]): boolean {
     if(rated){rating.value+=deltas[i];rating.games++;account.ratings[pool].value+=stats[i];account.ratings[pool].games++}
     const coins=60+(survivors(room.state).includes(p)?40:0)+Math.floor((eliminations[p]??0)*20)
     wallet(account).coins+=coins
+    room.gameSettlementCoins??={};room.gameSettlementCoins[p]=coins
     if(rated)room.ratingChanges[p]={before,after:rating.value,delta:deltas[i]}
     notify(account,{kind:rated?'rating':'result',code:room.code,title:rated?`Rating ${deltas[i]>=0?'+':''}${deltas[i]}`:'Classic reward',detail:rated?`${room.title}: ${Math.round(before)} → ${Math.round(rating.value)} Elo. +${coins} coins.`:`${room.title}: +${coins} coins. Unrated; your Elo is unchanged.`})
   }

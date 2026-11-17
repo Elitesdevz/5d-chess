@@ -834,7 +834,11 @@ export class Scene {
       const at = travelPosition(trace.points, Math.min(tick, trace.endTick))
       if (trace.collision && tick >= trace.endTick) {
         const attack=this.view.animation?.outcomes.find(o=>o.captures.some(c=>c.piece.player===trace.piece.player&&c.piece.kind===trace.piece.kind&&coordKey(c.at)===coordKey(trace.to)))
-        if(attack&&drawCapture(ctx,equippedEffect(attack.move.player,'capture',attack.move.piece.kind),at,(tick-trace.endTick)/1.8,()=>this.drawMan(ctx,trace.piece.kind,trace.piece.player,0,0,32),reduced.matches))continue
+        if(attack){
+          const capture=attack.captures.find(c=>c.piece.player===trace.piece.player&&c.piece.kind===trace.piece.kind&&coordKey(c.at)===coordKey(trace.to))
+          if(capture?.rewardCoins)this.drawCoinReward(at,capture.rewardCoins,.48+clamp((tick-trace.endTick)/1.8,0,1)*.46)
+          if(drawCapture(ctx,equippedEffect(attack.move.player,'capture',attack.move.piece.kind),at,(tick-trace.endTick)/1.8,()=>this.drawMan(ctx,trace.piece.kind,trace.piece.player,0,0,32),reduced.matches))continue
+        }
 
         const fade = Math.max(0, 1 - (tick - trace.endTick) / 1.5)
         if (fade) {
@@ -874,6 +878,7 @@ export class Scene {
         }
       }
       if(captureEffect!=='default')for(const c of captures){const at=this.squarePoint(arrival(c.at));if(p<captureArrival)this.drawMan(ctx,c.piece.kind,c.piece.player,at.x,at.y,32);else drawCapture(ctx,captureEffect,at,(p-captureArrival)/(1-captureArrival),()=>this.drawMan(ctx,c.piece.kind,c.piece.player,0,0,32),reduced.matches)}
+      for(const capture of captures)if(capture.rewardCoins){const point=this.squarePoint(arrival(capture.at));this.drawCoinReward(point,capture.rewardCoins,p)}
       if ((captures.length || status !== 'applied' || move.branch) && p > .45) {
         ctx.save()
         ctx.globalAlpha = (1 - p) * 1.8
@@ -883,5 +888,19 @@ export class Scene {
         ctx.restore()
       }
     }
+  }
+
+  private drawCoinReward(point:Point,coins:number,p:number){
+    const progress=clamp((p-.48)/.46,0,1),ctx=this.ctx,scale=1/Math.max(.015,this.camera.scale)
+    const alpha=Math.min(1,progress*8,(1-progress)*2.4)
+    if(alpha<=0)return
+    ctx.save();ctx.translate(point.x,point.y-(18+progress*24)*scale);ctx.scale(scale,scale);ctx.globalAlpha=alpha
+    ctx.fillStyle='#10180ee8';ctx.strokeStyle='#f4ce74';ctx.lineWidth=1.4
+    ctx.beginPath();ctx.roundRect(-20,-10,58,20,10);ctx.fill();ctx.stroke()
+    ctx.fillStyle='#f5c85e';ctx.strokeStyle='#fff1b9';ctx.lineWidth=1.2
+    ctx.beginPath();ctx.arc(-10,0,7,0,Math.PI*2);ctx.fill();ctx.stroke()
+    ctx.fillStyle='#9b671a';ctx.font='bold 10px ui-sans-serif,system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',-10,.5)
+    ctx.fillStyle='#fff0bd';ctx.font='700 11px ui-sans-serif,system-ui';ctx.textAlign='left';ctx.fillText(`+${coins}`,1,.5)
+    ctx.restore()
   }
 }

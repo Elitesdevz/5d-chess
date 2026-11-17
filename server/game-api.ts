@@ -9,6 +9,7 @@ import {requiredBoards} from '../src/rules.ts'
 import {legalMoves, routeKey} from '../src/moves.ts'
 import {resolveRound, sourceBudget} from '../src/resolve.ts'
 import {wallet} from './economy.ts'
+import {rewardCaptures} from './game-rewards.ts'
 import {startRatings, gameNotices, notify} from './accounts.ts'
 import {hash, verify} from './security.ts'
 import {fail, string, passwordValue} from './http.ts'
@@ -140,6 +141,7 @@ export function gameApi(store: ChessStore, unit: UnitOfWork, me: string, path: s
       room.state = result.state
       if(survivors(room.state).length<=1)room.finishedAt??=Date.now()
       room.journal.push(batch)
+      rewardCaptures(room,result,name=>unit.users.get(name),Date.now())
       room.results.push(result)
       room.locked = {}
       resetDeadline(room)

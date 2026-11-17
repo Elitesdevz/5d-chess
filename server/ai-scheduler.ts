@@ -1,5 +1,6 @@
 import {Worker} from 'node:worker_threads'
 import {aiNeedsPlan} from './ai-games.ts'
+import {rewardCaptures} from './game-rewards.ts'
 import {finishUpdate,resetDeadline} from './game-lifecycle.ts'
 import {gameNotices} from './accounts.ts'
 import {requiredBoards} from '../src/rules.ts'
@@ -54,6 +55,7 @@ export class AiScheduler {
        const result=resolveRound(room.state,checked)
        if(result.rejected.length)throw Error('AI turn rejected')
        room.state=result.state;room.results.push(result);room.journal.push(checked)
+       rewardCaptures(room,result,name=>unit.users.get(name),Date.now())
        gameNotices(room,[owner],room.seats[ai.player]!,true)
       }
       resetDeadline(room);finishUpdate(unit,room)
