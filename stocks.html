@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#121a17">
+<meta name="theme-color" content="#101918">
 <title>Stocks | 5D Chess</title>
 <link rel="icon" href="/chess/emblem.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/chess/styles.css">
@@ -13,72 +13,108 @@
 </head>
 <body data-page="stocks">
 <header class="masthead app-topbar">
-<a class="brand" id="brand-home" href="/chess/lobby.html"><img src="/chess/logo.png" width="48" height="48" alt=""><span><b>5D</b> Chess</span></a>
-<div class="account-area" id="account-area"><a class="button" href="/chess/login.html">Log in</a></div>
+  <a class="brand" id="brand-home" href="/chess/lobby.html"><img src="/chess/logo.png" width="48" height="48" alt=""><span><b>5D</b> Chess</span></a>
+  <div class="account-area" id="account-area"><a class="button" href="/chess/login.html">Log in</a></div>
 </header>
 <main class="exchange">
   <header class="exchange-hero">
-    <div><p class="exchange-label">5D Chess Exchange</p><h1>Stocks</h1><p class="exchange-intro">Trade 100 US stocks and a share of the casino with game coins.</p></div>
+    <div class="exchange-hero-copy"><p class="exchange-label">5D Chess Exchange</p><h1>Stocks<span>.</span></h1><p class="exchange-intro">Trade companies and casino shares with your game coins.</p></div>
     <div class="exchange-feed"><i></i><div><strong>Nasdaq reference prices</strong><span id="exchange-feed-time">Connecting to the exchange…</span></div></div>
   </header>
   <p id="exchange-load-error" role="status" class="exchange-load-error" hidden></p>
   <section id="exchange-app" hidden>
     <div class="exchange-summary">
-      <article><span>Cash available</span><strong id="exchange-cash"></strong></article>
-      <article><span>Holdings value</span><strong id="exchange-value"></strong></article>
-      <article><span>Unrealized return</span><strong id="exchange-gain"></strong></article>
-      <article class="exchange-summary-cas"><span>CAS dividends received</span><strong id="exchange-dividends"></strong></article>
+      <article><span>Cash available</span><strong id="exchange-cash"></strong><small>Coins in wallet</small></article>
+      <article><span>Holdings value</span><strong id="exchange-value"></strong><small id="exchange-holding-count"></small></article>
+      <article><span>Unrealized return</span><strong id="exchange-gain"></strong><small id="exchange-gain-percent"></small></article>
+      <article class="exchange-summary-cas"><span>CAS dividends</span><strong id="exchange-dividends"></strong><small>Total coins paid to you</small></article>
     </div>
-    <div class="exchange-main">
-      <div class="exchange-nav" role="group" aria-label="Exchange views">
-        <button type="button" data-exchange-view="market" aria-pressed="true">Market</button>
-        <button type="button" data-exchange-view="portfolio" aria-pressed="false">Portfolio</button>
-        <button type="button" data-exchange-view="activity" aria-pressed="false">Activity</button>
-      </div>
-      <section id="exchange-market" aria-label="Market">
+    <div class="exchange-nav" role="group" aria-label="Exchange views">
+      <button type="button" data-exchange-view="market" aria-pressed="true">Market</button>
+      <button type="button" data-exchange-view="portfolio" aria-pressed="false">Portfolio</button>
+      <button type="button" data-exchange-view="activity" aria-pressed="false">Activity</button>
+    </div>
+    <section id="exchange-market" aria-label="Market">
+      <div class="exchange-overview">
+        <section class="exchange-panel exchange-pulse">
+          <div class="exchange-section-head"><h2>Market pulse</h2><span>Latest session</span></div>
+          <div class="exchange-pulse-main">
+            <div class="exchange-breadth"><div id="exchange-breadth-label"></div><div id="exchange-breadth-track" aria-hidden="true"></div></div>
+            <div id="exchange-movers" class="exchange-movers"></div>
+          </div>
+        </section>
         <button type="button" class="exchange-cas" data-stock="CAS">
-          <span id="exchange-cas-art" class="exchange-cas-art"></span><span class="exchange-cas-copy"><small>CAS · In-game equity</small><strong>The Casino</strong><span id="exchange-cas-float"></span></span>
-          <span class="exchange-cas-price"><strong id="exchange-cas-price"></strong><span>View shares <b aria-hidden="true">›</b></span></span>
+          <span class="exchange-cas-copy"><small>CAS</small><strong>The Casino</strong><span id="exchange-cas-float"></span></span>
+          <span id="exchange-cas-art" class="exchange-cas-art"></span>
+          <span class="exchange-cas-price"><strong id="exchange-cas-price"></strong><span>Ownership &amp; shares <b aria-hidden="true">›</b></span></span>
         </button>
+      </div>
+      <section class="exchange-panel exchange-browser" aria-labelledby="exchange-browser-title">
+        <div class="exchange-section-head exchange-browser-head"><div><h2 id="exchange-browser-title">Browse stocks</h2><span>100 US companies across 11 sectors</span></div><button type="button" id="exchange-reset" hidden>Clear filters</button></div>
         <div class="exchange-filters">
-          <label class="exchange-search"><span class="exchange-search-icon" id="exchange-search-icon"></span><input type="search" id="exchange-search" placeholder="Search company or symbol" aria-label="Search company or symbol"></label>
+          <label class="exchange-search"><span class="exchange-search-icon" id="exchange-search-icon"></span><input type="search" id="exchange-search" placeholder="Search company or symbol" aria-label="Search company or symbol"><kbd aria-hidden="true">/</kbd></label>
           <select id="exchange-sector" aria-label="Sector"><option value="">All sectors</option></select>
+          <select id="exchange-move" aria-label="Daily move"><option value="">Any daily move</option><option value="up">Gaining</option><option value="down">Declining</option><option value="flat">Flat</option></select>
           <select id="exchange-sort" aria-label="Sort stocks">
-            <option value="name">Company name</option><option value="gainers">Biggest gainers</option><option value="losers">Biggest decliners</option><option value="price">Lowest price</option>
+            <option value="name">Company A–Z</option><option value="symbol">Ticker A–Z</option><option value="gainers">Largest gains</option><option value="losers">Largest declines</option><option value="price">Lowest price</option><option value="price-desc">Highest price</option>
           </select>
         </div>
+        <div class="exchange-list-tools"><div class="exchange-pills" role="group" aria-label="List scope">
+          <button type="button" data-scope="all" aria-pressed="true">All stocks</button>
+          <button type="button" data-scope="watch" aria-pressed="false">Watchlist <b id="exchange-watch-count">0</b></button>
+          <button type="button" data-scope="owned" aria-pressed="false">Owned</button>
+        </div><label class="exchange-budget"><input type="checkbox" id="exchange-budget"> Within my balance</label></div>
         <div id="exchange-market-list"></div>
-        <div class="exchange-pagination"><span id="exchange-market-count"></span><div><button type="button" id="exchange-prev" aria-label="Previous stocks">‹</button><button type="button" id="exchange-next" aria-label="Next stocks">›</button></div></div>
+        <div class="exchange-pagination"><span id="exchange-market-count" aria-live="polite"></span><div><button type="button" id="exchange-prev" aria-label="Previous stocks">‹</button><span id="exchange-page"></span><button type="button" id="exchange-next" aria-label="Next stocks">›</button></div></div>
       </section>
-      <section id="exchange-portfolio" aria-label="Portfolio" hidden></section>
-      <section id="exchange-activity" aria-label="Activity" hidden></section>
-    </div>
+    </section>
+    <section id="exchange-portfolio" class="exchange-panel exchange-account-panel" aria-label="Portfolio" hidden></section>
+    <section id="exchange-activity" class="exchange-panel exchange-account-panel" aria-label="Activity" hidden></section>
     <p class="exchange-source">US stock prices are delayed references. One US dollar of quoted price maps to one game coin. Trades use game coins and confer no ownership in real companies.</p>
   </section>
-
   <dialog class="exchange-dialog" id="exchange-stock-dialog" aria-labelledby="stock-title">
     <article>
       <form method="dialog" class="exchange-close"><button aria-label="Close stock details">×</button></form>
-      <header class="exchange-detail-header"><p class="exchange-label" id="stock-sector"></p><h2 id="stock-title"></h2><p id="stock-symbol"></p></header>
-      <div class="exchange-detail-price"><strong id="stock-price"></strong><span id="stock-change"></span></div>
-      <canvas class="exchange-chart" id="stock-chart" aria-label="Recorded price trend" role="img"></canvas>
-      <div class="exchange-chart-date"><span id="stock-chart-first"></span><span id="stock-chart-last"></span></div>
-      <div id="stock-order"></div>
+      <header class="exchange-detail-header"><span id="stock-monogram" class="stock-monogram"></span><div><p class="exchange-label" id="stock-sector"></p><h2 id="stock-title"></h2><p id="stock-symbol"></p></div><button type="button" id="stock-watch" class="exchange-watch" aria-label="Toggle watchlist" aria-pressed="false"></button></header>
+      <div class="exchange-detail-grid">
+        <section class="exchange-graph">
+          <div class="exchange-graph-top"><div class="exchange-detail-price"><strong id="stock-price"></strong><span id="stock-change"></span></div>
+            <div class="exchange-pills exchange-ranges" role="group" aria-label="Stock chart range"><button type="button" data-range="30" aria-pressed="true">1M</button><button type="button" data-range="90" aria-pressed="false">3M</button><button type="button" data-range="365" aria-pressed="false">1Y</button></div>
+          </div>
+          <p class="exchange-chart-source" id="stock-chart-status"></p>
+          <canvas class="exchange-chart" id="stock-chart" aria-label="Closing prices and trading volume. Use the left and right arrow keys to inspect dates." role="img"></canvas>
+          <p class="exchange-chart-readout" id="stock-chart-readout"></p>
+          <dl class="exchange-graph-stats" id="stock-range-stats"></dl>
+        </section>
+        <div id="stock-order"></div>
+      </div>
     </article>
   </dialog>
 
   <dialog class="exchange-dialog exchange-cas-dialog" id="exchange-cas-dialog" aria-labelledby="cas-title">
     <article>
       <form method="dialog" class="exchange-close"><button aria-label="Close casino shares">×</button></form>
-      <header class="exchange-detail-header"><p class="exchange-label">CAS · In-game equity</p><h2 id="cas-title">The Casino</h2><p id="cas-spread"></p></header>
-      <div class="exchange-detail-price"><strong id="cas-price"></strong><span id="cas-available"></span></div>
-      <canvas class="exchange-chart" id="cas-chart" aria-label="Recorded CAS share price" role="img"></canvas>
-      <div class="exchange-chart-date"><span id="cas-chart-first"></span><span id="cas-chart-last"></span></div>
-      <div id="cas-order"></div>
+      <header class="exchange-detail-header exchange-cas-header"><div><p class="exchange-label">CAS · In-game equity</p><h2 id="cas-title">The Casino</h2><p id="cas-spread"></p></div><div class="exchange-detail-price"><strong id="cas-price"></strong><span id="cas-available"></span></div></header>
+      <div class="exchange-detail-grid exchange-cas-grid">
+        <section class="exchange-cas-ownership">
+          <div class="exchange-section-head"><h3>Ownership</h3><span id="cas-total-shares"></span></div>
+          <div class="exchange-ownership">
+            <div class="exchange-pie" aria-hidden="true"><div class="exchange-pie-core"><strong id="cas-pie-value"></strong><small id="cas-pie-label"></small></div></div>
+            <div class="exchange-ownership-list" aria-label="Ownership breakdown"></div>
+          </div>
+          <p class="exchange-muted" id="cas-float-note"></p>
+        </section>
+        <div id="cas-order"></div>
+      </div>
       <div class="casino-share-data">
-        <section><h3>Ownership</h3><div class="exchange-ownership"></div><div class="exchange-ownership-list"></div></section>
-        <section><h3>Dividends</h3><p>At Dutch midnight, 10% of positive house margin after a 30% cost deduction is allocated across the public float. Only shares held by players receive a payout.</p><dl id="cas-dividends"></dl></section>
-        <section><h3>Private equity</h3><p>Private equity periodically sells shares into the public market or buys from available shares. Its stake stays between 15% and 30%.</p><div id="cas-moves"></div></section>
+        <section class="exchange-graph"><div class="exchange-section-head"><h3>Share price</h3><span>In-game orders</span></div>
+          <canvas class="exchange-chart" id="cas-chart" aria-label="CAS price history. Use the left and right arrow keys to inspect prices." role="img"></canvas>
+          <p class="exchange-chart-readout" id="cas-chart-readout"></p>
+        </section>
+        <div class="exchange-cas-ledgers">
+          <section><h3>Dividends</h3><p>At midnight in the Netherlands, 10% of positive house margin after a 30% cost deduction is allocated across the public float. Player-held shares receive their portion.</p><dl id="cas-dividends"></dl></section>
+          <section><h3>Private equity</h3><p>Private equity trades with the public pool to keep its stake between 15% and 30%.</p><div id="cas-moves"></div></section>
+        </div>
       </div>
     </article>
   </dialog>

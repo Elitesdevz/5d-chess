@@ -43,6 +43,15 @@ export function createApplication(store: ChessStore) {
         checkOrigin(req)
         const method = req.method || 'GET'
         if (path === '/api/health' && method === 'GET') {store.ready(); json(res,200,{ok: true, storageSchema: STORAGE_SCHEMA}); return}
+        if (path === '/api/stocks/trends' && method === 'GET'){
+          actor=user(store,req)??fail(401,'Log in first')
+          const symbols=[...new Set((url.searchParams.get('symbols')??'').split(','))]
+          if(symbols.length>3)fail(400,'Choose up to three stocks')
+          const data=await Promise.allSettled(symbols.map(async symbol=>[symbol,(await stockHistory.get(symbol)).slice(-22)] as const))
+          const trends=Object.fromEntries(data.flatMap(item=>item.status==='fulfilled'?[item.value]:[]))
+          json(res,200,{trends})
+          return
+        }
         if (path === '/api/stocks/history' && method === 'GET'){
           actor=user(store,req)??fail(401,'Log in first')
           const points=await stockHistory.get(url.searchParams.get('symbol')??'')
