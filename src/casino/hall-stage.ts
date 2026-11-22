@@ -378,7 +378,9 @@ export class HallStage {
     if(index===undefined||!receipt?.won||!table?.spin||this.reduced)return
     const t=(now-table.spin.ends)/1000
     if(t<0||t>2.8)return
-    const count=typeof receipt.choice==='number'?72:27,site=TABLES[index],geometry=this.celebration.geometry
+    const count=receipt.choice===0?72:typeof receipt.choice==='number'?49:27
+    const site=TABLES[index],geometry=this.celebration.geometry
+    this.celebration.material.color.set(receipt.choice===0?0xf0bdff:0xffca77)
     geometry.setDrawRange(0,count)
     this.celebration.visible=true
     this.celebration.material.opacity=Math.max(0,.92*(1-t/2.8))
