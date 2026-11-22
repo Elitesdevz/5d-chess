@@ -1,0 +1,151 @@
+body[data-page="stocks"] {
+  --stock-bg:#111a17;
+  --stock-card:#192620;
+  --stock-soft:#21312a;
+  --stock-ink:#f3f3e8;
+  --stock-muted:#a9b9ad;
+  --stock-green:#9dd8b1;
+  --stock-red:#ecad9d;
+  --stock-gold:#efc883;
+  --stock-border:#a4c6aa32;
+  background:#111a17;
+  color:var(--stock-ink);
+}
+.exchange {width:min(1090px,calc(100% - 38px));margin:0 auto;padding:35px 0 22px}
+.exchange [hidden] {display:none!important}
+.exchange button,.exchange input,.exchange select {font:inherit;color:inherit}
+.exchange button {cursor:pointer}
+.exchange button:disabled {cursor:default;opacity:.49}
+.exchange :is(button,input,select,a,summary):focus-visible {outline:2px solid #b3e5be;outline-offset:2px}
+.exchange .icon {width:18px;height:18px;vertical-align:middle}
+.exchange-hero {position:relative;display:flex;justify-content:space-between;align-items:flex-end;gap:20px;padding:12px 3px 25px;border-bottom:1px solid var(--stock-border);overflow:hidden}
+.exchange-hero::before {content:"";position:absolute;z-index:-1;inset:-27% -10% -40% 26%;background:radial-gradient(ellipse at 85% 73%,#47735a3f,transparent 65%),repeating-linear-gradient(90deg,#85a39016 0 1px,transparent 1px 58px);mask-image:linear-gradient(90deg,transparent,#0006)}
+.exchange-label {margin:0;color:var(--stock-green);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+.exchange-hero h1,.exchange-detail-header h2 {margin:.08em 0;font:normal clamp(43px,7vw,74px)/1 Georgia,serif;letter-spacing:-.045em}
+.exchange-intro {margin:10px 0 0;color:var(--stock-muted);font-size:14px;line-height:1.45}
+.exchange-feed {display:flex;align-items:center;gap:9px;padding:9px 12px;background:#192a23;border:1px solid var(--stock-border);border-radius:8px;min-width:192px;font-size:12px}
+.exchange-feed i {height:7px;width:7px;background:#85e1ae;border-radius:50%;box-shadow:0 0 11px #85e1ae80;flex:none}
+.exchange-feed strong,.exchange-feed span {display:block}
+.exchange-feed span {color:var(--stock-muted);font-size:10px;margin-top:2px;line-height:1.4}
+.exchange-summary {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin:14px 0}
+.exchange-summary article {display:grid;gap:5px;min-width:0;padding:13px 15px;background:var(--stock-card);border:1px solid var(--stock-border);border-radius:9px}
+.exchange-summary span {color:var(--stock-muted);font-size:12px}
+.exchange-summary strong {font:normal clamp(19px,3vw,28px)/1.15 Georgia,serif;color:#f0f6ed;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.exchange-summary .exchange-summary-cas {background:linear-gradient(110deg,#2c2920,#23251e);border-color:#e0bb773e}
+.exchange-summary-cas strong {color:var(--stock-gold)}
+.exchange .is-gain {color:var(--stock-green)}
+.exchange .is-loss {color:var(--stock-red)}
+.exchange-main {background:linear-gradient(140deg,#18251f,#14201a 56%);border:1px solid var(--stock-border);border-radius:13px;padding:13px 16px 6px;box-shadow:0 9px 42px #080e0a43}
+.exchange-nav {display:flex;gap:6px;border-bottom:1px solid var(--stock-border);padding:0 0 10px;margin:0 0 13px}
+.exchange-nav button {background:transparent;border:1px solid transparent;border-radius:6px;padding:7px 14px;color:var(--stock-muted);font-size:13px;font-weight:650}
+.exchange-nav button[aria-pressed="true"] {background:#284439;border-color:#8cc9a54a;color:#d9f4e3}
+.exchange-cas {width:100%;text-align:left;display:grid;grid-template-columns:53px minmax(0,1fr) auto;align-items:center;gap:13px;margin:0 0 12px;padding:12px 15px;background:radial-gradient(ellipse at 6% 90%,#79613c45,transparent 45%),linear-gradient(115deg,#382f20,#21271d 69%);border-radius:9px;border:1px solid #ddb67975;box-shadow:0 2px 9px #0003}
+.exchange-cas:hover {border-color:#edc886;background:linear-gradient(115deg,#4c3d26,#263224 80%)}
+.exchange-cas-art {width:50px;height:50px;display:grid;place-items:center;color:#efc883;border:1px solid #ddb67988;background:#271f17;border-radius:50%;box-shadow:inset 0 0 0 3px #322c21,inset 0 0 0 4px #deb6784a}
+.exchange-cas-art .icon {width:23px;height:23px}
+.exchange-cas-copy,.exchange-cas-price {display:grid;gap:3px;min-width:0}
+.exchange-cas-copy small {color:#efcb92;letter-spacing:.07em;font-weight:750;font-size:10px;text-transform:uppercase}
+.exchange-cas-copy strong {font:24px/1 Georgia,serif;color:#f6e7ca}
+.exchange-cas-copy>span,.exchange-cas-price span {color:#cfc7ad;font-size:11px}
+.exchange-cas-price {text-align:right;color:var(--stock-gold)}
+.exchange-cas-price strong {font:21px Georgia,serif;white-space:nowrap}
+.exchange-filters {display:grid;grid-template-columns:1fr minmax(124px,22%) minmax(140px,22%);gap:7px;margin-bottom:9px}
+.exchange-search {display:flex;align-items:center;gap:6px;padding:0 8px;min-width:0}
+.exchange-filters :is(.exchange-search,select) {background:#111e18;border:1px solid var(--stock-border);border-radius:6px;min-width:0;min-height:38px}
+.exchange-search-icon {display:grid;place-items:center;color:#91be9d}
+.exchange-search input {width:100%;min-width:0;border:0;background:none;padding:5px;font-size:13px}
+.exchange-search input::placeholder {color:#a2b2a6}
+.exchange-filters select {padding:7px 9px;font-size:13px;color:#d9e5da}
+.exchange-table-heading,.exchange-stock-row {display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1.05fr) minmax(72px,.5fr) minmax(62px,.48fr) 14px;align-items:center;gap:10px;text-align:left}
+.exchange-table-heading {color:#a7b9ab;text-transform:uppercase;font-size:10px;letter-spacing:.09em;padding:7px 10px}
+.exchange-table-heading span:nth-child(3),.exchange-table-heading span:nth-child(4),.exchange-stock-row>strong,.exchange-stock-row>b {text-align:right}
+.exchange-stock-row {width:100%;min-height:43px;padding:7px 10px;background:transparent;border:0;border-top:1px solid var(--stock-border);font-size:13px!important;font-variant-numeric:tabular-nums}
+.exchange-stock-row:hover {background:#294437;border-radius:6px}
+.exchange-company {display:flex;align-items:center;gap:10px;min-width:0}
+.exchange-company b {min-width:52px;color:#b8e3c3}
+.exchange-company span,.exchange-sector-name {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exchange-sector-name,.exchange-stock-row>span:last-child {color:#aab9ad}
+.exchange-pagination {display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;color:var(--stock-muted);font-size:12px}
+.exchange-pagination>div {display:flex;gap:5px}
+.exchange-pagination button {width:32px;height:31px;border-radius:5px;background:#20372b;border:1px solid var(--stock-border);font-size:19px;line-height:1}
+.exchange-source {font-size:11px;padding:0 2px;color:var(--stock-muted);line-height:1.5}
+.exchange-empty,.exchange-load-error {padding:15px 4px;color:var(--stock-muted);font-size:14px;line-height:1.4}
+.exchange-load-error a {color:var(--stock-green)}
+.exchange-ledger {list-style:none;margin:0;padding:0}
+.exchange-ledger li {display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 7px;border-bottom:1px solid var(--stock-border);font-size:14px}
+.exchange-ledger li small {display:block;color:var(--stock-muted);font-size:11px;margin-top:2px}
+.exchange-dialog {width:min(530px,calc(100% - 26px));max-height:calc(100svh - 28px);overflow:auto;color:var(--stock-ink);background:#18281f;border:1px solid #86aa8b72;border-radius:13px;padding:20px;box-shadow:0 14px 68px #000b;scrollbar-width:thin;scrollbar-color:#66846e #18281f}
+.exchange-dialog::backdrop {background:#090e0bd4}
+.exchange-dialog article {position:relative}
+.exchange-cas-dialog {width:min(640px,calc(100% - 26px));background:linear-gradient(132deg,#2e2a1f,#1b2720 44%);border-color:#ddb67988}
+.exchange-cas-dialog .exchange-label {color:var(--stock-gold)}
+.exchange-close {position:absolute;right:0;top:0}
+.exchange-close button {width:31px;height:31px;line-height:1;border:1px solid var(--stock-border);background:#111b15;border-radius:6px;font-size:22px}
+.exchange-detail-header {padding-right:33px}
+.exchange-detail-header h2 {font-size:clamp(30px,7vw,49px)}
+.exchange-detail-header p:last-child {color:var(--stock-muted);font-size:12px;margin:6px 0 0}
+.exchange-detail-price {display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-top:16px}
+.exchange-detail-price strong {font:25px Georgia,serif}
+.exchange-detail-price>span {color:var(--stock-muted);font-size:12px}
+.exchange-chart {display:block;width:100%;height:104px;margin:8px 0 0}
+.exchange-chart-date {display:flex;justify-content:space-between;color:var(--stock-muted);font-size:10px;min-height:13px}
+.exchange-ticket {margin:12px 0 0;padding:10px;border-radius:9px;background:#102017;border:1px solid var(--stock-border);display:grid;gap:8px}
+.exchange-sides {display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.exchange-sides button {border:1px solid transparent;border-radius:5px;padding:6px;background:#1b2d23;color:#b8c7bb;font-size:13px;font-weight:700}
+.exchange-sides button[aria-pressed=true] {background:#2b4b3a;border-color:#a0d6af80;color:#ddf7e3}
+.exchange-sides button[data-side=sell][aria-pressed=true] {background:#542e2c;border-color:#dcab9680;color:#f6d6cb}
+.exchange-quantity {display:flex;align-items:center;justify-content:space-between;gap:8px}
+.exchange-quantity label {display:flex;align-items:center;gap:7px;font-size:12px}
+.exchange-quantity input {width:82px;padding:6px;border:1px solid var(--stock-border);background:#0c1913;border-radius:5px}
+.exchange-quantity small {color:var(--stock-muted);font-size:10px;text-align:right}
+.exchange-ticket-total {display:flex;align-items:center;justify-content:space-between;gap:9px;font-size:10px;color:var(--stock-muted)}
+.exchange-ticket-total strong {display:block;color:#f2f6eb;font-size:16px}
+.exchange-ticket-total button {padding:8px 15px;background:#a7d5ae;color:#14241a;border:1px solid #e0f3dd;border-radius:6px;font-size:13px;font-weight:800}
+.exchange-cas-dialog .exchange-ticket-total button {background:#e7bf83;border-color:#ffe1ac;color:#302317}
+.exchange-order-message {font-size:12px;margin:0;color:var(--stock-green)}
+.casino-share-data {display:grid;grid-template-columns:1.1fr 1fr;gap:9px;margin-top:10px}
+.casino-share-data section {padding:10px;border:1px solid var(--stock-border);background:#121e17;border-radius:7px;min-width:0}
+.casino-share-data section:last-child {grid-column:1/-1}
+.casino-share-data h3 {font:19px Georgia,serif;margin:0 0 6px;color:#f4e2c3}
+.casino-share-data p {color:var(--stock-muted);margin:0 0 5px;font-size:11px;line-height:1.45}
+.exchange-ownership {display:flex;gap:2px;height:8px;border-radius:4px;overflow:hidden;margin:6px 0 8px}
+.exchange-ownership-list div,.casino-share-data dl div,.cas-move {display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 0;font-size:11px}
+.exchange-ownership-list div>span {display:flex;align-items:center;gap:5px;color:#d3dacf}
+.exchange-ownership-list i {height:7px;width:7px;border-radius:2px}
+.casino-share-data dl {margin:6px 0 0;color:#d3dacf}
+.casino-share-data dt,.cas-move span {color:var(--stock-muted)}
+.casino-share-data dd {margin:0;text-align:right}
+@media(max-width:650px) {
+  .exchange {width:calc(100% - 20px);padding-top:18px}
+  .exchange-hero {display:grid;gap:10px;padding-bottom:12px}
+  .exchange-hero h1 {font-size:52px}
+  .exchange-intro {margin-top:6px;font-size:13px}
+  .exchange-feed {justify-self:start;padding:6px 8px}
+  .exchange-summary {grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin:8px 0}
+  .exchange-summary article {padding:8px 9px;gap:3px}
+  .exchange-summary span {font-size:11px}
+  .exchange-main {padding:8px}
+  .exchange-nav {padding-bottom:6px;margin-bottom:7px}
+  .exchange-nav button {padding:6px 12px;font-size:12px}
+  .exchange-cas {grid-template-columns:39px minmax(0,1fr) auto;gap:7px;padding:8px;margin-bottom:7px}
+  .exchange-cas-art {width:37px;height:37px}
+  .exchange-cas-art .icon {width:18px;height:18px}
+  .exchange-cas-copy strong {font-size:20px}
+  .exchange-cas-copy small,.exchange-cas-copy>span,.exchange-cas-price span {font-size:9px}
+  .exchange-cas-price strong {font-size:16px}
+  .exchange-filters {grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px}
+  .exchange-search {grid-column:1/-1}
+  .exchange-filters :is(select,.exchange-search) {min-height:34px;font-size:12px}
+  .exchange-table-heading,.exchange-stock-row {grid-template-columns:minmax(0,1.4fr) minmax(43px,.46fr) minmax(43px,.43fr) 9px;gap:5px;padding-inline:5px}
+  .exchange-holdings {grid-template-columns:minmax(0,1.35fr) minmax(33px,.4fr) minmax(45px,.47fr) minmax(43px,.43fr) 9px}
+  .exchange-table-heading:not(.exchange-holdings) span:nth-child(2),.exchange-sector-name {display:none}
+  .exchange-company {display:grid;gap:1px}
+  .exchange-company b {min-width:0}
+  .exchange-company span {font-size:10px}
+  .exchange-stock-row {font-size:11px!important}
+  .exchange-dialog {padding:12px}
+  .exchange-chart {height:83px}
+}
+@media(max-width:360px) {
+  .casino-share-data {grid-template-columns:1fr}
+}

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#121a17">
+<title>Stocks | 5D Chess</title>
+<link rel="icon" href="/chess/emblem.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/chess/styles.css">
+<link rel="stylesheet" href="/chess/shell.css">
+<link rel="stylesheet" href="/chess/stocks.css">
+<script type="module" src="/chess/stocks.js"></script>
+</head>
+<body data-page="stocks">
+<header class="masthead app-topbar">
+<a class="brand" id="brand-home" href="/chess/lobby.html"><img src="/chess/logo.png" width="48" height="48" alt=""><span><b>5D</b> Chess</span></a>
+<div class="account-area" id="account-area"><a class="button" href="/chess/login.html">Log in</a></div>
+</header>
+<main class="exchange">
+  <header class="exchange-hero">
+    <div><p class="exchange-label">5D Chess Exchange</p><h1>Stocks</h1><p class="exchange-intro">Trade 100 US stocks and a share of the casino with game coins.</p></div>
+    <div class="exchange-feed"><i></i><div><strong>Nasdaq reference prices</strong><span id="exchange-feed-time">Connecting to the exchange…</span></div></div>
+  </header>
+  <p id="exchange-load-error" role="status" class="exchange-load-error" hidden></p>
+  <section id="exchange-app" hidden>
+    <div class="exchange-summary">
+      <article><span>Cash available</span><strong id="exchange-cash"></strong></article>
+      <article><span>Holdings value</span><strong id="exchange-value"></strong></article>
+      <article><span>Unrealized return</span><strong id="exchange-gain"></strong></article>
+      <article class="exchange-summary-cas"><span>CAS dividends received</span><strong id="exchange-dividends"></strong></article>
+    </div>
+    <div class="exchange-main">
+      <div class="exchange-nav" role="group" aria-label="Exchange views">
+        <button type="button" data-exchange-view="market" aria-pressed="true">Market</button>
+        <button type="button" data-exchange-view="portfolio" aria-pressed="false">Portfolio</button>
+        <button type="button" data-exchange-view="activity" aria-pressed="false">Activity</button>
+      </div>
+      <section id="exchange-market" aria-label="Market">
+        <button type="button" class="exchange-cas" data-stock="CAS">
+          <span id="exchange-cas-art" class="exchange-cas-art"></span><span class="exchange-cas-copy"><small>CAS · In-game equity</small><strong>The Casino</strong><span id="exchange-cas-float"></span></span>
+          <span class="exchange-cas-price"><strong id="exchange-cas-price"></strong><span>View shares <b aria-hidden="true">›</b></span></span>
+        </button>
+        <div class="exchange-filters">
+          <label class="exchange-search"><span class="exchange-search-icon" id="exchange-search-icon"></span><input type="search" id="exchange-search" placeholder="Search company or symbol" aria-label="Search company or symbol"></label>
+          <select id="exchange-sector" aria-label="Sector"><option value="">All sectors</option></select>
+          <select id="exchange-sort" aria-label="Sort stocks">
+            <option value="name">Company name</option><option value="gainers">Biggest gainers</option><option value="losers">Biggest decliners</option><option value="price">Lowest price</option>
+          </select>
+        </div>
+        <div id="exchange-market-list"></div>
+        <div class="exchange-pagination"><span id="exchange-market-count"></span><div><button type="button" id="exchange-prev" aria-label="Previous stocks">‹</button><button type="button" id="exchange-next" aria-label="Next stocks">›</button></div></div>
+      </section>
+      <section id="exchange-portfolio" aria-label="Portfolio" hidden></section>
+      <section id="exchange-activity" aria-label="Activity" hidden></section>
+    </div>
+    <p class="exchange-source">US stock prices are delayed references. One US dollar of quoted price maps to one game coin. Trades use game coins and confer no ownership in real companies.</p>
+  </section>
+
+  <dialog class="exchange-dialog" id="exchange-stock-dialog" aria-labelledby="stock-title">
+    <article>
+      <form method="dialog" class="exchange-close"><button aria-label="Close stock details">×</button></form>
+      <header class="exchange-detail-header"><p class="exchange-label" id="stock-sector"></p><h2 id="stock-title"></h2><p id="stock-symbol"></p></header>
+      <div class="exchange-detail-price"><strong id="stock-price"></strong><span id="stock-change"></span></div>
+      <canvas class="exchange-chart" id="stock-chart" aria-label="Recorded price trend" role="img"></canvas>
+      <div class="exchange-chart-date"><span id="stock-chart-first"></span><span id="stock-chart-last"></span></div>
+      <div id="stock-order"></div>
+    </article>
+  </dialog>
+
+  <dialog class="exchange-dialog exchange-cas-dialog" id="exchange-cas-dialog" aria-labelledby="cas-title">
+    <article>
+      <form method="dialog" class="exchange-close"><button aria-label="Close casino shares">×</button></form>
+      <header class="exchange-detail-header"><p class="exchange-label">CAS · In-game equity</p><h2 id="cas-title">The Casino</h2><p id="cas-spread"></p></header>
+      <div class="exchange-detail-price"><strong id="cas-price"></strong><span id="cas-available"></span></div>
+      <canvas class="exchange-chart" id="cas-chart" aria-label="Recorded CAS share price" role="img"></canvas>
+      <div class="exchange-chart-date"><span id="cas-chart-first"></span><span id="cas-chart-last"></span></div>
+      <div id="cas-order"></div>
+      <div class="casino-share-data">
+        <section><h3>Ownership</h3><div class="exchange-ownership"></div><div class="exchange-ownership-list"></div></section>
+        <section><h3>Dividends</h3><p>At Dutch midnight, 10% of positive house margin after a 30% cost deduction is allocated across the public float. Only shares held by players receive a payout.</p><dl id="cas-dividends"></dl></section>
+        <section><h3>Private equity</h3><p>Private equity periodically sells shares into the public market or buys from available shares. Its stake stays between 15% and 30%.</p><div id="cas-moves"></div></section>
+      </div>
+    </article>
+  </dialog>
+</main>
+</body>
+</html>
