@@ -1,3 +1,5 @@
+import {casState} from './cas-shares.ts'
+import {startStockQuotes} from './stock-quotes.ts'
 import {maintainGames} from './game-lifecycle.ts'
 import {createServer} from 'node:http'
 import type {Socket} from 'node:net'
@@ -19,13 +21,17 @@ refreshValuation()
 const maintain=()=>{try{store.transaction(unit=>maintainGames(store,unit))}catch{console.error('Game deadline check deferred')}}
 maintain()
 const gameTimer=setInterval(maintain,60_000);gameTimer.unref()
+const stopStockQuotes=startStockQuotes(store)
+const maintainShares=()=>{try{store.transaction(unit=>casState(unit,Date.now()))}catch{console.error('Casino share maintenance deferred')}}
+maintainShares()
+const sharesTimer=setInterval(maintainShares,30_000);sharesTimer.unref()
 const application = createApplication(store)
 const server = createServer(application.handle)
 const sockets = new Set<Socket>()
 server.on('connection', socket => {sockets.add(socket); socket.once('close',()=>sockets.delete(socket))})
 const port = Number(process.env.PORT || 4174), host = process.env.HOST || '127.0.0.1'
 server.listen(port,host,()=>console.log(`Multiverse server · http://${host}:${port}/chess/`))
-server.once('error', error => {store.close(); console.error(error); process.exitCode=1})
+server.once('error', error => {stopStockQuotes();store.close(); console.error(error); process.exitCode=1})
 
 let stopping = false
 function shutdown(): void {
@@ -33,6 +39,8 @@ function shutdown(): void {
   stopping = true
   clearTimeout(midnightTimer)
   clearInterval(gameTimer)
+  clearInterval(sharesTimer)
+  stopStockQuotes()
   application.drain()
   // Finish responses before closing storage. Transactions themselves never await.
   server.close(()=>{store.close()})

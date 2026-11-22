@@ -3,6 +3,7 @@ import type {ChessStore} from './storage.ts'
 import {casinoView,reserveRouletteStake,rouletteResult,settleReservedRoulette,validateBet} from './casino.ts'
 import {CASINO_OWNER,type CasinoBet,type CasinoRound} from '../src/casino-model.ts'
 import {BET_WINDOW,COUCH_SEATS,HALL_CAPACITY,LOUNGES,RESULT_TIME,SEAT_OFFSETS,SPAWN,SPIN_TIME,TABLES,WALK_SPEED,chairPosition,loungePosition,walk,type HallPlayer,type HallSpin,type HallTable,type HallView,type TablePrize} from '../src/roulette-hall-model.ts'
+import {recordCasinoMargins} from './cas-shares.ts'
 import {fail} from './http.ts'
 
 const ESCROW='rouletteHallEscrow'
@@ -56,6 +57,7 @@ export class RouletteHall {
         rounds.set(ticket.name,settleReservedRoulette(account,accounts,ticket.bet,pocket,now))
       }
       for(const account of accounts)if(!unit.findAccount(account.name))unit.users.add(account.name,account)
+      recordCasinoMargins(unit,rounds.values(),now)
       this.store.putMetadata(ESCROW,remaining)
       return rounds
     })

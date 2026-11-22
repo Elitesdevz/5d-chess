@@ -12,6 +12,7 @@ import {economyApi} from './economy-api.ts'
 import {gameApi} from './game-api.ts'
 import {eloApi} from './elo-gambling.ts'
 import {RouletteHall} from './roulette-hall.ts'
+import {stockApi} from './stock-api.ts'
 import {casinoApi} from './casino-api.ts'
 import {ensureAccount,pruneNotices} from './accounts.ts'
 import {staticFile} from './static.ts'
@@ -63,6 +64,7 @@ export function createApplication(store: ChessStore) {
             ?? economyApi(unit,account,path,method,data)
             ?? eloApi(unit,store,account,path,method,data)
             ?? casinoApi(unit,account,path,method,data)
+            ?? stockApi(unit,account,path,method,data)
             ?? gameApi(store,unit,me,path,method,data)
             ?? fail(404,'Not found')
         })
