@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto'
 import type {ChessStore} from './storage.ts'
 import {casinoView,reserveRouletteStake,rouletteResult,settleReservedRoulette,validateBet} from './casino.ts'
 import {CASINO_OWNER,type CasinoBet,type CasinoRound} from '../src/casino-model.ts'
-import {BET_WINDOW,HALL_CAPACITY,RESULT_TIME,SEAT_OFFSETS,SPAWN,SPIN_TIME,TABLES,WALK_SPEED,chairPosition,walk,type HallPlayer,type HallSpin,type HallTable,type HallView,type TablePrize} from '../src/roulette-hall-model.ts'
+import {BET_WINDOW,COUCH_SEATS,HALL_CAPACITY,LOUNGES,RESULT_TIME,SEAT_OFFSETS,SPAWN,SPIN_TIME,TABLES,WALK_SPEED,chairPosition,loungePosition,walk,type HallPlayer,type HallSpin,type HallTable,type HallView,type TablePrize} from '../src/roulette-hall-model.ts'
 import {fail} from './http.ts'
 
 const ESCROW='rouletteHallEscrow'
@@ -13,7 +13,7 @@ type Member=HallPlayer&{seen:number;moved:number}
 type Table={round:string;until:number;recent:number[];spin?:HallSpin;prizes?:TablePrize[];receipts?:Map<string,CasinoRound>}
 type Room={id:string;players:Map<string,Member>;tables:Table[]}
 const newTable=():Table=>({round:randomUUID(),until:0,recent:[]})
-const publicMember=({name,avatar,x,z,yaw,chair,online}:Member):HallPlayer=>({name,avatar,x,z,yaw,chair,online})
+const publicMember=({name,avatar,x,z,yaw,chair,lounge,online}:Member):HallPlayer=>({name,avatar,x,z,yaw,chair,lounge,online})
 
 export class RouletteHall {
   private rooms=new Map<string,Room>()
@@ -111,12 +111,12 @@ export class RouletteHall {
     const locked=pending?.tickets.find(ticket=>ticket.name===name)
     if(action==='presence'){
       const {x,z,yaw}=data
-      if(!me.chair&&data.room===room.id&&typeof x==='number'&&typeof z==='number'&&typeof yaw==='number'&&Number.isFinite(x)&&Number.isFinite(z)&&Number.isFinite(yaw)){
+      if(!me.chair&&!me.lounge&&data.room===room.id&&typeof x==='number'&&typeof z==='number'&&typeof yaw==='number'&&Number.isFinite(x)&&Number.isFinite(z)&&Number.isFinite(yaw)){
         Object.assign(me,walk(me,x,z,WALK_SPEED*Math.min(1.5,Math.max(0,(now-me.moved)/1000))),{yaw:Math.atan2(Math.sin(yaw),Math.cos(yaw))})
       }
       me.moved=now
     }else if(action==='sit'){
-      if(me.chair)fail(409,'Stand up before changing tables')
+      if(me.chair||me.lounge)fail(409,'Stand up before changing seats')
       const index=data.table
       if(typeof index!=='number'||!Number.isInteger(index)||!room.tables[index])fail(400,'Choose a table')
       const target=room.tables[index]
@@ -127,12 +127,24 @@ export class RouletteHall {
       me.chair={table:index,index:available[0]}
       Object.assign(me,chairPosition(me.chair))
       if(!target.until)target.until=now+BET_WINDOW
+    }else if(action==='lounge'){
+      if(me.chair||me.lounge)fail(409,'Stand up before changing seats')
+      const couch=data.couch
+      if(typeof couch!=='number'||!Number.isInteger(couch)||!LOUNGES[couch])fail(400,'Choose a couch')
+      const taken=new Set([...room.players.values()].filter(p=>p.lounge?.couch===couch).map(p=>p.lounge!.index))
+      const index=[1,0,2].find(i=>!taken.has(i)&&i<COUCH_SEATS.length)
+      if(index===undefined)fail(409,'This couch is full')
+      me.lounge={couch,index}
+      Object.assign(me,loungePosition(me.lounge))
     }else if(action==='stand'){
       if(locked)fail(409,'Your bet is locked until the wheel spins')
       if(me.chair&&table?.spin&&now<table.spin.ends)fail(409,'Wait for the wheel to land')
       if(me.chair){
         Object.assign(me,{z:me.z+.63,moved:now})
         me.chair=undefined
+      }else if(me.lounge){
+        Object.assign(me,loungePosition(me.lounge,true),{moved:now})
+        me.lounge=undefined
       }
     }else if(action==='bet'){
       if(!me.chair||!table||!table.until||data.round!==table.round)fail(409,'Betting has closed for this round')

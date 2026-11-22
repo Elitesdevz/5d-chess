@@ -1,6 +1,6 @@
 import * as T from 'three'
 import {ROULETTE_ORDER,pocketColor} from '../casino-model.ts'
-import {SEAT_OFFSETS,TABLES} from '../roulette-hall-model.ts'
+import {LOUNGES,SEAT_OFFSETS,TABLES} from '../roulette-hall-model.ts'
 import {box,cylinder,limb,mesh,v} from './scene/geometry.ts'
 import {batchStatic} from './scene/static-batch.ts'
 
@@ -174,8 +174,7 @@ export function buildHall(scene:T.Scene){
     scene.add(light(0xffcf91,44,9,x,3.75,z))
   }
   scene.add(light(0x95c8ec,40,14,0,3,-5.8))
-  lounge(architecture,-9.65,2.75,-Math.PI/2);lounge(architecture,9.65,2.75,Math.PI/2)
-  lounge(architecture,-8,6.7,0);lounge(architecture,8,6.7,0)
+  for(const site of LOUNGES)lounge(architecture,site.x,site.z,site.yaw)
   for(const [x,z] of [[-9.5,-5.3],[9.5,-5.3],[-10,5.8],[10,5.8]])plant(architecture,x,z)
   const bar=new T.Group();bar.position.set(0,0,8.23);scene.add(bar)
   box(bar,[7.6,1,.66],[0,.50,0],oak,.075);box(bar,[7.86,.08,.77],[0,1.03,0],brass,.038)

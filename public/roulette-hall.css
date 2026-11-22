@@ -199,3 +199,14 @@ body[data-casino="roulette"] #casino-root {
 @media (prefers-reduced-motion:reduce) {
   .hall-progress i,.hall-result {animation:none;transition:none}
 }
+.hall-world-lounge i {background:#e6c288;box-shadow:0 0 9px #e6c288}
+.hall-lounge-list {margin-top:8px;border-top:1px solid var(--hall-line);padding-top:7px}
+.hall-directory.is-collapsed .hall-lounge-list {display:none}
+.hall-lounge-list summary {color:#e7c58e;font-size:12px;cursor:pointer}
+.hall-lounge-list button {display:flex;justify-content:space-between;align-items:center;width:100%;margin-top:4px;padding:5px 8px;background:#21342d;border:1px solid #a58a6357;border-radius:5px;font-size:12px;text-align:left}
+.hall-lounge-list button:hover:not(:disabled) {border-color:var(--hall-gold)}
+.hall-lounge-list button small {color:#afc4b8}
+.hall-lounge-card {position:absolute;z-index:4;bottom:22px;left:50%;transform:translateX(-50%);width:min(320px,calc(100% - 25px));display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px}
+.hall-lounge-card small {display:block;color:var(--hall-gold);letter-spacing:.16em;font-size:9px}
+.hall-lounge-card strong {font:20px Georgia,serif}
+.hall-lounge-card button {background:#253c32;border:1px solid var(--hall-line);border-radius:6px;padding:7px 11px}

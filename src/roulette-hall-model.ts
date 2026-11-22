@@ -11,10 +11,22 @@ export const TABLES = [
   {name:'Obsidian',x:5,z:-3.4,color:'#9bc9d7'},
   {name:'The Rift',x:0,z:2.1,color:'#cbb0e4'},
 ] as const
+export const LOUNGES=[
+  {name:'West lounge',x:-9.65,z:2.75,yaw:-Math.PI/2},
+  {name:'East lounge',x:9.65,z:2.75,yaw:Math.PI/2},
+  {name:'West bar couch',x:-8,z:6.7,yaw:0},
+  {name:'East bar couch',x:8,z:6.7,yaw:0},
+] as const
+export const COUCH_SEATS=[-.82,0,.82]
+export type LoungeSeat={couch:number;index:number}
+export function loungePosition({couch,index}:LoungeSeat,stand=false):Position {
+  const site=LOUNGES[couch],offset=COUCH_SEATS[index],a=site.yaw,d=stand?1.47:0
+  return {x:site.x+Math.cos(a)*offset-Math.sin(a)*d,z:site.z-Math.sin(a)*offset-Math.cos(a)*d,yaw:a}
+}
 export const SEAT_OFFSETS = [-1.7,-.57,.57,1.7]
 export type Position = {x:number;z:number;yaw:number}
 export type Chair = {table:number;index:number}
-export type HallPlayer = Position & {name:string;avatar:string;chair?:Chair;online:boolean}
+export type HallPlayer = Position & {name:string;avatar:string;chair?:Chair;lounge?:LoungeSeat;online:boolean}
 export type TablePrize = {name:string;net:number;won:boolean}
 export type HallSpin = {round:string;pocket:number;started:number;ends:number}
 export interface HallTable {

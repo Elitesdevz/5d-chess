@@ -1,6 +1,6 @@
 import * as T from 'three'
 import {ROULETTE_ORDER,pocketColor,type RouletteChoice} from '../casino-model.ts'
-import {SEAT_OFFSETS,SPAWN,TABLES,WALK_SPEED,walk,type HallPlayer,type HallView,type Position} from '../roulette-hall-model.ts'
+import {LOUNGES,SEAT_OFFSETS,SPAWN,TABLES,WALK_SPEED,walk,type HallPlayer,type HallView,type Position} from '../roulette-hall-model.ts'
 import {buildHall,buildHallTables,WHEEL_X,WHEEL_Z} from './hall-decor.ts'
 import {box,limb,mesh,v} from './scene/geometry.ts'
 import {batchStatic} from './scene/static-batch.ts'
@@ -72,7 +72,7 @@ class Figure {
     this.shadow.rotation.x=-Math.PI/2
   }
   pose(dt:number,now:number,local?:Position,serving=false){
-    const target=local??this.target,chair=this.target.chair
+    const target=local??this.target,chair=this.target.chair||this.target.lounge
     const speed=Math.hypot(target.x-this.root.position.x,target.z-this.root.position.z)
     const f=local?1:1-Math.exp(-dt*10)
     this.root.position.x=T.MathUtils.lerp(this.root.position.x,target.x,f)
@@ -105,6 +105,7 @@ export class HallStage {
   private figures=new Map<string,{figure:Figure;label:HTMLElement}>()
   private wheels:ReturnType<typeof buildHallTables>
   private staff:Figure[]
+  private patrons:Figure[]
   private observer:ResizeObserver
   private controls=new AbortController()
   private view?:HallView
@@ -166,6 +167,12 @@ export class HallStage {
       const p={name:['Croupier Emilia','Croupier Laurent','Croupier Sacha'][i],avatar:'default',x:site.x-.38,z:site.z-1.49,yaw:Math.PI,online:true}
       return new Figure(this.scene,p,this.floorShadow,true)
     })
+    this.patrons=[
+      {name:'Marcel',x:-3.85,z:6.82,yaw:0,staff:true},
+      {name:'Amara',x:-8.28,z:-2.15,yaw:-.4,staff:false},
+      {name:'Elias',x:8.38,z:5.2,yaw:-.8,staff:false},
+      {name:'Sofia',x:3.9,z:6.35,yaw:1.7,staff:false},
+    ].map(({staff,...p})=>new Figure(this.scene,{...p,avatar:'default',online:true},this.floorShadow,staff))
     this.matMarkers=this.wheels.map(wheel=>{
       const m=mesh(new T.TorusGeometry(.072,.010,7,20),gold,wheel.group,[.3,1.059,.35],false)
       m.rotation.x=-Math.PI/2;m.visible=false;return m
@@ -180,7 +187,7 @@ export class HallStage {
     this.frameRequest=requestAnimationFrame(this.update)
   }
   set(view:HallView,clockDelta:number){
-    const chair=view.you.chair,seat=chair?chair.table+':'+chair.index:''
+    const {chair,lounge}=view.you,seat=chair?'table:'+chair.table+':'+chair.index:lounge?'couch:'+lounge.couch+':'+lounge.index:''
     if(view.room!==this.knownRoom||seat!==this.knownSeat||Math.hypot(view.you.x-this.position.x,view.you.z-this.position.z)>1.8){
       this.position={x:view.you.x,z:view.you.z,yaw:view.you.yaw};this.angle=view.you.yaw;this.tilt=0;this.seatedYaw=0;this.seatedTilt=0
     }
@@ -212,7 +219,7 @@ export class HallStage {
     const {signal}=this.controls
     const active=()=>!document.querySelector('dialog[open]')&&!document.activeElement?.matches('input')
     const directions=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']
-    window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(this.view?.you.chair||!directions.includes(k)||!active()||e.ctrlKey||e.metaKey||e.altKey)return;e.preventDefault();this.keys.add(k)},{signal})
+    window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if((this.view?.you.chair||this.view?.you.lounge)||!directions.includes(k)||!active()||e.ctrlKey||e.metaKey||e.altKey)return;e.preventDefault();this.keys.add(k)},{signal})
     window.addEventListener('keyup',e=>this.keys.delete(e.key.toLowerCase()),{signal})
     window.addEventListener('blur',()=>{this.keys.clear();this.touchKeys.clear();this.drag=undefined},{signal})
     document.querySelectorAll<HTMLButtonElement>('[data-walk]').forEach(b=>{
@@ -229,7 +236,7 @@ export class HallStage {
       if(!this.drag||this.drag.pointer!==e.pointerId)return
       const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y
       this.drag.distance+=Math.hypot(dx,dy)
-      if(this.view?.you.chair){
+      if(this.view?.you.chair||this.view?.you.lounge){
         this.seatedYaw=T.MathUtils.clamp(this.seatedYaw-dx*.004,-.49,.49)
         this.seatedTilt=T.MathUtils.clamp(this.seatedTilt+dy*.003,-.55,.55)
       }else{
@@ -263,7 +270,7 @@ export class HallStage {
     this.camera.aspect=w/h;this.camera.fov=w<h?66:55;this.camera.updateProjectionMatrix();this.renderer.setSize(w,h,false)
   }
   private move(dt:number){
-    if(this.view?.you.chair)return
+    if(this.view?.you.chair||this.view?.you.lounge)return
     const pressed=new Set([...this.keys,...this.touchKeys.values()])
     const x=Number(pressed.has('d')||pressed.has('arrowright'))-Number(pressed.has('a')||pressed.has('arrowleft'))
     const z=Number(pressed.has('s')||pressed.has('arrowdown'))-Number(pressed.has('w')||pressed.has('arrowup'))
@@ -284,13 +291,22 @@ export class HallStage {
     this.frame=time
     const dt=Math.min(.20,(time-this.last)/1000||.03);this.last=time
     if(!document.querySelector('dialog[open]'))this.move(dt)
-    const now=Date.now()+this.clockDelta,chair=this.view?.you.chair,active=chair===undefined?undefined:this.view?.tables[chair.table]
+    const now=Date.now()+this.clockDelta,chair=this.view?.you.chair,couch=this.view?.you.lounge,active=chair===undefined?undefined:this.view?.tables[chair.table]
     for(const [name,{figure}] of this.figures){
       const me=name===this.view?.you.name
       figure.root.visible=!(me&&chair)
       figure.pose(dt,time,me&&!chair?this.position:undefined)
     }
     this.staff.forEach((figure,i)=>figure.pose(dt,time,undefined,this.view?.tables[i].phase==='spin'))
+    const [bartender,amara,elias,sofia]=this.patrons
+    bartender.pose(dt,time,undefined,Math.sin(time*.0012)>.25)
+    // Slow oval paths keep the guests in the side aisles, clear of seats and tables.
+    if(!this.reduced){
+      const a=time*.00027,b=time*.00032+2
+      amara.target={...amara.target,x:-8.6+Math.sin(a)*.43,z:.45+Math.cos(a)*2.5,yaw:Math.atan2(-Math.cos(a)*.43,Math.sin(a)*2.5)}
+      elias.target={...elias.target,x:8.6+Math.sin(b)*.42,z:2+Math.cos(b)*2.85,yaw:Math.atan2(-Math.cos(b)*.42,Math.sin(b)*2.85)}
+    }
+    for(const guest of [amara,elias,sofia])guest.pose(dt,time)
     this.seatHands.visible=Boolean(chair)&&(!active?.spin||now<active.spin.started+690||now>active.spin.ends+450)
     if(chair&&active){
       const since=now-(this.stakeTimes.get(active.round+this.view!.you.name)??-Infinity)
@@ -358,6 +374,11 @@ export class HallStage {
         wanted.set(local.x,1.67,local.z+.22)
         aim.set(site.x+.17+this.seatedYaw*2.1,1.05+this.seatedTilt,site.z-.03)
       }
+    }else if(couch){
+      cameraMode='lounge'
+      const a=local.yaw+this.seatedYaw
+      wanted.set(local.x-Math.sin(a)*1.9,1.72,local.z-Math.cos(a)*1.9)
+      aim.set(local.x,1.0+this.seatedTilt,local.z)
     }else{
       const distance=this.camera.aspect<1?1.39:1.98
       wanted.set(T.MathUtils.clamp(local.x+Math.sin(this.angle)*distance,-10.85,10.85),2.6,T.MathUtils.clamp(local.z+Math.cos(this.angle)*distance,-6.2,8.3))
@@ -401,12 +422,17 @@ export class HallStage {
     }
     for(const [name,{figure,label}] of this.figures){
       if(name===this.view?.you.name||figure.root.position.distanceTo(this.camera.position)>(aspect<1?8:12)){label.hidden=true;continue}
-      show(label,figure.root.position.clone().add(v(0,figure.target.chair?1.75:1.94,0)))
+      show(label,figure.root.position.clone().add(v(0,figure.target.chair||figure.target.lounge?1.59:1.94,0)))
     }
     this.labels.querySelectorAll<HTMLButtonElement>('[data-in-world]').forEach((button,i)=>{
       const site=TABLES[i],distance=Math.hypot(this.position.x-site.x,this.position.z-site.z)
-      if(!this.view||this.view.you.chair||distance>8.0){button.hidden=true;return}
+      if(!this.view||this.view.you.chair||this.view.you.lounge||distance>8.0){button.hidden=true;return}
       show(button,v(site.x,2.34,site.z+.25))
+    })
+    this.labels.querySelectorAll<HTMLButtonElement>('[data-in-lounge]').forEach((button,i)=>{
+      const site=LOUNGES[i],distance=Math.hypot(this.position.x-site.x,this.position.z-site.z)
+      if(!this.view||this.view.you.chair||this.view.you.lounge||distance>4.5){button.hidden=true;return}
+      show(button,v(site.x,1.42,site.z))
     })
   }
   private dispose(){

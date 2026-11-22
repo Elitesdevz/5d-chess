@@ -2,7 +2,7 @@ import {api,ApiError,initShell,renderAccount} from '../shell.ts'
 import {icon} from '../icons.ts'
 import {avatarArt} from '../cosmetic-art.ts'
 import {casinoCoins,grossMultiplier,MAX_CASINO_STAKE,pocketColor,ROULETTE_ORDER,winProbability,type CasinoView,type RouletteChoice} from '../casino-model.ts'
-import {HALL_CAPACITY,TABLES,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
+import {COUCH_SEATS,HALL_CAPACITY,LOUNGES,TABLES,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
 import {rules} from './casino-panels.ts'
 import {rouletteWheel} from './roulette.ts'
 import type {HallStage} from './hall-stage.ts'
@@ -22,7 +22,7 @@ root.innerHTML=`
     <canvas id="hall-canvas" tabindex="0" aria-label="Roulette hall. Walk with WASD or arrow keys. Drag to look. Press E near a table to sit."></canvas>
     <div class="hall-fallback" hidden>${rouletteWheel()}</div>
     <div class="hall-shade"></div>
-    <div class="hall-projected">${TABLES.map((t,i)=>`<button type="button" class="hall-world-table" data-in-world="${i}" data-sit="${i}" aria-label="Take a seat at ${t.name}" hidden><i></i>${t.name}</button>`).join('')}</div>
+    <div class="hall-projected">${TABLES.map((t,i)=>`<button type="button" class="hall-world-table" data-in-world="${i}" data-sit="${i}" aria-label="Take a seat at ${t.name}" hidden><i></i>${t.name}</button>`).join('')}${LOUNGES.map((site,i)=>`<button type="button" class="hall-world-table hall-world-lounge" data-in-lounge="${i}" data-couch="${i}" aria-label="Sit on ${site.name}" hidden><i></i>Sit on couch</button>`).join('')}</div>
     <div class="hall-title"><div class="hall-monogram">${icon('king')}</div><div><p>5D CHESS CASINO</p><h1>The Royal Salon</h1><small id="hall-room-status">Connecting to the salon…</small></div></div>
     <nav class="hall-links" aria-label="Roulette tools"><button data-dialog="hall-rules" type="button" aria-label="Rules">${icon('info')}<span>Rules</span></button><button data-dialog="hall-ledger" type="button" aria-label="History">${icon('clock')}<span>History</span></button></nav>
     <div class="hall-map" aria-hidden="true"><div class="hall-map-floor">${TABLES.map((t,i)=>`<i style="--site:${t.color};left:${50+t.x/22*100}%;top:${(t.z+6.5)/15*100}%">${i+1}</i>`).join('')}<b id="hall-map-you"></b></div><span><i></i> YOU</span></div>
@@ -33,8 +33,12 @@ root.innerHTML=`
     <aside class="hall-directory hall-glass" aria-label="Roulette tables">
       <div class="hall-panel-heading"><div><small>THE FLOOR</small><h2>Find a seat</h2></div><button type="button" id="hall-directory-toggle" aria-label="Toggle table list" aria-expanded="true">⌄</button></div>
       <div class="hall-directory-list">${TABLES.map((t,i)=>`<button type="button" class="hall-table-link" data-sit="${i}" style="--table-color:${t.color}" disabled><span class="hall-table-medallion">${i+1}</span><span><strong>${t.name}</strong><small data-table-meta="${i}">Waiting for the hall</small></span><span aria-hidden="true">›</span></button>`).join('')}</div>
+      <details class="hall-lounge-list"><summary>Lounge seating</summary>
+        ${LOUNGES.map((site,i)=>`<button type="button" data-couch="${i}" disabled>${site.name}<small></small></button>`).join('')}
+      </details>
       <div class="hall-roster" id="hall-roster"></div>
     </aside>
+    <div class="hall-lounge-card hall-glass" hidden><div><small>LOUNGE</small><strong id="hall-couch-name"></strong></div><button type="button" id="hall-couch-stand">Stand up</button></div>
     <aside class="hall-betting hall-glass" aria-label="Table controls" hidden>
       <div class="hall-panel-heading"><div><small id="hall-table-index"></small><h2 id="hall-table-title"></h2></div><button type="button" id="hall-stand">Stand up</button></div>
       <div class="hall-round-info"><span id="hall-round-status"></span><strong id="hall-timer"></strong></div>
@@ -106,7 +110,7 @@ async function presence(){
   if(!response.ok)throw new Error('Reconnecting to the salon…')
   accept(await response.json() as HallView,start)
 }
-async function action(action:'sit'|'stand'|'bet',data:object){
+async function action(action:'sit'|'stand'|'bet'|'lounge',data:object){
   if(sendBusy||!connected)return
   sendBusy=true
   updateUI()
@@ -122,13 +126,16 @@ async function action(action:'sit'|'stand'|'bet',data:object){
 }
 function updateUI(){
   if(!view)return
-  const seat=view.you.chair,table=selection()
+  const seat=view.you.chair,couch=view.you.lounge,table=selection()
   const seated=Boolean(seat&&table)
-  hall.dataset.mode=seated?table!.phase:'walking'
+  hall.dataset.mode=seated?table!.phase:couch?'lounge':'walking'
   el('.hall-betting').hidden=!seated
-  el('.hall-directory').hidden=seated
-  el('.hall-walk').hidden=seated||!stage
-  el('.hall-walk-hint').hidden=seated||!stage
+  el('.hall-directory').hidden=seated||Boolean(couch)
+  el('.hall-lounge-card').hidden=!couch
+  if(couch)el('#hall-couch-name').textContent=LOUNGES[couch.couch].name
+  el<HTMLButtonElement>('#hall-couch-stand').disabled=sendBusy||!connected
+  el('.hall-walk').hidden=seated||Boolean(couch)||!stage
+  el('.hall-walk-hint').hidden=seated||Boolean(couch)||!stage
   el('.hall-map').hidden=!stage
   el('#hall-room-status').textContent=connected?`Room ${view.room} · ${view.players.filter(p=>p.online).length}/${HALL_CAPACITY} players`:'Reconnecting…'
   const roster=view.players.filter(p=>p.online&&p.name!==view?.you.name)
@@ -144,6 +151,12 @@ function updateUI(){
     for(const b of root.querySelectorAll<HTMLButtonElement>(`[data-sit="${i}"]`))b.disabled=sendBusy||!connected||Boolean(seated)||players===4||status.phase==='spin'||status.phase==='result'
   }
 
+  for(const b of root.querySelectorAll<HTMLButtonElement>('[data-couch]')){
+    const occupied=view.players.filter(p=>p.lounge?.couch===Number(b.dataset.couch)).length
+    b.disabled=sendBusy||!connected||seated||Boolean(couch)||occupied>=COUCH_SEATS.length
+    const count=b.querySelector('small')
+    if(count)count.textContent=`${occupied}/${COUCH_SEATS.length}`
+  }
   const wager=el<HTMLFormElement>('#hall-wager'),result=el('#hall-result')
   if(!seat||!table){result.hidden=true;surfaceKey='';displayResult='';return}
   const config=TABLES[seat.table],locked=isLocked()
@@ -244,6 +257,8 @@ async function start(){
   window.setInterval(updateClock,80)
 }
 root.querySelectorAll<HTMLButtonElement>('[data-sit]').forEach(b=>b.onclick=()=>void action('sit',{table:Number(b.dataset.sit)}))
+root.querySelectorAll<HTMLButtonElement>('[data-couch]').forEach(b=>b.onclick=()=>void action('lounge',{couch:Number(b.dataset.couch)}))
+el<HTMLButtonElement>('#hall-couch-stand').onclick=()=>void action('stand',{})
 el<HTMLButtonElement>('#hall-stand').onclick=()=>void action('stand',{})
 el<HTMLButtonElement>('#hall-directory-toggle').onclick=e=>{
   const button=e.currentTarget as HTMLButtonElement,open=button.getAttribute('aria-expanded')!=='true'
@@ -289,9 +304,11 @@ root.querySelectorAll<HTMLButtonElement>('[data-dialog]').forEach(b=>b.onclick=a
 })
 window.addEventListener('keydown',e=>{
   if(e.key.toLowerCase()!=='e'||e.repeat||document.querySelector('dialog[open]')||document.activeElement?.matches('input'))return
-  if(view?.you.chair){el<HTMLButtonElement>('#hall-stand').click();return}
+  if(view?.you.chair||view?.you.lounge){el<HTMLButtonElement>(view.you.chair?'#hall-stand':'#hall-couch-stand').click();return}
   const pos=stage?.position
   if(!pos)return
+  const couch=LOUNGES.map((site,i)=>({i,d:Math.hypot(pos.x-site.x,pos.z-site.z)})).sort((a,b)=>a.d-b.d)[0]
+  if(couch.d<2.1){el<HTMLButtonElement>(`.hall-lounge-list [data-couch="${couch.i}"]`).click();return}
   const nearby=TABLES.map((t,i)=>({i,d:Math.hypot(pos.x-t.x,pos.z-t.z-1.2)})).sort((a,b)=>a.d-b.d)[0]
   if(nearby.d<3.1)el<HTMLButtonElement>(`.hall-table-link[data-sit="${nearby.i}"]`).click()
 })
