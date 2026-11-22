@@ -27,6 +27,7 @@ const mark=(symbol:string)=>symbol===CAS?state!.cas.price:state!.quotes[symbol]?
 const validQuote=(symbol:string)=>symbol===CAS||Boolean(state?.quotes[symbol]&&state.now-state.quotes[symbol].updated<QUOTE_MAX_AGE)
 
 function setState(next:StockView){
+  if(state&&(next.now<state.now||next.portfolio.sequence<state.portfolio.sequence))return
   state=next
   if(profile&&profile.coins!==next.coins){profile={...profile,coins:next.coins};renderAccount(profile)}
   app.hidden=false
@@ -53,6 +54,7 @@ function renderExchange(){
   const marks=Object.values(state.quotes)
   const last=marks.length?Math.max(...marks.map(q=>q.updated)):0
   el('exchange-feed-time').textContent=marketFailed?'Refresh unavailable · showing saved prices':last?`${marks.length}/100 priced · Refreshed ${stamp(last)}`:'Waiting for the first price refresh'
+  document.querySelector('.exchange-feed')!.classList.toggle('is-waiting',marketFailed||!last||state.now-last>2*60*60*1000)
   el('exchange-cas-price').textContent=coins(state.cas.price)
   el('exchange-cas-float').textContent=`${state.cas.float/CAS_SHARES*100}% public float · ${casinoCoins(state.cas.available)} available`
   if(mode==='market')renderMarket()
@@ -111,7 +113,7 @@ function chart(prefix:string,series:{at:number;price:number}[],color:string){
   ctx.scale(scale,scale)
   ctx.strokeStyle='#dce8df1c';ctx.lineWidth=1
   for(let i=1;i<5;i++){const y=h*i/5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
-  el(prefix+'-chart-first').textContent=series.length?simpleDate(series[0].at):''
+  el(prefix+'-chart-first').textContent=series.length>1?simpleDate(series[0].at):series.length?'First recorded price':''
   el(prefix+'-chart-last').textContent=series.length>1?simpleDate(series.at(-1)!.at):''
   if(!series.length)return
   const low=Math.min(...series.map(n=>n.price)),high=Math.max(...series.map(n=>n.price))
@@ -280,6 +282,10 @@ async function start(){
   try{pending=JSON.parse(sessionStorage.getItem('stock-order:'+accountName)??'null')??undefined}catch{}
   await refresh()
   if(state&&location.hash==='#cas')openStock(CAS)
-  window.setInterval(()=>{if(!document.hidden)void refresh()},60_000)
+  const monitor=async()=>{
+    if(!document.hidden)await refresh()
+    window.setTimeout(monitor,state&&Object.keys(state.quotes).length?60_000:12_000)
+  }
+  window.setTimeout(monitor,state&&Object.keys(state.quotes).length?60_000:12_000)
 }
 void start()

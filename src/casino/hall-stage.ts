@@ -377,8 +377,8 @@ export class HallStage {
     }else if(couch){
       cameraMode='lounge'
       const a=local.yaw+this.seatedYaw
-      wanted.set(local.x-Math.sin(a)*1.9,1.72,local.z-Math.cos(a)*1.9)
-      aim.set(local.x,1.0+this.seatedTilt,local.z)
+      wanted.set(T.MathUtils.clamp(local.x+Math.sin(a)*.79+Math.cos(a)*.79,-10.9,10.9),2.12,local.z+Math.cos(a)*.79-Math.sin(a)*.79)
+      aim.set(local.x-Math.sin(a)*2.8,1.24+this.seatedTilt,local.z-Math.cos(a)*2.8)
     }else{
       const distance=this.camera.aspect<1?1.39:1.98
       wanted.set(T.MathUtils.clamp(local.x+Math.sin(this.angle)*distance,-10.85,10.85),2.6,T.MathUtils.clamp(local.z+Math.cos(this.angle)*distance,-6.2,8.3))

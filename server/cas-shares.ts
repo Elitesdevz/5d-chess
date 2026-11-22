@@ -96,8 +96,7 @@ export function casTrade(state:CasState,account:Account,side:StockSide,shares:nu
   chart(state,now)
 }
 
-export function recordCasinoMargins(unit:UnitOfWork,rounds:Iterable<CasinoRound>,now=Date.now()){
-  const state=casState(unit,now)
+export function recordCasinoMargins(unit:UnitOfWork,rounds:Iterable<CasinoRound>,now=Date.now(),state=casState(unit,now)){
   for(const round of rounds)state.margin+=toStockUnits(round.stake)-toStockUnits(round.gross)
   unit.putMetadata(CAS_META,state)
 }

@@ -67,3 +67,17 @@ test('a timed wager settles without an unready player, and a pending stake survi
  assert.deepEqual(store.metadataValue('rouletteHallEscrow'),[])
  assert.equal(JSON.parse(store.accountJson(names[1])).wallet.coins,1000)
 })
+
+test('couch seats are shared and leave the betting tables untouched',t=>{
+ const {hall,names}=setup(t,4),now=Date.now()
+ for(const name of names)hall.update(name,'presence',{},now)
+ const seated=names.slice(0,3).map(name=>hall.update(name,'lounge',{couch:0},now))
+ assert.equal(new Set(seated.map(view=>view.you.lounge.index)).size,3)
+ assert.equal(seated[2].players.filter(player=>player.lounge?.couch===0).length,3)
+ assert.ok(seated[2].tables.every(table=>table.phase==='idle'))
+ assert.throws(()=>hall.update(names[3],'lounge',{couch:0},now),{status:409})
+ assert.throws(()=>hall.update(names[0],'sit',{table:0},now),{status:409})
+ const standing=hall.update(names[0],'stand',{},now)
+ assert.equal(standing.you.lounge,undefined)
+ assert.equal(hall.update(names[3],'lounge',{couch:0},now).you.lounge.index,seated[0].you.lounge.index)
+})

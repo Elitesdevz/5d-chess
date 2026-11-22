@@ -5,7 +5,8 @@ import type {StockQuote} from '../src/stock-model.ts'
 export const STOCK_QUOTES='stockQuotes'
 const URL='https://api.nasdaq.com/api/screener/stocks?tableonly=true&limit=10000&download=true'
 const marketClock=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'})
-const day=(now:number)=>marketClock.format(now).split(',').slice(0,2).join(',')
+const marketDay=new Intl.DateTimeFormat('en-GB',{timeZone:'America/New_York',dateStyle:'short'})
+const day=(now:number)=>marketDay.format(now)
 type Quotes=Record<string,StockQuote>
 
 function marketHours(now:number){
@@ -34,7 +35,7 @@ export async function fetchStockQuotes(previous:Quotes={},now=Date.now(),signal?
     const price=Math.round(raw*100)/100
     const before=quotes[symbol]?.history??[]
     const history=[...before]
-    if(!history.length&&price-change>0)history.push({at:now-86_400_000,price:Math.round((raw-change)*100)/100})
+
     const last=history.at(-1)
     if(!last||last.price!==price){
       if(last&&day(last.at)===day(now))history[history.length-1]={at:now,price}

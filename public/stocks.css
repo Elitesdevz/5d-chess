@@ -149,3 +149,4 @@ body[data-page="stocks"] {
 @media(max-width:360px) {
   .casino-share-data {grid-template-columns:1fr}
 }
+.exchange-feed.is-waiting i {background:#e5ba7c;box-shadow:0 0 11px #e5ba7c70}
