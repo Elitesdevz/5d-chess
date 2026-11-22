@@ -12,6 +12,7 @@ export interface StockDividend {day:string;shares:number;amount:number}
 export interface StockPortfolio {
   sequence:number; positions:Record<string,StockHolding>; trades:StockTrade[]; dividends:StockDividend[]; dividendsPaid:number
 }
+export interface PricePoint {at:number;price:number;volume?:number}
 export interface StockQuote {price:number;change:number;percent:number;updated:number;history:{at:number;price:number}[]}
 export interface CasPublic {
   equity:number; float:number; available:number; price:number; bid:number; ask:number; version:number

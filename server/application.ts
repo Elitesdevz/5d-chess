@@ -12,6 +12,7 @@ import {economyApi} from './economy-api.ts'
 import {gameApi} from './game-api.ts'
 import {eloApi} from './elo-gambling.ts'
 import {RouletteHall} from './roulette-hall.ts'
+import {StockHistory} from './stock-history.ts'
 import {stockApi} from './stock-api.ts'
 import {casinoApi} from './casino-api.ts'
 import {ensureAccount,pruneNotices} from './accounts.ts'
@@ -22,6 +23,7 @@ export function createApplication(store: ChessStore) {
   const usage=new UsageStore(usagePath(store))
   const ai=new AiScheduler(store)
   const roulette=new RouletteHall(store)
+  const stockHistory=new StockHistory()
   ai.kick()
   const limiter = new LoginLimiter()
   const cleanNotices=()=>{for(const row of store.leaderboard())store.transaction(unit=>{const account=unit.users.get(row.name);if(account)pruneNotices(account)})}
@@ -29,7 +31,7 @@ export function createApplication(store: ChessStore) {
   const noticeTimer=setInterval(cleanNotices,60*1000);noticeTimer.unref()
   let draining = false
   return {
-    drain: () => {draining = true;ai.stop();roulette.stop();clearInterval(noticeTimer);usage.close()},
+    drain: () => {draining = true;ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);usage.close()},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       const started=Date.now();let actor:string|undefined,pathForUsage='',methodForUsage=req.method??'GET',beforeUsage:{coins?:number;elo?:number}|undefined
       const logUsage=(status:number)=>{try{serverUsage(usage,store,actor,pathForUsage,methodForUsage,status,started,typeof req.headers['x-client-trace']==='string'?req.headers['x-client-trace']:undefined,typeof req.headers['x-ui-action']==='string'?req.headers['x-ui-action']:undefined,beforeUsage)}catch{/* Diagnostics must not change an API response. */}}
@@ -41,6 +43,12 @@ export function createApplication(store: ChessStore) {
         checkOrigin(req)
         const method = req.method || 'GET'
         if (path === '/api/health' && method === 'GET') {store.ready(); json(res,200,{ok: true, storageSchema: STORAGE_SCHEMA}); return}
+        if (path === '/api/stocks/history' && method === 'GET'){
+          actor=user(store,req)??fail(401,'Log in first')
+          const points=await stockHistory.get(url.searchParams.get('symbol')??'')
+          json(res,200,{points});logUsage(200)
+          return
+        }
         // Never hold the writer lock while awaiting a network request body.
         const data = method === 'POST' && path !== '/api/logout' ? await body(req) : {}
         if(path.startsWith('/api/roulette-hall/')&&method==='POST'){
