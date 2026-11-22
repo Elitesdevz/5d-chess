@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto'
 import type {ChessStore} from './storage.ts'
+import type {Account} from './accounts.ts'
 import {wallet} from './economy.ts'
 import {reserveRouletteStake,rouletteResult,settleReservedRoulette,validateBet} from './casino.ts'
 import {CASINO_OWNER,type CasinoBet,type CasinoRound} from '../src/casino-model.ts'
@@ -21,8 +22,11 @@ export class RouletteHall {
   private escrow:Escrow[]
   private timer:ReturnType<typeof setInterval>
 
-  constructor(private store:ChessStore){
-    this.escrow=store.metadataValue(ESCROW) as Escrow[]|undefined??[]
+  private store:ChessStore
+
+  constructor(store:ChessStore){
+    this.store=store
+    this.escrow=(store.metadataValue(ESCROW) as Escrow[]|undefined)??[]
     for(const pending of this.escrow){
       const room=this.rooms.get(pending.room)??this.createRoom(pending.room)
       Object.assign(room.tables[pending.table],{round:pending.round,until:pending.until})
@@ -93,7 +97,7 @@ export class RouletteHall {
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):HallView{
     const raw=this.store.accountJson(name)
     if(!raw)fail(401,'Log in first')
-    const account=JSON.parse(raw) as NonNullable<ReturnType<import('./storage.ts').UnitOfWork['findAccount']>>
+    const account=JSON.parse(raw) as Account
     const avatar=account.wallet?.loadout.icon??'default'
     this.tick(now)
     let room=[...this.rooms.values()].find(r=>r.players.has(name))
@@ -117,8 +121,9 @@ export class RouletteHall {
       me.moved=now
     }else if(action==='sit'){
       if(me.chair)fail(409,'Stand up before changing tables')
-      const index=Number(data.table),target=room.tables[index]
-      if(!Number.isInteger(index)||!target)fail(400,'Choose a table')
+      const index=data.table
+      if(typeof index!=='number'||!Number.isInteger(index)||!room.tables[index])fail(400,'Choose a table')
+      const target=room.tables[index]
       if(target.spin)fail(409,'This table is finishing a round')
       const used=new Set([...room.players.values()].filter(p=>p.chair?.table===index).map(p=>p.chair!.index))
       const available=SEAT_OFFSETS.map((_,i)=>i).filter(i=>!used.has(i)).sort((a,b)=>Math.abs(TABLES[index].x+SEAT_OFFSETS[a]-me.x)-Math.abs(TABLES[index].x+SEAT_OFFSETS[b]-me.x))

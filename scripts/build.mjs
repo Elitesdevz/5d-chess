@@ -21,7 +21,7 @@ await build({entryPoints: ['src/portal.ts'], bundle: true, minify: true, format:
 await build({entryPoints: ['src/online.ts'], bundle: true, minify: true, format: 'esm',
   target: ['es2022'], outfile: 'dist/chess/online.js', legalComments: 'none'})
 await build({entryPoints: ['src/store.ts'], bundle:true, minify:true, format:'esm',target:['es2022'],outfile:'dist/chess/collection.js',legalComments:'none'})
-await build({entryPoints:['src/casino/main.ts'],bundle:true,minify:true,format:'esm',target:['es2022'],splitting:true,outdir:'dist/chess',entryNames:'casino',chunkNames:'chunks/[name]-[hash]',legalComments:'none'})
+await build({entryPoints:{casino:'src/casino/main.ts','roulette-hall':'src/casino/hall-client.ts'},bundle:true,minify:true,format:'esm',target:['es2022'],splitting:true,outdir:'dist/chess',entryNames:'[name]',chunkNames:'chunks/[name]-[hash]',legalComments:'none'})
 await build({entryPoints:['src/profile.ts'],bundle:true,minify:true,format:'esm',target:['es2022'],outfile:'dist/chess/profile.js',legalComments:'none'})
 await build({entryPoints:['src/leaderboard.ts'],bundle:true,minify:true,format:'esm',target:['es2022'],outfile:'dist/chess/leaderboard.js',legalComments:'none'})
 await build({entryPoints: ['server/index.ts'], bundle: true, platform: 'node', format: 'esm',
@@ -31,7 +31,7 @@ await build({entryPoints: ['server/storage-admin.ts'], bundle: true, platform: '
   target: ['node24'], outfile: 'dist/storage-admin.mjs', legalComments: 'none'})
 
 // Bundle the same public files as a module for path-scoped Cloudflare Worker deployment.
-const types = {'match.css':'text/css; charset=utf-8','puzzles.html':'text/html; charset=utf-8','puzzles.css':'text/css; charset=utf-8','puzzles.js':'text/javascript; charset=utf-8','profile.html':'text/html; charset=utf-8','profile.js':'text/javascript; charset=utf-8','profile.css':'text/css; charset=utf-8','leaderboard.html':'text/html; charset=utf-8','leaderboard.js':'text/javascript; charset=utf-8','roulette.css':'text/css; charset=utf-8','roulette.html':'text/html; charset=utf-8','dice.html':'text/html; charset=utf-8','casino.js':'text/javascript; charset=utf-8','casino.css':'text/css; charset=utf-8','index.html': 'text/html; charset=utf-8', 'login.html': 'text/html; charset=utf-8',
+const types = {'match.css':'text/css; charset=utf-8','puzzles.html':'text/html; charset=utf-8','puzzles.css':'text/css; charset=utf-8','puzzles.js':'text/javascript; charset=utf-8','profile.html':'text/html; charset=utf-8','profile.js':'text/javascript; charset=utf-8','profile.css':'text/css; charset=utf-8','leaderboard.html':'text/html; charset=utf-8','leaderboard.js':'text/javascript; charset=utf-8','roulette.css':'text/css; charset=utf-8','roulette-hall.css':'text/css; charset=utf-8','roulette-hall.js':'text/javascript; charset=utf-8','roulette.html':'text/html; charset=utf-8','dice.html':'text/html; charset=utf-8','casino.js':'text/javascript; charset=utf-8','casino.css':'text/css; charset=utf-8','index.html': 'text/html; charset=utf-8', 'login.html': 'text/html; charset=utf-8',
   'lobby.html': 'text/html; charset=utf-8', 'online.html': 'text/html; charset=utf-8',
   'collection.html':'text/html; charset=utf-8','collection.js':'text/javascript; charset=utf-8','collection.css':'text/css; charset=utf-8',
   'game.js': 'text/javascript; charset=utf-8', 'portal.js': 'text/javascript; charset=utf-8',
