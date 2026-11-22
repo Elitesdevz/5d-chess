@@ -161,7 +161,7 @@ button.exchange-company {text-align:left;background:none;border:0;padding:0;widt
 .exchange-stock-row .exchange-company {gap:7px}
 .exchange-stock-row .exchange-company span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#a8bdb1}
 
-.exchange-dialog {width:min(1000px,calc(100% - 32px));max-height:calc(100svh - 32px);overflow:auto;color:var(--stock-ink);background:linear-gradient(155deg,#1b302c,#0f211e 75%);border:1px solid #94c3a971;border-radius:14px;padding:19px;box-shadow:0 19px 78px #000c;scrollbar-width:thin;scrollbar-color:#638a76 #132420}
+.exchange-dialog {width:min(1000px,calc(100% - 32px));max-width:none;max-height:calc(100svh - 32px);overflow:auto;color:var(--stock-ink);background:linear-gradient(155deg,#1b302c,#0f211e 75%);border:1px solid #94c3a971;border-radius:14px;padding:19px;box-shadow:0 19px 78px #000c;scrollbar-width:thin;scrollbar-color:#638a76 #132420}
 .exchange-dialog::backdrop {background:#071210dd}
 .exchange-dialog article {position:relative}
 .exchange-cas-dialog {background:linear-gradient(135deg,#372e22,#222e25 55%,#162622);border-color:#dfb87589}
@@ -181,7 +181,7 @@ button.exchange-company {text-align:left;background:none;border:0;padding:0;widt
 .exchange-detail-price>span {color:var(--stock-muted);font-size:11px}
 .exchange-graph,.exchange-cas-ownership,.exchange-ticket,.exchange-cas-ledgers section {background:#112421;border:1px solid var(--stock-border);border-radius:9px;padding:11px;min-width:0}
 .exchange-graph-top {display:flex;align-items:center;justify-content:space-between;gap:7px}
-.exchange-chart-source,.exchange-chart-readout {color:#a9c0b4;font-size:11px;min-height:15px;margin:6px 0 0}
+.exchange-dialog :is(.exchange-chart-source,.exchange-chart-readout) {color:#a9c0b4;font-size:11px;min-height:15px;margin:6px 0 0}
 .exchange-chart {display:block;width:100%;height:267px;margin:2px 0 0;cursor:crosshair;touch-action:pan-y}
 .exchange-graph-stats {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:7px 0 0;padding:7px 0 0;border-top:1px solid var(--stock-border);font-variant-numeric:tabular-nums}
 .exchange-graph-stats dt {color:var(--stock-muted);font-size:10px}
