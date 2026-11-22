@@ -52,10 +52,26 @@ export function casinoBet(account:Account,accounts:Account[],input:unknown,now=D
  const w=wallet(account),balance=safeUnits(w.coins),stake=bet.stake*10000
  if(balance<stake)reject(409,'Not enough coins')
  const result=bet.game==='roulette'?rouletteResult(draw):draw??randomInt(1,7)
+ return settleCasinoRound(account,accounts,bet,result,now,false)
+}
+
+export function reserveRouletteStake(account:Account,stake:number){
+ const w=wallet(account),balance=safeUnits(w.coins),debit=units(stake)
+ if(balance<debit)reject(409,'Not enough coins')
+ w.coins=(balance-debit)/10000
+}
+
+/** A shared spin uses the same receipts, odds, precision and tax as a private wager. */
+export function settleReservedRoulette(account:Account,accounts:Account[],bet:CasinoBet,result:number,now:number){
+ return settleCasinoRound(account,accounts,{...bet,sequence:state(account).sequence+1},result,now,true).round
+}
+
+function settleCasinoRound(account:Account,accounts:Account[],bet:CasinoBet,result:number,now:number,reserved:boolean){
+ const s=state(account),w=wallet(account),balance=safeUnits(w.coins),stake=units(bet.stake)
  if(bet.game==='dice'&&(!Number.isInteger(result)||result<1||result>6))throw new Error('Invalid dice draw')
  const won=bet.game==='dice'?result===bet.choice:rouletteWins(bet.choice,result)
  const gross=won?Math.round(stake*grossMultiplier(bet.game,bet.choice)):0,profit=Math.max(0,gross-stake)
- const tax=profit/100,credited=gross-tax,next=balance-stake+credited
+ const tax=profit/100,credited=gross-tax,next=balance-(reserved?0:stake)+credited
  // Integer stakes and the supported payout schedule make all amounts exact to 0.0001 coin.
  if(!Number.isSafeInteger(next)||!Number.isSafeInteger(tax))reject(409,'This bet exceeds the supported balance precision')
  let owner:Account|undefined,treasury=0

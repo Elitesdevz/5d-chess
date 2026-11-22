@@ -11,6 +11,7 @@ import {accountApi} from './account-api.ts'
 import {economyApi} from './economy-api.ts'
 import {gameApi} from './game-api.ts'
 import {eloApi} from './elo-gambling.ts'
+import {RouletteHall} from './roulette-hall.ts'
 import {casinoApi} from './casino-api.ts'
 import {ensureAccount,pruneNotices} from './accounts.ts'
 import {staticFile} from './static.ts'
@@ -19,6 +20,7 @@ import {STORAGE_SCHEMA} from './storage.ts'
 export function createApplication(store: ChessStore) {
   const usage=new UsageStore(usagePath(store))
   const ai=new AiScheduler(store)
+  const roulette=new RouletteHall(store)
   ai.kick()
   const limiter = new LoginLimiter()
   const cleanNotices=()=>{for(const row of store.leaderboard())store.transaction(unit=>{const account=unit.users.get(row.name);if(account)pruneNotices(account)})}
@@ -26,7 +28,7 @@ export function createApplication(store: ChessStore) {
   const noticeTimer=setInterval(cleanNotices,60*1000);noticeTimer.unref()
   let draining = false
   return {
-    drain: () => {draining = true;ai.stop();clearInterval(noticeTimer);usage.close()},
+    drain: () => {draining = true;ai.stop();roulette.stop();clearInterval(noticeTimer);usage.close()},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       const started=Date.now();let actor:string|undefined,pathForUsage='',methodForUsage=req.method??'GET',beforeUsage:{coins?:number;elo?:number}|undefined
       const logUsage=(status:number)=>{try{serverUsage(usage,store,actor,pathForUsage,methodForUsage,status,started,typeof req.headers['x-client-trace']==='string'?req.headers['x-client-trace']:undefined,typeof req.headers['x-ui-action']==='string'?req.headers['x-ui-action']:undefined,beforeUsage)}catch{/* Diagnostics must not change an API response. */}}
@@ -40,6 +42,14 @@ export function createApplication(store: ChessStore) {
         if (path === '/api/health' && method === 'GET') {store.ready(); json(res,200,{ok: true, storageSchema: STORAGE_SCHEMA}); return}
         // Never hold the writer lock while awaiting a network request body.
         const data = method === 'POST' && path !== '/api/logout' ? await body(req) : {}
+        if(path.startsWith('/api/roulette-hall/')&&method==='POST'){
+          actor=user(store,req)??fail(401,'Log in first')
+          const action=path.slice('/api/roulette-hall/'.length)
+          const result=roulette.update(actor,action,data)
+          json(res,200,result)
+          if(action!=='presence')logUsage(200)
+          return
+        }
         const reply = store.transaction(unit => {
           actor=user(unit,req)
           const auth = authApi(unit,req,path,data,limiter)

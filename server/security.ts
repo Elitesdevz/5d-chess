@@ -13,7 +13,7 @@ export function tokenHash(token: string): string {return createHash('sha256').up
 export function sessionToken(req: IncomingMessage): string | undefined {
   return req.headers.cookie?.split(';').map(part => part.trim()).find(part => part.startsWith(`${cookieName}=`))?.slice(cookieName.length+1)
 }
-export function user(unit: UnitOfWork, req: IncomingMessage): string | undefined {
+export function user(unit: Pick<UnitOfWork,'session'>, req: IncomingMessage): string | undefined {
   const token = sessionToken(req)
   if (!token) return undefined
   const login = unit.session(tokenHash(token))
