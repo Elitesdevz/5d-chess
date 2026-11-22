@@ -6,12 +6,15 @@ body[data-casino="roulette"] {
   --hall-cream: #f7ead4;
   background: #101d1c;
   margin: 0;
-  min-height: 100svh;
+  display:flex;
+  flex-direction:column;
+  height:100svh;
 }
 body[data-casino="roulette"] #casino-root {
-  padding: 0; width: auto; max-width: none; margin: 0; overflow: hidden;
+  display:flex; flex:1; flex-direction:column; min-height:0;
+  padding:0; width:100%; max-width:none; margin:0; overflow:hidden;
 }
-.hall {position: relative; height: calc(100svh - 72px); min-height: 494px; isolation:isolate; overflow:hidden; background:radial-gradient(ellipse at 45% 20%,#324e49,#101c1c 72%); color:var(--hall-cream)}
+.hall {position: relative; flex:1; min-height:0; isolation:isolate; overflow:hidden; background:radial-gradient(ellipse at 45% 20%,#324e49,#101c1c 72%); color:var(--hall-cream)}
 .hall [hidden] {display:none!important}
 .hall button {font:inherit; color:inherit; cursor:pointer; min-width:0}
 .hall button:focus-visible,.hall a:focus-visible,.hall input:focus-visible {outline:2px solid #f4d593;outline-offset:3px}
@@ -70,6 +73,8 @@ body[data-casino="roulette"] #casino-root {
 .hall-walk-hint i {display:inline-block;width:4px;height:4px;background:#b29a6e;border-radius:50%;margin:0 4px}
 .hall-walk-hint kbd {border:1px solid #8d9a87;padding:0 3px;border-radius:3px;color:#f6ebd1;font-size:11px}
 .hall-walk {display:none}
+.hall .hall-directory h2 {white-space:nowrap}
+.hall-projected button:not(:disabled):hover {box-shadow:0 0 12px #eac58254}
 .hall-round-info {display:flex;align-items:center;justify-content:space-between;gap:8px;color:#d2dfd5;font-size:13px}
 .hall-round-info strong {font:22px Georgia,serif;color:var(--hall-gold);font-variant-numeric:tabular-nums}
 .hall-progress {height:3px;margin:6px 0 9px;background:#f7e9ca23;border-radius:4px;overflow:hidden}
@@ -153,7 +158,6 @@ body[data-casino="roulette"] #casino-root {
   .hall[data-mode=walking] .hall-map {left:auto;right:12px;bottom:18px}
 }
 @media (max-width:740px) {
-  .hall {height:calc(100svh - 62px);min-height:465px}
   .hall-title {left:12px;top:13px;gap:7px}
   .hall-title h1 {font-size:clamp(23px,6vw,32px)}
   .hall-title p {font-size:8px;letter-spacing:.15em}
@@ -164,8 +168,8 @@ body[data-casino="roulette"] #casino-root {
   .hall-links button {padding:7px}
   .hall-links button span {display:none}
   .hall-directory,.hall-betting {top:auto;right:9px;width:calc(100% - 18px);padding:9px;max-height:calc(100% - 75px)}
-  .hall-directory {width:min(195px,calc(100% - 18px));top:78px}
-  .hall-betting {bottom:8px;max-height:min(55%,350px)}
+  .hall-directory {width:min(172px,calc(100% - 18px));bottom:100px;max-height:calc(100% - 182px)}
+  .hall-betting {bottom:8px;max-height:min(60%,397px)}
   .hall-panel-heading {margin-bottom:6px}
   .hall-panel-heading h2 {font-size:23px}
   .hall-table-medallion {width:25px;height:25px;font-size:17px}
@@ -187,7 +191,7 @@ body[data-casino="roulette"] #casino-root {
   .hall-fallback-ball {top:42%;left:50%}
 }
 @media (max-width:460px) {
-  .hall-number-mat {grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(6,22px)}
+  .hall-number-mat {grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:repeat(6,27px)}
   .hall-number-mat .hall-zero {grid-row:span 6}
 }
 @media (prefers-reduced-motion:reduce) {

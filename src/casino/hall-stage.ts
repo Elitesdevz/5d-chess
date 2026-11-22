@@ -112,7 +112,9 @@ export class HallStage {
   private tilt=0
   private keys=new Set<string>()
   private touchKeys=new Map<number,string>()
-  private drag?:{x:number;y:number;pointer:number}
+  private drag?:{x:number;y:number;pointer:number;distance:number}
+  private seatedYaw=0
+  private seatedTilt=0
   private cameraAim=v(0,1.25,1)
   private last=0
   private frame=0
@@ -131,7 +133,8 @@ export class HallStage {
   private gl:WebGL2RenderingContext
   private fence:WebGLSync|null=null
   position:Position={...SPAWN}
-  constructor(private canvas:HTMLCanvasElement,private labels:HTMLElement){
+  get moving(){return Boolean(this.keys.size||this.touchKeys.size||this.drag)}
+  constructor(private canvas:HTMLCanvasElement,private labels:HTMLElement,private choose:(choice:RouletteChoice)=>void){
     this.renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'})
     this.gl=this.renderer.getContext() as WebGL2RenderingContext
     this.renderer.setPixelRatio(Math.min(devicePixelRatio,1.4))
@@ -179,7 +182,7 @@ export class HallStage {
   set(view:HallView,clockDelta:number){
     const chair=view.you.chair,seat=chair?chair.table+':'+chair.index:''
     if(view.room!==this.knownRoom||seat!==this.knownSeat||Math.hypot(view.you.x-this.position.x,view.you.z-this.position.z)>1.8){
-      this.position={x:view.you.x,z:view.you.z,yaw:view.you.yaw};this.angle=view.you.yaw;this.tilt=0
+      this.position={x:view.you.x,z:view.you.z,yaw:view.you.yaw};this.angle=view.you.yaw;this.tilt=0;this.seatedYaw=0;this.seatedTilt=0
     }
     this.knownRoom=view.room;this.knownSeat=seat;this.clockDelta=clockDelta
     this.view=view
@@ -217,18 +220,43 @@ export class HallStage {
       b.addEventListener('lostpointercapture',e=>this.touchKeys.delete(e.pointerId),{signal})
     })
     this.canvas.addEventListener('pointerdown',e=>{
-      if(this.view?.you.chair)return
+      const chair=this.view?.you.chair
+      if(chair&&this.view?.tables[chair.table].phase==='spin')return
       this.canvas.focus({preventScroll:true});this.canvas.setPointerCapture(e.pointerId)
-      this.drag={x:e.clientX,y:e.clientY,pointer:e.pointerId}
+      this.drag={x:e.clientX,y:e.clientY,pointer:e.pointerId,distance:0}
     },{signal})
     this.canvas.addEventListener('pointermove',e=>{
       if(!this.drag||this.drag.pointer!==e.pointerId)return
-      this.angle-= (e.clientX-this.drag.x)*.006
-      this.tilt=T.MathUtils.clamp(this.tilt+(e.clientY-this.drag.y)*.003,-.71,.49)
+      const dx=e.clientX-this.drag.x,dy=e.clientY-this.drag.y
+      this.drag.distance+=Math.hypot(dx,dy)
+      if(this.view?.you.chair){
+        this.seatedYaw=T.MathUtils.clamp(this.seatedYaw-dx*.004,-.49,.49)
+        this.seatedTilt=T.MathUtils.clamp(this.seatedTilt+dy*.003,-.55,.55)
+      }else{
+        this.angle-=dx*.006
+        this.tilt=T.MathUtils.clamp(this.tilt+dy*.003,-.71,.49)
+      }
       this.drag.x=e.clientX;this.drag.y=e.clientY
     },{signal})
+    this.canvas.addEventListener('pointerup',e=>{if(this.drag&&this.drag.distance<7)this.pickFelt(e)},{signal})
     this.canvas.addEventListener('lostpointercapture',()=>this.drag=undefined,{signal})
     window.addEventListener('pagehide',e=>{if(!e.persisted)this.dispose()},{signal})
+  }
+  private pickFelt(event:PointerEvent){
+    const chair=this.view?.you.chair
+    if(!chair||this.view?.tables[chair.table].phase!=='betting')return
+    const rect=this.canvas.getBoundingClientRect(),site=TABLES[chair.table]
+    const ray=new T.Raycaster()
+    ray.setFromCamera(new T.Vector2((event.clientX-rect.x)/rect.width*2-1,-(event.clientY-rect.y)/rect.height*2+1),this.camera)
+    const point=ray.ray.intersectPlane(new T.Plane(v(0,1,0),-1.044),v())
+    if(!point)return
+    const x=((point.x-site.x-.84)/1.92+.5)*640,y=((point.z-site.z+.11)/1.29+.5)*384
+    if(y>=89&&y<265){
+      if(x>=25&&x<59){this.choose(0);return}
+      if(x>=64&&x<616)this.choose(1+Math.floor((x-64)/46)+Math.floor((y-89)/60)*12)
+    }else if(y>=280&&y<322&&x>=64&&x<616){
+      this.choose((['low','even','white','black','odd','high'] as const)[Math.floor((x-64)/92)])
+    }
   }
   private fit(){
     const w=Math.max(1,this.canvas.clientWidth),h=Math.max(1,this.canvas.clientHeight)
@@ -305,7 +333,15 @@ export class HallStage {
         wheel.aura.material.opacity=table.phase==='result'?.53+.25*Math.sin(time*.008):.22+.19*Math.sin(time*.007)
       }else{
         wheel.aura.material.opacity=.20+.09*Math.sin(time*.002+i)
-        if(!table?.recent.length){wheel.rotor.rotation.y=0;wheel.marker.position.set(WHEEL_X,1.201,WHEEL_Z-.59)}
+        const previous=table?.recent[0]
+        if(previous===undefined){
+          wheel.rotor.rotation.y=0
+          wheel.marker.position.set(WHEEL_X,1.201,WHEEL_Z-.59)
+        }else{
+          wheel.rotor.rotation.y=.62
+          const angle=.62-(ROULETTE_ORDER.indexOf(previous)+.5)*tau/37
+          wheel.marker.position.set(WHEEL_X+Math.cos(angle)*.486,1.206,WHEEL_Z-Math.sin(angle)*.486)
+        }
       }
     })
     const wanted=v(),aim=v(),local=this.position
@@ -320,7 +356,7 @@ export class HallStage {
       }else{
         cameraMode='seat'
         wanted.set(local.x,1.67,local.z+.22)
-        aim.set(site.x+.17,1.05,site.z-.03)
+        aim.set(site.x+.17+this.seatedYaw*2.1,1.05+this.seatedTilt,site.z-.03)
       }
     }else{
       const distance=this.camera.aspect<1?1.39:1.98

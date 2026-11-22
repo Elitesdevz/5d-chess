@@ -1,8 +1,6 @@
 import {randomUUID} from 'node:crypto'
 import type {ChessStore} from './storage.ts'
-import type {Account} from './accounts.ts'
-import {wallet} from './economy.ts'
-import {reserveRouletteStake,rouletteResult,settleReservedRoulette,validateBet} from './casino.ts'
+import {casinoView,reserveRouletteStake,rouletteResult,settleReservedRoulette,validateBet} from './casino.ts'
 import {CASINO_OWNER,type CasinoBet,type CasinoRound} from '../src/casino-model.ts'
 import {BET_WINDOW,HALL_CAPACITY,RESULT_TIME,SEAT_OFFSETS,SPAWN,SPIN_TIME,TABLES,WALK_SPEED,chairPosition,walk,type HallPlayer,type HallSpin,type HallTable,type HallView,type TablePrize} from '../src/roulette-hall-model.ts'
 import {fail} from './http.ts'
@@ -95,11 +93,9 @@ export class RouletteHall {
   }
 
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):HallView{
-    const raw=this.store.accountJson(name)
-    if(!raw)fail(401,'Log in first')
-    const account=JSON.parse(raw) as Account
-    const avatar=account.wallet?.loadout.icon??'default'
     this.tick(now)
+    const account=this.store.rouletteWallet(name)??fail(401,'Log in first')
+    const avatar=account.avatar??'default'
     let room=[...this.rooms.values()].find(r=>r.players.has(name))
     if(!room){
       if(action!=='presence')fail(409,'Rejoin the hall first')
@@ -139,16 +135,19 @@ export class RouletteHall {
         me.chair=undefined
       }
     }else if(action==='bet'){
-      if(!me.chair||!table||table.spin||!table.until||data.round!==table.round)fail(409,'Betting has closed for this round')
+      if(!me.chair||!table||!table.until||data.round!==table.round)fail(409,'Betting has closed for this round')
       const bet=validateBet({game:'roulette',sequence:1,requestId:data.requestId,stake:data.stake,choice:data.choice})
-      if(locked){
-        if(locked.bet.requestId!==bet.requestId||locked.bet.choice!==bet.choice||locked.bet.stake!==bet.stake)fail(409,'Your bet is already locked')
+      const accepted=locked?.bet??table.receipts?.get(name)
+      if(accepted){
+        if(accepted.requestId!==bet.requestId||accepted.choice!==bet.choice||accepted.stake!==bet.stake)fail(409,'Your bet is already locked')
       }else{
+        if(table.spin)fail(409,'Betting has closed for this round')
         const entry:Escrow={room:room.id,table:me.chair.table,round:table.round,until:table.until,
           tickets:[...pending?.tickets??[],{name,avatar,seat:me.chair.index,bet}]}
         const next=[...this.escrow.filter(item=>item!==pending),entry]
         this.store.transaction(unit=>{
           const bettor=unit.users.get(name)??fail(401,'Log in first')
+          if(casinoView(bettor).recent.some(receipt=>receipt.requestId===bet.requestId))fail(409,'This bet was already settled')
           reserveRouletteStake(bettor,bet.stake)
           this.store.putMetadata(ESCROW,next)
         })
@@ -157,10 +156,10 @@ export class RouletteHall {
     }else fail(404,'Unknown roulette action')
 
     this.tick(now)
-    const current=JSON.parse(this.store.accountJson(name)!) as typeof account
+    const current=action==='bet'||action==='stand'?this.store.rouletteWallet(name)??account:account
     const own=me.chair?room.tables[me.chair.table]:undefined
     const receipt=own?.spin&&now>=own.spin.ends?own.receipts?.get(name):undefined
-    return {room:room.id,now,coins:wallet(current).coins,you:publicMember(me),players:[...room.players.values()].map(publicMember),
+    return {room:room.id,now,coins:current.coins??0,you:publicMember(me),players:[...room.players.values()].map(publicMember),
       tables:room.tables.map((t,i):HallTable=>{
         const result=t.spin&&now>=t.spin.ends, tickets=this.escrow.find(item=>item.round===t.round)?.tickets??[]
         return {round:t.round,until:t.until,phase:t.spin?result?'result':'spin':t.until?'betting':'idle',spin:t.spin,

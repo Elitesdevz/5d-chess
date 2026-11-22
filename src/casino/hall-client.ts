@@ -24,7 +24,7 @@ root.innerHTML=`
     <div class="hall-shade"></div>
     <div class="hall-projected">${TABLES.map((t,i)=>`<button type="button" class="hall-world-table" data-in-world="${i}" data-sit="${i}" aria-label="Take a seat at ${t.name}" hidden><i></i>${t.name}</button>`).join('')}</div>
     <div class="hall-title"><div class="hall-monogram">${icon('king')}</div><div><p>5D CHESS CASINO</p><h1>The Royal Salon</h1><small id="hall-room-status">Connecting to the salon…</small></div></div>
-    <nav class="hall-links" aria-label="Roulette tools"><button data-dialog="hall-rules" type="button">${icon('info')}<span>Rules</span></button><button data-dialog="hall-ledger" type="button">${icon('clock')}<span>History</span></button></nav>
+    <nav class="hall-links" aria-label="Roulette tools"><button data-dialog="hall-rules" type="button" aria-label="Rules">${icon('info')}<span>Rules</span></button><button data-dialog="hall-ledger" type="button" aria-label="History">${icon('clock')}<span>History</span></button></nav>
     <div class="hall-map" aria-hidden="true"><div class="hall-map-floor">${TABLES.map((t,i)=>`<i style="--site:${t.color};left:${50+t.x/22*100}%;top:${(t.z+6.5)/15*100}%">${i+1}</i>`).join('')}<b id="hall-map-you"></b></div><span><i></i> YOU</span></div>
     <div class="hall-walk" role="group" aria-label="Walk around">
       <button type="button" data-walk="w" aria-label="Walk forward">↑</button><button type="button" data-walk="a" aria-label="Walk left">←</button><button type="button" data-walk="s" aria-label="Walk back">↓</button><button type="button" data-walk="d" aria-label="Walk right">→</button>
@@ -109,11 +109,11 @@ async function presence(){
 async function action(action:'sit'|'stand'|'bet',data:object){
   if(sendBusy||!connected)return
   sendBusy=true
-  const start=Date.now()
   updateUI()
   try{
     await activePoll
     if(!connected)throw new Error('Reconnecting to the salon…')
+    const start=Date.now()
     accept(await api<HallView>('/roulette-hall/'+action,data),start)
   }catch(error){
     if(error instanceof ApiError&&error.status>=400&&error.status<500&&action==='bet')pending=undefined
@@ -210,7 +210,7 @@ async function start(){
   const profile=auth.profile
   try{
     const {HallStage}=await import('./hall-stage.ts')
-    stage=new HallStage(el<HTMLCanvasElement>('#hall-canvas'),el('.hall-projected'))
+    stage=new HallStage(el<HTMLCanvasElement>('#hall-canvas'),el('.hall-projected'),pick)
   }catch{
     noWebGL.hidden=false
     hall.classList.add('is-flat')
@@ -237,7 +237,7 @@ async function start(){
       activePoll=undefined
       if(!closed)updateUI()
     }
-    window.setTimeout(heartbeat,document.hidden?3500:stage?780:1150)
+    window.setTimeout(heartbeat,document.hidden?3500:stage?.moving?310:stage?780:1150)
   }
   window.addEventListener('pagehide',e=>{if(!e.persisted)closed=true})
   void heartbeat()
@@ -253,11 +253,14 @@ el<HTMLButtonElement>('#hall-mat-toggle').onclick=e=>{
   const button=e.currentTarget as HTMLButtonElement
   el('#hall-mat').hidden=!el('#hall-mat').hidden;button.setAttribute('aria-expanded',String(!el('#hall-mat').hidden))
 }
-root.querySelectorAll<HTMLButtonElement>('[data-choice]').forEach(b=>b.onclick=()=>{
-  if(pending)return
-  const value=b.dataset.choice!
-  choice=/^\d+$/.test(value)?Number(value):value as RouletteChoice
+function pick(value:RouletteChoice){
+  if(pending||isLocked()||selection()?.phase!=='betting')return
+  choice=value
   showSelection()
+}
+root.querySelectorAll<HTMLButtonElement>('[data-choice]').forEach(b=>b.onclick=()=>{
+  const value=b.dataset.choice!
+  pick(/^\d+$/.test(value)?Number(value):value as RouletteChoice)
 })
 root.querySelectorAll<HTMLButtonElement>('[data-stake]').forEach(b=>b.onclick=()=>{if(!pending){amount.value=b.dataset.stake!;showSelection()}})
 amount.addEventListener('input',showSelection)
@@ -267,6 +270,7 @@ el<HTMLFormElement>('#hall-wager').onsubmit=e=>{
   if(!table||sendBusy||!connected)return
   const stake=Number(amount.value)
   if(!Number.isSafeInteger(stake)||stake<1||stake>MAX_CASINO_STAKE){announce('Choose a whole coin stake.');return}
+  if(!pending&&stake>(view?.coins??0)){announce('Not enough coins for that stake.');return}
   pending??={round:table.round,requestId:crypto.randomUUID(),choice,stake}
   void action('bet',pending)
 }

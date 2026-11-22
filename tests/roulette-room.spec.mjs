@@ -11,22 +11,45 @@ import {wallet} from '../server/economy.ts'
 import {CASE_DESCRIPTIONS,caseOdds} from '../src/case-presentation.ts'
 import {CRATES} from '../src/collection.ts'
 test('case archive descriptions are unique and odds round without rounding tiny probabilities to zero',()=>{assert.equal(new Set(CRATES.map(c=>CASE_DESCRIPTIONS[c.id])).size,CRATES.length);assert.ok(CRATES.every(c=>CASE_DESCRIPTIONS[c.id]?.length>30));assert.equal(caseOdds(123456),'12.35%');assert.equal(caseOdds(1),'＜0.01%');assert.equal(caseOdds(0),'0%')})
-test('3D roulette controls, camera, persisted result, mobile mat and inspector work with the real server',async t=>{
- const dir=await mkdtemp(join(tmpdir(),'roulette-room-')),store=new ChessStore(dir),app=createApplication(store),server=createServer(app.handle);await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({headless:true,args:['--no-sandbox','--enable-webgl','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']}),context=await browser.newContext({viewport:{width:1440,height:960},reducedMotion:'reduce'}),page=await context.newPage(),errors=[]
- t.after(async()=>{app.drain();await browser.close();await new Promise(r=>{server.close(r);server.closeAllConnections()});store.close();await rm(dir,{recursive:true,force:true})});page.on('pageerror',e=>errors.push(e.message))
- await context.request.post(base+'/api/signup',{data:{username:'RoulettePlayer',password:'p',confirm:'p'}});store.transaction(u=>wallet(u.users.get('RoulettePlayer')).coins=20000)
- await page.goto(base+'/chess/roulette.html');await page.locator('.roulette-room.scene-ready').waitFor({timeout:45000});await page.waitForFunction(()=>Number(document.querySelector('#roulette-canvas').dataset.frame)>2);assert.ok(Number(await page.locator('#roulette-canvas').getAttribute('data-eye-height'))<1.9);await page.screenshot({path:'/tmp/roulette-room-seat.png'});await page.getByRole('button',{name:'Choose a bet on the mat',exact:true}).click();await page.waitForTimeout(700)
- await page.locator('[data-table-bet="17"]').click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-choice'),'17');await page.getByRole('button',{name:'Center',exact:true}).click();await page.waitForTimeout(600);await page.getByRole('button',{name:'Choose your chips',exact:true}).click();await page.locator('.roulette-chip-picker:not([hidden])').waitFor();await page.getByRole('button',{name:'Add 500 coin chip',exact:true}).click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-stake'),'600');await page.waitForFunction(()=>document.querySelector('#roulette-canvas').dataset.view==='chips'&&Number(document.querySelector('#roulette-canvas').dataset.eyeHeight)>2);await page.getByRole('button',{name:'Add 1 coin chip',exact:true}).click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-stake'),'601');await page.getByRole('button',{name:'Remove 1 coin chip',exact:true}).click();const chipsFrame=Number(await page.locator('#roulette-canvas').getAttribute('data-frame'));await page.waitForFunction(n=>Number(document.querySelector('#roulette-canvas').dataset.frame)>n+3,chipsFrame);await page.screenshot({path:'/tmp/roulette-chips-desktop.png'});await page.keyboard.press('Escape');await page.waitForTimeout(600)
- await page.getByRole('button',{name:'Rules',exact:true}).click();await page.locator('.roulette-room-modal[open]').waitFor();assert.match(await page.locator('.roulette-room-modal').innerText(),/1%/);await page.getByRole('button',{name:'Close roulette information'}).click()
- await page.getByRole('button',{name:'Place bet & spin',exact:true}).click();await page.locator('.roulette-room[data-phase=exchange]').waitFor();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-look-locked'),'true');await page.waitForFunction(()=>document.querySelector('#roulette-canvas').dataset.coinOwner==='player',null,{timeout:20000});await page.screenshot({path:'/tmp/roulette-room-handoff.png'});await page.locator('.roulette-room[data-phase=spin]').waitFor();await page.waitForFunction(()=>document.querySelector('#roulette-canvas').dataset.camera==='wheel',null,{timeout:20000});await page.screenshot({path:'/tmp/roulette-room-wheel.png'});await page.locator('.roulette-room[data-phase=idle]').waitFor({timeout:30000});assert.equal(await page.locator('#roulette-canvas').getAttribute('data-camera'),'seat');assert.equal(await page.locator('#roulette-canvas').getAttribute('data-look-locked'),'false')
- const settled=await(await context.request.get(base+'/api/casino')).json();assert.equal(settled.recent.length,1);assert.equal(await page.locator('#roulette-canvas').getAttribute('data-result'),String(settled.recent[0].result));await page.locator('#round-result:not([hidden])').waitFor();assert.match(await page.locator('#round-result').innerText(),/Credited/)
- await page.reload();await page.locator('.roulette-room.scene-ready').waitFor({timeout:45000});assert.deepEqual(await(await context.request.get(base+'/api/casino')).json(),settled)
- await page.getByRole('button',{name:'History',exact:true}).click();await page.locator('#roulette-history-dialog[open]').waitFor();await page.getByRole('button',{name:'Close roulette history'}).click()
- for(const width of [390,320]){const frame=Number(await page.locator('#roulette-canvas').getAttribute('data-frame'));await page.setViewportSize({width,height:844});await page.waitForFunction(n=>Number(document.querySelector('#roulette-canvas').dataset.frame)>n+1,frame);await page.getByRole('button',{name:'All bets',exact:true}).click();await page.locator('[data-pocket="12"]').click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-choice'),'12');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.getByRole('button',{name:'Choose your chips',exact:true}).click();await page.getByRole('button',{name:'Custom amount',exact:true}).click();await page.locator('.roulette-amount-modal input').fill('125');await page.getByRole('button',{name:'Set stake',exact:true}).click();assert.equal(await page.locator('#roulette-canvas').getAttribute('data-stake'),'125');await page.keyboard.press('Escape');const frame2=Number(await page.locator('#roulette-canvas').getAttribute('data-frame'));await page.waitForFunction(n=>Number(document.querySelector('#roulette-canvas').dataset.frame)>n,frame2);await page.getByRole('button',{name:'Choose a bet on the mat',exact:true}).click();await page.waitForTimeout(900);const frame3=Number(await page.locator('#roulette-canvas').getAttribute('data-frame'));await page.waitForFunction(n=>Number(document.querySelector('#roulette-canvas').dataset.frame)>n+1,frame3);assert.equal(await page.locator('.roulette-room').evaluate(room=>room.scrollLeft),0,'focusing physical controls cannot scroll the room');await page.screenshot({path:`/tmp/roulette-room-${width}.png`});const target=await page.locator('[data-table-bet="17"]').boundingBox();assert.ok(target.width>25,'magnified physical number keys are readable');await page.locator('[data-table-bet="17"]').click();await page.locator('.roulette-room').evaluate(room=>{const start=new Event('touchstart');Object.defineProperty(start,'touches',{value:[{clientX:150,clientY:250}]});room.dispatchEvent(start);const end=new Event('touchend');Object.defineProperty(end,'changedTouches',{value:[{clientX:155,clientY:380}]});room.dispatchEvent(end)});assert.equal(await page.locator('.roulette-room').getAttribute('data-focus'),'seat')}
- // Force presentation fixtures only: real settlement was verified above.
- const profile=(await(await context.request.get(base+'/api/me')).json()).profile
- await page.route('**/api/casino/bet',async route=>{const bet=route.request().postDataJSON(),gross=bet.stake*(bet.choice===0?49:36),tax=(gross-bet.stake)*.01,round={...bet,id:'visual-'+bet.sequence,result:bet.choice,won:true,gross,profit:gross-bet.stake,tax,credited:gross-tax,net:gross-tax-bet.stake,created:Date.now()};await route.fulfill({json:{...settled,profile:{...profile,coins:20000+round.net},coins:20000+round.net,nextSequence:bet.sequence+1,recent:[round],round}})})
- await page.setViewportSize({width:1280,height:900})
- for(const [choice,tier]of [[17,'2'],[0,'3']]){await page.getByRole('button',{name:'All bets',exact:true}).click();await page.locator(`[data-pocket="${choice}"]`).click();await page.getByRole('button',{name:'Place bet & spin',exact:true}).click();await page.waitForFunction(tier=>document.querySelector('#roulette-canvas').dataset.winTier===tier,tier,{timeout:20000});assert.equal(await page.locator('#roulette-canvas').getAttribute('data-win-glow'),'true');await page.locator('.roulette-room[data-phase=idle]').waitFor({timeout:20000})}
- await page.goto(base+'/chess/collection.html#shop');await page.locator('[data-crate-pool=skin-bronze]').click();assert.match(await page.locator('.crate-catalog-dialog').innerText(),/hands of the artisans/);assert.ok(await page.locator('.case-rarity-group').count()>0);assert.deepEqual(errors,[])
+test('desktop and phone players share a table and see the same draw',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'roulette-room-'))
+ const store=new ChessStore(dir),app=createApplication(store),server=createServer(app.handle)
+ await new Promise(r=>server.listen(0,'127.0.0.1',r))
+ const base='http://127.0.0.1:'+server.address().port
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']})
+ t.after(async()=>{app.drain();await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));store.close();await rm(dir,{recursive:true,force:true})})
+ const desktop=await browser.newContext({viewport:{width:1280,height:900}})
+ const mobile=await browser.newContext({viewport:{width:390,height:844},hasTouch:true,isMobile:true,reducedMotion:'reduce'})
+ // Exercise phone input and the network flow without a second software renderer competing for the GPU.
+ await mobile.addInitScript(()=>{const get=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return type.startsWith('webgl')?null:get.call(this,type,...args)}})
+ const errors=[]
+ for(const [context,username] of [[desktop,'IvoryGuest'],[mobile,'RiftGuest']]){
+  const signup=await context.request.post(base+'/api/signup',{data:{username,password:'p',confirm:'p'}})
+  assert.equal(signup.status(),201)
+  store.transaction(u=>wallet(u.users.get(username)).coins=1000)
+ }
+ const page=await desktop.newPage(),phone=await mobile.newPage()
+ for(const p of [page,phone]){
+  p.on('pageerror',error=>errors.push(error.message))
+  await p.goto(base+'/chess/roulette.html')
+  await p.locator('.hall-table-link[data-sit="0"]').click({timeout:45_000})
+ }
+ await page.locator('#hall-canvas[data-camera=seat]').waitFor()
+ await page.locator('.hall-seats').getByText('RiftGuest').waitFor()
+ await phone.getByRole('button',{name:'Bet on 17',exact:true}).click()
+ assert.equal(await phone.locator('[data-choice="17"]').getAttribute('aria-pressed'),'true')
+ assert.equal(await phone.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+ await phone.getByRole('button',{name:'Lock bet',exact:true}).click()
+ await phone.getByText('Your bet is locked. Waiting for the table.').waitFor()
+ await page.getByRole('button',{name:'Lock bet',exact:true}).click()
+ await page.locator('#hall-canvas[data-camera=wheel]').waitFor()
+ await page.locator('#hall-result:not([hidden])').waitFor()
+ await phone.locator('#hall-result:not([hidden])').waitFor()
+ assert.equal(await page.locator('.hall-result-title .hall-pocket').textContent(),await phone.locator('.hall-result-title .hall-pocket').textContent())
+ assert.equal(await page.locator('#hall-result li').count(),2)
+ const a=await(await desktop.request.get(base+'/api/casino')).json(),b=await(await mobile.request.get(base+'/api/casino')).json()
+ assert.equal(a.recent.length,1)
+ assert.equal(b.recent.length,1)
+ assert.equal(a.recent[0].result,b.recent[0].result)
+ assert.deepEqual(errors,[])
 })
