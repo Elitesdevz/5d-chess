@@ -7,6 +7,9 @@ const roofs=[0x76534b,0x465e63,0x515461,0x935a48]
 const wood=0x76523c,cream=0xebd9b2,iron=0x394b48
 export function neighborhood(parent:T.Object3D){
   const props=new Scenery(),windows:T.Matrix4[]=[]
+  const placePane=(x:number,y:number,z:number,yaw=0)=>{
+    const m=new T.Matrix4().makeRotationY(yaw);m.setPosition(x,y,z);windows.push(m)
+  }
   HOMES.forEach(([cx,cz],i)=>{
     const wall=paint[i%paint.length],roof=roofs[i%roofs.length],accent=[0x477c72,0x7d5662,0x526e80,0x9e734a][i%4]
     const box=(x:number,y:number,z:number,w:number,h:number,d:number,color:number,roll=0)=>props.add('box',cx+x,y,cz+z,w,h,d,color,0,roll)
@@ -19,11 +22,21 @@ export function neighborhood(parent:T.Object3D){
       box(x,1.61,2.89,.055,1.48,.09,cream);box(x,1.72,2.89,1.5,.05,.09,cream)
       box(x,.85,2.97,1.81,.11,.38,cream)
       for(const edge of [-1,1])box(x+edge*.91,1.62,3,.24,1.49,.08,accent)
-      windows.push(new T.Matrix4().makeTranslation(cx+x,1.59,cz+2.88))
-      box(side*2.97,1.5,0,.17,3,5.78,wall)
+      placePane(cx+x,1.59,cz+2.88)
+      const sx=side*2.97
+      box(sx,.43,0,.17,.86,5.78,wall);box(sx,2.68,0,.17,.72,5.78,wall)
+      for(const edge of [-1,1])box(sx,1.59,edge*1.82,.17,1.48,2.14,wall)
+      box(sx,1.59,0,.08,1.46,.052,cream);box(sx,1.72,0,.08,.047,1.49,cream)
+      box(sx,.85,0,.37,.11,1.71,cream);placePane(cx+sx,1.59,cz,Math.PI/2)
+      box(sx,.21,0,.22,.35,5.78,0x97897b)
       box(side*2.96,2.92,0,.21,.18,5.95,wood)
       box(side*.87,1.19,2.94,.12,2.38,.27,cream)
       box(side*1.58,3.70,0,3.69,.18,6.57,roof,side*-.419)
+      for(let row=0;row<6;row++){
+        const distance=.25+row*.54
+        box(side*distance,4.51-distance*.445,0,.16,.09,6.52,roof,side*-.419)
+      }
+      for(let k=0;k<3;k++)box(side*(.48+k*.68),3.44-k*.134,2.99,.08,.74-k*.24,.09,wood)
       box(side*3.22,2.98,0,.12,.19,6.57,wood)
       for(const z of [-2.92,2.92])box(side*2.89,1.55,z,.22,3.1,.22,cream)
       // A projecting planter with a few distinct blooms.
@@ -35,6 +48,11 @@ export function neighborhood(parent:T.Object3D){
       box(0,3.04,z,6.18,.14,.25,cream)
     }
     box(0,1.49,-2.88,5.96,2.99,.18,wall);box(0,2.72,2.89,1.76,.66,.18,wall)
+    // A door held open against the jamb leaves a clear straight entry.
+    box(.88,1.08,2.23,.095,2.12,1.23,accent)
+    box(.81,1.04,1.77,.12,.06,.17,0xb49560)
+    for(const y of [.65,1.52])box(.82,y,2.23,.045,.58,.86,wood)
+    for(const z of [-1.83,0,1.83])box(0,3.02,z,5.9,.14,.15,wood)
     box(0,.035,0,5.89,.07,5.76,0xa27e61)
     for(let k=0;k<11;k++)box(-2.7+k*.54,.074,0,.014,.006,5.72,wood)
     box(0,.055,3.17,1.81,.11,.51,0xb5a797);box(0,2.41,3.15,2.04,.13,.8,accent)
@@ -57,6 +75,17 @@ export function neighborhood(parent:T.Object3D){
       if(library||studio)box(x,1.56,-2.47,.19,.34+k%3*.07,.29,[accent,cream,roof,0xa99161][k%4],k%5===0?.12:0)
       else orb(x,1.47,-2.47,.25,.24,.23,bakery?0xdba15b:k%2?0x9cae90:cream)
     }
+    // Handwoven diamond motifs; the back cabinet has panel doors and brass pulls.
+    for(let k=-2;k<=2;k++)for(const x of [-.28,.28])box(x,.104,k*.46,.12,.008,.24,cream)
+    for(const x of [-.83,0,.83]){
+      box(x,.66,-2.24,.75,.98,.035,0x91694c);box(x,.68,-2.211,.59,.75,.031,wood)
+      orb(x+.20,.86,-2.17,.066,.066,.067,0xd2a765)
+    }
+    box(0,2.42,-2.746,1.16,.64,.075,wood);box(0,2.42,-2.69,1.04,.52,.04,cream)
+    box(0,2.42,-2.655,.93,.42,.031,accent)
+    props.add('gable',cx-.12,2.38,cz-2.627,.54,.23,.018,0xb7c0aa)
+    props.add('gable',cx+.15,2.36,cz-2.615,.59,.19,.018,0x547369)
+    orb(.26,2.51,-2.62,.087,.087,.015,0xf4d292)
     if(studio){box(2.15,1.52,-1.60,.84,1.05,.09,cream);box(2.15,1.52,-1.53,.66,.79,.04,accent)}
     else if(bakery){for(let n=0;n<3;n++)orb(2.19,1.05,-1.86+n*.36,.56,.24,.27,0xc68c55)}
     else {box(2.1,.98,-1.41,.52,.06,.42,cream);orb(2.46,1.18,-1.85,.26,.46,.26,accent)}

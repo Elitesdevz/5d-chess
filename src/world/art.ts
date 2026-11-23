@@ -1,5 +1,6 @@
 import {landscape,Scenery} from './landscape.ts'
 import {neighborhood} from './neighborhood.ts'
+import {contactShade} from './shade.ts'
 import {avenues,venueDetail} from './civic.ts'
 import * as T from 'three'
 import {box,cylinder,mesh,v,dice,resultRotation} from '../casino/scene/geometry.ts'
@@ -143,7 +144,15 @@ function landmarks(parent:T.Object3D){
 function fountain(scene:T.Scene){
   const plaza=new T.Group();scene.add(plaza)
   cylinder(plaza,2.87,.18,[0,.13,0],ivory,64);cylinder(plaza,2.68,.35,[0,.345,0],stone,64)
-  cylinder(plaza,2.57,.021,[0,.535,0],std(0x3a7b88,.36,.16),60)
+  const glints=texture(256,256,c=>{
+    c.fillStyle='#427f83';c.fillRect(0,0,256,256)
+    for(let i=0;i<134;i++){
+      const x=(i*83)%256,y=(i*61)%256
+      c.beginPath();c.moveTo(x,y);c.bezierCurveTo(x+3,y-2,x+7,y+1,x+12+i%15,y-1)
+      c.strokeStyle=i%5?'#8ec8b94c':'#b2ded580';c.lineWidth=.7;c.stroke()
+    }
+  })
+  cylinder(plaza,2.57,.021,[0,.535,0],new T.MeshStandardMaterial({map:glints,roughness:.22,metalness:.23}),60)
   // Travertine paving, bronze spill bowls and a double-sided cast knight.
   const mosaic=new Scenery()
   for(let i=0;i<72;i++){
@@ -205,12 +214,16 @@ function street(){
     potted(group,x,z,1.4)
   }
   for(const [x,z] of [[-8,2],[8,2],[-14,14],[14,14],[-18,7],[18,7]])bench(group,x,z,x>0?Math.PI/2:-Math.PI/2)
-  const guide=new T.Group();guide.position.set(-4.22,0,3.63);guide.rotation.y=.24;group.add(guide)
+  const guide=new T.Group();guide.position.set(-4.65,0,1.72);guide.rotation.y=.24;group.add(guide)
   box(guide,[2.53,1.31,.17],[0,1.43,0],ink,.06)
   banner(guide,'CITY SQUARE',[2.24,.28],[0,1.81,.093])
   banner(guide,'‹  BANK     CASINO  ↑',[2.18,.28],[0,1.42,.093])
   banner(guide,'EXCHANGE  ›',[2.03,.27],[0,1.11,.093])
   for(const x of [-.98,.98])block(guide,.10,.81,.15,x,.43,0,brass)
+  const trailSign=new T.Group();trailSign.position.set(1.8,0,44);trailSign.rotation.y=Math.PI;group.add(trailSign)
+  block(trailSign,.14,1.85,.16,0,.92,0,oak)
+  block(trailSign,1.58,.35,.14,.17,1.57,0,leather)
+  banner(trailSign,'Mill trail  ›',[1.42,.32],[.17,1.57,.078],'#f3e6cc')
   return group
 }
 function frontWindow(scene:T.Object3D,width:number,z:number,wall:T.Material,openDoor=true){
@@ -302,9 +315,9 @@ function makeScreen(scene:T.Object3D,symbol:string,x:number){
 function cave(scene:T.Object3D,oasis:boolean){
   const rockStops=Array.from({length:14},(_,i)=>7.39-i*1.16)
   plane(scene,5.76,16.9,0,0,0,std(oasis?0x546b58:0x444441))
-  for(const z of rockStops){
+  for(const [i,z] of rockStops.entries()){
     for(const side of [-1,1]){
-      const o=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[side*3.09,1.57,z]);o.scale.set(1.5,2.3,1.55);o.rotation.y=z*side*.53
+      const o=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[side*3.09,1.57,z]);o.scale.set(1.47+.15*Math.sin(i*1.3),2.28+.16*Math.cos(i),1.55);o.rotation.y=z*side*.53
     }
     const crown=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[0,3.25,z]);crown.scale.set(3.9,.9,1.47);crown.rotation.y=z*.71
   }
@@ -405,7 +418,7 @@ export function makeWorldArt(open:boolean){
   scene.fog=new T.FogExp2(0xc2c9be,.0056)
   scene.add(new T.HemisphereLight(0xdbe9ff,0xa89072,1.95))
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
-  scene.add(street());const water=fountain(scene),wind=landscape(scene)
+  scene.add(street());contactShade(scene);const water=fountain(scene),wind=landscape(scene)
   const ambient=(time:number)=>{water(time);wind(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>
   for(const zone of Object.keys(PLAN) as (keyof typeof PLAN)[]){

@@ -1,4 +1,4 @@
-import {CAVE_MOUTH,CAVE_X,OASIS_X,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
+import {CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
 import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
 export const WORLD_CAPACITY=50
@@ -109,7 +109,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
     const p=localSite(zone,x,z),shaft=Math.abs(p.x)<1.42
     return Math.abs(p.x)<7.72&&p.z<7.29&&p.z>(shaft?-6.21:-5.98)&&!roomObstacles(zone,p.x,p.z)
   }
-  if(!passableLand(x,z)||Math.hypot(x,z)<2.88||townFixture(x,z)||houseObstacle(x,z))return false
+  if(!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z)||houseObstacle(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x),opening=room==='bank'?1.13:room==='exchange'?1.02:1.25
     if(side<width+.28&&side>width-.28&&p.z>back-.28&&p.z<front+.28)return false

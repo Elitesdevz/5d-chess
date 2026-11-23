@@ -50,3 +50,26 @@ export function townFixture(x:number,z:number){
   if(Math.abs(Math.abs(x)-6.25)<.64&&(Math.abs(z+3)<2||Math.abs(z-4)<2))return true
   return Math.hypot(x+18,z-55)<1.67
 }
+
+export function trailDistance(x:number,z:number){
+  const route=16+24*Math.min(1,Math.max(0,(z-36)/37))+2*Math.sin(z*.16)
+  return z>32&&z<CAVE_MOUTH+1?Math.abs(Math.abs(x)-route):100
+}
+// Both the renderer and walking simulation use these positions for the tree trunks.
+export const VALLEY_TREES:{x:number;z:number;size:number}[]=[]
+const treeCells=new Map<string,{x:number;z:number}[]>()
+let woodlandSeed=6821
+function woodlandRandom(){woodlandSeed=(Math.imul(woodlandSeed,1664525)+1013904223)>>>0;return woodlandSeed/4294967296}
+for(let i=0;i<730;i++){
+  const x=(woodlandRandom()-.5)*220,z=(woodlandRandom()-.5)*220,size=2.2+woodlandRandom()*3.1
+  if(Math.abs(x)<63&&Math.abs(z)<48||Math.abs(x)<24&&z<64&&z>46||Math.abs(Math.abs(x)-40)<8&&z>65&&z<94||trailDistance(x,z)<2||ridgeDistance(x,z)>8)continue
+  VALLEY_TREES.push({x,z,size})
+  for(let a=Math.floor((x-.32)/6);a<=Math.floor((x+.32)/6);a++)for(let b=Math.floor((z-.32)/6);b<=Math.floor((z+.32)/6);b++){
+    const key=a+','+b
+    if(!treeCells.has(key))treeCells.set(key,[])
+    treeCells.get(key)!.push({x,z})
+  }
+}
+export function treeObstacle(x:number,z:number){
+  return treeCells.get(Math.floor(x/6)+','+Math.floor(z/6))?.some(t=>(x-t.x)**2+(z-t.z)**2<.32**2)??false
+}
