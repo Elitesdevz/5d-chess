@@ -1,5 +1,4 @@
-import {bankState} from './bank.ts'
-import {casState} from './cas-shares.ts'
+import {maintainEconomy} from './governance.ts'
 import {startStockQuotes} from './stock-quotes.ts'
 import {maintainGames} from './game-lifecycle.ts'
 import {createServer} from 'node:http'
@@ -23,9 +22,9 @@ const maintain=()=>{try{store.transaction(unit=>maintainGames(store,unit))}catch
 maintain()
 const gameTimer=setInterval(maintain,60_000);gameTimer.unref()
 const stopStockQuotes=startStockQuotes(store)
-const maintainShares=()=>{try{store.transaction(unit=>{const now=Date.now();casState(unit,now);bankState(unit,now)})}catch{console.error('Share maintenance deferred')}}
-maintainShares()
-const sharesTimer=setInterval(maintainShares,30_000);sharesTimer.unref()
+store.transaction(unit=>maintainEconomy(unit))
+const maintainShares=()=>{try{store.transaction(unit=>maintainEconomy(unit))}catch(error){console.error('Economy maintenance deferred',error)}}
+const sharesTimer=setInterval(maintainShares,5_000);sharesTimer.unref()
 const application = createApplication(store)
 const server = createServer(application.handle)
 const sockets = new Set<Socket>()

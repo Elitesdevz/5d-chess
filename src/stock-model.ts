@@ -1,8 +1,9 @@
+import type {CompanyView} from './equity-v2.ts'
 export const CAS='CAS'
 export const BNK='BNK'
 export type EquitySymbol=typeof CAS|typeof BNK
 export const isEquity=(symbol:string):symbol is EquitySymbol=>symbol===CAS||symbol===BNK
-export const CAS_SHARES=10_000
+export const CAS_SHARES=1_000_000
 export const MAX_STOCK_ORDER=1_000
 export const QUOTE_MAX_AGE=72*60*60*1000
 export const STOCK_UNITS=10_000
@@ -23,7 +24,7 @@ export interface EquityPublic { float:number; available:number; price:number; bi
 }
 export interface CasPublic extends EquityPublic {equity:number;equityMoves:{at:number;shares:number;side:StockSide}[]}
 export interface StockView {
-  coins:number; quotes:Record<string,StockQuote>; cas:CasPublic; bank:EquityPublic; portfolio:StockPortfolio; now:number
+  coins:number; quotes:Record<string,StockQuote>; cas:CasPublic; bank:EquityPublic; portfolio:StockPortfolio; now:number; companies:Record<EquitySymbol,CompanyView>
 }
 export interface StockOrder {symbol:string;side:StockSide;shares:number;total:number;sequence:number;id:string;version?:number}
 export const toStockUnits=(coins:number)=>Math.round(coins*STOCK_UNITS)

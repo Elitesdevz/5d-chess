@@ -1,7 +1,7 @@
 export const CAVE_DICE_EDGE=.0025
 export const CAVE_DICE_MULTIPLIER=6*(1-CAVE_DICE_EDGE)
 export const HOUSE_EDGE=0.02
-export const PROFIT_TAX=0.01
+export const PROFIT_TAX=0
 export const CASINO_OWNER='CasinoOwner'
 export const MAX_CASINO_STAKE=100000
 export type CasinoGame='roulette'|'dice'
@@ -15,12 +15,13 @@ export function rouletteWins(choice:RouletteChoice,result:number){
  if(choice==='white'||choice==='black')return pocketColor(result)===choice
  return choice==='odd'?result%2===1:choice==='even'?result%2===0:choice==='low'?result<=18:result>=19
 }
-export const grossMultiplier=(game:CasinoGame,choice:RouletteChoice)=>game==='dice'?5.88:typeof choice==='number'?choice===0?49:36:2
+export const grossMultiplier=(game:CasinoGame,choice:RouletteChoice,edge=HOUSE_EDGE)=>
+  game==='dice'?6*(1-edge):(typeof choice==='number'?choice===0?49:36:2)*((1-edge)/(1-HOUSE_EDGE))
 export const winProbability=(game:CasinoGame,choice:RouletteChoice)=>game==='dice'?1/6:typeof choice==='number'?choice===0?.02:.98/36:.49
 export interface CasinoBet {currency?:'elo';quoteDay?:string;eloRating?:number;requestId:string;sequence:number;game:CasinoGame;stake:number;choice:RouletteChoice}
 export interface CasinoRound extends CasinoBet {id:string;result:number;won:boolean;gross:number;profit:number;tax:number;credited:number;net:number;created:number;eloLost?:number;eloAfter?:number;coinReward?:number}
 export interface CasinoState {sequence:number;recent:CasinoRound[]}
-export interface CasinoView {coins:number;nextSequence:number;recent:CasinoRound[];houseEdge:number;profitTax:number;taxAccount:string;maxStake:number}
+export interface CasinoView {coins:number;nextSequence:number;recent:CasinoRound[];houseEdge:number;profitTax:number;taxAccount:string;maxStake:number;open?:boolean}
 export interface CasinoReply extends CasinoView {round:CasinoRound}
 export const casinoCoins=(value:number)=>new Intl.NumberFormat('en',{maximumFractionDigits:4}).format(value)
 

@@ -7,18 +7,15 @@ import type {Movement, PlayerCount} from '../src/model.ts'
 import type {ChessStore} from './storage.ts'
 import type {Reply} from './model.ts'
 import {ensureAccount} from './accounts.ts'
-import {CAS_META} from './cas-shares.ts'
-import {BANK_META} from './bank.ts'
+import {COMPANIES,type Companies} from './corporate.ts'
 import {STOCK_QUOTES} from './stock-quotes.ts'
-import {BNK,CAS,equityPrice,type EquityPublic,type StockQuote} from '../src/stock-model.ts'
+import {BNK,CAS,fromStockUnits,type StockQuote} from '../src/stock-model.ts'
 
 function netWorthPrices(store:ChessStore){
   const quotes=store.metadataValue(STOCK_QUOTES) as Record<string,StockQuote>|undefined
   const prices=new Map(Object.entries(quotes??{}).map(([symbol,quote])=>[symbol,quote.price]))
-  for(const [symbol,key] of [[CAS,CAS_META],[BNK,BANK_META]] as const){
-    const issue=store.metadataValue(key) as Pick<EquityPublic,'float'|'available'>|undefined
-    if(issue)prices.set(symbol,equityPrice(symbol,issue))
-  }
+  const economy=store.metadataValue(COMPANIES) as Companies|undefined
+  if(economy)for(const symbol of [CAS,BNK] as const)prices.set(symbol,fromStockUnits(economy[symbol].price))
   return prices
 }
 

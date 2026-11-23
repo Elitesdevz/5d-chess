@@ -17,7 +17,7 @@ let pending:Order|undefined
 const desks={loans:['LENDING DESK','Loans'],payments:['CASHIER','Payments'],vault:['BANK RESERVE','The Vault']} as const
 
 el('bank-back').innerHTML=icon('back')+'<span>Back to Home</span>'
-el('bank-term-buttons').innerHTML=BANK_TERMS.map(t=>`<button type="button" data-term="${t.days}" aria-pressed="${t.days===term}"><strong>${t.days} days</strong><small>${t.basisPoints/100}% daily</small></button>`).join('')
+el('bank-term-buttons').innerHTML=BANK_TERMS.map(t=>`<button type="button" data-term="${t.days}" aria-pressed="${t.days===term}"><strong>${t.days} days</strong><small data-loan-rate></small></button>`).join('')
 function show(message:string,kind='info'){
   const host=el('bank-feedback')
   host.textContent=message;host.dataset.kind=kind;host.hidden=!message
@@ -29,7 +29,7 @@ function setState(next:BankView){
   state=next
   if(profile&&profile.coins!==next.coins){profile={...profile,coins:next.coins};renderAccount(profile)}
   el('bank-directory').hidden=active!=='lobby'
-  el('bank-welcome').textContent=next.loan?`${coinAmount(next.loan.total)} outstanding`:'Loans, payments, and bank shares'
+  el('bank-welcome').textContent=next.loan?`${coinAmount(next.loan.total)} outstanding`:'Credit score '+next.score+' · Loans and payments'
   render()
 }
 function render(){
@@ -43,8 +43,9 @@ function render(){
   blocked.hidden=borrowAllowed
   blocked.textContent=loan?'You already have an active loan. Visit Payments to review it.':'Your borrowing limit is below the 100 coin minimum.'
   amount.max=String(Math.max(BANK_MIN_LOAN,limit))
-  const value=Number(amount.value),contract=BANK_TERMS.find(t=>t.days===term)!
-  const charge=Math.floor(value*contract.basisPoints)*term/10_000
+  const value=Number(amount.value)
+  hall.querySelectorAll('[data-loan-rate]').forEach(node=>node.textContent=state!.rate+'% daily')
+  const charge=Math.floor(value*state.rate*100)*term/10_000
   el('bank-estimate-interest').textContent=value>0&&Number.isFinite(value)?coinAmount(charge):'—'
   el('bank-estimate-total').textContent=value>0&&Number.isFinite(value)?coinAmount(value+charge):'—'
   const retryBorrow=pending?.kind==='borrow',retryRepay=pending?.kind==='repay'
@@ -94,7 +95,7 @@ async function refresh(){
   finally{refreshing=false}
 }
 function receipt(rec:BankReceipt){
-  stage?.transaction(rec.kind)
+  if(rec.kind!=='collection')stage?.transaction(rec.kind)
   show(rec.kind==='borrow'?`${coinAmount(rec.amount)} deposited into your wallet.`:`Paid ${coinAmount(rec.amount)}${rec.interest?` · ${coinAmount(rec.interest)} went to interest`:''}.`,'success')
   if(rec.kind==='repay')repayment.value=''
   render()

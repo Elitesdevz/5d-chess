@@ -1,3 +1,5 @@
+import {income} from './credit.ts'
+import {toStockUnits} from '../src/stock-model.ts'
 import {PUZZLES,puzzleById,testPuzzle} from '../src/puzzle-model.ts'
 import type {Account} from './accounts.ts'
 import type {Reply} from './model.ts'
@@ -17,7 +19,7 @@ export function puzzleApi(account:Account,path:string,method:string,data:Record<
  const attempt=testPuzzle(puzzle,data.orders)
  if(!attempt.ok)fail(400,attempt.message)
  const previous=puzzleProgress(account).completed, reward=previous.includes(puzzle.id)?0:PUZZLE_REWARD
- if(reward)wallet(account).coins+=reward
+ if(reward){wallet(account);income(account,toStockUnits(reward))}
  account.puzzleCompleted=[...new Set([...previous,puzzle.id])].sort((a,b)=>a-b)
  return {status:200,value:{...puzzleProgress(account),reward}}
 }

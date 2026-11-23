@@ -1,12 +1,14 @@
+import {income,requireSpending,type BankAccount} from './credit.ts'
+import {toStockUnits} from '../src/stock-model.ts'
 import {randomBytes,randomInt} from 'node:crypto'
 import {type Wallet,type Drop,type Listing,type Collectible,type ItemType,STARTER_COINS,MARKET_DESCRIPTION_LIMIT,PAID_SPIN_PRICE,ITEMS,GENERAL_ITEMS,CRATES,crateTickets,caseOffers,seasonalItems,setById,setRequirements,planSet,covers,type CosmeticSet,monthKey,nextMonth,CRATE_ODDS,RARITIES,SPIN_REWARDS,spinRewards,dailyDeals,dayKey,nextReset,nextWeek,weeklyItems,itemById,duplicateRefund} from '../src/collection.ts'
 import {KINDS,type Kind} from '../src/model.ts'
-export interface EconomicAccount {name:string;wallet?:Wallet;marketRequests?:{requestId:string;listing:Listing}[];receipts?:{key:string;drop:Drop}[]}
+export interface EconomicAccount {name:string;wallet?:Wallet;bank?:BankAccount;marketRequests?:{requestId:string;listing:Listing}[];receipts?:{key:string;drop:Drop}[]}
 export const uid=()=>randomBytes(12).toString('hex')
 const reject=(status:number,message:string):never=>{throw Object.assign(new Error(message),{status})}
 export function wallet(account:EconomicAccount):Wallet{
  const w=account.wallet??={coins:0,inventory:[],loadout:{icon:'default',pieces:{}}}
- if(!w.starterGranted){w.coins+=STARTER_COINS;w.starterGranted=true}
+ if(!w.starterGranted){income(account,toStockUnits(STARTER_COINS));w.starterGranted=true}
  return w
 }
 export function weightedIndex(weights:readonly number[],ticket=randomInt(weights.reduce((a,b)=>a+b,0))){if(!Number.isInteger(ticket)||ticket<0||ticket>=weights.reduce((a,b)=>a+b,0))throw new Error('Invalid draw');for(let i=0;i<weights.length;i++){ticket-=weights[i];if(ticket<0)return i}throw new Error('Invalid weights')}
@@ -15,7 +17,7 @@ export function grant(account:EconomicAccount,item:Collectible,source:Drop['sour
  w.inventory.push({uid:id,itemId:item.id,kind,acquired:now,pending:duplicate})
  return {id:uid(),source,uid:id,itemId:item.id,kind,duplicate,refund:duplicate?duplicateRefund(item):undefined,created:now}
 }
-function spend(account:EconomicAccount,price:number){const w=wallet(account);if(w.coins<price)reject(409,'Not enough coins');w.coins-=price}
+function spend(account:EconomicAccount,price:number){requireSpending(account);const w=wallet(account);if(w.coins<price)reject(409,'Not enough coins');w.coins-=price}
 export function spin(account:EconomicAccount,now=Date.now(),paid=false,expectedDay?:unknown):Drop{
  const w=wallet(account);if(w.inventory.length>=5000||(w.cases?.length??0)>=500)reject(409,'Inventory is full')
  if(expectedDay!==undefined&&expectedDay!==dayKey(now))reject(409,'The wheel has changed. Review today’s rewards before spinning.')
@@ -24,7 +26,7 @@ export function spin(account:EconomicAccount,now=Date.now(),paid=false,expectedD
  const set=reward.setId?setById(reward.setId):undefined;if(set&&w.inventory.length+setRequirements(set).length>5000)reject(409,'Inventory is full')
  if(paid)spend(account,PAID_SPIN_PRICE)
  let drop:Drop
- if(reward.coins){drop={id:uid(),source:'spin',coins:reward.coins,created:now};w.coins+=reward.coins}
+ if(reward.coins){drop={id:uid(),source:'spin',coins:reward.coins,created:now};income(account,toStockUnits(reward.coins),now)}
  else if(reward.caseId){const id=uid();(w.cases??=[]).push({uid:id,caseId:reward.caseId,acquired:now});drop={id:uid(),source:'spin',caseId:reward.caseId,caseUid:id,created:now}}
  else if(set){drop=grantSet(account,set,now);drop.source='spin'}
  else{const pool=reward.itemId?[itemById(reward.itemId)!]:GENERAL_ITEMS.filter(i=>i.rarity===reward.rarity);drop=grantUnit(account,pool[randomInt(pool.length)],'spin',now)}
@@ -68,7 +70,7 @@ export function resolveDuplicate(account:EconomicAccount,id:unknown,refund:unkno
  if(typeof refund!=='boolean')reject(400,'Choose keep or refund')
  const w=wallet(account),owned=w.inventory.find(i=>i.uid===id)??reject(404,'Item not found')
  if(!owned.pending)reject(409,'This item has already been kept or refunded')
- if(refund){w.coins+=duplicateRefund(itemById(owned.itemId)!);w.inventory=w.inventory.filter(i=>i!==owned)}else owned.pending=false
+ if(refund){income(account,toStockUnits(duplicateRefund(itemById(owned.itemId)!)));w.inventory=w.inventory.filter(i=>i!==owned)}else owned.pending=false
 }
 export function equip(account:EconomicAccount,slot:unknown,id:unknown){
  const w=wallet(account)
@@ -149,7 +151,7 @@ export function buyListing(buyer:EconomicAccount,accounts:EconomicAccount[],list
  if(!ids.length||new Set(ids).size!==ids.length)reject(409,'Invalid listing members')
  const members=ids.map(id=>sw.inventory.find(i=>i.uid===id&&i.listed===listing.id));if(members.some(i=>!i))reject(409,'Item unavailable')
  if(bw.inventory.length+members.length>5000)reject(409,'Inventory is full')
- spend(buyer,listing.price);sw.coins+=listing.price
+ spend(buyer,listing.price);income(seller,toStockUnits(listing.price),now)
  for(const owned of members){sw.inventory.splice(sw.inventory.indexOf(owned!),1);bw.inventory.push({...owned!,acquired:now,pending:false,listed:undefined})}
  listings.splice(listings.indexOf(listing),1)
 }

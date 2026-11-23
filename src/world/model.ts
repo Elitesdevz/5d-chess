@@ -62,7 +62,7 @@ export function riderHeight(player:WorldPlayer,now:number){
   const progress=Math.max(0,Math.min(1,(now-ride.started)/(ride.ends-ride.started)))
   return from+(floorHeight(ride.to)-from)*progress*progress*(3-2*progress)
 }
-export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'banker'|'trader'
+export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
 export interface WorldView{
   id:string;now:number;you:WorldPlayer;players:WorldPlayer[];coins:number;caveOpen:boolean;hall?:HallView;tableMotion?:Pick<HallTable,'spin'|'recent'>[];interaction?:WorldUse
@@ -73,7 +73,7 @@ function localInteractions(zone:WorldZone):WorldAction[]{
     ...LOUNGES.map((seat,i)=>({id:'couch:'+i,label:'Sit on couch',x:seat.x,z:seat.z,range:1.75})),
   ]
   if(zone==='bank')return [{id:'loans',label:'Speak to the lender',x:-2.9,z:.73},{id:'payments',label:'Speak to the cashier',x:2.9,z:.73},{id:'reserve',label:'Speak to the reserve clerk',x:7.4,z:.6}]
-  if(zone==='exchange'||zone.startsWith('floor:'))return [{id:'elevator',label:'Use elevator',...LIFT,range:1.25},...(zone==='exchange'?[]:[{id:'trader',label:'Speak to the trader',x:-2.7,z:-.4},{id:'trader',label:'Speak to the trader',x:2.7,z:-.4}])]
+  if(zone==='exchange'||zone.startsWith('floor:'))return [{id:'elevator',label:'Use elevator',...LIFT,range:1.25},...(zone==='exchange'?[{id:'reception',label:'View your portfolio',x:.63,z:-.77}]:[{id:'trader',label:'Speak to the trader',x:-2.7,z:-.4},{id:'trader',label:'Speak to the trader',x:2.7,z:-.4}])]
   return []
 }
 export const interactions=(zone:WorldZone)=>localInteractions(zone).map(action=>({...action,...site(zone,action.x,action.z)}))

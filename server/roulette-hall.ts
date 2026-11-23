@@ -1,15 +1,17 @@
 import {randomInt,randomUUID} from 'node:crypto'
 import type {ChessStore} from './storage.ts'
 import {casinoView,reserveRouletteStake,rouletteResult,settleReservedCasino,validateBet} from './casino.ts'
-import {CASINO_OWNER,type CasinoBet,type CasinoRound} from '../src/casino-model.ts'
+import {grossMultiplier,type CasinoBet,type CasinoRound} from '../src/casino-model.ts'
 import {BET_WINDOW,COUCH_SEATS,HALL_CAPACITY,LOUNGES,RESULT_TIME,SEAT_OFFSETS,SPAWN,SPIN_TIME,TABLES,WALK_SPEED,chairPosition,loungePosition,walk,type Position,type HallPlayer,type HallSpin,type HallTable,type HallView,type TablePrize} from '../src/roulette-hall-model.ts'
-import {casState,recordCasinoMargins} from './cas-shares.ts'
+import {companies,ESCROW,saveCompanies,type Companies,COMPANIES} from './corporate.ts'
+import {acceptWager,postPayout} from './casino-finance.ts'
+import {requireSpending} from './credit.ts'
+import {toStockUnits} from '../src/stock-model.ts'
 import {DICE_TABLE_INDEX,WORLD_TABLES} from '../src/world/model.ts'
 import {fail} from './http.ts'
 
-const ESCROW='rouletteHallEscrow'
 const PRESENCE_TIME=20_000
-type Ticket={name:string;avatar:string;seat:number;bet:CasinoBet}
+type Ticket={name:string;avatar:string;seat:number;bet:CasinoBet;payoutUnits?:number}
 type Escrow={room:string;table:number;round:string;until:number;tickets:Ticket[]}
 type Member=HallPlayer&{seen:number;moved:number}
 type Table={round:string;until:number;recent:number[];spin?:HallSpin;prizes?:TablePrize[];receipts?:Map<string,CasinoRound>}
@@ -58,16 +60,17 @@ export class RouletteHall {
     const table=room.tables[index],pocket=gameAt(index)==='dice'?randomInt(1,7):rouletteResult()
     const remaining=this.escrow.filter(item=>item!==pending)
     const receipts=this.store.transaction(unit=>{
-      const dayState=casState(unit,now)
-      const owner=unit.findAccount(CASINO_OWNER),accounts=owner?[owner]:[]
+      const e=companies(unit,now)
       const rounds=new Map<string,CasinoRound>()
       for(const ticket of pending.tickets){
         const account=unit.users.get(ticket.name)
         if(!account)throw new Error('Reserved roulette account is missing')
-        rounds.set(ticket.name,settleReservedCasino(account,accounts,ticket.bet,pocket,now))
+        const maximum=ticket.payoutUnits??toStockUnits(ticket.bet.stake*grossMultiplier(ticket.bet.game,ticket.bet.choice))
+        const round=settleReservedCasino(account,[],ticket.bet,pocket,now,maximum)
+        postPayout(e,round,maximum,now)
+        rounds.set(ticket.name,round)
       }
-      for(const account of accounts)if(!unit.findAccount(account.name))unit.users.add(account.name,account)
-      recordCasinoMargins(unit,rounds.values(),now,dayState)
+      saveCompanies(unit,e)
       this.store.putMetadata(ESCROW,remaining)
       return rounds
     })
@@ -180,12 +183,15 @@ export class RouletteHall {
         if(accepted.requestId!==bet.requestId||accepted.choice!==bet.choice||accepted.stake!==bet.stake)fail(409,'Your bet is already locked')
       }else{
         if(table.spin)fail(409,'Betting has closed for this round')
+        const ticket:Ticket={name,avatar,seat:me.chair.index,bet}
         const entry:Escrow={room:room.id,table:me.chair.table,round:table.round,until:table.until,
-          tickets:[...pending?.tickets??[],{name,avatar,seat:me.chair.index,bet}]}
+          tickets:[...pending?.tickets??[],ticket]}
         const next=[...this.escrow.filter(item=>item!==pending),entry]
         this.store.transaction(unit=>{
           const bettor=unit.users.get(name)??fail(401,'Log in first')
           if(casinoView(bettor).recent.some(receipt=>receipt.requestId===bet.requestId))fail(409,'This bet was already settled')
+          requireSpending(bettor,now)
+          ticket.payoutUnits=acceptWager(unit,bet,now)
           reserveRouletteStake(bettor,bet.stake)
           this.store.putMetadata(ESCROW,next)
         })
@@ -197,7 +203,8 @@ export class RouletteHall {
     const current=action==='bet'||action==='stand'?this.store.rouletteWallet(name)??account:account
     const own=me.chair?room.tables[me.chair.table]:undefined
     const receipt=own?.spin&&now>=own.spin.ends?own.receipts?.get(name):undefined
-    return {room:room.id,now,coins:current.coins??0,you:publicMember(me),players:[...room.players.values()].map(publicMember),
+    const policy=(this.store.metadataValue(COMPANIES) as Companies|undefined)?.CAS
+    return {room:room.id,now,houseEdge:(policy?.policy.edge??200)/10000,maxStake:policy?.policy.stake??5000,open:!policy?.bankruptcy&&!!(policy?.policy.open??1),coins:current.coins??0,you:publicMember(me),players:[...room.players.values()].map(publicMember),
       tables:room.tables.map((t,i):HallTable=>{
         const result=t.spin&&now>=t.spin.ends, tickets=this.escrow.find(item=>item.round===t.round)?.tickets??[]
         return {round:t.round,until:t.until,phase:t.spin?result?'result':'spin':t.until?'betting':'idle',spin:t.spin,

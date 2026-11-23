@@ -1,3 +1,5 @@
+import {income} from './credit.ts'
+import {toStockUnits} from '../src/stock-model.ts'
 import {AI_OPPONENTS,aiPrize,type AiId,type AiDaily} from '../src/ai-model.ts'
 import {dayKey,nextReset} from '../src/collection.ts'
 import {survivors} from '../src/model.ts'
@@ -20,7 +22,7 @@ export function settleAiReward(room:Room,account:Account,now=Date.now()){
  if(!human||room.seats[human]!==account.name)return
  const daily=aiDaily(account,now),wins=daily.wins[room.ai.id]??0,coins=aiPrize(room.ai.id,wins)
  account.aiDaily={day:daily.day,wins:{...daily.wins,[room.ai.id]:wins+1}}
- wallet(account).coins+=coins
+ wallet(account);income(account,toStockUnits(coins),now)
  room.ai.reward={coins,day:daily.day,win:wins+1}
 }
 export const aiNeedsPlan=(room:Room)=>!!room.ai&&survivors(room.state).length>1&&(room.state.movement==='live'?!room.locked[room.ai.player]:room.state.turn===room.ai.player)

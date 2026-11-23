@@ -98,3 +98,18 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world-table-rules{margin-top:7px;border-top:1px solid var(--line);padding-top:4px}
 .world-table-rules summary{color:#d7e4d6;font-size:10px;cursor:pointer}
 .world-table-rules p{font-size:10px;color:#c6d4c7;margin:5px 0}
+.world-equity-price{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;margin:.55rem 0 1rem}
+.world-equity-price strong{font-size:1.5rem;color:#f6dca5}
+.world-equity-price span{color:#b8c4c1}.world-equity-price button{margin-left:auto}
+.world-equity-tabs,.world-policy-buttons{display:flex;gap:.4rem;flex-wrap:wrap}
+.world-equity-tabs{margin:.7rem 0 1rem;border-bottom:1px solid #ffffff25;padding-bottom:.6rem}
+.world-equity-tabs button[aria-pressed=true],.world-policy-buttons button[aria-pressed=true]{border-color:#93cfad;color:#c5f5dc;background:#23463d}
+.world-equity-books{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+.world-equity-body h3{font-size:1rem;margin:.55rem 0}
+.world-equity-body small,.world-ledger small{display:block;color:#acbfbb;font-size:.76rem}
+.world-equity-status,.world-ballot{padding:.65rem .8rem;background:#ccb06a15;border:1px solid #ccb06a60;border-radius:.65rem}
+.world-policy summary small{display:inline;margin-left:.65rem}
+.world-policy-buttons button{text-align:left;min-width:4rem}
+.world-limit-order{grid-template-columns:repeat(3,minmax(0,1fr));margin:.8rem 0}
+.world-limit-order small,.world-limit-order strong{align-self:center}
+@media(max-width:530px){.world-limit-order{grid-template-columns:1fr 1fr}.world-limit-order label:nth-child(3){grid-column:1/-1}.world-equity-books{gap:.4rem}.world-equity-books .world-ledger li{font-size:.8rem}}

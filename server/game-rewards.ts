@@ -1,3 +1,5 @@
+import {income} from './credit.ts'
+import {toStockUnits} from '../src/stock-model.ts'
 import {dayKey} from '../src/collection.ts'
 import {survivors,type Resolution,type Player} from '../src/model.ts'
 import {notify,type Account} from './accounts.ts'
@@ -12,7 +14,7 @@ function credit(account:Account,room:Room,player:Player,now:number){
  const day=dayKey(now),daily=account.gameRewardDaily?.day===day?account.gameRewardDaily:{day,coins:0,events:0}
  const coins=Math.min(rewardAt(daily.events),Math.max(0,DAILY_GAME_REWARD_POOL-daily.coins))
  daily.events++;daily.coins+=coins;account.gameRewardDaily=daily
- if(coins)wallet(account).coins+=coins
+ if(coins){wallet(account);income(account,toStockUnits(coins),now)}
  room.gameRewardTotals??={};room.gameRewardTotals[player]=(room.gameRewardTotals[player]??0)+coins
  return coins
 }

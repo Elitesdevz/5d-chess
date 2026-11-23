@@ -9,6 +9,7 @@ import type {LegacyDatabase, Login, Room} from './model.ts'
 import {roomSummary, type RoomSummary} from './room-summary.ts'
 import {players, playerCount, survivors} from '../src/model.ts'
 import {fromStockUnits,toStockUnits,type StockHolding} from '../src/stock-model.ts'
+import {postCreditCollections} from './corporate.ts'
 import {syncDirectory} from './files.ts'
 
 export const STORAGE_SCHEMA = 1
@@ -35,6 +36,7 @@ class Entities<T> {
     if (this.get(key)) throw new Error('Duplicate record')
     this.loaded.set(key, {before: null, value})
   }
+  values():T[]{return [...this.loaded.values()].map(entry=>entry.value)}
   cached(predicate: (value: T) => boolean): T | undefined {
     for (const entry of this.loaded.values()) if (predicate(entry.value)) return entry.value
   }
@@ -56,6 +58,8 @@ export class UnitOfWork {
     this.users = new Entities(name => store.accountJson(name), (_name, json, account) => store.writeAccount(account, json))
     this.rooms = new Entities(code => store.roomJson(code), (_code, json, room) => store.writeRoom(room, json))
   }
+  accountNames(){return this.store.accountNames()}
+  borrowers(){return this.store.borrowers()}
   findAccount(name: string): Account | undefined {
     const pending = this.users.cached(account => account.name.toLowerCase() === name.toLowerCase())
     if (pending) return pending
@@ -75,6 +79,7 @@ export class UnitOfWork {
     return this.market.values
   }
   flush(): void {
+    postCreditCollections(this,this.users.values())
     this.users.flush()
     this.rooms.flush()
     if (this.market) {
@@ -202,6 +207,8 @@ export class ChessStore {
       json_extract(payload,'$.cave.day') AS caveDay,json_extract(payload,'$.cave.active') AS caveActive FROM accounts WHERE name=?`)
       .get(name) as {coins:number|null;avatar:string|null;caveDay:string|null;caveActive:number|null}|undefined
   }
+  accountNames(){return (this.statement('SELECT name FROM accounts ORDER BY id').all() as {name:string}[]).map(row=>row.name)}
+  borrowers(){return (this.statement("SELECT name FROM accounts WHERE json_type(payload,'$.bank.loan')='object'").all() as {name:string}[]).map(row=>row.name)}
   accountOrdinal(name:string):number|undefined {return (this.statement('SELECT id FROM accounts WHERE name=?').get(name) as {id:number}|undefined)?.id}
   accountName(name: string): string | undefined {return (this.statement('SELECT name FROM accounts WHERE name_key=?').get(name.toLowerCase()) as {name: string} | undefined)?.name}
   writeAccount(account: Account, json: string): void {
@@ -247,7 +254,7 @@ export class ChessStore {
   pendingAiCodes():string[]{return (this.statement("SELECT code FROM rooms WHERE finished=0 AND json_type(payload,'$.ai') IS NOT NULL AND COALESCE(json_extract(payload,'$.ai.retryAt'),0)<=? AND ((json_extract(payload,'$.state.movement')='live' AND json_type(payload,'$.locked.yellow') IS NULL) OR (json_extract(payload,'$.state.movement')='classic' AND json_extract(payload,'$.state.turn')='yellow')) ORDER BY id").all(Date.now()) as {code:string}[]).map(r=>r.code)}
   activeRooms(): number {return Number((this.statement("SELECT COUNT(*) AS count FROM rooms WHERE finished=0 AND json_type(payload,'$.ai') IS NULL").get() as {count: number}).count)}
   metadataValue(key:string):unknown {const row=this.statement('SELECT value FROM metadata WHERE key=?').get(key) as {value:string}|undefined;return row?JSON.parse(row.value):undefined}
-  putMetadata(key:string,value:unknown):void {this.requireWriter();this.statement('INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key,JSON.stringify(value))}
+  putMetadata(key:string,value:unknown):void {this.requireWriter();this.statement('INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE value<>excluded.value').run(key,JSON.stringify(value))}
   leaderboard() {
     const rows = this.statement(`SELECT name, COALESCE(json_extract(payload,'$.wallet.loadout.icon'),'default') AS avatar,
       json_extract(payload,'$.wallet.loadout.frame') AS frame, COALESCE(json_extract(payload,'$.rating.value'),1200) AS rating,

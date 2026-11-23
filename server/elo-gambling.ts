@@ -1,3 +1,4 @@
+import {income,requireSpending} from './credit.ts'
 import {randomBytes,randomInt} from 'node:crypto'
 import {dayKey,nextReset} from '../src/collection.ts'
 import {MAX_ELO_ROUNDS,MAX_ELO_STAKE,MIN_DICE_STAKE,type EloValuation,type EloGamblingView,type EncounterReason,type CasinoState,type CasinoRound} from '../src/casino-model.ts'
@@ -80,13 +81,14 @@ export function eloApi(unit:UnitOfWork,store:ChessStore,source:Account,path:stri
  if(!s.allowed||s.stage!=='active'||s.used>=MAX_ELO_ROUNDS)fail(409,'Elo wagers are closed until the next Dutch midnight.')
  if(b.quoteDay!==valuation.day||b.eloRating!==account.rating.value)fail(409,'Your Elo or the daily valuation changed. Review a new quote.')
  const stake=Number(b.stake);if(stake>Math.floor(account.rating.value))fail(409,'You cannot stake more Elo than you have.')
+ requireSpending(account,now)
  const result=draw??randomInt(1,7);if(!Number.isInteger(result)||result<1||result>6)throw Error('Invalid dice draw')
- const reward=eloReward(account.rating.value,stake,valuation),won=result===b.choice,grossUnits=won?Math.round(reward*10000):0,taxUnits=0,creditedUnits=grossUnits
+ const reward=eloReward(account.rating.value,stake,valuation),won=result===b.choice,grossUnits=won?Math.round(reward*10000):0,taxUnits=0
  const balance=Math.round(wallet(account).coins*10000)
- if(balance<0||!Number.isSafeInteger(balance)||!Number.isSafeInteger(balance+creditedUnits))fail(409,'This payout exceeds supported balance precision')
+ if(balance<0||!Number.isSafeInteger(balance)||!Number.isSafeInteger(balance+grossUnits))fail(409,'This payout exceeds supported balance precision')
  const lost=won?0:stake,eloBefore=account.rating.value
  if(lost){account.rating.value-=lost;s.lifetimeLost+=lost;unit.putMetadata('eloGamblingLifetimeLost',(unit.metadata<number>('eloGamblingLifetimeLost')??0)+lost)}
- wallet(account).coins=(balance+creditedUnits)/10000
+ const creditedUnits=income(account,grossUnits,now)
  const round:CasinoRound={currency:'elo',game:'dice',choice:Number(b.choice),stake,sequence:Number(b.sequence),requestId:b.requestId,quoteDay:valuation.day,eloRating:eloBefore,id:randomBytes(12).toString('hex'),result,won,gross:grossUnits/10000,profit:grossUnits/10000,tax:taxUnits/10000,credited:creditedUnits/10000,net:creditedUnits/10000,eloLost:lost,eloAfter:account.rating.value,coinReward:reward,created:now}
  s.used++;if(s.used>=MAX_ELO_ROUNDS){s.allowed=false;s.stage='normal'}else if(account.rating.value<1)s.stage='normal'
  casino.sequence=round.sequence;casino.recent.unshift(round);casino.recent.length=Math.min(100,casino.recent.length)

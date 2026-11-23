@@ -1,3 +1,5 @@
+import {income} from './credit.ts'
+import {toStockUnits} from '../src/stock-model.ts'
 import type {CaveVisit} from './world.ts'
 import type {BankAccount} from './bank.ts'
 import type {StockPortfolio} from '../src/stock-model.ts'
@@ -98,7 +100,7 @@ export function settleRatings(room: RatedRoom, accounts: Account[]): boolean {
     const before=rating.value
     if(rated){rating.value+=deltas[i];rating.games++;account.ratings[pool].value+=stats[i];account.ratings[pool].games++}
     const coins=60+(survivors(room.state).includes(p)?40:0)+Math.floor((eliminations[p]??0)*20)
-    wallet(account).coins+=coins
+    wallet(account);income(account,toStockUnits(coins))
     room.gameSettlementCoins??={};room.gameSettlementCoins[p]=coins
     if(rated)room.ratingChanges[p]={before,after:rating.value,delta:deltas[i]}
     notify(account,{kind:rated?'rating':'result',code:room.code,title:rated?`Rating ${deltas[i]>=0?'+':''}${deltas[i]}`:'Classic reward',detail:rated?`${room.title}: ${Math.round(before)} → ${Math.round(rating.value)} Elo. +${coins} coins.`:`${room.title}: +${coins} coins. Unrated; your Elo is unchanged.`})

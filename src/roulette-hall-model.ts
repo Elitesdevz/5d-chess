@@ -39,6 +39,7 @@ export interface HallTable {
   recent:number[]
 }
 export interface HallView {
+  houseEdge?:number;maxStake?:number;open?:boolean
   room:string; now:number; coins:number; you:HallPlayer; players:HallPlayer[]; tables:HallTable[]
   receipt?:CasinoRound
 }
