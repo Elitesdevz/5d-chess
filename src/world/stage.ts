@@ -405,8 +405,9 @@ export class CityStage {
       const spin=dice?undefined:round.spin
       const blend=spin?(this.reduced?Number(now<spin.ends+900):
         T.MathUtils.smoothstep(now,spin.started,spin.started+1050)*(1-T.MathUtils.smoothstep(now,spin.ends+700,spin.ends+1900))):0
-      this.cameraAim.set(T.MathUtils.lerp(wheel.x,me.x*.12+wheel.x*.88,1-blend),1.12,wheel.z)
-      this.camera.position.lerp(v(wheel.x,4.85,wheel.z+.72),blend)
+      const tableCenter=wheel.x+.83*T.MathUtils.smoothstep(this.camera.aspect,.72,1.4)
+      this.cameraAim.set(T.MathUtils.lerp(me.x*.12+wheel.x*.88,tableCenter,blend),1.12,wheel.z)
+      this.camera.position.lerp(v(tableCenter,3.53,wheel.z+.26),blend)
       this.camera.lookAt(this.cameraAim)
     }
     const s=this.station,r=this.view?.restaurant
