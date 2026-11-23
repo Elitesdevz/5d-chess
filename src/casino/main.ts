@@ -218,9 +218,8 @@ function bindDice(){
   if(!scene)return
   for(const c of scene.controls()){
    const button=document.querySelector<HTMLButtonElement>(`[data-control="${c.id}"]`)!
-   const enlarge=innerWidth<600&&(tableMode==='offer'||tableMode==='elo'&&(c.action.kind==='eloAdd'||c.id==='offer'||c.id==='return-coins')),width=enlarge?Math.max(44,c.width):c.width,height=enlarge?Math.max(44,c.height):c.height
+   const enlarge=innerWidth<600&&(tableMode==='offer'||tableMode==='elo'&&(c.action.kind==='eloAdd'||c.id==='offer'||c.id==='return-coins')||cave&&c.id==='return-coins'),width=enlarge?Math.max(44,c.width):c.width,height=enlarge?Math.max(44,c.height):c.height
    button.hidden=!c.visible;button.disabled=c.disabled;button.style.cssText=`left:${(c.x+(c.width-width)/2).toFixed(1)}px;top:${(c.y+(c.height-height)/2).toFixed(1)}px;width:${width.toFixed(1)}px;height:${height.toFixed(1)}px;pointer-events:${phase==='ready'&&c.id!=='offer'?'none':'auto'}`
-   if(c.id==='return-coins'&&cave)button.setAttribute('aria-label',tableMode==='elo'?'Return to coin wagers':'Leave the cave')
    if(c.id==='offer')button.setAttribute('aria-label',phase==='ready'?'Throw die':pending?'Retry the same offer':tableMode==='elo'?'DEAL':'Offer coins')
   }
   projectionFrame=requestAnimationFrame(project)
