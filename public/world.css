@@ -75,6 +75,9 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
   .world[data-seated=true] .world-stick,.world:has(dialog[open]) .world-stick{display:none}
   .world-use{bottom:23px;left:auto;right:13px;transform:none}
   .world-use kbd{display:none}
+  .world-use,.world-primary,.world-table-head button{min-height:40px}
+  .world-bet-numbers button,.world-bet-outside button{min-height:34px}
+  .world-floor-list button{min-height:41px}
 }
 @media(max-width:630px){
   .world-panel{right:6px;top:auto;bottom:7px;width:calc(100% - 12px);max-height:57%;padding:8px}
@@ -84,3 +87,14 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
   .world-service-head h2,.world-table-head h2{font-size:22px}
   .world-error{bottom:auto;top:10px}
 }
+.world-range{display:flex;gap:4px;margin:6px 0}
+.world-range button{background:#243e34;border:1px solid var(--line);border-radius:4px;padding:3px 6px;font-size:10px}
+.world-range button[aria-pressed=true]{background:#567361;border-color:#b9d4ba;color:#f6f4dd}
+.world-ownership{display:grid;grid-template-columns:minmax(90px,.6fr) minmax(0,1fr);align-items:center;gap:10px;margin-top:7px}
+.world-pie{width:min(100%,140px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;margin:auto}
+.world-pie>b{width:67%;height:67%;display:grid;place-content:center;text-align:center;border-radius:50%;background:#172e28;color:#fff2d0;font:normal 23px Georgia,serif}
+.world-pie small{font:10px system-ui;color:#c0d2c1}
+.world-ownership .world-ledger i{display:inline-block;width:7px;height:7px;border-radius:2px}
+.world-table-rules{margin-top:7px;border-top:1px solid var(--line);padding-top:4px}
+.world-table-rules summary{color:#d7e4d6;font-size:10px;cursor:pointer}
+.world-table-rules p{font-size:10px;color:#c6d4c7;margin:5px 0}

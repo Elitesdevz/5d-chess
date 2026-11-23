@@ -72,11 +72,12 @@ export class CityWorlds {
     else if(zone==='oasis'&&z>7.05)this.exterior(world,member,'oasis',now)
     else if((zone==='hotel'||zone==='bank'||zone==='exchange'||zone==='cave')&&Math.abs(x)<1.7&&z>7.39)this.exterior(world,member,zone,now)
     else if((zone==='exchange'||zone.startsWith('floor:'))&&near(member,0,-4.5,1.15))member.interaction='elevator'
+    else if(zone.startsWith('floor:')&&interactions(zone).some(p=>p.id==='trader'&&near(member,p.x,p.z,1.28)))member.interaction='trader'
   }
 
   canTrade(name:string,symbol:unknown,now=Date.now()){
     const member=this.occupants.get(name)?.members.get(name)
-    return Boolean(member&&now-member.seen<TIMEOUT&&member.interaction==='trader'&&member.zone==='floor:'+symbol)
+    return typeof symbol==='string'&&Boolean(member&&now-member.seen<TIMEOUT&&member.interaction==='trader'&&member.zone==='floor:'+symbol)
   }
   canBank(name:string,kind:string,now=Date.now()){
     const member=this.occupants.get(name)?.members.get(name)

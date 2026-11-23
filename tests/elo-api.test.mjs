@@ -8,6 +8,7 @@ import {createServer} from 'node:http'
 import {ChessStore} from '../server/storage.ts'
 import {createApplication} from '../server/application.ts'
 import {ensureAccount} from '../server/accounts.ts'
+import {dayKey} from '../src/collection.ts'
 
 test('real Elo API serializes identical and competing requests without double loss or quota bypass',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'chess-elo-http-')),store=new ChessStore(dir),token='elo-api-fixture',app=createApplication(store),server=createServer(app.handle)
@@ -15,6 +16,8 @@ test('real Elo API serializes identical and competing requests without double lo
  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{await new Promise(r=>{server.close(r);server.closeAllConnections()});store.close();await rm(dir,{recursive:true,force:true})});const base=`http://127.0.0.1:${server.address().port}`
  const call=async(path,data,auth=true)=>{const r=await fetch(base+'/api/casino'+path,{method:data===undefined?'GET':'POST',headers:{...(auth?{cookie:'multiverse_session='+token}:{}),...(data===undefined?{}:{'content-type':'application/json'})},body:data===undefined?undefined:JSON.stringify(data)});return {status:r.status,data:await r.json()}}
  assert.equal((await call('/elo',undefined,false)).status,401)
+ assert.equal((await call('/elo')).status,403)
+ store.transaction(u=>u.users.get('Alice').cave={day:dayKey(),active:true})
  const offer=(await call('/elo/trigger',{reason:'chance'})).data;assert.equal(offer.accepted,true);const active=(await call('/elo/decision',{day:offer.day,offerId:offer.offerId,accept:true})).data
  assert.equal((await call('/bet',{game:'dice',choice:1,stake:25,sequence:1,requestId:'wrong-table-coins'})).status,409)
  const b={game:'dice',currency:'elo',choice:1,stake:50,sequence:1,requestId:'same-elo-http-request',quoteDay:active.day,eloRating:active.elo}

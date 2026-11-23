@@ -18,16 +18,15 @@ export class CityServices {
   private busy=false
   private digest=''
   private orderSide:'buy'|'sell'='buy'
+  private history=new Map<string,PricePoint[]>()
   private chart?:StockChart
-  private readout?:HTMLElement
-  private view?:WorldUse
   private dialog:HTMLDialogElement
   private floorAction:(symbol:string)=>void
   private balance:(coins:number)=>void
   private account:string
   constructor(dialog:HTMLDialogElement,account:string,floorAction:(symbol:string)=>void,balance:(coins:number)=>void){
     this.dialog=dialog;this.host=dialog.querySelector('.world-dialog-body')!;this.account=account;this.floorAction=floorAction;this.balance=balance
-    dialog.addEventListener('close',()=>{this.token++;this.chart?.dispose();this.chart=undefined;this.readout=undefined;this.view=undefined;this.digest=''})
+    dialog.addEventListener('close',()=>{this.token++;this.chart?.dispose();this.chart=undefined;this.digest=''})
   }
   close(){if(this.dialog.open)this.dialog.close()}
   private get<T>(key:string){
@@ -50,7 +49,7 @@ export class CityServices {
     const key=view+(symbol??'')
     if(this.digest===key&&this.dialog.open)return
     this.chart?.dispose();this.chart=undefined
-    this.view=view;this.digest=key;const token=++this.token
+    this.digest=key;const token=++this.token
     if(view==='elevator'){
       this.elevator()
       if(!this.dialog.open)this.dialog.showModal()
@@ -151,12 +150,29 @@ export class CityServices {
   private equity(symbol:string,data:StockView):EquityPublic|undefined{return symbol===CAS?data.cas:symbol===BNK?data.bank:undefined}
   private marketPrice(symbol:string,data:StockView){return this.equity(symbol,data)?.price??data.quotes[symbol]?.price}
   private async stockHistory(symbol:string,token:number,seed:PricePoint[],color:string,chart:StockChart){
-    chart.set(seed,color)
-    if(isEquity(symbol))return
+    let points=this.history.get(symbol)??seed,range=30
+    const buttons=this.host.querySelectorAll<HTMLButtonElement>('[data-range]')
+    const update=()=>{
+      const cutoff=Date.now()-range*86_400_000
+      chart.set(points.filter(p=>p.at>=cutoff),color)
+      buttons.forEach(button=>button.setAttribute('aria-pressed',String(Number(button.dataset.range)===range)))
+    }
+    buttons.forEach(button=>button.onclick=()=>{range=Number(button.dataset.range);update()})
+    update()
+    if(isEquity(symbol)||this.history.has(symbol))return
     try{
-      const {points}=await api<{points:PricePoint[]}>('/stocks/history?symbol='+encodeURIComponent(symbol))
-      if(token===this.token&&this.chart===chart)chart.set(points.slice(-90),color)
+      const result=await api<{points:PricePoint[]}>('/stocks/history?symbol='+encodeURIComponent(symbol))
+      this.history.set(symbol,result.points)
+      if(token===this.token&&this.chart===chart){points=result.points;update()}
     }catch{}
+  }
+  private casinoOwnership(data:StockView){
+    const casino=data.cas,ownership=[
+      ['CasinoOwner',30,'#e6b86d'],['Private equity',casino.equity/CAS_SHARES*100,'#92b7cb'],['The Keeper',20,'#b496c9'],['Public float',casino.float/CAS_SHARES*100,'#8cd6ac'],['Treasury',10,'#73887b'],
+    ] as const
+    let end=0
+    const arcs=ownership.map(([,size,tone])=>{const start=end;end+=size;return `${tone} ${start}% ${end}%`})
+    return `<details open><summary>Casino ownership and dividends</summary><div class="world-ownership"><div class="world-pie" aria-hidden="true" style="background:conic-gradient(from -90deg,${arcs.join(',')})"><b>${casino.float/CAS_SHARES*100}%<small>Public float</small></b></div><ul class="world-ledger">${ownership.map(([holder,size,tone])=>`<li><span><i style="background:${tone}"></i> ${holder}</span><b>${size}%</b></li>`).join('')}</ul></div><p>${casino.lastDividend?'Last public allocation: '+coins(casino.lastDividend.pool):'No public dividend allocated yet.'}</p></details>`
   }
   private stock(symbol:string,data:StockView,token:number,notice=''){
     this.balance(data.coins)
@@ -164,9 +180,9 @@ export class CityServices {
     const pending=saved?.symbol===symbol?saved:undefined
     if(pending)this.orderSide=pending.side
     this.chart?.dispose();this.chart=undefined
-    this.render(symbol,stockName(symbol),`<div class="world-trade-grid"><section><div class="world-price"><strong>${price===undefined?'Price unavailable':coins(price)}</strong><small>${issue?'In-game share price':'Nasdaq reference price'}</small></div><canvas data-chart tabindex="0" aria-label="Stock price history"></canvas><p data-readout class="world-muted"></p></section>
+    this.render(symbol,stockName(symbol),`<div class="world-trade-grid"><section><div class="world-price"><strong>${price===undefined?'Price unavailable':coins(price)}</strong><small>${issue?'In-game share price':'Nasdaq reference price'}</small></div><div class="world-range" role="group" aria-label="Chart range"><button type="button" data-range="30">1M</button><button type="button" data-range="90">3M</button><button type="button" data-range="365">1Y</button></div><canvas data-chart tabindex="0" aria-label="Stock price history"></canvas><p data-readout class="world-muted"></p></section>
     <form class="world-service-form"><div class="world-button-row"><button type="button" data-side="buy" aria-pressed="${this.orderSide==='buy'}">Buy</button><button type="button" data-side="sell" aria-pressed="${this.orderSide==='sell'}">Sell</button></div><label>Shares<input name="shares" type="number" inputmode="numeric" min="1" max="${MAX_STOCK_ORDER}" value="${pending?.shares??1}" required></label><small>${coins(data.coins)} available · ${holding?.shares??0} shares held</small><strong data-total></strong><button type="submit" class="world-primary" data-order></button></form></div>
-    ${symbol===CAS?`<details open><summary>Casino ownership and dividends</summary><div class="world-share-row"><i style="--share:30;--tone:#e6b86d"></i><i style="--share:${data.cas.equity/100};--tone:#92b7cb"></i><i style="--share:20;--tone:#b496c9"></i><i style="--share:${data.cas.float/100};--tone:#8cd6ac"></i><i style="--share:10;--tone:#667c71"></i></div><p>CasinoOwner 30% · Private equity ${data.cas.equity/CAS_SHARES*100}% · The Keeper 20% · Public ${data.cas.float/CAS_SHARES*100}% · Treasury 10%.</p><p>${data.cas.lastDividend?'Last public allocation: '+coins(data.cas.lastDividend.pool):'No public dividend allocated yet.'}</p></details>`:
+    ${symbol===CAS?this.casinoOwnership(data):
       symbol===BNK?`<details open><summary>Bank dividends</summary><p>25% of collected loan interest goes to the public shares at Dutch midnight. You have received ${coins(data.portfolio.bankDividendsPaid??0)}.</p></details>`:''}
     <details><summary>Portfolio</summary><ul class="world-ledger">${Object.entries(data.portfolio.positions).map(([ticker,h])=>`<li><span>${safeText(ticker)} · ${h.shares}</span><b>${coins((this.marketPrice(ticker,data)??0)*h.shares)}</b></li>`).join('')||'<li>No shares yet</li>'}</ul></details>
     <details><summary>Trade and dividend history</summary><ul class="world-ledger">${[...data.portfolio.trades.map(t=>({at:t.at,label:`${t.side==='buy'?'Bought':'Sold'} ${t.shares} ${t.symbol}`,amount:t.total})),...data.portfolio.dividends.map(d=>({at:Date.parse(d.day),label:(d.symbol??CAS)+' dividend',amount:d.amount}))].sort((a,b)=>b.at-a.at).slice(0,15).map(r=>`<li><span>${safeText(r.label)} · ${date.format(r.at)}</span><b>${coins(r.amount)}</b></li>`).join('')||'<li>No activity yet</li>'}</ul></details>`)

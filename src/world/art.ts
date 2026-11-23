@@ -191,6 +191,33 @@ function caveFront(parent:T.Object3D,x:number,sealed:boolean){
   }
   batchStatic(g)
 }
+function fountain(scene:T.Scene){
+  const plaza=new T.Group();scene.add(plaza)
+  cylinder(plaza,2.87,.18,[0,.13,0],ivory,64);cylinder(plaza,2.68,.35,[0,.345,0],stone,64)
+  cylinder(plaza,2.57,.021,[0,.535,0],std(0x3a7b88,.36,.16),60)
+  cylinder(plaza,.42,1.02,[0,.81,0],stone,22);cylinder(plaza,.71,.12,[0,1.32,0],brass,32)
+  const crest=mesh(new T.OctahedronGeometry(.53),brass,plaza,[0,1.91,0]);crest.scale.y=1.4
+  const ripples=Array.from({length:3},()=>{
+    const ring=mesh(new T.RingGeometry(.94,1,56),new T.MeshBasicMaterial({color:0xb7eddf,transparent:true,opacity:.19,depthWrite:false}),plaza,[0,.553,0],false)
+    ring.rotation.x=-Math.PI/2;return ring
+  })
+  const spray=new T.InstancedMesh(new T.SphereGeometry(.031,6,4),std(0xacf1e1,.19,.2),60),matrix=new T.Matrix4()
+  spray.frustumCulled=false;plaza.add(spray)
+  const animate=(time:number)=>{
+    ripples.forEach((ring,i)=>{
+      const progress=(time/2200+i/3)%1
+      ring.scale.setScalar(.7+progress*1.76);ring.material.opacity=.21*Math.sin(progress*Math.PI)
+    })
+    for(let i=0;i<spray.count;i++){
+      const angle=Math.floor(i/10)*tau/6,steps=(time/1380+i%10/10)%1,d=.62+steps*1.58
+      matrix.makeTranslation(Math.sin(angle)*d,1.31+steps*(1.48-2.26*steps),Math.cos(angle)*d)
+      spray.setMatrixAt(i,matrix)
+    }
+    spray.instanceMatrix.needsUpdate=true
+  }
+  animate(0)
+  return animate
+}
 function street(rich=true){
   const group=new T.Group()
   plane(group,112,88,0,-.035,2,paving())
@@ -208,16 +235,12 @@ function street(rich=true){
     potted(group,x,z,1.4)
   }
   for(const [x,z] of [[-8,2],[8,2],[-14,14],[14,14],[-18,7],[18,7]])bench(group,x,z,x>0?Math.PI/2:-Math.PI/2)
-  const plaza=new T.Group();plaza.position.set(0,0,0);group.add(plaza)
-  cylinder(plaza,2.87,.18,[0,.13,0],ivory,64);cylinder(plaza,2.68,.35,[0,.345,0],stone,64)
-  cylinder(plaza,2.57,.021,[0,.535,0],new T.MeshStandardMaterial({color:0x406f80,metalness:.6,roughness:.16}),60)
-  cylinder(plaza,.42,1.02,[0,.81,0],stone,22);cylinder(plaza,.71,.12,[0,1.32,0],brass,32)
-  const crest=mesh(new T.OctahedronGeometry(.53),brass,plaza,[0,1.91,0]);crest.scale.y=1.4
-  const map=box(group,[2.7,1.6,.17],[-6,1.46,4.0],ink,.06)
-  map.rotation.y=.21
-  const guide=banner(group,'CITY SQUARE',[2.43,.37],[-6,1.88,4.09]);guide.rotation.y=.21
-  const directions=banner(group,'BANK  ·  CASINO  ·  EXCHANGE',[2.43,.28],[-6,1.32,4.1]);directions.rotation.y=.21
-  for(const x of [-6.94,-5.08])block(group,.10,.81,.15,x,.43,4,brass)
+  const guide=new T.Group();guide.position.set(-4.22,0,3.63);guide.rotation.y=.24;group.add(guide)
+  box(guide,[2.53,1.31,.17],[0,1.43,0],ink,.06)
+  banner(guide,'CITY SQUARE',[2.24,.28],[0,1.81,.093])
+  banner(guide,'‹  BANK     CASINO  ↑',[2.18,.28],[0,1.42,.093])
+  banner(guide,'EXCHANGE  ›',[2.03,.27],[0,1.11,.093])
+  for(const x of [-.98,.98])block(guide,.10,.81,.15,x,.43,0,brass)
   return group
 }
 function streetView(scene:T.Scene,zone:WorldZone,height=0){
@@ -257,6 +280,7 @@ function gallery(scene:T.Scene,type:'hotel'|'exchange'|'stock',symbol=''){
     box(scene,[4.4,.38,.23],[0,3.62,-7.64],ink,.06)
     banner(scene,'GAMING FLOOR',[4.18,.34],[0,3.62,-7.51])
     plane(scene,3.65,15.5,0,.016,0,rug)
+    for(const x of [-1.70,1.70])plane(scene,.039,15.38,x,.022,0,brass)
     for(const x of [-6.58,6.58])for(const z of [-4.7,-.7,3.6]){
       bench(scene,x,z,x>0?Math.PI/2:-Math.PI/2,leather);potted(scene,x*.92,z+.77)
     }
@@ -264,6 +288,10 @@ function gallery(scene:T.Scene,type:'hotel'|'exchange'|'stock',symbol=''){
       block(scene,4.6,.15,12,side*6.85,3.27,-.75,oak)
       block(scene,.06,.092,11.5,side*4.58,4.21,-.75,metal)
       for(const z of [-5.8,-4,-2.2,-.4,1.4,3.2,4.8])block(scene,.05,1,.05,side*4.58,3.73,z,metal)
+    }
+    for(const x of [-4.24,4.24]){
+      box(scene,[.17,2.94,.16],[x,1.53,-7.68],brass,.025)
+      block(scene,.074,1.36,.05,x,2.64,-7.57,gold)
     }
     frontWindow(scene,w,7.78,wall)
   }else{
@@ -351,8 +379,9 @@ export function makeWorldArt(zone:WorldZone,open:boolean){
   const sun=new T.DirectionalLight(0xffe2bb,isCave?.22:1.85);sun.position.set(-12,18,10);scene.add(sun)
   const actors:ClubGuest[]=[]
   let wheels:ReturnType<typeof buildHallTables>|undefined,publicDie:T.Group|undefined,screen:ReturnType<typeof makeScreen>[]|undefined
+  let ambient:((now:number)=>void)|undefined
   if(outside){
-    scene.add(street());caveFront(scene,-37,!open);caveFront(scene,37,false)
+    scene.add(street());ambient=fountain(scene);caveFront(scene,-37,!open);caveFront(scene,37,false)
   }else if(zone==='hotel'){
     streetView(scene,zone);gallery(scene,'hotel')
   }else if(zone==='casino'){
@@ -389,7 +418,7 @@ export function makeWorldArt(zone:WorldZone,open:boolean){
       ringVault(scene)
     }
   }else cave(scene,zone==='oasis')
-  return {scene,actors,wheels,publicDie,screen}
+  return {scene,actors,wheels,publicDie,screen,ambient}
 }
 function ringVault(scene:T.Scene){
   mesh(new T.TorusGeometry(.48,.041,8,44),brass,scene,[0,.89,-2.9],false)

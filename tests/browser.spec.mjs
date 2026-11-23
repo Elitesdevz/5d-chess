@@ -28,9 +28,15 @@ test('production paths serve on refresh, with chess-only routing', async t => {
   const root = await fetch(base + '/chess/')
   assert.equal(root.status, 200)
   assert.match(await root.text(), /src="\/chess\/game\.js"/)
-  for (const asset of ['game.js', 'styles.css', 'emblem.svg', 'shell.css', 'collection.html', 'collection.css', 'collection.js','roulette.html','dice.html','casino.js','casino.css','roulette.css','third-party-notices.txt']) {
+  for (const asset of ['game.js', 'styles.css', 'emblem.svg', 'shell.css', 'collection.html', 'collection.css', 'collection.js','world.html','world.js','world.css','casino.js','casino.css','roulette.css','third-party-notices.txt']) {
     assert.equal((await fetch(base + '/chess/' + asset)).status, 200)
   }
+  for(const [page,go] of [['roulette','casino'],['dice','casino'],['stocks','stocks'],['bank','bank']]){
+    const legacy=await fetch(base+'/chess/'+page+'.html',{redirect:'manual'})
+    assert.equal(legacy.status,302)
+    assert.match(legacy.headers.get('location'),new RegExp('/chess/world\\.html\\?go='+go+'$'))
+  }
+  assert.equal((await fetch(base+'/chess/dice.html?cave=1')).status,200)
   const logo = await fetch(base + '/chess/logo.png')
   assert.equal(logo.headers.get('content-type'),'image/png')
   assert.deepEqual(Buffer.from(await logo.arrayBuffer()),await readFile('public/logo.png'))

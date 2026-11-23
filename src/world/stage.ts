@@ -16,9 +16,18 @@ const routes=[
   [[31,20],[33,13],[39,13],[45,20],[42,26],[31,20]],
   [[-41,22],[-31,23],[-26,25],[-22,33],[-36,27],[-41,22]],
 ] as const
+const streets=routes.map(route=>{
+  let length=0
+  const segments=route.slice(1).map((end,i)=>{
+    const start=route[i],from=length
+    length+=Math.hypot(end[0]-start[0],end[1]-start[1])
+    return {start,end,from,to:length}
+  })
+  return {segments,length}
+})
 function pedestrian(index:number,time:number){
-  const route=routes[index],progress=(time/3900+index*.77)%(route.length-1)
-  const a=route[Math.floor(progress)],b=route[Math.floor(progress)+1],p=progress%1
+  const {segments,length}=streets[index],distance=(time*(1.3+index*.05)/1000+index*9)%length
+  const {start:a,end:b,from,to}=segments.find(segment=>distance<segment.to)??segments[0],p=(distance-from)/(to-from)
   return {x:a[0]+(b[0]-a[0])*p,z:a[1]+(b[1]-a[1])*p,yaw:Math.atan2(a[0]-b[0],a[1]-b[1])}
 }
 const EMPTY=()=>v()
@@ -45,6 +54,7 @@ export class CityStage {
   private stick={x:0,z:0}
   private drag?:{id:number;x:number;y:number}
   private last=0
+  private lastStep=0
   private frame=0
   private yaw=0
   private pitch=.1
@@ -85,7 +95,7 @@ export class CityStage {
     const changed=view.id!==this.view?.id||next.zone!==prior?.zone
     const seat=(p:WorldView['you']|undefined)=>p?.chair?'chair:'+p.chair.table+':'+p.chair.index:p?.lounge?'couch:'+p.lounge.couch+':'+p.lounge.index:''
     if(changed||seat(prior)!==seat(next)||Math.hypot(next.x-this.position.x,next.z-this.position.z)>1.35){
-      Object.assign(this.position,next);this.yaw=next.yaw;this.pitch=.1
+      this.position={x:next.x,z:next.z,yaw:next.yaw};this.yaw=next.yaw;this.pitch=.1
     }
     this.clock=offset;this.view=view
     if(changed||this.caveOpen!==view.caveOpen&&view.you.zone==='city'){
@@ -106,7 +116,7 @@ export class CityStage {
       })
     }
     const {x,z,yaw}=this.position
-    this.camera.position.set(x+Math.sin(yaw)*2.4,2.23,z+Math.cos(yaw)*2.4)
+    this.camera.position.copy(this.walkingEye(x,z,yaw))
     this.look.set(x-Math.sin(yaw)*2,1.5,z-Math.cos(yaw)*2)
   }
   private clearScene(){
@@ -187,7 +197,6 @@ export class CityStage {
     const prompt=this.parent.querySelector<HTMLButtonElement>('[data-world-use]')!
     prompt.hidden=!candidate
     prompt.querySelector('span')!.textContent=candidate?.label??''
-    this.parent.dispatchEvent(new CustomEvent('world-near',{detail:candidate?.id}))
   }
   private avatars(dt:number,now:number){
     if(!this.view||!this.art)return
@@ -228,18 +237,26 @@ export class CityStage {
       eye.set(x+Math.sin(this.yaw)*.99,1.92,z+Math.cos(this.yaw)*.99)
       aim.set(x-Math.sin(this.yaw)*2.1,1.47,z-Math.cos(this.yaw)*2.1)
     }else{
-      const distance=this.zone==='cave'||this.zone==='oasis'?.18:this.camera.aspect<1?1.65:2.4
-      let ex=x+Math.sin(this.yaw)*distance,ez=z+Math.cos(this.yaw)*distance
-      if(this.zone!=='city'){ex=T.MathUtils.clamp(ex,-9.5,9.5);ez=T.MathUtils.clamp(ez,-6.09,7.43)}
-      eye.set(ex,this.zone==='cave'?1.64:2.38,ez)
+      eye.copy(this.walkingEye(x,z,this.yaw))
       aim.set(x-Math.sin(this.yaw)*2.5,1.39+this.pitch*3,z-Math.cos(this.yaw)*2.5)
     }
     const factor=this.reduced?1:1-Math.exp(-6*dt)
     this.camera.position.lerp(eye,factor);this.look.lerp(aim,factor)
     this.camera.lookAt(this.look);this.camera.updateMatrixWorld()
   }
+  private walkingEye(x:number,z:number,yaw:number){
+    const cave=this.zone==='cave'||this.zone==='oasis',distance=cave?.18:this.camera.aspect<1?1.65:2.8
+    let ex=x+Math.sin(yaw)*distance,ez=z+Math.cos(yaw)*distance
+    if(this.zone!=='city'){
+      const edge=this.zone==='hotel'?9.28:this.zone==='casino'?10.45:this.zone==='bank'?9.05:cave?2.3:7.8
+      ex=T.MathUtils.clamp(ex,-edge,edge)
+      ez=T.MathUtils.clamp(ez,cave?-7.5:-5.94,this.zone?.startsWith('floor:')||this.zone==='exchange'?7.11:7.43)
+    }
+    return v(ex,cave?1.65:2.49,ez)
+  }
   private motion(now:number){
     if(!this.art)return
+    if(!this.reduced)this.art.ambient?.(now)
     const hall=this.view?.hall
     for(const [i,actor] of this.art.actors.entries()){
       const spin=hall?.tables[i]?.spin
@@ -263,22 +280,25 @@ export class CityStage {
   }
   private tick=(time:number)=>{
     this.frame=requestAnimationFrame(this.tick)
-    if(document.hidden||this.gl?.isContextLost()||time-this.last<27)return
+    if(document.hidden){this.lastStep=0;return}
+    const stepTime=Math.min(.25,(time-(this.lastStep||time))/1000)
+    this.lastStep=time
+    this.step(stepTime);this.prompt()
+    if(this.gl?.isContextLost()||time-this.last<27)return
     if(this.gl&&this.fence){
       if(this.gl.clientWaitSync(this.fence,0,0)===this.gl.TIMEOUT_EXPIRED)return
       this.gl.deleteSync(this.fence);this.fence=null
     }
     const dt=Math.min(.14,(time-this.last)/1000||.035);this.last=time
-    this.step(dt);this.prompt()
     if(this.art&&this.renderer){
       const now=Date.now()+this.clock
       this.cameraView(dt,now);this.avatars(dt,now);this.motion(now)
       this.renderer.render(this.art.scene,this.camera)
       if(this.gl){this.fence=this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE,0);this.gl.flush()}
     }else if(!this.renderer)this.drawFlat()
+    this.canvas.dataset.zone=this.zone??''
     const darkness=this.parent.querySelector<HTMLElement>('.world-dark')!
     darkness.style.opacity=this.zone==='cave'?String(Math.max(0,(7-this.position.z)/14)**1.55*.94):'0'
-    this.canvas.dataset.zone=this.zone??''
   }
   private drawFlat(){
     const c=this.canvas,ctx=c.getContext('2d')

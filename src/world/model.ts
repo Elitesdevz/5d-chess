@@ -46,7 +46,7 @@ const box=(x:number,z:number,a:number,b:number,w:number,d:number)=>Math.abs(x-a)
 export const HOUSE_ROWS=[[-40,-15],[-32,-20],[-22,-21],[22,-22],[32,-19],[42,-15],[-42,11],[-27,18],[-17,24],[16,25],[27,18],[42,10]] as const
 export function walkable(zone:WorldZone,x:number,z:number,caveOpen=true){
   if(zone==='city'){
-    if(Math.abs(x)>52||z<-34||z>40)return false
+    if(Math.abs(x)>52||z<-34||z>40||Math.hypot(x,z)<2.88)return false
     if(box(x,z,0,-17,11,9.3)||box(x,z,-24,-1.7,8.2,6)||box(x,z,24,-2,8,6.2))return false
     if(HOUSE_ROWS.some(([a,b])=>box(x,z,a,b,3.15,3.15)))return false
     return !box(x,z,-37,34,6,3.6)&&!box(x,z,37,34,6,3.6)&& (caveOpen||!box(x,z,-37,30.8,2.3,1.6))
@@ -55,7 +55,11 @@ export function walkable(zone:WorldZone,x:number,z:number,caveOpen=true){
   if(zone==='bank')return Math.abs(x)<=8.8&&z>=-.41&&z<=7.75
   if(zone==='hotel')return Math.abs(x)<=9.2&&z>=-7.7&&z<=7.7
   if(zone==='cave'||zone==='oasis')return Math.abs(x)<=2.32&&Math.abs(z)<=7.8
-  if(zone==='exchange'||zone.startsWith('floor:'))return Math.abs(x)<=7.9&&z>=-5.7&&z<=7.7
+  if(zone==='exchange'||zone.startsWith('floor:')){
+    if(Math.abs(x)>7.9||z<-5.7||z>7.7)return false
+    if(zone==='exchange')return !box(x,z,.63,-1.97,2.18,.62)
+    return ![-2.7,2.7].some(desk=>box(x,z,desk,-1.77,1.29,.51))
+  }
   return false
 }
 export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true):Position{

@@ -143,6 +143,13 @@ function setTableMode(mode:'normal'|'offer'|'elo'){
  document.querySelector('.silent-room')?.setAttribute('data-table-mode',mode)
  el('soul-disclosure').hidden=mode==='normal';el('dice-canvas').setAttribute('aria-describedby',mode==='normal'?'table-instructions':'table-instructions soul-disclosure');document.querySelectorAll('[data-control]').forEach(b=>mode==='normal'?b.removeAttribute('aria-describedby'):b.setAttribute('aria-describedby','soul-disclosure'))
  const tools=document.querySelector<HTMLElement>('.table-tools');if(tools)tools.hidden=mode==='offer'
+ if(cave){
+  const label=mode==='elo'?'Return to coin wagers and close Elo wagers for today':'Leave through the green door'
+  const green=document.querySelector<HTMLButtonElement>('[data-control="return-coins"]')
+  green?.setAttribute('aria-label',label)
+  if(green?.firstElementChild)green.firstElementChild.textContent=label
+  el('exit-cave-fallback').textContent=label
+ }
  el('encounter-fallback').hidden=mode!=='offer';el('elo-fallback-increments').hidden=mode!=='elo';el('elo-fallback-quote').hidden=mode!=='elo';el('stake-label').textContent=mode==='elo'?'Elo at risk':'Stake in coins';if(!busy)el('place-bet').textContent=mode==='elo'?'DEAL':'Offer coins'
  if(mode==='offer'){el('round-result').hidden=true;clearTimeout(resultTimer);scene?.lockCamera(true);el('encounter-question').textContent=encounterQuestion(soul?.reason);say(encounterQuestion(soul?.reason),10000)}
  else if(!busy)scene?.lockCamera(false)

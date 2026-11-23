@@ -8,4 +8,4 @@ export interface Profile {name: string; settings: Preferences; rating: Rating; c
 export interface Notice {id: string; kind: 'join'|'move'|'turn'|'result'|'rating'|'casino'; title: string; detail: string; code: string; game?:'dice'|'roulette'; created: number; read: boolean; permanent?: boolean}
 export const poolFor = (movement: Movement = 'live', count = 2): RatingPool => `${movement}-${count === 2 ? 'duel' : 'multi'}`
 
-export const noticeUrl=(notice:Notice)=>notice.kind==='casino'?`/chess/${notice.game==='dice'?'dice':'roulette'}.html`:`/chess/online.html?code=${encodeURIComponent(notice.code)}`
+export const noticeUrl=(notice:Notice)=>notice.kind==='casino'?'/chess/world.html?go=casino':`/chess/online.html?code=${encodeURIComponent(notice.code)}`

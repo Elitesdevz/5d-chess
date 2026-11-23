@@ -1,6 +1,6 @@
-import {api,getSession,initShell,renderAccount} from '../shell.ts'
+import {api,ApiError,getSession,initShell,renderAccount} from '../shell.ts'
 import type {Profile} from '../account-model.ts'
-import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type RouletteChoice} from '../casino-model.ts'
+import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type CasinoView,type RouletteChoice} from '../casino-model.ts'
 import {BNK,CAS,isEquity,type StockView,type PricePoint} from '../stock-model.ts'
 import {DICE_TABLE_INDEX,DESTINATIONS,WORLD_TABLES,type Destination,type WorldAction,type WorldView} from './model.ts'
 import {CityServices,coins,safeText} from './services.ts'
@@ -10,7 +10,7 @@ const cast=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementBy
 const host=cast('city-world'),connection=cast('world-connection'),panel=cast('world-table'),dialog=cast<HTMLDialogElement>('world-service')
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined,profile:Profile|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
-let viewKey='',shownService='',nearby='',lastFloor='';let closeAfterFloor=false
+let viewKey='',shownService='',lastFloor='';let closeAfterFloor=false
 let stake=25,choice:RouletteChoice='white',activeTable=-1,tableKey=''
 let pending:{round:string;requestId:string;stake:number;choice:RouletteChoice}|undefined
 const options={white:'Ivory',black:'Obsidian',even:'Even',odd:'Odd',low:'1–18',high:'19–36'} as const
@@ -38,8 +38,8 @@ function updateSelection(){
   const gross=stake*grossMultiplier(chair.table===DICE_TABLE_INDEX?'dice':'roulette',choice)
   const line=panel.querySelector('[data-payout]')
   if(line)line.textContent=Number.isSafeInteger(stake)&&stake>0?coins(gross-(gross-stake)*.01)+' if you win':'Choose a whole coin amount'
-  const weapon=panel.querySelector<HTMLButtonElement>('[data-lock]')
-  if(weapon)weapon.disabled=performing||!Number.isSafeInteger(stake)||stake<1||stake>MAX_CASINO_STAKE||stake>(view?.coins??0)
+  const lock=panel.querySelector<HTMLButtonElement>('[data-lock]')
+  if(lock)lock.disabled=performing||!Number.isSafeInteger(stake)||stake<1||stake>MAX_CASINO_STAKE||stake>(view?.coins??0)
 }
 function renderTable(){
   if(!view)return
@@ -55,7 +55,7 @@ function renderTable(){
   if(activeTable!==chair.table){choice=dice?1:'white';activeTable=chair.table}
   const locked=Boolean(table.seats[chair.index]?.locked)
   if(pending&&(pending.round!==table.round||locked))pending=undefined
-  const key=JSON.stringify([chair.table,table.round,table.phase,table.seats,table.prizes])
+  const key=JSON.stringify([chair.table,table.round,table.phase,locked,table.prizes])
   if(key!==tableKey){
     tableKey=key
     const faces=dice?Array.from({length:6},(_,i)=>i+1):Array.from({length:37},(_,i)=>i)
@@ -63,10 +63,20 @@ function renderTable(){
       dice?'':`<div class="world-bet-outside">${Object.entries(options).map(([value,label])=>`<button type="button" data-face="${value}">${label}</button>`).join('')}</div>`
     }`
     panel.innerHTML=`<div class="world-table-head"><div><small>${dice?'PUBLIC DICE':'ROULETTE'} · <span data-round-clock></span></small><h2>${WORLD_TABLES[chair.table].name}</h2></div><button type="button" data-stand ${table.phase==='spin'||locked&&table.phase==='betting'?'disabled':''}>Stand up</button></div>
-      <ul class="world-seats">${table.seats.map(p=>`<li class="${p?.locked?'is-ready':''}">${p?safeText(p.name):'Open seat'}</li>`).join('')}</ul>
+      <ul class="world-seats">${table.seats.map(()=>'<li></li>').join('')}</ul>
       ${table.phase==='betting'&&!locked?`<form class="world-wager">${mat}<div class="world-wager-row"><label>Stake<input type="number" min="1" max="${MAX_CASINO_STAKE}" step="1" required value="${stake}" inputmode="numeric"></label><button type="submit" class="world-primary" data-lock>Lock bet</button></div><small data-payout></small></form>`:
       table.phase==='spin'?'<p class="world-muted">Bets are closed. Watch the table.</p>':
       table.phase==='result'?`<div class="world-result"><strong>${dice?'Face':'Pocket'} ${table.spin?.pocket}</strong><ul class="world-ledger">${(table.prizes??[]).map(p=>`<li><span>${safeText(p.name)}</span><b class="${p.won?'is-winner':''}">${p.net>=0?'+':'−'}${casinoCoins(Math.abs(p.net))}</b></li>`).join('')}</ul></div>`:'<p class="world-muted">Your bet is locked. Waiting for the table.</p>'}`
+    panel.insertAdjacentHTML('beforeend',`<details class="world-table-rules"><summary>Rules and recent results</summary><p>${dice?'Pick one face. The croupier rolls one shared die. A hit pays 5.88 times the stake before tax.':'Bet on a pocket or choose an outside bet. The wheel result is shared by the table.'} A 1% tax applies to positive winnings.</p><p>${table.recent.length?'Recent: '+table.recent.join(' · '):'No recent results yet.'}</p></details>${dice?'':'<details class="world-table-rules" data-history><summary>Your roulette history</summary><ul class="world-ledger"></ul></details>'}`)
+    const history=panel.querySelector<HTMLDetailsElement>('[data-history]')
+    if(history)history.ontoggle=()=>{
+      if(!history.open)return
+      const list=history.querySelector('ul')!
+      list.innerHTML='<li>Loading rounds…</li>'
+      void api<CasinoView>('/casino').then(data=>{
+        list.innerHTML=data.recent.filter(r=>r.game==='roulette').slice(0,15).map(r=>`<li><span>Pocket ${r.result} · ${title(r.choice)}</span><b class="${r.won?'is-winner':''}">${r.net>=0?'+':'−'}${casinoCoins(Math.abs(r.net))}</b></li>`).join('')||'<li>No roulette rounds yet.</li>'
+      }).catch(()=>{list.innerHTML='<li>Roulette history is unavailable.</li>'})
+    }
     const form=panel.querySelector<HTMLFormElement>('form')
     if(form){
       form.oninput=e=>{if((e.target as HTMLElement).matches('input')){stake=Number((e.target as HTMLInputElement).value);updateSelection()}}
@@ -74,10 +84,15 @@ function renderTable(){
         e.preventDefault()
         if(performing)return
         pending??={round:table.round,stake,choice,requestId:crypto.randomUUID()}
-        void action('bet',pending).catch(()=>{pending=undefined})
+        void action('bet',pending).catch(error=>{if(error instanceof ApiError&&error.status>=400&&error.status<500&&error.status!==408)pending=undefined})
       }
     }
   }
+  panel.querySelectorAll('.world-seats li').forEach((seat,i)=>{
+    const member=table.seats[i],label=member?.name??'Open seat'
+    if(seat.textContent!==label)seat.textContent=label
+    seat.classList.toggle('is-ready',Boolean(member?.locked))
+  })
   tableStatus();updateSelection()
 }
 panel.onclick=e=>{
@@ -113,7 +128,7 @@ function accepted(next:WorldView,start:number){
   host.dataset.zone=next.you.zone
   host.dataset.seated=String(Boolean(next.you.chair||next.you.lounge))
   if(changed){
-    viewKey=scope;nearby='';shownService='';services?.close()
+    viewKey=scope;shownService='';services?.close()
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
   }
   stage?.set(next,offset);stage?.lock(dialog.open)
@@ -160,13 +175,10 @@ function use(point?:WorldAction){
   void action('use',{target:point.id}).catch(()=>undefined)
 }
 host.querySelector<HTMLButtonElement>('[data-world-use]')!.onclick=()=>stage?.act()
-host.addEventListener('world-near',e=>{
-  const id=(e as CustomEvent<string|undefined>).detail
-  if(nearby===id)return
-  nearby=id??''
-  if(id==='trader'&&!dialog.open&&!performing)void action('use',{target:id}).catch(()=>undefined)
-})
 dialog.addEventListener('close',()=>stage?.lock(false))
+document.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&!dialog.open&&(seated()||view?.you.lounge))use()
+})
 window.addEventListener('pagehide',e=>{if(!e.persisted)closed=true})
 async function start(){
   await initShell();const auth=await getSession()
