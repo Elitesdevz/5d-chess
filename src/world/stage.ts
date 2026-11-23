@@ -80,6 +80,8 @@ export class CityStage {
   private zone?:WorldZone
   private caveOpen=true
   private pause=false
+  private lastMessage=0
+  private speech=new Map<string,{text:string;until:number}>()
   private nearest?:WorldAction
   private input=new AbortController()
   private reduced=matchMedia('(prefers-reduced-motion:reduce)').matches
@@ -133,6 +135,16 @@ export class CityStage {
       else this.liftFacing={from:this.yaw,delta,started:performance.now()}
     }
     this.clock=offset;this.view=view;this.zone=next.zone;this.caveOpen=view.caveOpen
+    if(changedWorld){this.lastMessage=0;this.speech.clear()}
+    const receivedAt=performance.now()
+    for(const line of view.chat??[]){
+      if(line.id<=this.lastMessage)continue
+      this.lastMessage=line.id
+      if(view.now-line.at>=6500)continue
+      this.speech.set(line.name,{text:line.text,until:receivedAt+6500})
+      const tag=this.figures.get(line.name)?.tag
+      if(tag){tag.textContent=line.text;tag.classList.add('speech')}
+    }
     if(!this.art&&this.renderer)this.buildScene()
     if(this.art){
       this.art.seal.visible=!this.caveOpen
@@ -343,7 +355,8 @@ export class CityStage {
       if(current.tag){
         const mark=figure.root.position.clone().add(v(0,1.91,0)).project(this.camera)
         current.tag.hidden=member.zone!==this.view.you.zone||mark.z<=-1||mark.z>=1||Math.abs(mark.x)>.98||Math.abs(mark.y)>.96||this.camera.position.distanceTo(figure.root.position)>16
-        const latest=this.view.chat?.findLast(line=>line.name===member.name&&now-line.at<6500)
+        const message=this.speech.get(member.name),latest=message&&performance.now()<message.until?message:undefined
+        if(message&&!latest)this.speech.delete(member.name)
         const label=latest?.text??member.name
         if(current.tag.textContent!==label)current.tag.textContent=label
         current.tag.classList.toggle('speech',!!latest)
