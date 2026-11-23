@@ -1,7 +1,7 @@
 import * as T from 'three'
 import {box,mesh,cylinder} from '../casino/scene/geometry.ts'
 import {batchStatic} from '../casino/scene/static-batch.ts'
-import {COUNTERS,GRILLS,RESTAURANT,RESTAURANT_NAME,MENU,SEATS,TABLES,SUPPLIES,type KfcMess,type KitchenHand,type OrderItems,type RestaurantView} from './restaurant-model.ts'
+import {COUNTERS,GRILLS,RESTAURANT,RESTAURANT_NAME,MENU,SEATS,TABLES,SUPPLIES,restaurantPoints,type KfcMess,type KitchenHand,type Patty,type OrderItems,type RestaurantView} from './restaurant-model.ts'
 
 const red=metal(0x992e35),redTrim=metal(0xc9383f),cream=metal(0xffe9c8)
 const grey=metal(0x394349),ink=metal(0x202b2e),teal=metal(0x426b69)
@@ -280,14 +280,25 @@ export function buildRestaurant(g:T.Group){
   for(const x of [-2.3,2.3]){const light=new T.PointLight(0xffd3a6,32,9);light.position.set(x,3.13,2.6);g.add(light)}
   batchStatic(g)
   const meals=new Map<string,{key:string;mesh:T.Group}>()
-  const stages=new Map<number,{bun:T.Group;raw:T.Group;surface:T.Mesh}>()
+  const stages=new Map<number,{bun:T.Group;raw:T.Group;surface:T.Mesh;phase:Patty;flippedAt:number}>()
   GRILLS.forEach((x,slot)=>{
     const bun=foodVisual('bun'),raw=foodVisual('raw')
     g.add(bun,raw);bun.position.set(x+.44,1.083,-6.47);raw.position.set(x-.18,1.072,-6.48)
-    stages.set(slot,{bun,raw,surface:raw.children[0] as T.Mesh})
+    stages.set(slot,{bun,raw,surface:raw.children[0] as T.Mesh,phase:'empty',flippedAt:0})
   })
   const messes=new Map<string,T.Group>()
-  return (view:RestaurantView|undefined)=>{
+  const lamp=new T.MeshBasicMaterial({color:0xffcb68,transparent:true,opacity:.78,depthWrite:false})
+  const rings=Array.from({length:4},()=>{
+    const ring=new T.Mesh(new T.RingGeometry(.29,.32,32),lamp)
+    ring.rotation.x=-Math.PI/2;ring.visible=false;g.add(ring)
+    return ring
+  })
+  const update=(view:RestaurantView|undefined)=>{
+    const targets=restaurantPoints(view).filter(p=>p.id.startsWith('kfc:kitchen:'))
+    for(const [i,ring] of rings.entries()){
+      const target=targets[i];ring.visible=!!target
+      if(target)ring.position.set(target.x,.149,target.z)
+    }
     const ready=view?.pickup.length??0
     if(ready!==readyCount){
       readyCount=ready
@@ -316,7 +327,11 @@ export function buildRestaurant(g:T.Group){
       const data=view?.stations.find(s=>s.slot===i)
       props.bun.visible=!!data?.bun
       props.raw.visible=!!data&&data.patty!=='empty'
-      props.surface.material=data?.patty==='flipped'?cookedMeat:rawMeat
+      const phase=data?.patty??'empty'
+      if(phase==='flipped'&&props.phase==='raw')props.flippedAt=view?.now??0
+      else if(phase!=='flipped')props.flippedAt=0
+      props.phase=phase
+      props.surface.material=phase==='flipped'?cookedMeat:rawMeat
       if(data&&!data.lifted)place('cook'+i,data.done,GRILLS[i]+.45,1.082,-6.12,0,.74)
     }
     for(const [id,old] of meals)if(!placed.has(id)){remove(old.mesh);meals.delete(id)}
@@ -327,6 +342,15 @@ export function buildRestaurant(g:T.Group){
     }
     for(const [id,m] of messes)if(!seen.has(id)){remove(m);messes.delete(id)}
   }
+  const tick=(now:number)=>{
+    lamp.opacity=.56+.23*Math.sin(now/420)
+    for(const {raw,flippedAt} of stages.values()){
+      const p=flippedAt?T.MathUtils.clamp((now-flippedAt)/560,0,1):0
+      raw.position.y=1.072+Math.sin(p*Math.PI)*.32
+      raw.rotation.x=p*Math.PI
+    }
+  }
+  return {update,tick}
 }
 
 export function staffProps(parent:T.Group){

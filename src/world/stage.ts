@@ -125,7 +125,7 @@ export class CityStage {
     if(!this.art&&this.renderer)this.buildScene()
     if(this.art){
       this.art.seal.visible=!this.caveOpen
-      this.art.restaurant(view.restaurant)
+      this.art.restaurant.update(view.restaurant)
       const target=next.lift?.to??next.zone
       if(target.startsWith('floor:'))this.art.floor(target.slice(6))
     }
@@ -343,7 +343,7 @@ export class CityStage {
   }
   private motion(now:number){
     if(!this.art)return
-    if(!this.reduced)this.art.ambient?.(now)
+    if(!this.reduced){this.art.ambient?.(now);this.art.restaurant.tick(now)}
     if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))
     if(this.zone?.startsWith('floor:'))this.art.floor(this.zone.slice(6))?.actors.forEach(actor=>actor.pose(now))
     const tables=this.view?.hall?.tables??this.view?.tableMotion
