@@ -2,8 +2,8 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world{position:relative;flex:1;min-height:0;isolation:isolate;overflow:hidden;background:#203a3d;color:#eaf1e6}
 .world [hidden]{display:none!important}
 #world-canvas,.world-dark,.world-names{position:absolute;width:100%;height:100%;inset:0}
-#world-canvas{outline:none;touch-action:none;cursor:grab}
-#world-canvas:active{cursor:grabbing}
+#world-canvas{outline:none;touch-action:none;cursor:crosshair}
+.world[data-flat=true] #world-canvas{cursor:default}
 .world-dark{pointer-events:none;background:#020504;opacity:0;transition:opacity .25s;z-index:1}
 .world-names{pointer-events:none;z-index:2}
 .world-name{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;padding:2px 7px;border-radius:4px;background:#122420dc;border:1px solid #d4bd845c;color:#f3e6c9;font-size:11px}

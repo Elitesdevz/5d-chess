@@ -24,6 +24,7 @@ export class Figure {
   root=new T.Group()
   target:HallPlayer
   private body=new T.Group()
+  private head=new T.Group()
   private arms:T.Group[]=[]
   private legs:T.Group[]=[]
   private knees:T.Group[]=[]
@@ -58,19 +59,22 @@ export class Figure {
       batchStatic(arm);batchStatic(knee)
     }
     mesh(new T.CylinderGeometry(.057,.065,.13,12),skin,this.body,[0,1.46,0])
-    mesh(new T.SphereGeometry(.145,20,14),skin,this.body,[0,1.62,0]).scale.set(.88,1.19,.86)
-    mesh(new T.SphereGeometry(.138,18,12,0,tau,0,Math.PI*.53),hairPalette[(code>>>2)%hairPalette.length],this.body,[0,1.66,.013]).scale.set(.99,1.15,.97)
+    this.body.add(this.head)
+    mesh(new T.SphereGeometry(.145,20,14),skin,this.head,[0,1.62,0]).scale.set(.88,1.19,.86)
+    mesh(new T.SphereGeometry(.138,18,12,0,tau,0,Math.PI*.53),hairPalette[(code>>>2)%hairPalette.length],this.head,[0,1.66,.013]).scale.set(.99,1.15,.97)
     for(const side of [-1,1]){
-      mesh(new T.SphereGeometry(.027,9,7),skin,this.body,[side*.122,1.603,0]).scale.set(.73,1.14,.79)
-      mesh(new T.SphereGeometry(.011,8,6),shoe,this.body,[side*.043,1.637,-.114])
+      mesh(new T.SphereGeometry(.027,9,7),skin,this.head,[side*.122,1.603,0]).scale.set(.73,1.14,.79)
+      mesh(new T.SphereGeometry(.011,8,6),shoe,this.head,[side*.043,1.637,-.114])
     }
-    mesh(new T.SphereGeometry(.035,10,8),skin,this.body,[0,1.603,-.117]).scale.set(.66,1.05,.73)
-    box(this.body,[.045,.009,.007],[0,1.564,-.116],shoe,.003)
+    mesh(new T.SphereGeometry(.035,10,8),skin,this.head,[0,1.603,-.117]).scale.set(.66,1.05,.73)
+    box(this.head,[.045,.009,.007],[0,1.564,-.116],shoe,.003)
+    batchStatic(this.head)
     batchStatic(this.body)
     this.shadow=new T.Mesh(new T.PlaneGeometry(.97,.85),new T.MeshBasicMaterial({map:shadow,transparent:true,depthWrite:false}))
     this.root.add(this.shadow);this.shadow.position.y=.026
     this.shadow.rotation.x=-Math.PI/2
   }
+  hideHead(){this.head.visible=false}
   pose(dt:number,now:number,local?:Position,serving=false){
     const target=local??this.target,chair=this.target.chair||this.target.lounge
     const speed=Math.hypot(target.x-this.root.position.x,target.z-this.root.position.z)
