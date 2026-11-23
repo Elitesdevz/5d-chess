@@ -42,3 +42,11 @@ export function houseObstacle(x:number,z:number){
   }
   return false
 }
+export const MARKET=[[-14,18],[14,18]] as const
+export const BOULEVARD_TREES=[19,30,39,54] as const
+export function townFixture(x:number,z:number){
+  if(Math.abs(z-18)<.87&&Math.abs(Math.abs(x)-14)<1.52)return true
+  if(Math.abs(z-14.85)<.34&&BOULEVARD_TREES.some(dx=>Math.abs(Math.abs(x)-dx)<.34))return true
+  if(Math.abs(Math.abs(x)-6.25)<.64&&(Math.abs(z+3)<2||Math.abs(z-4)<2))return true
+  return Math.hypot(x+18,z-55)<1.67
+}

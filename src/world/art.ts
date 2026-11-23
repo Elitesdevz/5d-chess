@@ -1,6 +1,6 @@
 import {landscape,Scenery} from './landscape.ts'
 import {neighborhood} from './neighborhood.ts'
-import {HOMES} from './terrain.ts'
+import {avenues,venueDetail} from './civic.ts'
 import * as T from 'three'
 import {box,cylinder,mesh,v,dice,resultRotation} from '../casino/scene/geometry.ts'
 import {materials} from '../casino/scene/materials.ts'
@@ -96,24 +96,82 @@ function glazing(parent:T.Object3D,x:number,y:number,z:number,w:number,h:number)
   block(parent,.043,h,.067,x,y,z+.027,brass);block(parent,w,.035,.061,x,y+.12,z+.027,brass)
 }
 function landmarks(parent:T.Object3D){
-  for(const [type,label,material] of [['hotel','ROYAL HOTEL & CASINO',rug],['bank','FIFTH DIMENSION BANK',blue],['exchange','THE EXCHANGE',blue]] as const){
+  for(const [type,label] of [['hotel','ROYAL HOTEL & CASINO'],['bank','FIFTH DIMENSION BANK'],['exchange','THE EXCHANGE']] as const){
     const {x,z,width,front}=PLAN[type],root=new T.Group();root.position.set(x,0,z);parent.add(root)
-    box(root,[width*1.32,.5,.34],[0,4.28,front+.19],ink,.05)
-    banner(root,label,[width*1.22,.42],[0,4.28,front+.368])
+    const props=new Scenery(),finish=type==='hotel'?0x774951:type==='bank'?0xcabd9f:0x43636a,gilt=0xbd965e
+    const bar=(xx:number,y:number,offset:number,w:number,h:number,d:number,tint:number)=>props.add('box',xx,y,front+offset,w,h,d,tint)
     for(const side of [-1,1]){
-      block(root,.22,3.3,.62,side*1.55,1.66,front+.32,ivory)
-      block(root,.40,.14,.74,side*1.55,3.29,front+.32,brass)
-      potted(root,side*(width*.8),front+.7,1.03)
+      potted(root,side*width*.82,front+.77,1.02)
+      for(const fraction of [.53,.94]){
+        const a=side*width*fraction
+        if(type==='bank'){
+          props.add('post',a,2.13,front+.45,.58,4.23,.58,0xd8c9aa)
+          for(const y of [.17,.37,3.95,4.14])props.add('post',a,y,front+.45,.79,.16,.79,gilt)
+        }else{
+          bar(a,2.61,.26,.35,5.2,.52,finish);bar(a,2.68,.55,.075,4.8,.07,gilt)
+        }
+      }
     }
-    box(root,[3.75,.16,1.43],[0,3.4,front+.66],material,.045)
+    const height=type==='bank'?5.35:4.7
+    bar(0,height,.25,width*1.98,type==='bank'?1.12:1.24,.52,finish)
+    for(const y of [height-.55,height+.55])bar(0,y,.59,width*2.05,.12,.22,gilt)
+    bar(0,height,.62,type==='exchange'?6.95:9.35,.94,.12,0x243b40)
+    banner(root,label,[type==='exchange'?6.48:8.9,.88],[0,height,front+.69])
+    if(type==='hotel'){
+      // A stepped crown with sunburst ribs over a projecting bulb-lined marquee.
+      for(let n=0;n<3;n++)bar(0,5.43+n*.41,-.14,12.5-n*3.2,.49,.89,finish)
+      for(let n=-6;n<=6;n++)bar(n*.46,6.02-Math.abs(n)*.051,.38,.14,1.36-Math.abs(n)*.09,.13,gilt)
+      for(const [w,y,d,c] of [[7.15,3.65,2.05,0x754550],[7.42,3.52,2.2,gilt],[7.19,3.38,2.04,0x65434b]])bar(0,y,.92,w,.14,d,c)
+      for(let n=-12;n<=12;n++)props.add('crown',n*.279,3.38,front+1.98,.114,.116,.10,0xffe5a9)
+      // The rear gaming hall gets its own cornice and repeated window pilasters.
+      const end=PLAN.casino.z-PLAN.hotel.z
+      for(const side of [-1,1]){
+        for(const y of [.27,4.06,5.45])props.add('box',side*11.40,y,end+1.1,.32,.15,15.85,gilt)
+        for(let i=0;i<8;i++)props.add('box',side*11.40,2.71,end-6.5+i*2.15,.30,5.43,.15,finish)
+      }
+    }else if(type==='bank'){
+      props.add('gable',0,6.58,front+.08,width*1.96,1.58,.91,0xcbbfa5)
+      props.add('gable',0,6.51,front+.57,width*1.57,1.12,.06,0x887f6b)
+      props.add('gable',0,6.46,front+.62,width*1.30,.76,.06,0xcbbfa5)
+    }else{
+      bar(0,3.66,.70,5.82,.18,1.42,0x96b3ae)
+      for(const side of [-1,1])for(let k=0;k<3;k++)bar(side*(width-.36*k),7.12,.31,.12,13.8,.24,k%2?gilt:0x899e98)
+    }
+    props.finish(root)
   }
 }
 function fountain(scene:T.Scene){
   const plaza=new T.Group();scene.add(plaza)
   cylinder(plaza,2.87,.18,[0,.13,0],ivory,64);cylinder(plaza,2.68,.35,[0,.345,0],stone,64)
   cylinder(plaza,2.57,.021,[0,.535,0],std(0x3a7b88,.36,.16),60)
-  cylinder(plaza,.42,1.02,[0,.81,0],stone,22);cylinder(plaza,.71,.12,[0,1.32,0],brass,32)
-  const crest=mesh(new T.OctahedronGeometry(.53),brass,plaza,[0,1.91,0]);crest.scale.y=1.4
+  // Travertine paving, bronze spill bowls and a double-sided cast knight.
+  const mosaic=new Scenery()
+  for(let i=0;i<72;i++){
+    const a=i*tau/72
+    mosaic.add('box',3.11*Math.sin(a),.016,3.11*Math.cos(a),.25,.033,.42,i%6===0?0xa27a50:0xcab99b,a)
+  }
+  mosaic.finish(plaza)
+  const basin=(y:number,r:number)=>{
+    const bowl=mesh(new T.LatheGeometry([[.24,0],[r*.63,.06],[r,.29],[r,.35],[r*.90,.35],[r*.78,.23],[.24,.15]].map(([x,y])=>new T.Vector2(x,y)),48),brass,plaza,[0,y,0])
+    cylinder(plaza,r*.9,.019,[0,bowl.position.y+.329,0],std(0x70aca8,.36,.18),48)
+  }
+  cylinder(plaza,.41,1.05,[0,.85,0],ivory,16);basin(.97,1.12)
+  cylinder(plaza,.24,.79,[0,1.59,0],stone,12);basin(1.73,.59)
+  cylinder(plaza,.28,.22,[0,2.10,0],brass,24)
+  const silhouette=new T.Shape()
+  silhouette.moveTo(-.48,0);silhouette.quadraticCurveTo(-.24,.29,-.44,.79)
+  silhouette.lineTo(-.50,.97);silhouette.lineTo(-.42,1.38);silhouette.lineTo(-.23,1.23)
+  silhouette.lineTo(-.09,1.47);silhouette.lineTo(.016,1.21);silhouette.quadraticCurveTo(.36,1.12,.66,.74)
+  silhouette.lineTo(.59,.56);silhouette.lineTo(.32,.55);silhouette.lineTo(.08,.73)
+  silhouette.quadraticCurveTo(-.10,.47,.38,.09);silhouette.lineTo(.40,0);silhouette.closePath()
+  const patina=std(0x467b70,.52,.37),cast=new T.Group();cast.position.set(0,2.21,0);cast.rotation.y=-.27;plaza.add(cast)
+  mesh(new T.ExtrudeGeometry(silhouette,{depth:.22,bevelEnabled:true,bevelSegments:3,steps:1,bevelSize:.055,bevelThickness:.05}),patina,cast,[0,0,-.11])
+  for(const z of [-.17,.17])mesh(new T.SphereGeometry(.034,10,6),brass,cast,[.09,1.02,z])
+  for(let i=0;i<8;i++){
+    const a=i*tau/8,point=(r:number,y:number)=>new T.Vector3(Math.sin(a)*r,y,Math.cos(a)*r)
+    const arc=new T.QuadraticBezierCurve3(point(.93,1.26),point(1.66,2.21),point(2.20,.535))
+    mesh(new T.TubeGeometry(arc,18,.022,5,false),std(0x94d5cf,.21,.24),plaza,[0,0,0],false)
+  }
   const ripples=Array.from({length:3},()=>{
     const ring=mesh(new T.RingGeometry(.94,1,56),new T.MeshBasicMaterial({color:0xb7eddf,transparent:true,opacity:.19,depthWrite:false}),plaza,[0,.553,0],false)
     ring.rotation.x=-Math.PI/2;return ring
@@ -126,7 +184,7 @@ function fountain(scene:T.Scene){
       ring.scale.setScalar(.7+progress*1.76);ring.material.opacity=.21*Math.sin(progress*Math.PI)
     })
     for(let i=0;i<spray.count;i++){
-      const angle=Math.floor(i/10)*tau/6,steps=(time/1380+i%10/10)%1,d=.62+steps*1.58
+      const angle=Math.floor(i/10)*tau/6+.22,steps=(time/1380+i%10/10)%1,d=.62+steps*1.58
       matrix.makeTranslation(Math.sin(angle)*d,1.31+steps*(1.48-2.26*steps),Math.cos(angle)*d)
       spray.setMatrixAt(i,matrix)
     }
@@ -137,12 +195,8 @@ function fountain(scene:T.Scene){
 }
 function street(){
   const group=new T.Group()
-  plane(group,112,108,0,-.053,2,paving())
-  const road=std(0x2e3d49,.15,.53),mark=std(0xb5a688)
-  plane(group,11,77,0,-.015,3,road);plane(group,105,8,0,-.014,11,road)
-  for(const z of [-27,-21,-15,-9,-3,3,18,24,30,36])plane(group,.11,1.95,0,-.010,z,mark)
-  for(const sign of [-1,1])for(let n=1;n<=11;n++)plane(group,1.98,.095,n*4*sign,-.009,11,mark)
-  plane(group,23.6,17.85,0,.014,1.925,paving())
+  avenues(group)
+  plane(group,23.6,14.8,0,-.016,.52,paving())
   landmarks(group);neighborhood(group)
   for(const [x,z] of [[-10,2],[10,2],[-11,13],[11,13],[-15,-8],[15,-8],[-17,12],[17,12],[-33,12],[33,12],[-44,-5],[44,-5],[-9,26],[9,26],[-25,26],[25,26]]){
     lamp(group,x,z)
@@ -319,6 +373,7 @@ function tower(shaft:T.Object3D){
     if(!room)return
     let entry=decor.get(symbol)
     if(!entry){
+      venueDetail(room,'floor',symbol)
       const name=FLOOR_LIST.find(stock=>stock.symbol===symbol)!.name
       banner(room,name,[6,.39],[0,4.17,-4.08],symbol==='CAS'?'#ffdca1':'#ccecee')
       const actors=[new ClubGuest(room,-2.7,-2.38,0xaa7c61,0x365263,true),new ClubGuest(room,2.7,-2.38,0xd2a17d,symbol==='CAS'?0x674451:0x374d5d,true,1)]
@@ -338,8 +393,16 @@ export function liftPlatform(parent:T.Object3D){
 const bronzeFloor=std(0x60584c,.35,.74)
 export function makeWorldArt(open:boolean){
   const scene=new T.Scene()
-  scene.background=new T.Color(0x7495a9)
-  scene.fog=new T.FogExp2(scene.background as T.Color,.0064)
+  const sky=texture(1024,512,c=>{
+    const wash=c.createLinearGradient(0,0,0,512)
+    for(const [stop,tint] of [[0,'#427fa9'],[.31,'#83b5cc'],[.47,'#ded6bd'],[.53,'#e8ddc6'],[1,'#a9ad97']] as const)wash.addColorStop(stop,tint)
+    c.fillStyle=wash;c.fillRect(0,0,1024,512)
+    const sun=c.createRadialGradient(692,207,1,692,207,55)
+    sun.addColorStop(0,'#fff6d9');sun.addColorStop(.095,'#fff1cb');sun.addColorStop(.12,'#ffedcaaa');sun.addColorStop(1,'#ffdfaa00')
+    c.fillStyle=sun;c.fillRect(636,151,112,112)
+  })
+  sky.mapping=T.EquirectangularReflectionMapping;scene.background=sky
+  scene.fog=new T.FogExp2(0xc2c9be,.0056)
   scene.add(new T.HemisphereLight(0xdbe9ff,0xa89072,1.95))
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());const water=fountain(scene),wind=landscape(scene)
@@ -349,8 +412,8 @@ export function makeWorldArt(open:boolean){
     const group=new T.Group(),{x,z}=PLAN[zone];group.position.set(x,0,z);scene.add(group);rooms[zone]=group
   }
   const {hotel,casino,bank,exchange}=rooms
-  gallery(hotel,'hotel')
-  buildHall(casino,true)
+  gallery(hotel,'hotel');venueDetail(hotel,'hotel')
+  buildHall(casino,true);venueDetail(casino,'casino')
   const wheels=buildHallTables(casino),actors:ClubGuest[]=[]
   for(const [x,z] of [[-5,-4.9],[5,-4.9],[0,.61]])actors.push(new ClubGuest(casino,x-.35,z,0xb78968,0x29323d,true))
   const table=new T.Group();casino.add(table);table.position.set(PUBLIC_DICE.x,0,PUBLIC_DICE.z)
@@ -370,12 +433,12 @@ export function makeWorldArt(open:boolean){
     block(casino,width,3.74,.25,side*(2.8+width)/2,1.87,8.9,ink)
   }
   block(casino,22.5,1.65,.25,0,4.56,8.9,ink)
-  buildBankArchitecture(bank,true);buildBankVault(bank);frontWindow(bank,20.4,8.05,blue)
+  venueDetail(bank,'bank');buildBankArchitecture(bank,true);buildBankVault(bank);frontWindow(bank,20.4,8.05,blue)
   block(bank,20.4,2.68,.25,0,5.33,8.05,blue)
   const staff=[new ClubGuest(bank,-2.9,-2.72,0xb38469,0x284557,true,1),new ClubGuest(bank,2.9,-2.71,0xd5ad86,0x313c59,true,2),new ClubGuest(bank,7.4,-1.32,0x946344,0x213344,true)]
-  gallery(exchange,'exchange');staff.push(new ClubGuest(exchange,.65,-3.11,0xc89b79,0x4b3d58,true,1))
+  gallery(exchange,'exchange');venueDetail(exchange,'exchange');staff.push(new ClubGuest(exchange,.65,-3.11,0xc89b79,0x4b3d58,true,1))
   const floor=tower(elevator(scene))
-  for(const zone of ['cave','oasis'] as const){rooms[zone].rotation.y=Math.PI;cave(rooms[zone],zone==='oasis')}
+  for(const zone of ['cave','oasis'] as const){rooms[zone].rotation.y=Math.PI;cave(rooms[zone],zone==='oasis');venueDetail(rooms[zone],zone)}
   const seal=mesh(new T.IcosahedronGeometry(1,2),rock,rooms.cave,[0,1.34,7.01]);seal.scale.set(1.84,1.8,1.1);seal.visible=!open
   return {scene,actors,staff,wheels,publicDie,floor,ambient,seal}
 }

@@ -1,4 +1,4 @@
-import {CAVE_MOUTH,CAVE_X,OASIS_X,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
+import {CAVE_MOUTH,CAVE_X,OASIS_X,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
 import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
 export const WORLD_CAPACITY=50
@@ -93,6 +93,7 @@ export function groundZone(x:number,z:number):PublicZone{
 }
 function roomObstacles(zone:WorldZone,x:number,z:number){
   if(zone==='casino')return WORLD_TABLES.some(t=>box(x,z,t.x,t.z,2.35,1.28))||box(x,z,-5.9,8.23,4.05,.54)
+  if(zone==='hotel')return box(x,z,-6.25,-6.26,2.33,.67)
   if(zone==='bank')return z<-.41
   if(zone==='exchange'||zone.startsWith('floor:')){
     const side=Math.abs(x)
@@ -108,7 +109,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
     const p=localSite(zone,x,z),shaft=Math.abs(p.x)<1.42
     return Math.abs(p.x)<7.72&&p.z<7.29&&p.z>(shaft?-6.21:-5.98)&&!roomObstacles(zone,p.x,p.z)
   }
-  if(!passableLand(x,z)||Math.hypot(x,z)<2.88||houseObstacle(x,z))return false
+  if(!passableLand(x,z)||Math.hypot(x,z)<2.88||townFixture(x,z)||houseObstacle(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x),opening=room==='bank'?1.13:room==='exchange'?1.02:1.25
     if(side<width+.28&&side>width-.28&&p.z>back-.28&&p.z<front+.28)return false

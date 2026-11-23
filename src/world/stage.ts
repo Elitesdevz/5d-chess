@@ -9,13 +9,14 @@ import type {Position} from '../roulette-hall-model.ts'
 const TAU=Math.PI*2
 const STANDING_EYE=1.637,SEATED_EYE=1.47
 const routes=[
-  [[-16,6],[-14.7,-4],[-11,-5],[-10,8],[-16,6]],
-  [[13,10],[23,10],[24,6.9],[35,8],[24,14],[13,10]],
-  [[-35,8],[-26,7],[-19,9],[-14,15],[-24,15],[-35,8]],
-  [[-6,18],[-4,11],[-4,-4],[-8,-5],[-8,17],[-6,18]],
-  [[5,16],[9,7],[8,-4],[13,-5],[12,12],[5,16]],
-  [[31,20],[33,13],[39,13],[45,20],[42,26],[31,20]],
-  [[-41,22],[-31,23],[-26,25],[-22,33],[-36,27],[-41,22]],
+  [[-14,7],[-13,-5],[-10.5,-5],[-10.5,6.6],[-14,7]],
+  [[15,8.5],[23,7.25],[30,8.2],[35,12.7],[24,13.35],[15,8.5]],
+  [[-35,8],[-26,7],[-19,8],[-14,14],[-24,13.4],[-35,8]],
+  [[-4,15],[-4.6,9],[-3.85,-4],[-4.9,-4],[-4.9,15],[-4,15]],
+  [[5,16],[9,7],[8,-4],[12,-5],[12,12],[5,16]],
+  [[32,21],[33,15.7],[39,16.5],[40.5,22],[40.5,29],[32,29],[32,21]],
+  [[-40,30],[-30,27],[-26,26],[-21,29],[-30,32],[-40,30]],
+  [[-13.5,43.5],[-13.5,45],[-22,45],[-27,53],[-25.5,53],[-21,46],[-13.5,46],[-13.5,43.5]],
 ] as const
 const streets=routes.map(route=>{
   let length=0
@@ -137,13 +138,14 @@ export class CityStage {
     this.art=makeWorldArt(this.caveOpen)
     this.npc=routes.map((_,i)=>{
       const target=pedestrian(i,Date.now()+this.clock)
-      return new Figure(this.art!.scene,{...target,name:['Iris','Marlowe','June','Dion','Rafi','Hana','Vera'][i],avatar:'default',online:true},this.shadow!)
+      return new Figure(this.art!.scene,{...target,name:['Iris','Marlowe','June','Dion','Rafi','Hana','Vera','Otis'][i],avatar:'default',online:true},this.shadow!)
     })
   }
   private clearScene(){
     for(const entry of this.figures.values()){entry.figure.dispose();entry.tag?.remove()}
     this.figures.clear()
     if(this.art){
+      if(this.art.scene.background instanceof T.Texture)this.art.scene.background.dispose()
       this.art.scene.traverse(obj=>{
         if(obj instanceof T.Mesh){
           obj.geometry.dispose()
