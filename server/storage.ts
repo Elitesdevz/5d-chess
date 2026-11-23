@@ -254,6 +254,18 @@ export class ChessStore {
     let rank = 1
     return sorted.map((row,i) => {if (i && row.rating !== sorted[i-1].rating) rank=i+1; return {...row, rank}})
   }
+  coinLeaderboard() {
+    const rows=this.statement(`SELECT name,COALESCE(json_extract(payload,'$.wallet.loadout.icon'),'default') AS avatar,
+      json_extract(payload,'$.wallet.loadout.frame') AS frame,
+      COALESCE(json_extract(payload,'$.wallet.coins'),0) AS coins FROM accounts`).all() as Array<{name:string;avatar:string;frame:string|null;coins:number}>
+    const sorted=rows.map(row=>({...row,frame:row.frame??undefined,coins:Math.round(row.coins*10_000)/10_000}))
+      .sort((a,b)=>b.coins-a.coins||a.name.localeCompare(b.name))
+    let rank=1
+    return sorted.map((row,i)=>{
+      if(i&&row.coins!==sorted[i-1].coins)rank=i+1
+      return {...row,rank}
+    })
+  }
   listingRows(): Row[] {return this.statement('SELECT payload FROM listings ORDER BY ordinal').all() as Row[]}
   writeListing(id: string, json: string): void {this.requireWriter(); this.statement('INSERT INTO listings(id,payload) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,revision=listings.revision+1').run(id, json)}
   deleteListing(id: string): void {this.requireWriter(); this.statement('DELETE FROM listings WHERE id=?').run(id)}
