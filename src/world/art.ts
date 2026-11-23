@@ -211,7 +211,7 @@ function street(){
   for(const [x,z] of [[-10,2],[10,2],[-11,13],[11,13],[-15,-8],[15,-8],[-17,12],[17,12],[-33,12],[33,12],[-44,-5],[44,-5],[-9,26],[9,26],[-25,26],[25,26]]){
     lamp(group,x,z)
   }
-  for(const [x,z] of [[-10.8,-2],[10.8,-2],[-15,15],[15,15],[-32,-6],[32,-6],[-35,22],[35,22],[-27,-13],[27,-13],[-15,-21],[15,-21]]){
+  for(const [x,z] of [[-10.8,-2],[10.8,-2],[-15,15],[15,15],[-32,-6],[32,-6],[-35,22],[31.2,29.25],[-27,-13],[27,-13],[-15,-21],[15,-21]]){
     potted(group,x,z,1.4)
   }
   for(const [x,z] of [[-8,2],[8,2],[-14,14],[14,14],[-18,7],[18,7]])bench(group,x,z,x>0?Math.PI/2:-Math.PI/2)
@@ -219,7 +219,7 @@ function street(){
   box(guide,[2.53,1.31,.17],[0,1.43,0],ink,.06)
   banner(guide,'CITY SQUARE',[2.24,.28],[0,1.81,.093])
   banner(guide,'‹  BANK     CASINO  ↑',[2.18,.28],[0,1.42,.093])
-  banner(guide,'EXCHANGE  ›',[2.03,.27],[0,1.11,.093])
+  banner(guide,'EXCHANGE   KFC  ›',[2.03,.27],[0,1.11,.093])
   for(const x of [-.98,.98])block(guide,.10,.81,.15,x,.43,0,brass)
   const trailSign=new T.Group();trailSign.position.set(1.8,0,44);trailSign.rotation.y=Math.PI;group.add(trailSign)
   block(trailSign,.14,1.85,.16,0,.92,0,oak)

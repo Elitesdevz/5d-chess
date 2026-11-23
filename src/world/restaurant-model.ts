@@ -32,7 +32,7 @@ export type TicketPhase='queue'|'kitchen'|'ready'|'carrying'|'served'
 export type TicketView={id:string;item:Meal;lane:number;name:string;phase:TicketPhase;seat?:number}
 export type KfcMess={id:string;kind:'wipe'|'mop';x:number;z:number}
 export type KfcWork={key:string;kind:WorkKind;step:number;readyAt:number}
-export type KfcActor={id:string;name:string;x:number;z:number;yaw:number;pose:'walk'|'work'|'eat'|'sit'|'tray'|'mop';role?:KfcRole|'manager'}
+export type KfcActor={id:string;name:string;x:number;z:number;yaw:number;pose:'walk'|'work'|'eat'|'sit'|'tray'|'mop'|'wipe';role?:KfcRole|'manager'}
 export type RestaurantView={
   staff:Record<KfcRole,KfcShiftOwner[]>;queues:TicketView[][];pickup:TicketView[];messes:KfcMess[];actors:KfcActor[];
   taken:number[];mealsAt:{seat:number;item:Meal}[];meal?:KfcMeal;shift?:KfcShift;work?:KfcWork;tray?:TicketView;pay?:{coins:number;id:string};

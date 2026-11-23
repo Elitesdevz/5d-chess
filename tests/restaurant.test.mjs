@@ -125,3 +125,24 @@ test('human jobs are limited to physical slots and NPCs return when players cloc
   r.act(d,'hire',{role:'cashier'},time+2)
   assert.equal(r.view('Danni',time+2,true).shift.slot,1)
 })
+
+test('a Krull combo needs both flipping and bagging before pickup',t=>{
+  const {restaurant:r,store}=fixture(t)
+  const buyer=member('Alice',counter(0)),cook=member('Bob',MANAGER),cashier=member('Charlie',MANAGER)
+  r.act(cook,'hire',{role:'cook'},time)
+  r.act(cashier,'hire',{role:'cashier'},time)
+  r.act(buyer,'buy',{lane:0,item:'combo',id:'combo-order-001'},time)
+  Object.assign(cashier,member('Charlie',{x:COUNTERS[0],z:-2.72}))
+  r.act(cashier,'take',{item:'combo',ticket:'combo-order-001'},time)
+  Object.assign(cook,member('Bob',{x:GRILLS[0],z:-5.47}))
+  for(const [part,kind] of ['flip','fries'].entries()){
+    const at=time+part*2500
+    r.act(cook,'start',{point:'kfc:cook'},at)
+    const task=r.view('Bob',at,true).work
+    assert.equal(task.kind,kind)
+    for(let step=0;step<3;step++)r.act(cook,'step',{key:task.key,step},at+step*650)
+    assert.equal(r.view('Bob',at+1300,true).pickup.some(p=>p.id==='combo-order-001'),part===1)
+  }
+  assert.equal(wallet(store,'Bob'),107)
+  assert.equal(wallet(store,'Alice'),78)
+})

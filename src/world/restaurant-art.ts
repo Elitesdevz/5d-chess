@@ -8,6 +8,7 @@ const grey=metal(0x394349),ink=metal(0x202b2e),teal=metal(0x426b69)
 const wood=metal(0x9a634a),birch=metal(0xdeb68a),silver=metal(0xb0b6ae,.46)
 const kitchenTile=metal(0xd7cbc0),darkRed=metal(0x643239),chip=metal(0xf0b958),sauce=metal(0xcc783d)
 const glow=new T.MeshBasicMaterial({color:0xffe5b2}),ice=new T.MeshBasicMaterial({color:0xbce3db})
+const spillLiquid=new T.MeshStandardMaterial({color:0xb68255,roughness:.24,metalness:.12,transparent:true,opacity:.78})
 const windowGlass=new T.MeshStandardMaterial({color:0x9bbfc1,opacity:.19,transparent:true,depthWrite:false,side:T.DoubleSide,roughness:.16})
 function metal(color:number,metalness=0){return new T.MeshStandardMaterial({color,metalness,roughness:.72})}
 function block(g:T.Object3D,w:number,h:number,d:number,x:number,y:number,z:number,m:T.Material){
@@ -60,7 +61,7 @@ function trimFront(g:T.Object3D){
     for(const x of [2.49,3.72,4.99])block(g,.058,2.28,.13,side*x,1.46,z+.01,ink)
     block(g,4.7,.058,.14,side*3.72,1.12,z,ink)
     for(let i=0;i<9;i++)block(g,.28,.11,1.01,side*(1.68+i*.51),2.58,z+.43,i%2?cream:redTrim)
-    const door=new T.Group();door.position.set(side*1.21,0,z-.035);door.rotation.y=-side*.92;g.add(door)
+    const door=new T.Group();door.position.set(side*1.21,0,z-.035);door.rotation.y=-side*1.34;g.add(door)
     block(door,.078,2.24,.115,-side*.91,1.12,0,red)
     block(door,.98,.14,.138,-side*.48,.076,0,red)
     block(door,.97,.077,.122,-side*.48,2.21,0,red)
@@ -71,6 +72,16 @@ function trimFront(g:T.Object3D){
     for(let i=0;i<5;i++)mesh(new T.IcosahedronGeometry(.22,1),teal,g,[planter+Math.sin(i*1.7)*.31,.46+i%2*.16,z+.70])
   }
   block(g,12.7,.08,1.84,0,.004,z+.92,kitchenTile)
+  for(const side of [-1,1]){
+    const x=side*2.63
+    block(g,1.78,.064,.49,x,.501,z+.72,wood)
+    block(g,1.78,.28,.04,x,.675,z+.91,red)
+    for(const leg of [-.71,.71])block(g,.058,.49,.32,x+leg,.253,z+.72,ink)
+  }
+  for(const x of [-5.8,5.8]){
+    block(g,.15,.62,.19,x,2.04,z+.15,ink)
+    block(g,.13,.34,.10,x,2.01,z+.27,glow)
+  }
   sign(g,[RESTAURANT_NAME],0,3.39,z+.18,9.7,.61,{bg:'#7a262b',font:146})
   const emblem=new T.Group();emblem.position.set(0,4.25,z-.20);g.add(emblem)
   const ring=mesh(new T.CylinderGeometry(1.02,1.02,.24,48),redTrim,emblem,[0,.66,0]);ring.rotation.x=Math.PI/2
@@ -108,6 +119,7 @@ function tray(item:Meal='combo'){
       cylinder(t,.024,.095,[side*.085,.073,side*.098],cream,11).rotation.x=1.38
     }
   }
+  batchStatic(t)
   return t
 }
 function booth(g:T.Object3D,i:number){
@@ -183,7 +195,7 @@ function office(g:T.Object3D){
 function spill(g:T.Object3D,m:KfcMess){
   const marker=new T.Group();marker.position.set(m.x,0,m.z);g.add(marker)
   if(m.kind==='mop'){
-    const drink=new T.Mesh(new T.CircleGeometry(.36,24),new T.MeshStandardMaterial({color:0xb68255,roughness:.24,metalness:.12,transparent:true,opacity:.78}))
+    const drink=new T.Mesh(new T.CircleGeometry(.36,24),spillLiquid)
     drink.rotation.x=-Math.PI/2;drink.position.y=.032;drink.scale.set(1,.58,1);marker.add(drink)
     const cup=cylinder(marker,.062,.159,[.25,.063,-.08],cream,14);cup.rotation.z=1.4
     for(let i=0;i<3;i++)cylinder(marker,.034,.008,[.3+i*.06,.027,.15-i*.06],sauce,12)
@@ -216,6 +228,11 @@ export function buildRestaurant(g:T.Group){
   block(g,7.92,.12,5.18,-1.87,.071,-4.35,kitchenTile)
   for(let i=0;i<10;i++)block(g,7.6,.008,.021,-1.85,.138,-6.78+i*.51,silver)
   fitKitchen(g);office(g)
+  const screen=document.createElement('canvas');screen.width=480;screen.height=128
+  const screenTex=new T.CanvasTexture(screen);screenTex.colorSpace=T.SRGBColorSpace
+  mesh(new T.PlaneGeometry(1.76,.48),new T.MeshBasicMaterial({map:screenTex}),g,[3.91,2.48,-2.28],false)
+  const display=screen.getContext('2d')!
+  let readyCount=-1
   TABLES.forEach((_,i)=>booth(g,i))
   sign(g,MENU.slice(0,3).map(item=>item.name+'  '+item.price),-5.91,2.16,-1.33,1.93,1.29,{bg:'#283437',rotation:Math.PI/2,font:55})
   sign(g,MENU.slice(3).map(item=>item.name+'  '+item.price),5.90,2.16,-1.33,1.93,1.29,{bg:'#283437',rotation:-Math.PI/2,font:64})
@@ -224,6 +241,14 @@ export function buildRestaurant(g:T.Group){
   const dishes=new Map<number,{item:Meal;mesh:T.Group}>()
   const messes=new Map<string,T.Group>()
   return (view:RestaurantView|undefined)=>{
+    const ready=view?.pickup.length??0
+    if(ready!==readyCount){
+      readyCount=ready
+      display.fillStyle='#263e3b';display.fillRect(0,0,480,128)
+      display.fillStyle='#fbdda9';display.textAlign='center';display.textBaseline='middle'
+      display.font='800 58px system-ui';display.fillText(ready?ready+' READY':'PREPARING',240,66)
+      screenTex.needsUpdate=true
+    }
     const placed=new Set<number>()
     for(const {seat,item} of view?.mealsAt??[]){
       placed.add(seat)
@@ -250,5 +275,11 @@ export function staffProps(parent:T.Group){
   cylinder(mop,.021,1.30,[0,.69,0],birch,10)
   box(mop,[.30,.067,.15],[0,.054,.014],teal,.015)
   for(let i=0;i<8;i++)block(mop,.029,.024,.20,.029*(i-3.5),.026,.025,cream)
-  return {tray:food,mop}
+  const cloth=new T.Group();cloth.position.set(.24,1.07,-.44);cloth.visible=false;parent.add(cloth)
+  box(cloth,[.14,.035,.19],[0,0,0],teal,.02)
+  const apron=new T.Group();parent.add(apron);apron.visible=false
+  box(apron,[.25,.45,.045],[0,1.093,-.151],red,.022)
+  box(apron,[.249,.036,.055],[0,1.019,-.165],cream,.006)
+  box(apron,[.13,.08,.025],[.008,1.177,-.188],cream,.006)
+  return {tray:food,mop,cloth,apron}
 }

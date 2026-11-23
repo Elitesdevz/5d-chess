@@ -65,6 +65,8 @@ export class Restaurant {
     this.notePay(player,this.store.transaction(u=>this.credit(u,player,coins,service,now)))
   }
   hasTray(name:string){return this.tickets.some(t=>t.carrier===name)}
+  workerRole(name:string){return this.staff.get(name)?.role}
+  jobKind(name:string){return this.jobs.get(name)?.kind}
   private taskRelease(name:string){
     const task=this.jobs.get(name)
     if(task?.ticket){
@@ -213,8 +215,9 @@ export class Restaurant {
       }else{
         const m=this.messes.filter(x=>!x.claim)[slot]
         const home={x:slot===0?-3.26:3.2,z:4.9-slot*2.11}
-        const pos=m?along([home,{x:home.x,z:m.z},m],Math.max(0,(now-m.created)/415)):{...home,yaw:Math.PI}
-        actors.push({...look,...pos,pose:m?'mop':'work'})
+        const target=m&&{x:m.x-(m.kind==='wipe'?Math.sign(m.x)*.83:0),z:m.z}
+        const pos=m&&target?along([home,{x:home.x,z:target.z},target],Math.max(0,(now-m.created)/415)):{...home,yaw:Math.PI}
+        actors.push({...look,...pos,pose:m?m.kind:'work'})
       }
     })
     for(const ticket of this.tickets){
@@ -245,14 +248,18 @@ export class Restaurant {
     this.requirePoint(member,'kfc:menu:'+lane,now)
     this.store.transaction(u=>{
       const a=u.users.get(member.name)??fail(401,'Log in first'),purse=wallet(a)
-      if(a.restaurant?.id===data.id)return
-      if(a.restaurantLast===data.id)return
+      const receipt=a.restaurantOrders?.find(o=>o.id===data.id)
+      if(receipt){
+        if(receipt.item!==item.id||receipt.lane!==lane)fail(409,'This receipt belongs to another meal')
+        return
+      }
+      if(a.restaurant?.id===data.id||a.restaurantLast===data.id)return
       if(a.restaurant)fail(409,'Finish the meal you already ordered first')
       const balance=toStockUnits(purse.coins)-toStockUnits(item.price)
       if(balance<0)fail(409,'You need '+item.price+' coins for this order')
       purse.coins=fromStockUnits(balance)
       a.restaurant={id:data.id as string,item:item.id,lane,status:'paid',bites:0}
-      a.restaurantLast=a.restaurant.id
+      a.restaurantOrders=[{id:a.restaurant.id,item:item.id,lane},...(a.restaurantOrders??[])].slice(0,40)
       u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_ordered',reference:a.restaurant.id,coins:item.price},now)
     })
     this.restore(member.name,now)

@@ -16,7 +16,7 @@ const routes=[
   [[-35,8],[-26,7],[-19,8],[-14,14],[-24,13.4],[-35,8]],
   [[-4,15],[-4.6,9],[-3.85,-4],[-4.9,-4],[-4.9,15],[-4,15]],
   [[5,16],[9,7],[8,-4],[12,-5],[12,12],[5,16]],
-  [[32,21],[33,15.7],[39,16.5],[40.5,22],[40.5,29],[32,29],[32,21]],
+  [[29.84,25.1],[29.72,14.04],[43.6,14.04],[43.69,29.62],[29.62,29.62],[29.84,25.1]],
   [[-40,30],[-30,27],[-26,26],[-21,29],[-30,32],[-40,30]],
   [[-13.5,43.5],[-13.5,45],[-22,45],[-27,53],[-25.5,53],[-21,46],[-13.5,46],[-13.5,43.5]],
 ] as const
@@ -277,8 +277,15 @@ export class CityStage {
       const figure=current.figure
       figure.target=member.dining===undefined?member:{...member,lounge:{couch:0,index:0}}
       figure.root.position.y=local&&member.zone==='city'?terrainHeight(this.position.x,this.position.z):height
-      if(member.carrying&&!current.props)current.props=staffProps(figure.root)
-      if(current.props)current.props.tray.visible=!!member.carrying
+      const cleaning=(member.workingUntil??0)>now&&(member.workKind==='mop'||member.workKind==='wipe')
+      if((member.carrying||cleaning||member.kfcRole)&&!current.props)current.props=staffProps(figure.root)
+      if(current.props){
+        current.props.tray.visible=!!member.carrying
+        current.props.apron.visible=!!member.kfcRole&&member.dining===undefined
+        current.props.cloth.visible=cleaning&&member.workKind==='wipe'
+        current.props.mop.visible=cleaning&&member.workKind==='mop'
+        current.props.mop.rotation.z=.19+Math.sin(now*.008)*.13
+      }
       figure.pose(dt,now,local?this.position:undefined,!!member.carrying||(member.workingUntil??0)>now,(member.eatingUntil??0)>now)
       const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
       if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
@@ -316,8 +323,10 @@ export class CityStage {
       figure.target=character
       props.tray.visible=actor.pose==='tray'
       props.mop.visible=actor.pose==='mop'
+      props.cloth.visible=actor.pose==='wipe'
+      props.cloth.position.x=.24+Math.sin(now*.007)*.10
       props.mop.rotation.z=.19+Math.sin(now*.005)*.14
-      figure.pose(dt,now,undefined,actor.pose==='work'||actor.pose==='tray'||actor.pose==='mop',actor.pose==='eat')
+      figure.pose(dt,now,undefined,actor.pose==='work'||actor.pose==='tray'||actor.pose==='mop'||actor.pose==='wipe',actor.pose==='eat')
     }
     for(const [id,entry] of this.restaurantNpc)if(!active.has(id)){entry.figure.dispose();this.restaurantNpc.delete(id)}
   }

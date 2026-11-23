@@ -12,7 +12,7 @@ const TIMEOUT=27_000
 type Member=WorldPlayer&{seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean}
 type World={id:string;members:Map<string,Member>;restaurant:Restaurant}
 export interface CaveVisit {day:string;active:boolean}
-const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil})
+const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole})
 
 export class CityWorlds {
   private worlds=new Map<string,World>()
@@ -41,7 +41,7 @@ export class CityWorlds {
   }
   private arrive(world:World,member:Member,zone:WorldZone,now:number,point?:Position){
     if(member.zone==='casino'&&zone!=='casino')this.roulette.detach(member.name,world.id)
-    if(member.zone==='kfc'){world.restaurant.leave(member.name);delete member.dining;delete member.eatingUntil;delete member.workingUntil;delete member.carrying}
+    if(member.zone==='kfc'){world.restaurant.leave(member.name);delete member.dining;delete member.eatingUntil;delete member.workingUntil;delete member.carrying;delete member.kfcRole}
     member.zone=zone;member.interaction=undefined;member.chair=undefined;member.lounge=undefined;member.lift=undefined;member.liftArrived=undefined
     Object.assign(member,spawn(zone,point),{moved:now})
   }
@@ -66,9 +66,12 @@ export class CityWorlds {
   private walkthrough(world:World,member:Member,open:boolean,now:number){
     const before=member.zone,zone=before.startsWith('floor:')?before:groundZone(member.x,member.z)
     if(before!==zone){
-      if(before==='kfc')world.restaurant.leave(member.name)
+      if(before==='kfc'){
+        world.restaurant.leave(member.name)
+        delete member.carrying;delete member.kfcRole;delete member.workingUntil;delete member.workKind
+      }
       if(before==='casino')this.roulette.detach(member.name,world.id)
-      if(member.zone==='kfc'){world.restaurant.leave(member.name);delete member.dining;delete member.eatingUntil;delete member.workingUntil;delete member.carrying}
+      if(member.zone==='kfc'){world.restaurant.leave(member.name);delete member.dining;delete member.eatingUntil;delete member.workingUntil;delete member.carrying;delete member.kfcRole}
     member.zone=zone;member.interaction=undefined
     }
     if(zone==='cave'&&open&&localSite(zone,member.x,member.z).z<-7.06){this.privateEntry(world,member,now);return}
@@ -138,7 +141,9 @@ export class CityWorlds {
         me.interaction='kfc:dining'
       }else me.interaction=target.id as WorldUse
     }else if(action==='restaurant'){
+      const kind=world.restaurant.jobKind(name)
       world.restaurant.act(me,data.command,data,now)
+      if(data.command==='step')me.workKind=kind
       if(data.command==='step'||data.command==='take'||data.command==='deliver')me.workingUntil=now+800
       if(data.command==='stand')me.interaction=undefined
     }else if(action==='floor'){
@@ -157,7 +162,10 @@ export class CityWorlds {
       hall??=this.roulette.update(name,'presence',{},now,{id:world.id,position:this.boundPosition(me)})
       Object.assign(me,{...site('casino',hall.you.x,hall.you.z),yaw:hall.you.yaw,chair:hall.you.chair,lounge:hall.you.lounge})
     }
-    for(const person of world.members.values())if(person.zone==='kfc')person.carrying=world.restaurant.hasTray(person.name)
+    for(const person of world.members.values())if(person.zone==='kfc'){
+      person.carrying=world.restaurant.hasTray(person.name)
+      person.kfcRole=world.restaurant.workerRole(person.name)
+    }
     const level=riderHeight(me,now)
     const players=me.zone==='private'?[]:[...world.members.values()].filter(p=>p.name!==name&&p.zone!=='private'&&near(me,p.x,p.z,48)&&(shared?Math.abs(riderHeight(p,now)-level)<23:p.zone===me.zone)).map(p=>publicMember(p,shared))
     const casino=site('casino',0,3)
