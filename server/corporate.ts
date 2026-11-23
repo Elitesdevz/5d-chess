@@ -26,7 +26,7 @@ export interface Company {
   price:number;quotes:PricePoint[];orders:Order[];trades:Trade[];nextOrder:number
   policy:Record<string,number>;cooldowns:Record<string,number>;supports:Record<string,Record<string,Support>>
   marks:Record<string,{shares:number;eligible:number;reached:number}>;lastBallot?:{policy:string;value:number;passed:boolean;at:number}
-  loss:number;profit:number;nextDividend:number;lastDividend?:{day:string;pool:number;paid:number}
+  loss:number;profit:number;nextDividend:number;nextOperatingCost?:number;lastDividend?:{day:string;pool:number;paid:number}
   ledger:LedgerEntry[];issuance:{at:number;shares:number;basis:number}[];buybackCash:number
   pending:number;receivables:number;nonperforming:number;obligations:number
   loan?:{principal:number;rate:number;opened:number;due:number}
@@ -73,7 +73,7 @@ function openingCompany(symbol:EquitySymbol,old:Legacy|undefined,now:number):Com
     (old?.reserve??cashUnits(120_000))+(old?.marketCash??cashUnits(50_000))+(old?.collectedInterest??0),
     price,quotes:old?.history?.map(p=>({...p,price:p.price/100}))??[{at:now,price:fromStockUnits(price)}],
     orders:[],trades:[],nextOrder:0,policy:{...startingPolicies[symbol]},cooldowns:{},supports:{},marks:{},
-    loss:0,profit:symbol===CAS?old?.margin??0:old?.collectedInterest??0,nextDividend:now+7*DAY,ledger:[],issuance:[],
+    loss:0,profit:symbol===CAS?old?.margin??0:old?.collectedInterest??0,nextDividend:now+7*DAY,nextOperatingCost:now+DAY,ledger:[],issuance:[],
     buybackCash:0,pending:0,receivables:0,nonperforming:0,obligations:0,recoveryUntil:0}
 }
 export function companies(unit:UnitOfWork,now=Date.now()):Companies{
@@ -160,6 +160,17 @@ export function repayCorporate(e:Companies,now:number){
   operating(c,'Corporate interest paid',-interest,now);bankInterest(b,'Corporate interest collected',interest,now)
   journal(c,'Corporate principal repaid',-l.principal,now);journal(b,'Corporate principal received',l.principal,now)
   delete c.loan
+}
+
+export function coverOperatingCosts(c:Company,now:number){
+  c.nextOperatingCost??=now+DAY
+  if(now<c.nextOperatingCost)return
+  const at=c.nextOperatingCost,days=1+Math.floor((now-at)/DAY)
+  const expense=cashUnits(c.symbol===CAS?25:10)*days
+  c.nextOperatingCost+=days*DAY
+  const paid=Math.min(expense,Math.max(0,c.cash-c.pending))
+  c.cash-=paid;c.obligations+=expense-paid
+  operating(c,'Daily operating expenses',-expense,at)
 }
 
 export function postCreditCollections(unit:UnitOfWork,accounts:Account[],now=Date.now(),existing?:Companies){

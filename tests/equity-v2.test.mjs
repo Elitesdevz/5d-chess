@@ -218,3 +218,15 @@ test('wagers commit backed terms and settle the original payout after policy cha
   assert.equal(f.state().CAS.profit,cashUnits(-488.1))
   assert.equal(f.user('CasinoOwner').wallet.coins,100000)
 })
+
+test('recurring costs can trigger a real shortfall while policy alone cannot declare bankruptcy',t=>{
+  const f=fixture(t)
+  f.tick()
+  f.change(e=>{e.CAS.cash=cashUnits(5024);e.CAS.policy.open=0;e.BNK.policy.reserve=50})
+  f.tick(at(1)-1)
+  assert.equal(f.state().CAS.bankruptcy,undefined)
+  f.tick(at(1))
+  assert.equal(f.state().CAS.cash,cashUnits(4999))
+  assert.equal(f.state().CAS.bankruptcy.at,at(1))
+  assert.equal(f.state().BNK.bankruptcy,undefined)
+})

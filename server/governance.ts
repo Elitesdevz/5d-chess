@@ -5,7 +5,7 @@ import type {UnitOfWork} from './storage.ts'
 import {DAY,income,updateCredit} from './credit.ts'
 import {wallet} from './economy.ts'
 import {portfolio} from './cas-shares.ts'
-import {PE,BUYBACK,postCreditCollections,dictionary,holderLabel,cashUnits,assets,liabilities,shortfall,lendable,cashForDistribution,safetyReserve,eligible,sharesOf,ratio,journal,operating,repayCorporate,debt,companies,saveCompanies,setHolding,type Ballot,type Company,type Companies} from './corporate.ts'
+import {PE,BUYBACK,postCreditCollections,dictionary,holderLabel,cashUnits,assets,liabilities,shortfall,lendable,cashForDistribution,safetyReserve,coverOperatingCosts,eligible,sharesOf,ratio,journal,operating,repayCorporate,debt,companies,saveCompanies,setHolding,type Ballot,type Company,type Companies} from './corporate.ts'
 import {book,cancelOrders,maintainOrders,offerInventory,submit} from './order-book.ts'
 import {fail} from './http.ts'
 
@@ -220,6 +220,7 @@ export function advanceEconomy(unit:UnitOfWork,e:Companies,now:number){
     repayCorporate(e,now)
   }
   for(const company of [c,b]){
+    coverOperatingCosts(company,now)
     declare(company,now)
     if(company.bankruptcy&&shortfall(company,now)===0)cure(company,now,'Bankruptcy ended after financial recovery')
   }
