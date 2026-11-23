@@ -355,8 +355,8 @@ async function trade(event:SubmitEvent){
   }finally{working=false;if(selected)renderTicket()}
 }
 
-for(const prefix of ['cas','stock']){
-  const form=el(prefix+'-order').querySelector<HTMLFormElement>('form')!
+{
+  const form=el('stock-order').querySelector<HTMLFormElement>('form')!
   form.onsubmit=trade
   form.querySelector('input')!.oninput=renderTicket
   form.querySelector<HTMLButtonElement>('[data-max]')!.onclick=()=>{
@@ -377,9 +377,7 @@ for(const prefix of ['cas','stock']){
     side=button.dataset.side as StockSide;orderMessage('');renderTicket()
   })
 }
-for(const id of ['exchange-stock-dialog']){
-  el<HTMLDialogElement>(id).addEventListener('close',()=>selected='')
-}
+el<HTMLDialogElement>('exchange-stock-dialog').addEventListener('close',()=>selected='')
 document.querySelector('.exchange')!.addEventListener('click',event=>{
   const target=event.target as Element
   const watch=target.closest<HTMLButtonElement>('[data-watch]')

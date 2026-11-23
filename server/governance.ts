@@ -147,7 +147,7 @@ function recapitalize(unit:UnitOfWork,e:Companies,c:Company,now:number){
   if(!b||now<b.at+7*DAY)return
   const at=b.at+7*DAY
   cancelOrders(unit,e,c,o=>o.holder===BUYBACK,at)
-  c.policy={...rescuedPolicies[c.symbol]};c.cooldowns={}
+  c.policy={...rescuedPolicies[c.symbol]}
   const due=debt(c,at)+c.obligations
   const target=c.symbol==='CAS'
     ?cashUnits(75_000)+ratio(c.pending,c.policy.coverage)
