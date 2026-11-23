@@ -1,7 +1,7 @@
 import * as T from 'three'
 import {box,mesh,cylinder} from '../casino/scene/geometry.ts'
 import {batchStatic} from '../casino/scene/static-batch.ts'
-import {COUNTERS,GRILLS,RESTAURANT,RESTAURANT_NAME,MENU,SEATS,TABLES,type KfcMess,type Meal,type RestaurantView} from './restaurant-model.ts'
+import {COUNTERS,GRILLS,RESTAURANT,RESTAURANT_NAME,MENU,SEATS,TABLES,SUPPLIES,type KfcMess,type KitchenHand,type OrderItems,type RestaurantView} from './restaurant-model.ts'
 
 const red=metal(0x992e35),redTrim=metal(0xc9383f),cream=metal(0xffe9c8)
 const grey=metal(0x394349),ink=metal(0x202b2e),teal=metal(0x426b69)
@@ -91,36 +91,81 @@ function trimFront(g:T.Object3D){
   block(g,3.14,1.38,.40,-3.96,4.22,-6.8,red)
   sign(g,['KFC'],-3.96,4.22,-7.02,2.99,1.21,{bg:'#8b292e',rotation:Math.PI,font:165})
 }
-function tray(item:Meal='combo'){
-  const t=new T.Group()
-  block(t,.43,.029,.29,0,.024,0,red)
-  if(item==='burger'||item==='combo'){
-    const x=item==='combo'?-.102:0
-    const burger=mesh(new T.SphereGeometry(.098,14,8),chip,t,[x,.101,0]);burger.scale.y=.46
-    cylinder(t,.087,.025,[x,.064,0],darkRed,16)
-    cylinder(t,.085,.018,[x,.048,0],teal,16)
-  }
-  if(item==='cola'||item==='combo'){
-    const x=item==='combo'?.117:0
-    const cup=mesh(new T.CylinderGeometry(.043,.036,.112,14),cream,t,[x,.086,-.064])
-    cup.rotation.z=.055
-    cylinder(t,.046,.012,[x,.146,-.064],redTrim,15)
-    block(t,.012,.068,.012,x+.005,.18,-.076,silver)
-  }
-  if(item==='fries'||item==='combo'){
-    const x=item==='combo'?.083:0
-    block(t,.071,.068,.072,x,.07,.061,redTrim)
-    for(let k=0;k<5;k++)box(t,[.014,.064+(k%2)*.023,.015],[x-.026+k*.012,.122,.058+(k%2)*.015],chip,.003)
-  }
-  if(item==='chicken'){
-    for(const side of [-1,1]){
-      const golden=mesh(new T.IcosahedronGeometry(.103,1),sauce,t,[side*.095,.09,side*.026])
-      golden.scale.set(1,.64,.77)
-      cylinder(t,.024,.095,[side*.085,.073,side*.098],cream,11).rotation.x=1.38
+const rawMeat=metal(0xa94e51),cookedMeat=metal(0x6e422e)
+function foodVisual(item:Exclude<KitchenHand,'tray'>){
+  const food=new T.Group()
+  if(item==='burger'||item==='bun'){
+    const top=mesh(new T.SphereGeometry(.096,14,8),chip,food,[0,.071,0]);top.scale.y=.43
+    cylinder(food,.088,.022,[0,.03,0],birch,16)
+    if(item==='burger'){
+      cylinder(food,.091,.027,[0,.052,0],cookedMeat,16)
+      cylinder(food,.092,.013,[0,.063,0],teal,16)
+      for(const [x,z] of [[-.026,.011],[.027,.019],[.018,-.029]])block(food,.014,.003,.012,x,.103,z,cream)
     }
+  }else if(item==='cola'||item==='cup'){
+    mesh(new T.CylinderGeometry(.046,.034,.114,14),cream,food,[0,.061,0])
+    if(item==='cola'){
+      cylinder(food,.048,.011,[0,.124,0],redTrim,15)
+      block(food,.011,.068,.011,.012,.157,-.012,silver)
+    }
+  }else if(item==='fries'||item==='bag'){
+    block(food,.089,.085,.066,0,.046,0,redTrim)
+    block(food,.076,.013,.061,0,.082,0,darkRed)
+    if(item==='fries')for(let k=0;k<7;k++)box(food,[.013,.062+(k%2)*.027,.014],[.013*(k%4-1.5),.105,.022*(Math.floor(k/4)-.5)],chip,.003)
+  }else cylinder(food,.089,.029,[0,.024,0],rawMeat,14)
+  return food
+}
+function tray(items:OrderItems={burger:1,fries:1,cola:1}){
+  const t=new T.Group()
+  block(t,.52,.029,.34,0,.020,0,red)
+  const pieces=(['burger','fries','cola'] as const).flatMap(item=>Array.from({length:items[item]},()=>item))
+  for(const [i,item] of pieces.entries()){
+    const visual=foodVisual(item);visual.scale.setScalar(pieces.length>3?.76:.95)
+    visual.position.set((i%3-1)*.166,.034,pieces.length>3?(Math.floor(i/3)-.5)*.163:0)
+    t.add(visual)
   }
-  batchStatic(t)
   return t
+}
+function supplyFixtures(g:T.Object3D){
+  const {bun,raw,bag,cup,fryer,soda,tickets}=SUPPLIES
+  for(const [p,title,item] of [[bun,'BUNS','bun'],[raw,'PATTIES','raw']] as const){
+    block(g,.6,1.03,.97,-5.99,.52,p.z,silver)
+    block(g,.62,.07,.99,-5.98,1.05,p.z,grey)
+    for(let i=0;i<5;i++){
+      const food=foodVisual(item);food.position.set(-5.99+(i%2-.5)*.224,1.09,p.z+(Math.floor(i/2)-1)*.23);g.add(food)
+    }
+    sign(g,[title],-6.13,1.51,p.z,.97,.21,{rotation:Math.PI/2,font:147})
+  }
+  block(g,2.90,.88,.47,-2.78,.45,-4.26,grey)
+  block(g,2.97,.082,.51,-2.78,.922,-4.26,silver)
+  for(const [p,title,item] of [[bag,'FRIES BAGS','bag'],[cup,'CUPS','cup']] as const){
+    for(let i=0;i<4;i++){
+      const food=foodVisual(item);food.position.set(p.x+.11*i-.17,.968,-4.25);g.add(food)
+    }
+    sign(g,[title],p.x,.77,-4.02,1.12,.19,{font:138})
+  }
+  for(const p of [fryer,soda])block(g,.48,.92,.81,3.00,.46,p.z,silver)
+  box(g,[.51,.09,.80],[2.98,.957,fryer.z],grey,.016)
+  block(g,.36,.019,.53,2.98,1.003,fryer.z,ink)
+  for(let i=0;i<5;i++)block(g,.016,.036,.45,2.84+.06*i,1.032,fryer.z,silver)
+  for(let i=0;i<10;i++)block(g,.025,.052,.052,2.88+(i%3)*.091,1.059,fryer.z-.17+(Math.floor(i/3)*.103),chip)
+  block(g,.31,.035,.064,2.68,1.07,fryer.z+.18,ink)
+  sign(g,['FRYER'],2.737,.74,fryer.z,.72,.23,{rotation:-Math.PI/2,font:137})
+  block(g,.43,.48,.75,3.02,1.19,soda.z,red)
+  block(g,.33,.17,.62,2.96,1.45,soda.z,darkRed)
+  for(let i=0;i<3;i++){
+    block(g,.08,.063,.09,2.743,1.26,soda.z+(.19*(i-1)),silver)
+    block(g,.044,.090,.12,2.742,1.42,soda.z+(.19*(i-1)),i===1?cream:teal)
+  }
+  sign(g,['SODA'],2.787,1.61,soda.z,.71,.24,{rotation:-Math.PI/2,font:149})
+  const z=-2.09
+  box(g,[.55,.075,.36],[tickets.x,1.055,z],wood,.016)
+  for(const side of [-1,1])block(g,.033,.14,.36,tickets.x+side*.27,1.13,z,birch)
+  block(g,.53,.14,.036,tickets.x,1.13,z+.16,birch)
+  const papers=new T.Group();g.add(papers);papers.position.set(tickets.x,1.09,z)
+  for(let i=0;i<6;i++){const slip=block(papers,.12,.009,.19,(i-2.5)*.054,.006*i,0,cream);slip.rotation.y=i*.39}
+  sign(g,['KITCHEN TICKETS'],tickets.x,.85,-2.035,1.01,.18,{rotation:Math.PI,font:138})
+  return papers
 }
 function booth(g:T.Object3D,i:number){
   const {x,z}=TABLES[i]
@@ -159,13 +204,8 @@ function fitKitchen(g:T.Object3D){
     block(g,1.42,.9,.69,x,.46,-6.50,silver)
     block(g,1.46,.06,.74,x,.941,-6.5,grey)
     block(g,1.34,.09,.53,x,1,-6.56,ink)
-    if(i%2===0){
-      for(let j=0;j<5;j++)block(g,.092,.018,.38,x-.39+j*.19,1.056,-6.53,silver)
-      cylinder(g,.097,.031,[x+.38,1.076,-6.38],sauce,13)
-    }else{
-      box(g,[.38,.14,.48],[x-.28,1.08,-6.49],silver,.022)
-      for(let j=0;j<8;j++)block(g,.026,.088,.038,x-.42+j%4*.086,1.199,-6.55+Math.floor(j/4)*.14,chip)
-    }
+    for(let j=0;j<5;j++)block(g,.087,.02,.38,x-.39+j*.14,1.056,-6.49,silver)
+    block(g,.37,.033,.43,x+.44,1.067,-6.48,birch)
     sign(g,[`COOK ${i+1}`],x,1.75,-6.80,1.25,.25,{font:138})
   }
   block(g,7.46,.53,.84,-1.52,2.79,-6.39,silver)
@@ -176,7 +216,7 @@ function fitKitchen(g:T.Object3D){
   passSign.rotation.y=-.27
   block(g,.41,1,.82,4,.50,-1.7,red)
   block(g,.44,.05,.86,4,1.025,-1.7,silver)
-  const prepared=tray();g.add(prepared);prepared.scale.setScalar(.73);prepared.position.set(4,1.055,-1.78)
+
 }
 function office(g:T.Object3D){
   block(g,.13,2.44,3.85,3.32,1.22,-5.08,grey)
@@ -228,6 +268,7 @@ export function buildRestaurant(g:T.Group){
   block(g,7.92,.12,5.18,-1.87,.071,-4.35,kitchenTile)
   for(let i=0;i<10;i++)block(g,7.6,.008,.021,-1.85,.138,-6.78+i*.51,silver)
   fitKitchen(g);office(g)
+  const papers=supplyFixtures(g)
   const screen=document.createElement('canvas');screen.width=480;screen.height=128
   const screenTex=new T.CanvasTexture(screen);screenTex.colorSpace=T.SRGBColorSpace
   mesh(new T.PlaneGeometry(1.76,.48),new T.MeshBasicMaterial({map:screenTex}),g,[3.91,2.48,-2.28],false)
@@ -235,10 +276,16 @@ export function buildRestaurant(g:T.Group){
   let readyCount=-1
   TABLES.forEach((_,i)=>booth(g,i))
   sign(g,MENU.slice(0,3).map(item=>item.name+'  '+item.price),-5.91,2.16,-1.33,1.93,1.29,{bg:'#283437',rotation:Math.PI/2,font:55})
-  sign(g,MENU.slice(3).map(item=>item.name+'  '+item.price),5.90,2.16,-1.33,1.93,1.29,{bg:'#283437',rotation:-Math.PI/2,font:64})
+  sign(g,MENU.map(item=>item.name+'  '+item.price),5.90,2.16,-1.33,1.93,1.29,{bg:'#283437',rotation:-Math.PI/2,font:55})
   for(const x of [-2.3,2.3]){const light=new T.PointLight(0xffd3a6,32,9);light.position.set(x,3.13,2.6);g.add(light)}
   batchStatic(g)
-  const dishes=new Map<number,{item:Meal;mesh:T.Group}>()
+  const meals=new Map<string,{key:string;mesh:T.Group}>()
+  const stages=new Map<number,{bun:T.Group;raw:T.Group;surface:T.Mesh}>()
+  GRILLS.forEach((x,slot)=>{
+    const bun=foodVisual('bun'),raw=foodVisual('raw')
+    g.add(bun,raw);bun.position.set(x+.44,1.083,-6.47);raw.position.set(x-.18,1.072,-6.48)
+    stages.set(slot,{bun,raw,surface:raw.children[0] as T.Mesh})
+  })
   const messes=new Map<string,T.Group>()
   return (view:RestaurantView|undefined)=>{
     const ready=view?.pickup.length??0
@@ -249,17 +296,30 @@ export function buildRestaurant(g:T.Group){
       display.font='800 58px system-ui';display.fillText(ready?ready+' READY':'PREPARING',240,66)
       screenTex.needsUpdate=true
     }
-    const placed=new Set<number>()
-    for(const {seat,item} of view?.mealsAt??[]){
-      placed.add(seat)
-      const old=dishes.get(seat)
-      if(old?.item===item)continue
+    papers.visible=!!view?.tickets
+    const placed=new Set<string>()
+    const place=(id:string,items:OrderItems,x:number,y:number,z:number,yaw=0,scale=1)=>{
+      placed.add(id)
+      const key=String(items.burger)+items.fries+items.cola
+      const old=meals.get(id)
+      if(old?.key===key)return
       if(old)remove(old.mesh)
-      const {x,z,yaw}=SEATS[seat],food=tray(item);g.add(food)
-      food.position.set(x-Math.sin(yaw)*.52,.783,z);food.rotation.y=yaw
-      dishes.set(seat,{item,mesh:food})
+      const food=tray(items);g.add(food);food.position.set(x,y,z);food.rotation.y=yaw;food.scale.setScalar(scale)
+      meals.set(id,{key,mesh:food})
     }
-    for(const [n,old] of dishes)if(!placed.has(n)){remove(old.mesh);dishes.delete(n)}
+    for(const {seat,items} of view?.mealsAt??[]){
+      const {x,z,yaw}=SEATS[seat]
+      place('seat'+seat,items,x-Math.sin(yaw)*.52,.783,z,yaw,.95)
+    }
+    if(view?.pickup.length)place('pickup',view.pickup[0].items,4,1.055,-1.76,0,.75)
+    for(const [i,props] of stages){
+      const data=view?.stations.find(s=>s.slot===i)
+      props.bun.visible=!!data?.bun
+      props.raw.visible=!!data&&data.patty!=='empty'
+      props.surface.material=data?.patty==='flipped'?cookedMeat:rawMeat
+      if(data&&!data.lifted)place('cook'+i,data.done,GRILLS[i]+.45,1.082,-6.12,0,.74)
+    }
+    for(const [id,old] of meals)if(!placed.has(id)){remove(old.mesh);meals.delete(id)}
     const seen=new Set<string>()
     for(const m of view?.messes??[]){
       seen.add(m.id)
@@ -270,7 +330,6 @@ export function buildRestaurant(g:T.Group){
 }
 
 export function staffProps(parent:T.Group){
-  const food=tray();parent.add(food);food.position.set(0,1.02,-.43);food.visible=false
   const mop=new T.Group();parent.add(mop);mop.position.set(.33,0,-.42);mop.visible=false
   cylinder(mop,.021,1.30,[0,.69,0],birch,10)
   box(mop,[.30,.067,.15],[0,.054,.014],teal,.015)
@@ -281,5 +340,14 @@ export function staffProps(parent:T.Group){
   box(apron,[.25,.45,.045],[0,1.093,-.151],red,.022)
   box(apron,[.249,.036,.055],[0,1.019,-.165],cream,.006)
   box(apron,[.13,.08,.025],[.008,1.177,-.188],cream,.006)
-  return {tray:food,mop,cloth,apron}
+  let previous='',item:T.Group|undefined
+  const hold=(hand:KitchenHand|undefined,items?:OrderItems)=>{
+    const key=hand==='tray'&&items?`tray:${items.burger}${items.fries}${items.cola}`:hand??''
+    if(key===previous)return
+    previous=key
+    if(item)remove(item)
+    item=hand==='tray'?tray(items):hand?foodVisual(hand):undefined
+    if(item){item.position.set(hand==='tray'?0:.17,1.08,-.48);parent.add(item)}
+  }
+  return {mop,cloth,apron,hold}
 }

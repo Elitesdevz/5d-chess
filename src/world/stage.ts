@@ -280,13 +280,13 @@ export class CityStage {
       const cleaning=(member.workingUntil??0)>now&&(member.workKind==='mop'||member.workKind==='wipe')
       if((member.carrying||cleaning||member.kfcRole)&&!current.props)current.props=staffProps(figure.root)
       if(current.props){
-        current.props.tray.visible=!!member.carrying
+        current.props.hold(member.carrying?'tray':member.kitchenHand,member.carriedItems)
         current.props.apron.visible=!!member.kfcRole&&member.dining===undefined
         current.props.cloth.visible=cleaning&&member.workKind==='wipe'
         current.props.mop.visible=cleaning&&member.workKind==='mop'
         current.props.mop.rotation.z=.19+Math.sin(now*.008)*.13
       }
-      figure.pose(dt,now,local?this.position:undefined,!!member.carrying||(member.workingUntil??0)>now,(member.eatingUntil??0)>now)
+      figure.pose(dt,now,local?this.position:undefined,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now)
       const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
       if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
       if(interior){
@@ -321,7 +321,7 @@ export class CityStage {
       }
       const {figure,props}=entry
       figure.target=character
-      props.tray.visible=actor.pose==='tray'
+      props.hold(actor.pose==='tray'?'tray':undefined,actor.items)
       props.mop.visible=actor.pose==='mop'
       props.cloth.visible=actor.pose==='wipe'
       props.cloth.position.x=.24+Math.sin(now*.007)*.10

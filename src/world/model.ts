@@ -1,4 +1,4 @@
-import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole} from './restaurant-model.ts'
+import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type OrderItems} from './restaurant-model.ts'
 import {CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
 import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
@@ -60,7 +60,7 @@ export function spawn(zone:WorldZone,point=zone.startsWith('floor:')?FLOOR_ARRIV
   return {...site(zone,point.x,point.z),yaw:point.yaw+(reverse(zone)<0?Math.PI:0)}
 }
 export type LiftRide={to:WorldZone;started:number;ends:number}
-export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole}
+export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems}
 export function riderHeight(player:WorldPlayer,now:number){
   const from=floorHeight(player.zone),ride=player.lift
   if(!ride)return player.zone==='city'?terrainHeight(player.x,player.z):from

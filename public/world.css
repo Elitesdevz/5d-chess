@@ -175,3 +175,23 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .credit-summary small,.credit-summary span{font-size:.73rem;color:#b3cbbe}.credit-summary>div:first-child strong{font-size:1.75rem;color:#ebd49d}
 @media(max-width:440px){.kfc-header,.kfc-content{padding:12px}.kfc-header{gap:8px}.kfc-jobs{grid-template-columns:1fr}.kfc-hud{left:7px}.world-dialog .kfc-notice{margin-inline:12px}.kfc-menu article{gap:6px}.kfc-food-icon{width:33px}.kfc-content button{padding:7px}}
 @media(prefers-reduced-motion:reduce){.kfc-work-lens .kfc-food{animation:none!important}}
+.kfc-quantity{flex:0 0 auto;display:grid;grid-template-columns:2.2rem 1.5rem 2.2rem;align-items:center;text-align:center;color:#73383c}
+.kfc-content .kfc-quantity button{padding:6px}
+.kfc-bill{display:flex;justify-content:space-between;align-items:center}
+.kfc-ticket-workspace{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;min-height:90px}
+.kfc-content .kfc-paper{position:relative;z-index:1;display:grid;text-align:left;gap:.45rem;touch-action:none;user-select:none;background:#fff6e6;border:1px dashed #97644f;border-radius:4px;color:#542d30;cursor:grab}
+.kfc-paper small{letter-spacing:.105em;color:#945453;font-size:.58rem}
+.kfc-ticket-box{display:grid;align-content:center;text-align:center;gap:7px;border:3px solid #57352e;border-radius:8px;background:#a56a54;color:#fff1dc;font-size:.83rem}
+.kfc-ticket-box span{width:60%;margin-inline:auto;height:6px;border-radius:9px;background:#563635}
+.kfc-content .kfc-dragging{z-index:3;cursor:grabbing;pointer-events:none}
+.kfc-grill{height:184px;position:relative;border:4px solid #b5a799;border-radius:14px;background:#595a56;overflow:hidden}
+.kfc-griddle{position:absolute;border:4px inset #60504a;inset:42% 42% 12% 4%;border-radius:12px;background:repeating-linear-gradient(90deg,#44413d 0 7px,#55504b 7px 11px)}
+.kfc-content .kfc-patty{position:absolute;z-index:2;left:24%;top:51%;height:48px;width:65px;border-radius:48%;touch-action:none;background:radial-gradient(ellipse at 32% 25%,#c97b69,#a04c48 75%);border:2px solid #79403b;box-shadow:0 5px #613d35;cursor:grab}
+.kfc-grill[data-cooked=true] .kfc-patty{background:repeating-linear-gradient(105deg,#7e4533 0 8px,#5c392c 8px 11px)}
+.kfc-flip-zone{position:absolute;inset:5% 52% 63% 10%;color:#f8ead4;text-align:center;border:1px dashed #ddd7bc88;border-radius:9px;font-size:1.6rem;pointer-events:none}
+.kfc-bun{position:absolute;display:grid;place-items:center;inset:26% 6% 14% 68%;border-radius:11px;background:#bc9a75;border:3px solid #a37b5d}
+.kfc-food-bun i:first-child{inset:9px 2px;border-radius:64% 64% 34% 34%;background:#d49a56;box-shadow:inset 0 -4px #a77345,inset 0 3px #f5c77d}
+.kfc-fill{position:relative;height:128px;border:4px solid #aaa298;border-radius:10px;background:linear-gradient(145deg,#545752,#252b2a)}
+.kfc-fill .kfc-pick{position:absolute;left:14%;top:28%;background:#f5d9af;cursor:grab;touch-action:none;z-index:2}
+.kfc-fill-target{display:grid;place-content:center;position:absolute;inset:19% 7% 18% 49%;border:2px dashed #eccea5;border-radius:7px;background:#8e4744;color:#fff2db}
+.kfc-fountain .kfc-fill-target{background:linear-gradient(#981f30 40%,#32312d 40%);padding-top:16px}

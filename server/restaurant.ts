@@ -4,12 +4,28 @@ import {wallet} from './economy.ts'
 import {fail} from './http.ts'
 import type {ChessStore,UnitOfWork} from './storage.ts'
 import {toStockUnits,fromStockUnits} from '../src/stock-model.ts'
-import {COUNTERS,GRILLS,KFC_ROLES,MANAGER,MENU,PASS,RESTAURANT,SEATS,STAFF,TABLES,WORK,menuItem,restaurantPoints,type KfcActor,type KfcMeal,type KfcMess,type KfcRole,type KfcShift,type KfcWork,type Meal,type RestaurantView,type TicketView,type WorkKind} from '../src/world/restaurant-model.ts'
+import {COUNTERS,GRILLS,KFC_ROLES,MENU,PASS,RESTAURANT,SEATS,STAFF,TABLES,WORK,blankOrder,kitchenPay,orderItems,orderPrice,orderSize,restaurantPoints,sameItems,
+  type KfcActor,type KfcMeal,type KfcMess,type KfcRole,type KfcShift,type KfcWork,type KitchenJob,type KitchenPoint,type OrderItems,type RestaurantView,type TicketView} from '../src/world/restaurant-model.ts'
 import type {WorldPlayer} from '../src/world/model.ts'
 
-type Ticket=TicketView&{player?:string;created:number;changed:number;seatingSince?:number;work:WorkKind[];cook?:string;carrier?:string}
+type Ticket=TicketView&{player?:string;mealId?:string;created:number;changed:number;seatingSince?:number;cook?:string;carrier?:string}
 type Mess=KfcMess&{created:number;claim?:string}
-type Task=KfcWork&{ticket?:string;mess?:string;started:number}
+type Task=KfcWork&{mess:string;started:number}
+type Cook=KitchenJob&{touched:number}
+const COOK_LEASE=100_000
+const COOK_TIME=900
+function parseOrder(raw:unknown):OrderItems{
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))fail(400,'Choose quantities for your order')
+  const order=raw as Partial<OrderItems>
+  const items=blankOrder()
+  for(const {id} of MENU){
+    const count=order[id]
+    if(typeof count!=='number'||!Number.isInteger(count)||count<0||count>4)fail(400,'Choose up to four of each item')
+    items[id]=count
+  }
+  if(!orderSize(items)||orderSize(items)>6)fail(400,'Choose one to six items')
+  return items
+}
 const NPC={
   cashier:['Nia','Louis','Aya'],cook:['Mika','Eddie','Joy','Mae','Remy'],janitor:['Robin','Sam','Kit'],
 }
@@ -43,6 +59,7 @@ export class Restaurant {
   private tickets:Ticket[]=[]
   private messes:Mess[]=[]
   private jobs=new Map<string,Task>()
+  private kitchen=new Map<string,Cook>()
   private pay=new Map<string,{coins:number;id:string}>()
   private departures:{id:string;name:string;seat:number;at:number}[]=[]
   private nextGuest=0
@@ -65,22 +82,27 @@ export class Restaurant {
     this.notePay(player,this.store.transaction(u=>this.credit(u,player,coins,service,now)))
   }
   hasTray(name:string){return this.tickets.some(t=>t.carrier===name)}
+  carriedItems(name:string){
+    const job=this.kitchen.get(name)
+    return job?.hand==='tray'?job.done:this.tickets.find(t=>t.carrier===name)?.items
+  }
   workerRole(name:string){return this.staff.get(name)?.role}
   jobKind(name:string){return this.jobs.get(name)?.kind}
+  kitchenHand(name:string){return this.kitchen.get(name)?.hand}
+  private releaseKitchen(name:string){
+    const job=this.kitchen.get(name)
+    const ticket=this.tickets.find(t=>job?.ticket.id===t.id)
+    if(ticket?.cook===name)delete ticket.cook
+    this.kitchen.delete(name)
+  }
   private taskRelease(name:string){
     const task=this.jobs.get(name)
-    if(task?.ticket){
-      const ticket=this.tickets.find(t=>t.id===task.ticket)
-      if(ticket?.cook===name)delete ticket.cook
-    }
-    if(task?.mess){
-      const mess=this.messes.find(m=>m.id===task.mess)
-      if(mess?.claim===name)delete mess.claim
-    }
+    const mess=this.messes.find(m=>m.id===task?.mess)
+    if(mess?.claim===name)delete mess.claim
     this.jobs.delete(name)
   }
   private endShift(name:string){
-    this.staff.delete(name);this.taskRelease(name)
+    this.staff.delete(name);this.taskRelease(name);this.releaseKitchen(name)
     for(const t of this.tickets){
       if(t.carrier!==name)continue
       t.phase='ready';delete t.carrier
@@ -89,6 +111,7 @@ export class Restaurant {
   leave(name:string){
     this.seats.delete(name);this.endShift(name);this.pay.delete(name)
     // Paid meals live with the account and are restored at the counter on return.
+    for(const t of this.tickets)if(t.player===name&&t.cook)this.releaseKitchen(t.cook)
     this.tickets=this.tickets.filter(t=>t.player!==name)
   }
   private tableFor(ticket:Ticket){
@@ -112,18 +135,17 @@ export class Restaurant {
     return this.store.restaurantMeal(name)
   }
   private ticket(meal:KfcMeal,name:string,now:number,human=false):Ticket{
-    const item=menuItem(meal.item)!
-    return {id:meal.id,item:item.id,lane:meal.lane,name,phase:'queue',player:human?name:undefined,
-      created:now,changed:now,work:[...item.work]}
+    return {id:human?randomUUID():meal.id,mealId:human?meal.id:undefined,items:orderItems(meal),lane:meal.lane,
+      name,phase:'queue',player:human?name:undefined,created:now,changed:now}
   }
   private serve(ticket:Ticket,now:number,employee?:string){
     if(ticket.player||employee){
       const wage=this.store.transaction(u=>{
         if(ticket.player){
           const account=u.users.get(ticket.player)
-          if(account?.restaurant?.id!==ticket.id)fail(409,'That meal was already served')
+          if(!account?.restaurant||account.restaurant.id!==ticket.mealId)fail(409,'That meal was already served')
           account.restaurant.status='served'
-          u.economyUsage(account.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_served',reference:ticket.id},now)
+          u.economyUsage(account.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_served',reference:ticket.mealId},now)
         }
         return employee?this.credit(u,employee,ACTOR_PAY.deliver,'deliver_order',now):undefined
       })
@@ -140,18 +162,16 @@ export class Restaurant {
     const activeCook=[...this.staff.values()].some(s=>s.role==='cook')
     this.departures=this.departures.filter(p=>now-p.at<7000)
     for(const [name,job] of this.jobs)if(now-job.started>CHECK_SECONDS)this.taskRelease(name)
+    for(const [name,job] of this.kitchen)if(now-job.touched>COOK_LEASE)this.releaseKitchen(name)
     for(const t of [...this.tickets]){
       const age=now-t.changed
       if(t.phase==='queue'){
         if(this.queue(t.lane)[0]!==t)continue
-        if(age>=(this.shiftAt('cashier',t.lane)?26_000:5000))this.transition(t,'kitchen',now)
+        if(age>=(this.shiftAt('cashier',t.lane)?50_000:5000))this.transition(t,'kitchen',now)
       }else if(t.phase==='kitchen'){
-        if(!t.cook&&age>=(activeCook?26_000:6200)){
-          t.work.shift()
-          this.transition(t,t.work.length?'kitchen':'ready',now)
-        }
+        if(!t.cook&&age>=(activeCook?50_000:5200+orderSize(t.items)*1000))this.transition(t,'ready',now)
       }else if(t.phase==='ready'){
-        if(age>=(this.shiftAt('cashier',t.lane)?28_000:8500))this.serve(t,now)
+        if(age>=(this.hasCashier()?48_000:8500))this.serve(t,now)
       }else if(t.phase==='carrying'){
         if(age>=CHECK_SECONDS){delete t.carrier;this.transition(t,'ready',now)}
       }else if(!t.player&&age>=NPC_SIT&&t.seat!==undefined){
@@ -168,8 +188,10 @@ export class Restaurant {
       const taken=this.taken()
       const free=availableSeats().filter(n=>!taken.includes(n))
       if(free.length){
-        const index=this.guest++,item=MENU[(index*3+index%4)%MENU.length],lane=index%3
-        const t=this.ticket({id:'guest-'+index,item:item.id,lane,status:'paid',bites:0},CUSTOMERS[index%CUSTOMERS.length],now)
+        const index=this.guest++,lane=index%3
+        const choices:OrderItems[]=[{burger:1,fries:1,cola:1},{burger:2,fries:0,cola:1},{burger:0,fries:1,cola:2},{burger:1,fries:0,cola:0},
+          {burger:2,fries:2,cola:0},{burger:0,fries:0,cola:1}]
+        const t=this.ticket({id:'guest-'+index,items:choices[index%choices.length],lane,status:'paid',bites:0},CUSTOMERS[index%CUSTOMERS.length],now)
         t.seat=free[(index*5)%free.length]
         this.tickets.push(t)
         if(index%4===1)this.mess('mop',lane-1,3.82+(index%3)*.47,now)
@@ -177,9 +199,10 @@ export class Restaurant {
       this.nextGuest=now+8200
     }
   }
+  private hasCashier(){return [...this.staff.values()].some(shift=>shift.role==='cashier')}
   private publicTicket(t:Ticket):TicketView{
-    const {id,item,lane,name,phase}=t
-    return {id,item,lane,name,phase,seat:this.tableFor(t)}
+    const {id,items,lane,name,phase}=t
+    return {id,items,lane,name,phase,seat:this.tableFor(t)}
   }
   view(name:string,now:number,inside:boolean):RestaurantView{
     if(inside)this.restore(name,now)
@@ -188,12 +211,16 @@ export class Restaurant {
       return {name:player??npc,player:!!player}
     })])) as RestaurantView['staff']
     const tray=this.tickets.find(t=>t.carrier===name)
-    const mealsAt=this.tickets.flatMap(t=>!t.player&&t.phase==='served'&&t.seat!==undefined?[{seat:t.seat,item:t.item}]:[])
+    const mealsAt=this.tickets.flatMap(t=>!t.player&&t.phase==='served'&&t.seat!==undefined?[{seat:t.seat,items:t.items}]:[])
     for(const [user,seat] of this.seats){
       const meal=this.meal(user)
-      if(meal?.status==='served')mealsAt.push({seat,item:meal.item})
+      if(meal?.status==='served')mealsAt.push({seat,items:orderItems(meal)})
     }
-    return {staff,queues:COUNTERS.map((_,i)=>this.queue(i).slice(0,6).map(t=>this.publicTicket(t))),
+    const stations=[...this.kitchen].flatMap(([player,job])=>{
+      const slot=this.staff.get(player)?.slot
+      return slot===undefined?[]:[{slot,bun:job.bun,patty:job.patty,done:job.done,lifted:job.hand==='tray'}]
+    })
+    return {staff,stations,now,tickets:this.tickets.filter(t=>t.phase==='kitchen'&&!t.cook).length,kitchen:this.kitchen.get(name),queues:COUNTERS.map((_,i)=>this.queue(i).slice(0,6).map(t=>this.publicTicket(t))),
       pickup:this.tickets.filter(t=>t.phase==='ready').map(t=>this.publicTicket(t)),
       messes:this.messes.map(({id,x,z,kind})=>({id,x,z,kind})),actors:this.actors(now),taken:this.taken(),mealsAt,
       meal:inside?this.meal(name):undefined,shift:this.staff.get(name),work:this.jobs.get(name),tray:tray?this.publicTicket(tray):undefined,pay:this.pay.get(name)}
@@ -211,7 +238,7 @@ export class Restaurant {
         const counter={x:COUNTERS[slot],z:-2.26},table=ticket&&this.tableFor(ticket)
         const route=table===undefined?[counter,PASS]:[counter,{x:3.48,z:-2.5},{x:3.48,z:-.35},{x:0,z:-.18},...tableRoute(table)]
         const pos=ticket?along(route,ticket.phase==='served'?Math.max(0,9-(now-ticket.changed)*.0036):(now-ticket.changed)*.00215):{...counter,yaw:Math.PI}
-        actors.push({...look,...pos,pose:ticket?'tray':'work'})
+        actors.push({...look,...pos,pose:ticket?'tray':'work',items:ticket?.items})
       }else{
         const m=this.messes.filter(x=>!x.claim)[slot]
         const home={x:slot===0?-3.26:3.2,z:4.9-slot*2.11}
@@ -243,24 +270,24 @@ export class Restaurant {
     if(!this.closeTo(member,id,now))fail(409,'Move closer to that station first')
   }
   private buy(member:WorldPlayer,data:Record<string,unknown>,now:number){
-    const item=menuItem(data.item),lane=data.lane
-    if(!item||typeof lane!=='number'||!Number.isInteger(lane)||lane<0||lane>=COUNTERS.length||typeof data.id!=='string'||!/^[\w-]{12,80}$/.test(data.id))fail(400,'Choose a menu item')
+    const items=parseOrder(data.items),lane=data.lane
+    if(typeof lane!=='number'||!Number.isInteger(lane)||lane<0||lane>=COUNTERS.length||typeof data.id!=='string'||!/^[\w-]{12,80}$/.test(data.id))fail(400,'Choose a menu item')
     this.requirePoint(member,'kfc:menu:'+lane,now)
     this.store.transaction(u=>{
       const a=u.users.get(member.name)??fail(401,'Log in first'),purse=wallet(a)
       const receipt=a.restaurantOrders?.find(o=>o.id===data.id)
       if(receipt){
-        if(receipt.item!==item.id||receipt.lane!==lane)fail(409,'This receipt belongs to another meal')
+        if(!sameItems(orderItems(receipt),items)||receipt.lane!==lane)fail(409,'This receipt belongs to another meal')
         return
       }
       if(a.restaurant?.id===data.id||a.restaurantLast===data.id)return
       if(a.restaurant)fail(409,'Finish the meal you already ordered first')
-      const balance=toStockUnits(purse.coins)-toStockUnits(item.price)
-      if(balance<0)fail(409,'You need '+item.price+' coins for this order')
+      const price=orderPrice(items),balance=toStockUnits(purse.coins)-toStockUnits(price)
+      if(balance<0)fail(409,'You need '+price+' coins for this order')
       purse.coins=fromStockUnits(balance)
-      a.restaurant={id:data.id as string,item:item.id,lane,status:'paid',bites:0}
-      a.restaurantOrders=[{id:a.restaurant.id,item:item.id,lane},...(a.restaurantOrders??[])].slice(0,40)
-      u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_ordered',reference:a.restaurant.id,coins:item.price},now)
+      a.restaurant={id:data.id as string,items,lane,status:'paid',bites:0}
+      a.restaurantOrders=[{id:a.restaurant.id,items,lane},...(a.restaurantOrders??[])].slice(0,40)
+      u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_ordered',reference:a.restaurant.id,coins:price},now)
     })
     this.restore(member.name,now)
   }
@@ -279,27 +306,74 @@ export class Restaurant {
     this.requirePoint(member,point,now)
     const name=member.name,shift=this.staff.get(name)
     if(this.jobs.has(name))fail(409,'Finish your current task first')
-    if(point==='kfc:cook'&&shift?.role==='cook'){
-      const t=this.tickets.find(t=>t.phase==='kitchen'&&!t.cook)
-      if(!t)fail(409,'No kitchen tickets yet')
-      t.cook=name;this.jobs.set(name,{key:randomUUID(),kind:t.work[0],step:0,readyAt:now,started:now,ticket:t.id})
-    }else if(point.startsWith('kfc:clean:')&&shift?.role==='janitor'){
-      const m=this.messes.find(m=>'kfc:clean:'+m.id===point)
-      if(!m||m.claim)fail(409,'That cleanup is already covered')
-      m.claim=name;this.jobs.set(name,{key:randomUUID(),kind:m.kind,step:0,readyAt:now,started:now,mess:m.id})
-    }else fail(409,'You are not assigned to this station')
+    if(!point.startsWith('kfc:clean:')||shift?.role!=='janitor')fail(409,'You are not assigned to this station')
+    const mess=this.messes.find(m=>'kfc:clean:'+m.id===point)
+    if(!mess||mess.claim)fail(409,'That cleanup is already covered')
+    mess.claim=name
+    this.jobs.set(name,{key:randomUUID(),kind:mess.kind,step:0,readyAt:now,started:now,mess:mess.id})
   }
   private step(member:WorldPlayer,data:Record<string,unknown>,now:number){
     const job=this.jobs.get(member.name)
     if(!job||job.key!==data.key||job.step!==data.step||now<job.readyAt)fail(409,'That step is not ready')
-    this.requirePoint(member,job.ticket?'kfc:cook':'kfc:clean:'+job.mess,now)
+    this.requirePoint(member,'kfc:clean:'+job.mess,now)
     if(job.step<WORK[job.kind].steps.length-1){job.step++;job.readyAt=now+STEP_DELAY;return}
-    const ticket=this.tickets.find(t=>t.id===job.ticket),mess=this.messes.find(m=>m.id===job.mess)
-    if(!ticket&&!mess)fail(409,'That task is finished')
+    const mess=this.messes.find(m=>m.id===job.mess)
+    if(!mess)fail(409,'That task is finished')
     this.wage(member.name,WORK[job.kind].pay,job.kind,now)
     this.taskRelease(member.name)
-    if(ticket){ticket.work.shift();this.transition(ticket,ticket.work.length?'kitchen':'ready',now)}
-    if(mess)this.messes=this.messes.filter(m=>m!==mess)
+    this.messes=this.messes.filter(m=>m!==mess)
+  }
+  /** Called by the world interaction key. A hot grill opens the manipulation view. */
+  kitchenPoint(member:WorldPlayer,point:string,now:number,gesture?:unknown){
+    if(member.zone!=='kfc'||this.staff.get(member.name)?.role!=='cook')fail(409,'Ask the manager for a cook shift first')
+    this.requirePoint(member,point,now)
+    const name=member.name,action=point.slice('kfc:kitchen:'.length) as KitchenPoint
+    const job=this.kitchen.get(name)
+    if(action==='tickets'){
+      const t=this.tickets.find(t=>t.phase==='kitchen'&&!t.cook)
+      if(job||!t)fail(409,'The ticket box is empty')
+      t.cook=name
+      this.kitchen.set(name,{ticket:this.publicTicket(t),done:blankOrder(),bun:false,patty:'empty',readyAt:0,touched:now})
+      return true
+    }
+    if(!job)fail(409,'Collect a ticket from the kitchen box first')
+    job.touched=now
+    if(action==='send'){
+      const t=this.tickets.find(t=>t.id===job.ticket.id&&t.cook===name)
+      if(!t||job.hand!=='tray'||!sameItems(job.done,t.items))fail(409,'Complete the order before sending out the tray')
+      const pay=MENU.reduce((sum,{id})=>sum+job.done[id]*kitchenPay[id],0)
+      this.wage(name,pay,'prepare_order',now)
+      this.releaseKitchen(name)
+      this.transition(t,'ready',now)
+      return true
+    }
+    if(action==='station'){
+      if(job.hand==='bun'){job.bun=true;delete job.hand}
+      else if(job.hand==='raw'){job.patty='raw';job.readyAt=now+COOK_TIME;delete job.hand}
+      else if(job.hand==='burger'||job.hand==='fries'||job.hand==='cola'){
+        const item=job.hand
+        if(job.done[item]>=job.ticket.items[item])fail(409,'The tray already has enough of that item')
+        job.done[item]++;delete job.hand
+      }else if(job.patty!=='empty'){
+        if(gesture===undefined)return false
+        if(now<job.readyAt)fail(409,'Give the patty a moment on the grill')
+        if(gesture==='flip'&&job.patty==='raw'){job.patty='flipped';job.readyAt=now+COOK_TIME}
+        else if(gesture==='assemble'&&job.patty==='flipped'&&job.bun){
+          job.bun=false;job.patty='empty';job.hand='burger'
+        }else fail(409,'Follow the recipe in order')
+      }else if(sameItems(job.done,job.ticket.items))job.hand='tray'
+      else fail(409,'The tray needs more items')
+      return true
+    }
+    if(action==='bun'||action==='raw'||action==='bag'||action==='cup')job.hand=action
+    else if(action==='fryer'||action==='soda'){
+      if(gesture===undefined)return false
+      if(action==='fryer'&&gesture==='scoop'&&job.hand==='bag')job.hand='fries'
+      else if(action==='soda'&&gesture==='fill'&&job.hand==='cup')job.hand='cola'
+      else fail(409,'Bring the correct container first')
+    }
+    else fail(400,'Choose a kitchen station')
+    return true
   }
   private cashier(member:WorldPlayer,command:string,data:Record<string,unknown>,now:number){
     const name=member.name,shift=this.staff.get(name)
@@ -308,7 +382,7 @@ export class Restaurant {
       this.requirePoint(member,'kfc:till:'+shift.slot,now)
       const t=this.queue(shift.slot)[0]
       if(!t||t.id!==data.ticket)fail(409,'That customer has moved on')
-      if(t.item!==data.item)fail(409,'Choose the item the customer asked for')
+      if(!sameItems(t.items,parseOrder(data.items)))fail(409,'The ticket quantities do not match the customer’s order')
       this.wage(name,ACTOR_PAY.cashier,'take_order',now)
       this.transition(t,'kitchen',now)
     }else if(command==='pickup'){
@@ -332,6 +406,7 @@ export class Restaurant {
     else if(command==='quit'){this.requirePoint(member,'kfc:manager',now);this.endShift(member.name)}
     else if(command==='start'&&typeof data.point==='string')this.start(member,data.point,now)
     else if(command==='step')this.step(member,data,now)
+    else if(command==='kitchen'&&typeof data.point==='string'&&data.point.startsWith('kfc:kitchen:'))this.kitchenPoint(member,data.point,now,data.gesture)
     else if(command==='take'||command==='pickup'||command==='deliver')this.cashier(member,command,data,now)
     else if(command==='sit'){
       const n=data.seat
@@ -351,7 +426,7 @@ export class Restaurant {
         const meal=a.restaurant
         if(meal?.status!=='served')fail(409,'Your meal is still being prepared')
         meal.bites++
-        if(meal.bites>=3){
+        if(meal.bites>=Math.max(3,orderSize(orderItems(meal)))){
           delete a.restaurant
           u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_finished',reference:meal.id},now)
         }
