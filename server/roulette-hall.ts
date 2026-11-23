@@ -44,6 +44,10 @@ export class RouletteHall {
   }
   stop(){clearInterval(this.timer)}
 
+  tableMotion(id:string){
+    return this.rooms.get(id)?.tables.map(({spin,recent})=>({spin,recent}))
+  }
+
   private createRoom(id=randomUUID().slice(0,6).toUpperCase()){
     const room:Room={id,players:new Map(),tables:(id.startsWith('W-')?WORLD_TABLES:TABLES).map(newTable)}
     this.rooms.set(id,room)

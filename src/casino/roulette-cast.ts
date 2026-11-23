@@ -6,7 +6,7 @@ import {box,mesh,limb,v} from './scene/geometry.ts'
 /** Jointed, clothed club guests. Shared articulated hands with the first-person player. */
 export class ClubGuest{
  readonly root=new T.Group();readonly left:Arm;readonly right:Arm;readonly head=new T.Group();private blink:T.Mesh[]=[];private restY=1.64;private baseZ:number
- constructor(scene:T.Scene,x:number,z:number,skin:number,suit:number,private dealer=false,style=0){
+ constructor(scene:T.Object3D,x:number,z:number,skin:number,suit:number,private dealer=false,style=0){
   this.baseZ=z;scene.add(this.root);this.root.position.set(x,0,z);this.root.rotation.y=dealer?0:-Math.atan2(x,3.5)
   const m=materials();m.skin.color.setHex(skin);m.sleeve.color.setHex(suit);m.shirt.color.setHex(0xeee6d4);m.robe.color.setHex(suit);m.glove.color.setHex(skin)
   const cloth=m.sleeve,face=m.skin

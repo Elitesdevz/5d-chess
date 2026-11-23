@@ -110,14 +110,14 @@ async function floorScreens(zone:string){
   try{
     const data=await api<StockView>('/stocks'),issue=symbol===CAS?data.cas:symbol===BNK?data.bank:undefined
     if(view?.you.zone!==zone)return
-    stage?.quote(issue?.history??data.quotes[symbol]?.history??[],issue?.price??data.quotes[symbol]?.price)
+    stage?.quote(symbol,issue?.history??data.quotes[symbol]?.history??[],issue?.price??data.quotes[symbol]?.price)
     if(!isEquity(symbol)){
       const {points}=await api<{points:PricePoint[]}>('/stocks/history?symbol='+encodeURIComponent(symbol))
-      if(view?.you.zone===zone)stage?.quote(points.slice(-60),data.quotes[symbol]?.price)
+      if(view?.you.zone===zone)stage?.quote(symbol,points.slice(-60),data.quotes[symbol]?.price)
     }
   }catch{}
 }
-function accepted(next:WorldView,start:number){
+function accepted(next:WorldView,start:number,reposition=false){
   offset=next.now-(start+Date.now())/2
   const scope=next.id+':'+next.you.zone,changed=viewKey!==scope
   view=next
@@ -131,7 +131,7 @@ function accepted(next:WorldView,start:number){
     viewKey=scope;shownService='';services?.close()
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
   }
-  stage?.set(next,offset);stage?.lock(dialog.open)
+  stage?.set(next,offset,reposition);stage?.lock(dialog.open)
   setCoins(next.coins)
   const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
   for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
@@ -148,7 +148,7 @@ function accepted(next:WorldView,start:number){
 }
 async function presence(){
   const t=Date.now()
-  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({world:view?.id,zone:view?.you.zone,...stage?.position}),signal:AbortSignal.timeout(5500)})
+  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,...stage?.position}),signal:AbortSignal.timeout(5500)})
   if(!response.ok){
     if(response.status===401){closed=true;location.replace('/chess/login.html')}
     throw new Error('City connection lost')
@@ -164,7 +164,7 @@ async function action(name:string,data:object){
     if(name==='use')await presence()
     if(closed)return
     const t=Date.now()
-    accepted(await api<WorldView>('/world/'+name,data),t)
+    accepted(await api<WorldView>('/world/'+name,{...data,scene:true}),t,name==='teleport'||name==='exit-cave')
   }catch(error){showError(error instanceof Error?error.message:'City action failed');throw error}
   finally{performing=false;updateSelection()}
 }
@@ -191,9 +191,9 @@ async function start(){
   },setCoins)
   const {CityStage}=await import('./stage.ts')
   stage=new CityStage(cast('world-canvas'),host,use)
-  const url=new URL(location.href),go=url.searchParams.get('go')??'',symbol=url.searchParams.get('symbol')??(url.hash==='#cas'?CAS:url.hash==='#bnk'?BNK:null)
+  const url=new URL(location.href),go=url.searchParams.get('go')??''
   if(url.searchParams.get('exit')==='cave')await action('exit-cave',{})
-  else if(like(go))await action('teleport',{to:go,symbol})
+  else if(like(go))await action('teleport',{to:go})
   else await presence()
   history.replaceState(null,'',url.pathname)
   const beat=async()=>{
@@ -215,6 +215,6 @@ document.addEventListener('click',event=>{
   if(!like(to))return
   event.preventDefault()
   services?.close()
-  void action('teleport',{to,symbol:url.searchParams.get('symbol')}).catch(()=>undefined)
+  void action('teleport',{to}).catch(()=>undefined)
 })
 void start().catch(error=>{connection.hidden=false;connection.textContent=error instanceof Error?error.message:'The city could not open.'})

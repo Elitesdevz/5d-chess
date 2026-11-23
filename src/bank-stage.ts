@@ -33,11 +33,11 @@ function sign(parent:T.Object3D,text:string,width:number,height:number,position:
 function ring(parent:T.Object3D,r:number,t:number,position:number[],m:T.Material=gilt){
   return mesh(new T.TorusGeometry(r,t,10,60),m,parent,position,false)
 }
-function spotlight(scene:T.Scene,color:number,power:number,range:number,x:number,y:number,z:number){
+function spotlight(scene:T.Object3D,color:number,power:number,range:number,x:number,y:number,z:number){
   const light=new T.PointLight(color,power,range,2)
   scene.add(light);light.position.set(x,y,z)
 }
-function makeFloor(scene:T.Scene){
+function makeFloor(scene:T.Object3D){
   const texture=art(512,512,c=>{
     c.fillStyle='#192f36';c.fillRect(0,0,512,512)
     for(let k=0;k<16;k++){
@@ -137,7 +137,7 @@ export function bankDesk(parent:T.Object3D,x:number,title:string){
   batchStatic(g)
 }
 
-export function buildBankArchitecture(scene:T.Scene,city=false){
+export function buildBankArchitecture(scene:T.Object3D,city=false){
   const room=new T.Group();scene.add(room);makeFloor(scene)
   box(room,[21,6.7,.36],[0,3.35,-6.57],blue,.025)
   if(!city)box(room,[21,6.7,.36],[0,3.35,8.4],blue,.025)
@@ -178,7 +178,7 @@ export function buildBankArchitecture(scene:T.Scene,city=false){
   sign(room,'FIFTH DIMENSION BANK',4.03,.43,[0,3.60,-1.88])
   batchStatic(room)
 }
-export function buildBankVault(scene:T.Scene){
+export function buildBankVault(scene:T.Object3D){
   const vault=new T.Group();scene.add(vault);vault.position.set(7.35,0,-6.11)
   box(vault,[3.72,4.45,.52],[0,2.23,-.15],ink,.14)
   box(vault,[3.41,3.88,.24],[0,2.21,.18],steel,.13)

@@ -145,13 +145,12 @@ function plant(parent:T.Object3D,x:number,z:number){
   }
   batchStatic(g)
 }
-export function buildHall(scene:T.Scene,city=false){
+export function buildHall(scene:T.Object3D,city=false){
   const architecture=new T.Group();scene.add(architecture)
   floor(architecture)
   box(architecture,[24,5.5,.3],[0,2.75,-6.7],wall)
   if(!city)box(architecture,[24,5.5,.3],[0,2.75,8.9],wall)
-  box(architecture,[.3,5.5,15.5],[-11.25,2.75,1.1],wall)
-  box(architecture,[.3,5.5,15.5],[11.25,2.75,1.1],wall)
+  if(!city)for(const x of [-11.25,11.25])box(architecture,[.3,5.5,15.5],[x,2.75,1.1],wall)
   box(architecture,[23,.25,16],[0,5.42,1.15],ebony)
   for(const x of [-11,-7.4,-3.7,0,3.7,7.4,11]){
     cylinder(architecture,.20,4.5,[x,2.35,-6.28],stone,20)
@@ -234,7 +233,7 @@ function chips(group:T.Group,x:number,z:number,stacks:number){
     }
   }
 }
-export function buildHallTables(scene:T.Scene){
+export function buildHallTables(scene:T.Object3D){
   const wheelMap=wheelTexture()
   return TABLES.map((site,index)=>{
     const group=new T.Group();group.position.set(site.x,0,site.z);scene.add(group)

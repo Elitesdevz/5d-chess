@@ -1,8 +1,8 @@
 import * as T from 'three'
-import {makeWorldArt,spinWheel} from './art.ts'
+import {liftPlatform,makeWorldArt,spinWheel} from './art.ts'
 import {Figure} from '../casino/hall-stage.ts'
 import {resultRotation,v} from '../casino/scene/geometry.ts'
-import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,interactions,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
+import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
 const TAU=Math.PI*2
@@ -44,13 +44,16 @@ export class CityStage {
   private fence:WebGLSync|null=null
   private art?:ReturnType<typeof makeWorldArt>
   private view?:WorldView
-  private camera=new T.PerspectiveCamera(58,1,.05,140)
+  private camera=new T.PerspectiveCamera(58,1,.05,720)
   private shadow?:T.CanvasTexture
   private figures=new Map<string,Avatar>()
   private npc:Figure[]=[]
+  private lifts=new Map<string,T.Group>()
+  private liftFacing?:{from:number;delta:number;started:number}
   private arrows=new Set<string>()
   private stick={x:0,z:0}
   private mouse?:{x:number;y:number}
+  private lockedAt=0
   private drag?:{id:number;x:number;y:number}
   private last=0
   private lastStep=0
@@ -89,47 +92,52 @@ export class CityStage {
     this.pause=value
     if(value){this.arrows.clear();this.stick={x:0,z:0};this.drag=undefined;this.mouse=undefined;this.releaseMouse()}
   }
-  set(view:WorldView,offset:number){
+  set(view:WorldView,offset:number,reposition=false){
     const prior=this.view?.you,next=view.you
-    const changed=view.id!==this.view?.id||next.zone!==prior?.zone
+    const changedWorld=view.id!==this.view?.id
     const seat=(p:WorldView['you']|undefined)=>p?.chair?'chair:'+p.chair.table+':'+p.chair.index:p?.lounge?'couch:'+p.lounge.couch+':'+p.lounge.index:''
     const seatChanged=seat(prior)!==seat(next)
-    if(changed||seatChanged||Math.hypot(next.x-this.position.x,next.z-this.position.z)>1.35){
+    if(changedWorld||reposition||seatChanged||next.lift&&!prior?.lift||Math.hypot(next.x-this.position.x,next.z-this.position.z)>1.35){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
     }
-    if(changed||seatChanged){
+    if(changedWorld||reposition||seatChanged){
+      this.liftFacing=undefined
       this.yaw=next.yaw;this.pitch=0
       if(next.chair){
-        const table=WORLD_TABLES[next.chair.table]
+        const {x,z}=WORLD_TABLES[next.chair.table],table=site('casino',x,z)
         this.yaw=Math.atan2(next.x-table.x,next.z-table.z)
         this.pitch=-.24
       }
       if(next.chair||next.lounge)this.releaseMouse()
     }
-    this.clock=offset;this.view=view
-    if(changed||this.caveOpen!==view.caveOpen&&view.you.zone==='city'){
-      this.caveOpen=view.caveOpen;this.zone=view.you.zone
-      this.rebuild()
+    if(next.lift&&!prior?.lift){
+      const delta=Math.atan2(Math.sin(Math.PI-this.yaw),Math.cos(Math.PI-this.yaw))
+      if(this.reduced){this.yaw=Math.PI;this.pitch=0}
+      else this.liftFacing={from:this.yaw,delta,started:performance.now()}
+    }
+    this.clock=offset;this.view=view;this.zone=next.zone;this.caveOpen=view.caveOpen
+    if(!this.art&&this.renderer)this.buildScene()
+    if(this.art){
+      this.art.seal.visible=!this.caveOpen
+      const target=next.lift?.to??next.zone
+      if(target.startsWith('floor:'))this.art.floor(target.slice(6))
     }
   }
-  quote(points:{price:number}[],value?:number){this.art?.screen?.forEach(update=>update(points,value))}
+  quote(symbol:string,points:{price:number}[],value?:number){this.art?.floor(symbol)?.screens.forEach(update=>update(points,value))}
   act(){this.onAction(this.nearest)}
   private releaseMouse(){if(document.pointerLockElement===this.canvas)document.exitPointerLock()}
   private turn(dx:number,dy:number){
     if(this.pause||!this.renderer)return
+    this.liftFacing=undefined
     this.yaw-=dx*.0032
     this.pitch=T.MathUtils.clamp(this.pitch-dy*.0032,-1.34,1.34)
   }
-  private rebuild(){
-    this.clearScene()
-    if(!this.zone||!this.renderer||this.zone==='private')return
-    this.art=makeWorldArt(this.zone,this.caveOpen)
-    if(this.zone==='city'){
-      this.npc=routes.map((_,i)=>{
-        const target=pedestrian(i,Date.now()+this.clock)
-        return new Figure(this.art!.scene,{...target,name:['Iris','Marlowe','June','Dion','Rafi','Hana','Vera'][i],avatar:'default',online:true},this.shadow!)
-      })
-    }
+  private buildScene(){
+    this.art=makeWorldArt(this.caveOpen)
+    this.npc=routes.map((_,i)=>{
+      const target=pedestrian(i,Date.now()+this.clock)
+      return new Figure(this.art!.scene,{...target,name:['Iris','Marlowe','June','Dion','Rafi','Hana','Vera'][i],avatar:'default',online:true},this.shadow!)
+    })
   }
   private clearScene(){
     for(const entry of this.figures.values()){entry.figure.dispose();entry.tag?.remove()}
@@ -145,7 +153,7 @@ export class CityStage {
         }
       })
     }
-    this.npc=[];this.art=undefined
+    this.npc=[];this.lifts.clear();this.art=undefined
   }
   private fit(){
     const w=Math.max(1,this.canvas.clientWidth),h=Math.max(1,this.canvas.clientHeight)
@@ -167,10 +175,13 @@ export class CityStage {
     this.canvas.addEventListener('pointerleave',()=>{this.mouse=undefined},{signal})
     document.addEventListener('pointerlockchange',()=>{
       this.mouse=undefined
+      this.lockedAt=performance.now()
       if(this.pause||this.view?.you.chair||this.view?.you.lounge)this.releaseMouse()
     },{signal})
     document.addEventListener('mousemove',e=>{
-      if(document.pointerLockElement===this.canvas)this.turn(e.movementX,e.movementY)
+      if(document.pointerLockElement!==this.canvas)return
+      if(performance.now()-this.lockedAt<250&&Math.hypot(e.movementX,e.movementY)>180)return
+      this.turn(e.movementX,e.movementY)
     },{signal})
     this.canvas.addEventListener('pointerdown',e=>{
       if(this.pause||!this.renderer||e.button!==0)return
@@ -212,19 +223,21 @@ export class CityStage {
     window.addEventListener('pagehide',e=>{if(!e.persisted){this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame);this.clearScene();this.renderer?.dispose()}},{signal})
   }
   private step(dt:number){
-    if(!this.zone||this.pause||this.view?.you.chair||this.view?.you.lounge)return
+    if(!this.zone||this.pause||this.view?.you.chair||this.view?.you.lounge||this.view?.you.lift)return
     const keys=this.arrows
     const x=this.stick.x+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'))
     const z=this.stick.z+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'))
     const length=Math.max(1,Math.hypot(x,z)),speed=WORLD_SPEED*dt/length
     if(x||z){
       const dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=z*Math.cos(this.yaw)-x*Math.sin(this.yaw)
-      this.position=worldMove(this.zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen)
+      const inCave=groundZone(this.position.x,this.position.z)==='cave'
+      this.position=worldMove(this.zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave)
     }
     this.position.yaw=this.yaw
   }
   private prompt(){
-    const candidate=this.zone&&!this.view?.you.chair&&!this.view?.you.lounge?interactions(this.zone).map(p=>({...p,distance:Math.hypot(this.position.x-p.x,this.position.z-p.z)}))
+    const zone=this.zone?.startsWith('floor:')?this.zone:groundZone(this.position.x,this.position.z)
+    const candidate=this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift?interactions(zone).map(p=>({...p,distance:Math.hypot(this.position.x-p.x,this.position.z-p.z)}))
       .filter(p=>p.distance<=(p.range??1.65)).sort((a,b)=>a.distance-b.distance)[0]:undefined
     const was=this.nearest?.id
     this.nearest=candidate
@@ -237,8 +250,10 @@ export class CityStage {
     if(!this.view||!this.art)return
     const roster=[this.view.you,...this.view.players]
     const active=new Set(roster.map(p=>p.name))
+    const neededLifts=new Set<string>()
     for(const member of roster){
       const local=this.view.you.name===member.name
+      const height=riderHeight(member,now)
       let current=this.figures.get(member.name)
       if(!current){
         let tag:HTMLElement|undefined
@@ -248,37 +263,55 @@ export class CityStage {
       }
       const figure=current.figure
       figure.target=member
+      figure.root.position.y=height
       figure.pose(dt,now,local?this.position:undefined)
+      const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
+      if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
+      if(interior){
+        const key=member.lift?member.name:member.zone
+        neededLifts.add(key)
+        let cabin=this.lifts.get(key)
+        if(!cabin){cabin=liftPlatform(this.art.scene);this.lifts.set(key,cabin)}
+        cabin.visible=true;cabin.position.y=height
+      }
       if(current.tag){
         const mark=figure.root.position.clone().add(v(0,1.91,0)).project(this.camera)
-        current.tag.hidden=mark.z<=-1||mark.z>=1||Math.abs(mark.x)>.98||Math.abs(mark.y)>.96||this.camera.position.distanceTo(figure.root.position)>16
+        current.tag.hidden=member.zone!==this.view.you.zone||mark.z<=-1||mark.z>=1||Math.abs(mark.x)>.98||Math.abs(mark.y)>.96||this.camera.position.distanceTo(figure.root.position)>16
         if(!current.tag.hidden){current.tag.style.left=(50+50*mark.x)+'%';current.tag.style.top=(50-50*mark.y)+'%'}
       }
     }
+    for(const [key,cabin] of this.lifts)if(!neededLifts.has(key))cabin.visible=false
     for(const [name,entry] of this.figures)if(!active.has(name)){entry.figure.dispose();entry.tag?.remove();this.figures.delete(name)}
     this.npc.forEach((figure,i)=>{if(!this.reduced)figure.target={...figure.target,...pedestrian(i,now)};figure.pose(dt,now)})
   }
-  private cameraView(){
+  private cameraView(now:number){
     const me=this.view?.you,{x,z}=this.position
-    this.camera.position.set(x,me?.chair||me?.lounge?SEATED_EYE:STANDING_EYE,z)
+    if(this.liftFacing){
+      const {started,from,delta}=this.liftFacing,progress=Math.min(1,(performance.now()-started)/420)
+      this.yaw=from+delta*progress*progress*(3-2*progress)
+      if(progress===1)this.liftFacing=undefined
+    }
+    this.camera.position.set(x,(me?riderHeight(me,now):0)+(me?.chair||me?.lounge?SEATED_EYE:STANDING_EYE),z)
     this.camera.rotation.set(this.pitch,this.yaw,0,'YXZ')
     this.camera.updateMatrixWorld()
   }
   private motion(now:number){
     if(!this.art)return
     if(!this.reduced)this.art.ambient?.(now)
-    const hall=this.view?.hall
+    if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))
+    if(this.zone?.startsWith('floor:'))this.art.floor(this.zone.slice(6))?.actors.forEach(actor=>actor.pose(now))
+    const tables=this.view?.hall?.tables??this.view?.tableMotion
     for(const [i,actor] of this.art.actors.entries()){
-      const spin=hall?.tables[i]?.spin
+      const spin=tables?.[i]?.spin
       actor.pose(now,spin&&now<spin.started+800?.25:0)
     }
     this.art.wheels?.forEach((wheel,i)=>{
-      const table=hall?.tables[i],spin=table?.spin,n=spin?.pocket??table?.recent[0]
+      const table=tables?.[i],spin=table?.spin,n=spin?.pocket??table?.recent[0]
       if(n===undefined)return
       const progress=spin&&!this.reduced?T.MathUtils.clamp((now-spin.started)/(spin.ends-spin.started),0,1):1
       spinWheel(wheel,n,progress)
     })
-    const table=hall?.tables[DICE_TABLE_INDEX],die=this.art.publicDie,roll=table?.spin
+    const table=tables?.[DICE_TABLE_INDEX],die=this.art.publicDie,roll=table?.spin
     if(die){
       const n=roll?.pocket??table?.recent[0]??1
       const p=roll&&!this.reduced?T.MathUtils.clamp((now-roll.started)/(roll.ends-roll.started),0,1):1
@@ -302,13 +335,14 @@ export class CityStage {
     const dt=Math.min(.14,(time-this.last)/1000||.035);this.last=time
     if(this.art&&this.renderer){
       const now=Date.now()+this.clock
-      this.cameraView();this.avatars(dt,now);this.motion(now)
+      this.cameraView(now);this.avatars(dt,now);this.motion(now)
       this.renderer.render(this.art.scene,this.camera)
       if(this.gl){this.fence=this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE,0);this.gl.flush()}
     }else if(!this.renderer)this.drawFlat()
     this.canvas.dataset.zone=this.zone??''
     const darkness=this.parent.querySelector<HTMLElement>('.world-dark')!
-    darkness.style.opacity=this.zone==='cave'?String(Math.max(0,(7-this.position.z)/14)**1.55*.94):'0'
+    const {x,z}=this.position,ground=!this.zone?.startsWith('floor:')&&groundZone(x,z)
+    darkness.style.opacity=ground==='cave'?String(Math.max(0,(7.7-localSite('cave',x,z).z)/15)**1.55*.94):'0'
   }
   private drawFlat(){
     const c=this.canvas,ctx=c.getContext('2d')
@@ -318,8 +352,11 @@ export class CityStage {
     ctx.fillStyle='#14272d';ctx.fillRect(0,0,w,h)
     ctx.strokeStyle='#779d9151';ctx.lineWidth=1
     for(let i=-64;i<65;i+=2){const [x,z]=project(i,i);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.moveTo(0,z);ctx.lineTo(w,z);ctx.stroke()}
-    const landmarks=this.zone==='city'?CITY_PORTALS.filter(p=>p.to!=='cave'||this.caveOpen).map(p=>({x:p.x,z:p.z,label:p.label||'Passage'})):
-      [...interactions(this.zone??'city'),...(this.zone==='hotel'?[{x:0,z:-7.2,label:'Gaming floor'}]:[]),{x:0,z:this.zone==='cave'?-7.3:7.55,label:this.zone==='cave'?'Dark passage':'Exit'}]
+    const landmarks=this.zone?.startsWith('floor:')?interactions(this.zone):[
+      ...CITY_PORTALS.filter(p=>p.to!=='cave'||this.caveOpen).map(p=>({x:p.x,z:p.z,label:p.label||'Passage'})),
+      ...['casino','bank','exchange'].flatMap(zone=>interactions(zone as WorldZone)),
+      {...site('hotel',0,-7.9),label:'Gaming floor'},
+    ]
     for(const p of landmarks){const [x,y]=project(p.x,p.z);ctx.fillStyle='#8fe2b5';ctx.fillRect(x-8,y-8,16,16);ctx.fillStyle='#dfedda';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText(p.label,x,y-12)}
     for(const other of this.view?.players??[]){const [x,z]=project(other.x,other.z);ctx.fillStyle='#f1c78b';ctx.beginPath();ctx.arc(x,z,5,0,TAU);ctx.fill()}
     ctx.fillStyle='#b0eada';ctx.beginPath();ctx.arc(w/2,h/2,7,0,TAU);ctx.fill()
