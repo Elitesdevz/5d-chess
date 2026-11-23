@@ -152,13 +152,14 @@ export function lendable(bank:Company,now:number){
 export function cashForDistribution(c:Company,now:number){
   return Math.max(0,Math.min(c.cash-safetyReserve(c)-c.obligations-debt(c,now),assets(c)-liabilities(c,now)))
 }
-export function repayCorporate(e:Companies,now:number){
+export function repayCorporate(unit:UnitOfWork,e:Companies,now:number){
   const c=e.CAS,b=e.BNK,l=c.loan
   if(!l)return
   const interest=corporateInterest(c,now),total=l.principal+interest
   c.cash-=total;b.cash+=total;b.receivables-=l.principal
   operating(c,'Corporate interest paid',-interest,now);bankInterest(b,'Corporate interest collected',interest,now)
   journal(c,'Corporate principal repaid',-l.principal,now);journal(b,'Corporate principal received',l.principal,now)
+  unit.economyUsage(undefined,'/api/stocks',{action:'corporate_payment',symbol:CAS,coins:fromStockUnits(total),interest:fromStockUnits(interest)},now)
   delete c.loan
 }
 
@@ -174,10 +175,11 @@ export function coverOperatingCosts(c:Company,now:number){
 }
 
 export function postCreditCollections(unit:UnitOfWork,accounts:Account[],now=Date.now(),existing?:Companies){
-  const entries=accounts.map(collections).filter(e=>e!==undefined)
+  const entries=accounts.flatMap(account=>{const record=collections(account);return record?[{...record,name:account.name}]:[]})
   if(!entries.length)return
   const e=existing??companies(unit,now),bank=e.BNK
-  for(const {principal,interest,loss,recovered} of entries){
+  for(const {principal,interest,loss,recovered,events,name} of entries){
+    for(const {at,details} of events)unit.economyUsage(name,'/api/bank',details,at)
     bank.receivables-=principal
     bank.nonperforming+=loss-recovered
     bank.cash+=principal+interest

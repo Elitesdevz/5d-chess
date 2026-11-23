@@ -2,6 +2,7 @@ import type {EconomicAccount as Account} from './economy.ts'
 import {BANK_TERMS,type BankReceipt,type BankTerm} from '../src/bank-model.ts'
 import {dayKey,midnight} from '../src/collection.ts'
 import {fromStockUnits,toStockUnits} from '../src/stock-model.ts'
+import type {EconomyUsage} from './economy-usage.ts'
 import {fail} from './http.ts'
 
 export const DAY=86_400_000
@@ -20,11 +21,11 @@ export function creditAccount(account:Account){
   bank.score??=620
   return bank as BankAccount & {score:number}
 }
-type Collections={principal:number;interest:number;loss:number;recovered:number}
+type Collections={principal:number;interest:number;loss:number;recovered:number;events:{at:number;details:EconomyUsage}[]}
 const pending=new WeakMap<Account,Collections>()
 function ledger(account:Account){
   let record=pending.get(account)
-  if(!record){record={principal:0,interest:0,loss:0,recovered:0};pending.set(account,record)}
+  if(!record){record={principal:0,interest:0,loss:0,recovered:0,events:[]};pending.set(account,record)}
   return record
 }
 export function collections(account:Account){
@@ -41,12 +42,16 @@ export function migrateLoan(loan:Loan){
   // Carry the old contract's fixed rate across the split.
   loan.rate=({3:60,7:45,14:35} as Record<number,number>)[loan.days]??18
 }
+function creditEvent(account:Account,details:EconomyUsage,at:number){
+  ledger(account).events.push({at,details:{symbol:'BNK',...details}})
+}
 export function updateCredit(account:Account,now:number){
   const bank=creditAccount(account),loan=bank.loan
   if(!loan){
     if(bank.recoveryAt&&now>=bank.recoveryAt&&bank.score<600){
       const steps=1+Math.floor((now-bank.recoveryAt)/(14*DAY))
       bank.score=Math.min(600,bank.score+steps*10);bank.recoveryAt+=steps*14*DAY
+      creditEvent(account,{action:'credit_changed',score:bank.score},now)
     }
     return bank
   }
@@ -66,9 +71,10 @@ export function updateCredit(account:Account,now:number){
       regular*Math.floor(loan.principal*rate/10000)+(days-regular)*Math.floor(loan.principal*(rate+10)/10000))
     loan.interest+=charge;loan.charged+=charge;loan.lastAccrual=last+days*DAY
   }
-  if(now>due+DAY&&!loan.late){bank.score=Math.max(300,bank.score-80);loan.late=true}
+  if(now>due+DAY&&!loan.late){bank.score=Math.max(300,bank.score-80);loan.late=true;creditEvent(account,{action:'credit_changed',score:bank.score},now)}
   if(now>=due+7*DAY&&!loan.defaulted){
     bank.score=Math.max(300,bank.score-120);loan.defaulted=true;ledger(account).loss+=loan.principal
+    creditEvent(account,{action:'loan_default',reference:loan.id,score:bank.score,coins:fromStockUnits(loan.principal+loan.interest)},now)
   }
   return bank
 }
@@ -89,10 +95,12 @@ export function collect(account:Account,amount:number,now:number,automatic=false
       const positive=(bank.positive??[]).filter(at=>at>now-30*DAY)
       if(positive.length<2&&(!positive.length||now-positive.at(-1)!>=14*DAY)){
         bank.score=Math.min(850,bank.score+15);bank.positive=[...positive,now]
+        creditEvent(account,{action:'credit_changed',score:bank.score},now)
       }
     }
   }
   if(automatic){
+    creditEvent(account,{action:'debt_collection',reference:loan.id,coins:fromStockUnits(amount),interest:fromStockUnits(interest)},now)
     const sequence=++bank.sequence
     bank.receipts=[{id:'collection-'+sequence,sequence,kind:'collection',requested:null,amount:fromStockUnits(amount),interest:fromStockUnits(interest),at:now},...bank.receipts]
   }

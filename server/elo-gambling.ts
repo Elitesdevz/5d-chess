@@ -91,6 +91,7 @@ export function eloApi(unit:UnitOfWork,store:ChessStore,source:Account,path:stri
  const creditedUnits=income(account,grossUnits,now)
  const round:CasinoRound={currency:'elo',game:'dice',choice:Number(b.choice),stake,sequence:Number(b.sequence),requestId:b.requestId,quoteDay:valuation.day,eloRating:eloBefore,id:randomBytes(12).toString('hex'),result,won,gross:grossUnits/10000,profit:grossUnits/10000,tax:taxUnits/10000,credited:creditedUnits/10000,net:creditedUnits/10000,eloLost:lost,eloAfter:account.rating.value,coinReward:reward,created:now}
  s.used++;if(s.used>=MAX_ELO_ROUNDS){s.allowed=false;s.stage='normal'}else if(account.rating.value<1)s.stage='normal'
+ unit.economyUsage(account.name,'/api/casino/elo/bet',{action:'wager_settled',reference:round.requestId,coins:round.credited,value:stake,status:'elo'},now)
  casino.sequence=round.sequence;casino.recent.unshift(round);casino.recent.length=Math.min(100,casino.recent.length)
  return {status:200,value:{...casinoView(account),round,profile:profile(account),eloGambling:view()}}
 }

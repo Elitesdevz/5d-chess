@@ -10,7 +10,13 @@ export function casinoApi(unit: UnitOfWork, account: Account, path: string, meth
   if(path==='/api/casino/cave'||path==='/api/casino/cave/bet'){
     if(!account.cave?.active)fail(403,'Enter the cave from the city')
     if(path.endsWith('/cave')&&method==='GET')return {status:200,value:casinoView(account,true)}
-    if(path.endsWith('/bet')&&method==='POST'&&data.game==='dice')return {status:200,value:{...casinoBet(account,[account],data,Date.now(),undefined,true),profile:profile(account)}}
+    if(path.endsWith('/bet')&&method==='POST'&&data.game==='dice'){
+      const now=Date.now(),sequence=casinoView(account,true).nextSequence
+      const result=casinoBet(account,[account],data,now,undefined,true)
+      if(result.nextSequence!==sequence)unit.economyUsage(account.name,path,{action:'wager_settled',reference:result.round.requestId,coins:result.round.credited,
+        value:result.round.stake,status:'cave'},now)
+      return {status:200,value:{...result,profile:profile(account)}}
+    }
     return
   }
   const now=Date.now()
@@ -20,6 +26,10 @@ export function casinoApi(unit: UnitOfWork, account: Account, path: string, meth
   const bet=validateBet(data),before=casinoView(account)
   const maximum=before.recent.some(r=>r.requestId===bet.requestId)?undefined:acceptWager(unit,bet,now)
   const result=casinoBet(account,[account],data,now,undefined,false,maximum)
-  if(maximum!==undefined)settleWager(unit,result.round,maximum,now)
+  if(maximum!==undefined){
+    settleWager(unit,result.round,maximum,now)
+    unit.economyUsage(account.name,path,{action:'wager_settled',reference:result.round.requestId,symbol:'CAS',coins:result.round.credited,
+      value:result.round.stake,status:result.round.won?'won':'lost'},now)
+  }
   return {status:200,value:{...result,...casinoTerms(unit,now),profile:profile(account)}}
 }

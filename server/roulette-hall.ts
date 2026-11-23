@@ -69,6 +69,8 @@ export class RouletteHall {
         const round=settleReservedCasino(account,[],ticket.bet,pocket,now,maximum)
         postPayout(e,round,maximum,now)
         rounds.set(ticket.name,round)
+        unit.economyUsage(ticket.name,'/api/world/bet',{action:'wager_settled',reference:round.requestId,symbol:'CAS',coins:round.credited,
+          value:round.stake,status:round.won?'won':'lost'},now)
       }
       saveCompanies(unit,e)
       this.store.putMetadata(ESCROW,remaining)
@@ -193,6 +195,8 @@ export class RouletteHall {
           requireSpending(bettor,now)
           ticket.payoutUnits=acceptWager(unit,bet,now)
           reserveRouletteStake(bettor,bet.stake)
+          unit.economyUsage(name,binding?'/api/world/bet':'/api/roulette-hall/bet',
+            {action:'wager_locked',reference:bet.requestId,symbol:'CAS',coins:bet.stake,price:ticket.payoutUnits/10000,value:me.chair!.table},now)
           this.store.putMetadata(ESCROW,next)
         })
         this.escrow=next

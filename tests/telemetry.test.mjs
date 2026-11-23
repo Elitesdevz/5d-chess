@@ -24,3 +24,38 @@ test('cohort is the first 100 created accounts including existing users; APIs en
  await request('/api/me',1,undefined,{'x-client-trace':'trace-12345678','x-ui-action':'action-12345678'})
  const read=new UsageStore(dir+'/telemetry.sqlite');const count=read.events('User1').length;await request('/api/me');assert.equal(read.events('User1').length,count,'unchanged background polling does not fill the record');store.transaction(u=>u.users.get('User1').wallet.coins=777);await request('/api/me');assert.equal(read.events('User1').at(-1).coins,777,'an uncorrelated balance change still produces an authoritative snapshot');try{assert.equal(read.events('User101').length,0);const records=read.events('User1');assert.ok(records.some(e=>e.source==='client'&&e.label==='Find game'));assert.ok(records.some(e=>e.source==='server'&&e.requestId==='trace-12345678'&&e.actionId==='action-12345678'&&typeof e.coins==='number'&&e.elo===1200));assert.doesNotMatch(JSON.stringify(records),/private-password|session-1|never-log/)}finally{read.close()}
 })
+
+test('economy telemetry delivers committed events only and keeps company and player trails separate',async()=>{
+ const {drainEconomyUsage}=await import('../server/telemetry.ts')
+ const {stockApi}=await import('../server/stock-api.ts')
+ const {bankApi}=await import('../server/bank.ts')
+ const {maintainEconomy}=await import('../server/governance.ts')
+ const {companies,saveCompanies,cashUnits}=await import('../server/corporate.ts')
+ const now=Date.UTC(2026,10,23,11),store=new ChessStore('.', {memory:true}),log=new UsageStore(':memory:')
+ try{
+  store.transaction(u=>{
+   for(let i=1;i<=101;i++)u.users.add('Trader'+i,{name:'Trader'+i,salt:'',hash:'',wallet:{coins:500,starterGranted:true,inventory:[],loadout:{icon:'default',pieces:{}}}})
+   maintainEconomy(u,now)
+  })
+  const stock=(name,side,id)=>store.transaction(u=>{
+   u.usageTrace('client-trace-001','ui-action-001')
+   return stockApi(u,u.users.get(name),'/api/stocks/order','POST',{symbol:'CAS',side,price:.2,shares:2,id},now)
+  })
+  stock('Trader1','buy','usage-order-0001')
+  stock('Trader1','buy','usage-order-0001')
+  stock('Trader101','buy','usage-order-0101')
+  assert.throws(()=>stock('Trader2','sell','usage-order-rollback'),{status:409})
+  store.transaction(u=>bankApi(u,u.users.get('Trader1'),'/api/bank/borrow','POST',{id:'usage-loan-001',sequence:1,amount:200,days:7},now))
+  store.transaction(u=>{const e=companies(u,now);e.CAS.cash=0;e.CAS.obligations=cashUnits(50000);saveCompanies(u,e);maintainEconomy(u,now)})
+  assert.equal(log.events('Trader1').length,0)
+  drainEconomyUsage(log,store);drainEconomyUsage(log,store)
+  assert.deepEqual(log.events('Trader1').map(e=>e.economy.action),['order_placed','order_filled','loan_opened'])
+  assert.equal(log.events('Trader1')[0].requestId,'client-trace-001')
+  assert.equal(log.events('Trader1')[0].actionId,'ui-action-001')
+  assert.equal(log.events('Trader2').length,0)
+  assert.equal(log.events('Trader101').length,0)
+  assert.deepEqual(log.events('@economy:CAS').map(e=>e.economy.action),['order_filled','order_filled','bankruptcy'])
+  assert.equal(cleanUsage({id:'forged-event',kind:'economy',page:'/api/stocks',time:now}),undefined)
+  assert.equal(cleanUsage({id:'regular-event',kind:'click',page:'/chess/',time:now,economy:{action:'loan_opened'}}).economy,undefined)
+ }finally{log.close();store.close()}
+})

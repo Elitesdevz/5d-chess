@@ -36,7 +36,11 @@ function unlock(unit:UnitOfWork,e:Companies,c:Company,o:Order,now:number){
   o.shares=0
 }
 export function cancelOrders(unit:UnitOfWork,e:Companies,c:Company,predicate:(o:Order)=>boolean,now:number){
-  for(const o of c.orders)if(o.shares&&predicate(o))unlock(unit,e,c,o,now)
+  for(const o of c.orders)if(o.shares&&predicate(o)){
+    if(o.holder!==INVENTORY)unit.economyUsage(institution(o.holder)?undefined:o.holder,'/api/stocks/cancel',
+      {action:'order_canceled',reference:o.id,symbol:c.symbol,side:o.side,shares:o.shares,price:fromStockUnits(o.price)},now)
+    unlock(unit,e,c,o,now)
+  }
 }
 
 export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:string;side:StockSide;price:number;shares:number;id:string},now:number){
@@ -66,6 +70,8 @@ export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:strin
     w.coins=fromStockUnits(balance-units)
   }
   c.orders.push(order)
+  if(holder!==INVENTORY)unit.economyUsage(institution(holder)?undefined:holder,'/api/stocks/order',
+    {action:'order_placed',reference:id,symbol:c.symbol,side,shares,price:fromStockUnits(price)},now)
   for(const resting of book(c,side==='buy'?'sell':'buy')){
     if(!order.shares||!(side==='buy'?resting.price<=price:resting.price>=price))break
     const bid=side==='buy'?order:resting,ask=side==='sell'?order:resting
@@ -103,6 +109,10 @@ export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:strin
     receive(unit,e,c,bid.holder,qty*(bid.price-execution),now)
     const trade={id:randomUUID(),buy:bid.holder,sell:ask.holder,price:execution,shares:qty,at:now}
     c.trades.push(trade)
+    const fill={action:'order_filled' as const,reference:trade.id,symbol:c.symbol,shares:qty,price:fromStockUnits(execution),coins:fromStockUnits(paid)}
+    unit.economyUsage(undefined,'/api/stocks/order',fill,now)
+    for(const [account,side] of [[buyer,'buy'],[seller,'sell']] as const)if(account)
+      unit.economyUsage(account.name,'/api/stocks/order',{...fill,side},now)
     for(const [account,side] of [[buyer,'buy'],[seller,'sell']] as const)if(account){
       const p=portfolio(account)
       p.trades.unshift({id:trade.id,sequence:++p.sequence,symbol:c.symbol,side,shares:qty,total:fromStockUnits(paid),at:now})

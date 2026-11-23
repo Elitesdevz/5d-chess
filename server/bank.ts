@@ -40,6 +40,7 @@ export function bankApi(unit:UnitOfWork,account:Account,path:string,method:strin
   if(sequence!==bank.sequence+1)fail(409,'Your bank ledger changed. Review the transaction again.')
   if(requested!==null&&(typeof requested!=='number'||!Number.isFinite(requested)||requested<=0||requested>100_000))fail(400,'Enter a valid coin amount')
   const balance=toStockUnits(purse.coins)
+  const previousLoan=bank.loan?.id
   let amount:number,interest=0
   if(borrow){
     const days=data.days
@@ -67,5 +68,7 @@ export function bankApi(unit:UnitOfWork,account:Account,path:string,method:strin
   bank.sequence=sequence
   const receipt:BankReceipt={id,sequence,kind,requested:requested as number|null,amount:fromStockUnits(amount),interest:fromStockUnits(interest),at:now,days:borrow?bank.loan?.days:undefined}
   bank.receipts=[receipt,...bank.receipts]
+  unit.economyUsage(account.name,'/api/bank/'+kind,{action:borrow?'loan_opened':'loan_payment',symbol:'BNK',reference:borrow?bank.loan?.id:previousLoan,coins:receipt.amount,
+    interest:receipt.interest,days:receipt.days,score:bank.score,value:borrow?rate/100:undefined},now)
   return {status:200,value:{...view(),receipt}}
 }

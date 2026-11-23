@@ -1,4 +1,4 @@
-import {UsageStore,usagePath,usageApi,serverUsage} from './telemetry.ts'
+import {UsageStore,usagePath,usageApi,serverUsage,drainEconomyUsage,worldEconomyUsage} from './telemetry.ts'
 import {puzzleApi} from './puzzles.ts'
 import {AiScheduler} from './ai-scheduler.ts'
 import type {IncomingMessage, ServerResponse} from 'node:http'
@@ -23,6 +23,11 @@ import {STORAGE_SCHEMA} from './storage.ts'
 
 export function createApplication(store: ChessStore) {
   const usage=new UsageStore(usagePath(store))
+  let telemetryWarning=false
+  const collectEconomy=()=>{try{drainEconomyUsage(usage,store)}catch{
+    if(!telemetryWarning){console.error('Economy telemetry delivery deferred');telemetryWarning=true}
+  }}
+  const economyUsageTimer=setInterval(collectEconomy,2000);economyUsageTimer.unref()
   const ai=new AiScheduler(store)
   const roulette=new RouletteHall(store)
   const city=new CityWorlds(store,roulette)
@@ -34,7 +39,7 @@ export function createApplication(store: ChessStore) {
   const noticeTimer=setInterval(cleanNotices,60*1000);noticeTimer.unref()
   let draining = false
   return {
-    drain: () => {draining = true;ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);usage.close()},
+    drain: () => {draining = true;ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       const started=Date.now();let actor:string|undefined,pathForUsage='',methodForUsage=req.method??'GET',beforeUsage:{coins?:number;elo?:number}|undefined
       const logUsage=(status:number)=>{try{serverUsage(usage,store,actor,pathForUsage,methodForUsage,status,started,typeof req.headers['x-client-trace']==='string'?req.headers['x-client-trace']:undefined,typeof req.headers['x-ui-action']==='string'?req.headers['x-ui-action']:undefined,beforeUsage)}catch{/* Diagnostics must not change an API response. */}}
@@ -66,7 +71,9 @@ export function createApplication(store: ChessStore) {
         if(path.startsWith('/api/world/')&&method==='POST'){
           actor=user(store,req)??fail(401,'Log in first')
           const action=path.slice('/api/world/'.length)
-          json(res,200,city.update(actor,action,data))
+          const view=city.update(actor,action,data)
+          json(res,200,view)
+          if(action==='use'||action==='floor')worldEconomyUsage(usage,store,actor,action,view)
           if(action!=='presence')logUsage(200)
           return
         }
@@ -79,6 +86,7 @@ export function createApplication(store: ChessStore) {
           return
         }
         const reply = store.transaction(unit => {
+          unit.usageTrace(req.headers['x-client-trace'],req.headers['x-ui-action'])
           actor=user(unit,req)
           const auth = authApi(unit,req,path,data,limiter)
           if (auth){const named=(auth.value as {user?:unknown}).user;if(typeof named==='string')actor=named;return auth}

@@ -14,7 +14,7 @@ export function authApi(unit: UnitOfWork, req: IncomingMessage, path: string, da
   }
   if (path === '/api/signup' && method === 'POST') {
     const name = string(data.username, 'username', 32), password = passwordValue(data.password)!
-    if (/[\u0000-\u001f\u007f]/.test(name)) fail(400, 'Invalid username')
+    if (name.toLowerCase().startsWith('@economy:')||/[\u0000-\u001f\u007f]/.test(name)) fail(400, 'Invalid username')
     if (password !== data.confirm) fail(400, 'Passwords do not match')
     if (unit.findAccount(name)) fail(409, 'Username already taken')
     const salt = randomBytes(16).toString('hex'), token = randomBytes(32).toString('hex')

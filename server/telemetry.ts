@@ -3,6 +3,7 @@ import {dirname,join} from 'node:path'
 import {openSync,closeSync,existsSync} from 'node:fs'
 import {randomUUID} from 'node:crypto'
 import type {ChessStore} from './storage.ts'
+import type {WorldView} from '../src/world/model.ts'
 import type {Reply} from './model.ts'
 import {cleanUsage,usagePage,TELEMETRY_ACCOUNT_LIMIT,TELEMETRY_BYTES_PER_ACCOUNT,TELEMETRY_BATCH_LIMIT,type UsageEvent} from '../src/telemetry-model.ts'
 import {fail} from './http.ts'
@@ -56,4 +57,27 @@ export function serverUsage(log:UsageStore,store:ChessStore,name:string|undefine
  const event:UsageEvent={id:randomUUID(),kind:'api',time:Date.now(),page:usagePage(path),method,status,duration:Date.now()-start,coins:account.wallet?.coins,elo:account.rating?.value,previousCoins:before?.coins??previous?.coins,previousElo:before?.elo??previous?.elo}
  if(trace&&/^[\w-]{8,80}$/.test(trace))event.requestId=trace;if(action&&/^[\w-]{8,80}$/.test(action))event.actionId=action
  log.bestEffort(name,event)
+}
+
+/** Domain events enter this queue in the business transaction and reach the
+ * existing capped log only after that transaction commits. Stable IDs deduplicate retries. */
+export function drainEconomyUsage(log:UsageStore,store:ChessStore){
+ const rows=store.pendingUsage()
+ if(!rows.length)return
+ const groups=new Map<string,UsageEvent[]>()
+ for(const row of rows){
+  const events=groups.get(row.account)??[]
+  events.push(JSON.parse(row.payload) as UsageEvent)
+  groups.set(row.account,events)
+ }
+ for(const [account,events] of groups)log.append(account,events,'server')
+ store.clearUsage(rows.at(-1)!.id)
+}
+
+export function worldEconomyUsage(log:UsageStore,store:ChessStore,name:string,action:string,view:WorldView){
+ if(!telemetryEligible(store,name))return
+ const floor=view.you.lift?.to,service=action==='floor'?'elevator':view.interaction
+ if(!service)return
+ log.bestEffort(name,{id:randomUUID(),kind:'economy',time:Date.now(),page:'/api/world/'+action,
+  economy:{action:'desk_opened',service,symbol:floor?.startsWith('floor:')?floor.slice(6):view.you.zone==='bank'?'BNK':undefined}})
 }

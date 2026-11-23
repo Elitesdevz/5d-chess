@@ -47,10 +47,16 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
     }else if(action==='cancel'){
       const id=idFrom(data.id)
       cancelOrders(unit,e,c,o=>o.id===id&&o.holder===account.name,now)
-    }else if(action==='support')supportPolicy(c,account.name,data,now)
-    else if(action==='rescue')rescueSupport(c,account.name,data)
-    else {
-      castVote(e,account.name,data.id,data.choice,now)
+    }else if(action==='support'){
+      if(supportPolicy(c,account.name,data,now))unit.economyUsage(account.name,'/api/stocks/support',{action:'policy_support',symbol,
+        policy:data.policy as string,value:data.value as number,status:data.on?'enabled':'disabled'},now)
+    }else if(action==='rescue'){
+      if(rescueSupport(c,account.name,data))unit.economyUsage(account.name,'/api/stocks/rescue',{action:'rescue_support',symbol,
+        value:data.value as number,status:data.on?'enabled':'disabled'},now)
+    }else {
+      const vote=castVote(e,account.name,data.id,data.choice,now)
+      if(vote)unit.economyUsage(account.name,'/api/stocks/vote',{action:'ballot_vote',reference:vote.id,symbol:vote.symbol,
+        policy:vote.policy,value:vote.value,status:vote.votes[account.name]},now)
       advanceEconomy(unit,e,now)
     }
     saveCompanies(unit,e)
@@ -86,5 +92,6 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
   positions.sequence=sequence
   const trade:StockTrade={id,sequence,symbol,side,shares,total,at:now}
   positions.trades.unshift(trade)
+  unit.economyUsage(account.name,'/api/stocks/trade',{action:'quoted_stock_trade',reference:id,symbol,side,shares,coins:total,price:quote.price},now)
   return {status:200,value:{...view(),trade}}
 }

@@ -1,8 +1,10 @@
+import type {EconomyUsage} from '../server/economy-usage.ts'
 export const TELEMETRY_ACCOUNT_LIMIT=100
 export const TELEMETRY_BYTES_PER_ACCOUNT=10_000_000
 export const TELEMETRY_BATCH_LIMIT=20
 export interface UsageEvent {
- id:string;time:number;kind:'click'|'change'|'navigation'|'visibility'|'balance'|'error'|'api';session?:string;sequence?:number;page:string
+ id:string;time:number;kind:'click'|'change'|'navigation'|'visibility'|'balance'|'error'|'api'|'economy';session?:string;sequence?:number;page:string
+ economy?:EconomyUsage
  label?:string;target?:string;href?:string;actionId?:string;requestId?:string;method?:string;status?:number;duration?:number
  coins?:number;elo?:number;previousCoins?:number;previousElo?:number;width?:number;height?:number;x?:number;y?:number;checked?:boolean;disabled?:boolean;input?:string;line?:number;column?:number
 }

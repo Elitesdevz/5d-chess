@@ -1,3 +1,6 @@
+import {randomUUID} from 'node:crypto'
+import type {EconomyUsage} from './economy-usage.ts'
+import {TELEMETRY_ACCOUNT_LIMIT,type UsageEvent} from '../src/telemetry-model.ts'
 import {DatabaseSync, backup as sqliteBackup, type StatementSync} from 'node:sqlite'
 import {mkdirSync, existsSync, readFileSync, writeFileSync, openSync, fsyncSync, closeSync, chmodSync, unlinkSync} from 'node:fs'
 import {resolve, dirname, join} from 'node:path'
@@ -57,6 +60,17 @@ export class UnitOfWork {
     this.store = store
     this.users = new Entities(name => store.accountJson(name), (_name, json, account) => store.writeAccount(account, json))
     this.rooms = new Entities(code => store.roomJson(code), (_code, json, room) => store.writeRoom(room, json))
+  }
+  private trace?:{requestId?:string;actionId?:string}
+  usageTrace(requestId:unknown,actionId:unknown){
+    const safe=(value:unknown)=>typeof value==='string'&&/^[\w-]{8,80}$/.test(value)?value:undefined
+    this.trace={requestId:safe(requestId),actionId:safe(actionId)}
+  }
+  economyUsage(account:string|undefined,page:string,details:EconomyUsage,at=Date.now()){
+    const ordinal=account===undefined?undefined:this.store.accountOrdinal(account)
+    if(account!==undefined&&(ordinal===undefined||ordinal>TELEMETRY_ACCOUNT_LIMIT))return
+    const name=account??'@economy:'+(details.symbol??'events')
+    this.store.queueUsage(name,{id:randomUUID(),time:at,kind:'economy',page,economy:details,...this.trace})
   }
   accountNames(){return this.store.accountNames()}
   borrowers(){return this.store.borrowers()}
@@ -119,6 +133,9 @@ export class ChessStore {
       if (!options.readOnly) {
         this.db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;')
         if (version === 0) this.initialize(options.memory ? undefined : join(directory, 'multiplayer.json'))
+        this.db.exec(`CREATE TABLE IF NOT EXISTS economy_usage_outbox (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, account TEXT NOT NULL, payload TEXT NOT NULL CHECK(json_valid(payload))
+        )`)
       }
     } catch (error) {this.db.close(); throw error}
   }
@@ -200,6 +217,17 @@ export class ChessStore {
       return result
     } catch (error) {this.db.exec('ROLLBACK'); throw error}
     finally {this.inTransaction = false}
+  }
+  queueUsage(account:string,event:UsageEvent){
+    this.requireWriter()
+    const row=this.statement('INSERT INTO economy_usage_outbox(account,payload) VALUES(?,?)').run(account,JSON.stringify(event))
+    if(Number(row.lastInsertRowid)%200===0)this.clearUsage(Number(row.lastInsertRowid)-20_000)
+  }
+  pendingUsage(){
+    return this.statement('SELECT id,account,payload FROM economy_usage_outbox ORDER BY id LIMIT 200').all() as {id:number;account:string;payload:string}[]
+  }
+  clearUsage(through:number){
+    this.statement('DELETE FROM economy_usage_outbox WHERE id<=?').run(through)
   }
   accountJson(name: string): string | undefined {return (this.statement('SELECT payload FROM accounts WHERE name=?').get(name) as Row | undefined)?.payload}
   rouletteWallet(name:string){
