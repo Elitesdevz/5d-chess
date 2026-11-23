@@ -145,7 +145,7 @@ async function lobby(){
     try{
       const data=await api<{players:{name:string;avatar:string;frame?:string;rating?:number;coins?:number;rank:number}[];me:{rating?:number;coins?:number;rank:number|null}}>(coins?'/leaderboard/coins':'/leaderboard')
       if(request!==leaderboardRequest)return
-      const value=(p:{coins?:number;rating?:number})=>formatRankValue.format((coins?p.coins:p.rating)??0)
+      const value=(p:{coins?:number;rating?:number})=>coins?formatRankValue.format(p.coins??0):String(p.rating??0)
       const href='/chess/leaderboard.html'+(coins?'?mode=coins':'')
       const table=document.createElement('table')
       table.innerHTML=`<thead><tr><th scope="col">#</th><th scope="col">Player</th><th scope="col">${label}</th></tr></thead><tbody></tbody>`
