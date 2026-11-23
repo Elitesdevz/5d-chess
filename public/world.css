@@ -171,7 +171,7 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .kfc-ticket-box span{width:60%;margin-inline:auto;height:6px;border-radius:9px;background:#563635}
 .kfc-content .kfc-dragging{z-index:3;cursor:grabbing}
 .world-pause{position:absolute;inset:0;z-index:11;background:#050707f5;display:grid;align-content:center;justify-items:center;gap:18px;color:#fff4dc}
-.world-pause h2{margin:0;font:normal clamp(2.6rem,8vw,5rem)/1 Georgia,serif}
+.world-pause h2{text-transform:uppercase;margin:0;font:normal clamp(2.6rem,8vw,5rem)/1 Georgia,serif}
 .world-pause>div{display:flex;gap:12px}.world-pause :is(a,button){background:#262f29;color:#f5e8cc;border:1px solid #708776;padding:10px 18px;border-radius:8px;text-decoration:none;cursor:pointer}
 .world-pause button{background:#b89055;color:#1e1b12;font-weight:750}
 .world-pause-toggle{position:absolute;z-index:6;right:12px;top:12px;color:#f1dec0;background:#172723d9;border:1px solid #acbb9666;border-radius:7px;padding:6px 11px}
@@ -228,3 +228,5 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 }
 .world-wagers [data-chip] b::before{content:"";display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:#e9c186}
 .world-wagers [data-chip="1"] b::before{background:#72bcbc}.world-wagers [data-chip="2"] b::before{background:#cf8799}.world-wagers [data-chip="3"] b::before{background:#c2a8e5}
+
+.world-pause-toggle span{display:block;width:8px;height:12px;border-inline:2px solid currentColor}

@@ -63,8 +63,6 @@ export class CityStage {
   private voluntaryUnlock=false
   private wasLocked=false
   private onPause:()=>void
-  private cameraSeatKey=''
-  private viewBlend=0
   private cameraAim=new T.Vector3()
   private tools?:ReturnType<typeof kitchenTools>
   private station?:{point:string;x:number;y:number;phase:number;sent:boolean;fillAt:number}
@@ -391,7 +389,7 @@ export class CityStage {
     }
     for(const [id,entry] of this.restaurantNpc)if(!active.has(id)){entry.figure.dispose();this.restaurantNpc.delete(id)}
   }
-  private cameraView(now:number,dt:number){
+  private cameraView(now:number){
     const me=this.view?.you,{x,z}=this.position
     if(this.liftFacing){
       const {started,from,delta}=this.liftFacing,progress=Math.min(1,(performance.now()-started)/420)
@@ -403,16 +401,14 @@ export class CityStage {
     const chair=me?.chair,round=chair&&this.view?.hall?.tables[chair.table]
     if(chair&&round){
       const table=WORLD_TABLES[chair.table],dice=chair.table===DICE_TABLE_INDEX
-      const key=chair.table+':'+chair.index
-      if(key!==this.cameraSeatKey){this.cameraSeatKey=key;this.viewBlend=0}
       const wheel=site('casino',table.x+(dice?0:WHEEL_X),table.z+(dice?0:WHEEL_Z))
-      const overhead=!dice&&!!round.spin&&now<round.spin.ends+2100
-      this.viewBlend=this.reduced?Number(overhead):T.MathUtils.damp(this.viewBlend,Number(overhead),4.8,dt)
-      const blend=this.viewBlend
+      const spin=dice?undefined:round.spin
+      const blend=spin?(this.reduced?Number(now<spin.ends+900):
+        T.MathUtils.smoothstep(now,spin.started,spin.started+1050)*(1-T.MathUtils.smoothstep(now,spin.ends+700,spin.ends+1900))):0
       this.cameraAim.set(T.MathUtils.lerp(wheel.x,me.x*.12+wheel.x*.88,1-blend),1.12,wheel.z)
       this.camera.position.lerp(v(wheel.x,4.85,wheel.z+.72),blend)
       this.camera.lookAt(this.cameraAim)
-    }else this.cameraSeatKey=''
+    }
     const s=this.station,r=this.view?.restaurant
     if(s&&r?.kitchen&&this.tools){
       const {p,fryer,soda}=this.tools.aim(s.point,r)
@@ -478,7 +474,7 @@ export class CityStage {
     const dt=Math.min(.14,(time-this.last)/1000||.035);this.last=time
     if(this.art&&this.renderer){
       const now=Date.now()+this.clock
-      this.cameraView(now,dt);this.avatars(dt,now);this.motion(now,dt)
+      this.cameraView(now);this.avatars(dt,now);this.motion(now,dt)
       this.renderer.render(this.art.scene,this.camera)
       if(this.gl){this.fence=this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE,0);this.gl.flush()}
     }else if(!this.renderer)this.drawFlat()
