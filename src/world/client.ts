@@ -35,11 +35,11 @@ function updateSelection(){
   const chair=seated()
   if(!chair)return
   panel.querySelectorAll<HTMLButtonElement>('[data-face]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.face===String(choice))))
-  const gross=stake*grossMultiplier(chair.table===DICE_TABLE_INDEX?'dice':'roulette',choice)
+  const gross=stake*grossMultiplier(chair.table===DICE_TABLE_INDEX?'dice':'roulette',choice,view?.hall?.houseEdge)
   const line=panel.querySelector('[data-payout]')
-  if(line)line.textContent=Number.isSafeInteger(stake)&&stake>0?coins(gross-(gross-stake)*.01)+' if you win':'Choose a whole coin amount'
+  if(line)line.textContent=view?.hall?.open===false?'New wagers are paused':Number.isSafeInteger(stake)&&stake>0?coins(gross)+' if you win':'Choose a whole coin amount'
   const lock=panel.querySelector<HTMLButtonElement>('[data-lock]')
-  if(lock)lock.disabled=performing||!Number.isSafeInteger(stake)||stake<1||stake>MAX_CASINO_STAKE||stake>(view?.coins??0)
+  if(lock)lock.disabled=view?.hall?.open===false||performing||!Number.isSafeInteger(stake)||stake<1||stake>(view?.hall?.maxStake??MAX_CASINO_STAKE)||stake>(view?.coins??0)
 }
 function renderTable(){
   if(!view)return
@@ -55,7 +55,7 @@ function renderTable(){
   if(activeTable!==chair.table){choice=dice?1:'white';activeTable=chair.table}
   const locked=Boolean(table.seats[chair.index]?.locked)
   if(pending&&(pending.round!==table.round||locked))pending=undefined
-  const key=JSON.stringify([chair.table,table.round,table.phase,locked,table.prizes])
+  const key=JSON.stringify([chair.table,table.round,table.phase,locked,table.prizes,view.hall?.maxStake,view.hall?.open])
   if(key!==tableKey){
     tableKey=key
     const faces=dice?Array.from({length:6},(_,i)=>i+1):Array.from({length:37},(_,i)=>i)
@@ -64,10 +64,10 @@ function renderTable(){
     }`
     panel.innerHTML=`<div class="world-table-head"><div><small>${dice?'PUBLIC DICE':'ROULETTE'} · <span data-round-clock></span></small><h2>${WORLD_TABLES[chair.table].name}</h2></div><button type="button" data-stand ${table.phase==='spin'||locked&&table.phase==='betting'?'disabled':''}>Stand up</button></div>
       <ul class="world-seats">${table.seats.map(()=>'<li></li>').join('')}</ul>
-      ${table.phase==='betting'&&!locked?`<form class="world-wager">${mat}<div class="world-wager-row"><label>Stake<input type="number" min="1" max="${MAX_CASINO_STAKE}" step="1" required value="${stake}" inputmode="numeric"></label><button type="submit" class="world-primary" data-lock>Lock bet</button></div><small data-payout></small></form>`:
+      ${table.phase==='betting'&&!locked?`<form class="world-wager">${mat}<div class="world-wager-row"><label>Stake<input type="number" min="1" max="${view.hall?.maxStake??MAX_CASINO_STAKE}" step="1" required value="${stake}" inputmode="numeric"></label><button type="submit" class="world-primary" data-lock>Lock bet</button></div><small data-payout></small></form>`:
       table.phase==='spin'?'<p class="world-muted">Bets are closed. Watch the table.</p>':
       table.phase==='result'?`<div class="world-result"><strong>${dice?'Face':'Pocket'} ${table.spin?.pocket}</strong><ul class="world-ledger">${(table.prizes??[]).map(p=>`<li><span>${safeText(p.name)}</span><b class="${p.won?'is-winner':''}">${p.net>=0?'+':'−'}${casinoCoins(Math.abs(p.net))}</b></li>`).join('')}</ul></div>`:'<p class="world-muted">Your bet is locked. Waiting for the table.</p>'}`
-    panel.insertAdjacentHTML('beforeend',`<details class="world-table-rules"><summary>Rules and recent results</summary><p>${dice?'Pick one face. The croupier rolls one shared die. A hit pays 5.88 times the stake before tax.':'Bet on a pocket or choose an outside bet. The wheel result is shared by the table.'} A 1% tax applies to positive winnings.</p><p>${table.recent.length?'Recent: '+table.recent.join(' · '):'No recent results yet.'}</p></details>${dice?'':'<details class="world-table-rules" data-history><summary>Your roulette history</summary><ul class="world-ledger"></ul></details>'}`)
+    panel.insertAdjacentHTML('beforeend',`<details class="world-table-rules"><summary>Rules and recent results</summary><p>${dice?'Pick one face. The croupier rolls one shared die. The return for your selected face is shown above.':'Bet on a pocket or choose an outside bet. The wheel result is shared by the table.'}</p><p>${table.recent.length?'Recent: '+table.recent.join(' · '):'No recent results yet.'}</p></details>${dice?'':'<details class="world-table-rules" data-history><summary>Your roulette history</summary><ul class="world-ledger"></ul></details>'}`)
     const history=panel.querySelector<HTMLDetailsElement>('[data-history]')
     if(history)history.ontoggle=()=>{
       if(!history.open)return

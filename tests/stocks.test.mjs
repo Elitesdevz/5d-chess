@@ -2,11 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {ChessStore} from '../server/storage.ts'
 import {stockApi} from '../server/stock-api.ts'
-import {CAS_META,casState,recordCasinoMargins} from '../server/cas-shares.ts'
+import {COMPANIES,companies,operating,saveCompanies} from '../server/corporate.ts'
+import {maintainEconomy} from '../server/governance.ts'
+import {DAY} from '../server/credit.ts'
 import {STOCK_QUOTES} from '../server/stock-quotes.ts'
 import {STOCKS} from '../src/stock-catalog.ts'
-import {casOrderTotal} from '../src/stock-model.ts'
-import {nextReset} from '../src/collection.ts'
 import {casinoApi} from '../server/casino-api.ts'
 
 const then=Date.parse('2026-11-18T10:00:00Z')
@@ -40,49 +40,31 @@ test('stock orders debit or credit the wallet once and reject stale quotes and o
   assert.equal(read('Alice').coins,9824.75)
 })
 
-test('CAS trades conserve the public float and midnight pays the held fraction exactly once',t=>{
-  const {store,read,trade}=fixture(t)
-  const initial=read('Alice').cas
-  assert.equal(initial.float,1000)
-  const buy={symbol:'CAS',side:'buy',shares:100,id:'order-casino-01',sequence:1,version:initial.version,total:casOrderTotal(initial,'buy',100)}
-  const bought=trade('Alice',buy)
-  assert.equal(bought.cas.available,900)
-  assert.equal(bought.cas.float,1000)
-  assert.equal(bought.portfolio.positions.CAS.shares,100)
-  assert.throws(()=>trade('Bob',{...buy,id:'order-casino-02'}),{status:409})
-  store.transaction(unit=>recordCasinoMargins(unit,[{stake:1000,gross:0},{stake:150,gross:150}],then))
-  const midnight=nextReset(then)
-  const paid=read('Alice',midnight)
-  assert.equal(paid.coins,bought.coins+7)
-  assert.deepEqual(paid.cas.lastDividend,{day:'2026-11-18',pool:70,paid:7})
-  assert.equal(paid.portfolio.dividendsPaid,7)
-  assert.deepEqual(read('Alice',midnight),paid)
-  assert.equal(read('Bob',midnight).coins,10000)
-  const sell=trade('Alice',{...buy,side:'sell',sequence:2,id:'order-casino-03',version:paid.cas.version,total:casOrderTotal(paid.cas,'sell',100)},midnight)
-  assert.equal(sell.cas.available,1000)
-  assert.equal(sell.portfolio.positions.CAS,undefined)
-})
-
-test('private equity rebalances within its band and trades only available float',t=>{
+test('weekly dividends cover losses and pay only eligible outstanding shares',t=>{
   const {store,read}=fixture(t)
-  const initial=read('Alice').cas
-  const after=store.transaction(unit=>{
-    const state=unit.metadata(CAS_META)
-    unit.putMetadata(CAS_META,{...state,nextEquity:then})
-    return casState(unit,then)
-  })
-  assert.equal(after.equityMoves[0].side,'sell')
-  assert.ok(after.equity>=1500&&after.equity<initial.equity)
-  assert.equal(after.equity+after.float,4000)
-  assert.equal(after.float,after.available)
-  const repurchased=store.transaction(unit=>{
-    unit.putMetadata(CAS_META,{...after,equity:1500,float:2500,available:50,nextEquity:then})
-    return casState(unit,then)
-  })
-  assert.equal(repurchased.equityMoves[0].side,'buy')
-  assert.equal(repurchased.equity,1550)
-  assert.equal(repurchased.float,2450)
-  assert.equal(repurchased.available,0)
+  const post=(account,action,data,now)=>store.transaction(unit=>stockApi(unit,unit.users.get(account),'/api/stocks/'+action,'POST',data,now).value)
+  read('Alice')
+  post('Alice','order',{symbol:'BNK',side:'buy',shares:100,id:'bank-share-alice',price:.16},then)
+  post('Bob','order',{symbol:'BNK',side:'buy',shares:300,id:'bank-share-bob1',price:.16},then)
+  function postProfit(coins,now){
+    store.transaction(unit=>{
+      const e=companies(unit,now)
+      e.nextPE=then+50*DAY
+      e.BNK.cash+=coins*10000;operating(e.BNK,'Operating result',coins*10000,now)
+      saveCompanies(unit,e)
+    })
+  }
+  postProfit(-100,then)
+  store.transaction(unit=>maintainEconomy(unit,then+7*DAY))
+  assert.equal(read('Alice',then+7*DAY).bank.lastDividend.paid,0)
+  postProfit(500,then+8*DAY)
+  store.transaction(unit=>maintainEconomy(unit,then+14*DAY))
+  const paid=read('Alice',then+14*DAY)
+  assert.equal(paid.bank.lastDividend.pool,100)
+  assert.equal(paid.portfolio.bankDividendsPaid,25)
+  assert.equal(read('Bob',then+14*DAY).portfolio.bankDividendsPaid,75)
+  assert.deepEqual(read('Alice',then+14*DAY),paid)
+  assert.equal(paid.portfolio.dividends[0].symbol,'BNK')
 })
 
 test('a dice receipt contributes to house margin only once',t=>{
@@ -90,7 +72,7 @@ test('a dice receipt contributes to house margin only once',t=>{
   const data={game:'dice',stake:10,choice:6,sequence:1,requestId:'stock-dice-test-01'}
   const play=()=>store.transaction(unit=>casinoApi(unit,unit.users.get('Alice'),'/api/casino/bet','POST',data).value)
   const result=play()
-  assert.equal(store.metadataValue(CAS_META).margin,Math.round((result.round.stake-result.round.gross)*10000))
+  assert.equal(store.metadataValue(COMPANIES).CAS.profit,Math.round((result.round.stake*.999-result.round.gross)*10000))
   play()
-  assert.equal(store.metadataValue(CAS_META).margin,Math.round((result.round.stake-result.round.gross)*10000))
+  assert.equal(store.metadataValue(COMPANIES).CAS.profit,Math.round((result.round.stake*.999-result.round.gross)*10000))
 })

@@ -4,8 +4,8 @@ import {StockChart,sparkline} from './stock-chart.ts'
 import {casinoCoins} from './casino-model.ts'
 import type {Profile} from './account-model.ts'
 import {STOCKS,SECTORS} from './stock-catalog.ts'
-import {BANK_SHARE_COUNT} from './bank-model.ts'
-import {BNK,CAS,CAS_SHARES,MAX_STOCK_ORDER,QUOTE_MAX_AGE,isEquity,equityOrderTotal,type PricePoint,type StockOrder,type StockSide,type StockTrade,type StockView} from './stock-model.ts'
+import {CityServices} from './world/services.ts'
+import {BNK,CAS,MAX_STOCK_ORDER,QUOTE_MAX_AGE,isEquity,type PricePoint,type StockOrder,type StockSide,type StockTrade,type StockView} from './stock-model.ts'
 
 const el=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as E
 const nodes=[...document.querySelectorAll<HTMLButtonElement>('[data-exchange-view]')]
@@ -15,11 +15,10 @@ const coins=(value:number)=>casinoCoins(value)+' coins'
 const signed=(value:number)=>value===0?'0':(value>0?'+':'−')+casinoCoins(Math.abs(value))
 const changeClass=(v:number)=>v>0?'is-gain':v<0?'is-loss':''
 const stamp=(time:number)=>new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Amsterdam',dateStyle:'short',timeStyle:'short'}).format(time)
-const simpleDate=(time:number)=>new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Amsterdam',month:'short',day:'numeric'}).format(time)
 const maxRows=12
 const dayMs=86_400_000
 const stockChart=new StockChart(el<HTMLCanvasElement>('stock-chart'),el('stock-chart-readout'))
-const casChart=new StockChart(el<HTMLCanvasElement>('cas-chart'),el('cas-chart-readout'),true)
+let companyDesk:CityServices|undefined
 const historyBySymbol=new Map<string,PricePoint[]>()
 const historyLoading=new Set<string>()
 const historyRetry=new Map<string,number>()
@@ -28,7 +27,7 @@ const trendRetry=new Map<string,number>()
 let trendTimer=0,trendActive=false
 const visibleTrendRows=()=>[...el('exchange-market-list').querySelectorAll<HTMLTableRowElement>('tbody tr')]
 const watched=new Set<string>()
-let scope='all',range=30,ownershipIndex=-1
+let scope='all',range=30
 const sectorColors=['#9cd6ce','#b1b0ed','#dbad7d','#bbd298','#88bed2','#e7aaa6','#d8c388','#d6a689','#a6d5ac','#c5b4d9','#b2c2ae']
 const sectorColor=(sector:string)=>sectorColors[SECTORS.indexOf(sector)]??'#9cd6ce'
 let state:StockView|undefined,profile:Profile|undefined,page=0,mode='market',selected='',side:StockSide='buy',working=false,refreshing=false
@@ -78,11 +77,11 @@ function renderExchange(){
   el('exchange-feed-time').textContent=marketFailed?'Refresh unavailable · showing saved prices':last?`${marks.length}/100 priced · Refreshed ${stamp(last)}`:'Waiting for the first price refresh'
   document.querySelector('.exchange-feed')!.classList.toggle('is-waiting',marketFailed||!last||state.now-last>2*60*60*1000)
   el('exchange-cas-price').textContent=coins(state.cas.price)
-  el('exchange-cas-float').textContent=`${state.cas.float/CAS_SHARES*100}% public float · ${casinoCoins(state.cas.available)} available`
+  el('exchange-cas-float').textContent=`${casinoCoins(state.cas.available)} unsold shares`
   document.querySelector<HTMLElement>('.exchange-bank')!.hidden=!state.bank
   if(state.bank){
     el('exchange-bank-price').textContent=coins(state.bank.price)
-    el('exchange-bank-float').textContent=`${state.bank.float/BANK_SHARE_COUNT*100}% public float · ${casinoCoins(state.bank.available)} available`
+    el('exchange-bank-float').textContent=`${casinoCoins(state.bank.available)} unsold shares`
   }
   if(mode==='market'){renderPulse();renderMarket()}
   else if(mode==='portfolio')renderPortfolio()
@@ -222,17 +221,12 @@ const orderMarkup=`<form class="exchange-ticket">
   <p class="exchange-order-limit" data-order-limit hidden></p>
   <p class="exchange-order-message" role="status" data-order-message hidden></p>
 </form>`
-for(const prefix of ['cas','stock'])el(prefix+'-order').innerHTML=orderMarkup
+el('stock-order').innerHTML=orderMarkup
 
-const ticket=()=>el(selected===CAS?'cas-order':'stock-order').querySelector<HTMLFormElement>('form')!
+const ticket=()=>el('stock-order').querySelector<HTMLFormElement>('form')!
 const quantity=()=>Number(ticket().querySelector<HTMLInputElement>('input')!.value)
 function estimate(shares:number){
   if(!state||!validQuote(selected)||!Number.isSafeInteger(shares)||shares<1||shares>MAX_STOCK_ORDER)return undefined
-  if(isEquity(selected)){
-    const equity=issue(selected)
-    if(!equity||side==='buy'&&shares>equity.available||side==='sell'&&shares>equity.float-equity.available)return undefined
-    return equityOrderTotal(selected,equity,side,shares)
-  }
   return Math.round(state.quotes[selected].price*100)*shares/100
 }
 function orderMessage(text:string,bad=false){
@@ -261,96 +255,6 @@ function renderTicket(){
   form.querySelector('input')!.disabled=working||retry
   form.querySelector<HTMLButtonElement>('[data-max]')!.disabled=working||retry||!validQuote(selected)||(side==='sell'?!held:state!.coins<=0)
 }
-function ownershipSegments(){
-  const cas=state!.cas
-  return [['CasinoOwner',3000,'#efbe6c'],['Private equity',cas.equity,'#8bb4d1'],['The Keeper',2000,'#bf9cda'],['Public float',cas.float,'#8cdbb1'],['Treasury reserve',1000,'#66837d']] as const
-}
-function showOwnership(index:number){
-  const part=ownershipSegments()
-  const [name,count]=part[index<0?3:index]
-  let cursor=0
-  const fill=part.map(([,shares,color],i)=>{
-    const next=cursor+shares/CAS_SHARES*100
-    const wedge=`${color}${index>=0&&i!==index?'48':''} ${cursor}% ${next}%`
-    cursor=next
-    return wedge
-  })
-  const ring=document.querySelector<HTMLElement>('.exchange-pie')!
-  ring.style.background=`conic-gradient(from -90deg,${fill.join(',')})`
-  el('cas-pie-value').textContent=casinoCoins(count/CAS_SHARES*100)+'%'
-  el('cas-pie-label').textContent=name
-  document.querySelectorAll<HTMLButtonElement>('[data-owner]').forEach(b=>b.classList.toggle('is-highlight',Number(b.dataset.owner)===index))
-}
-function chooseOwner(index:number){
-  ownershipIndex=ownershipIndex===index?-1:index
-  document.querySelectorAll<HTMLButtonElement>('[data-owner]').forEach((button,i)=>button.setAttribute('aria-pressed',String(i===ownershipIndex)))
-  showOwnership(ownershipIndex)
-}
-const ownershipPie=document.querySelector<HTMLElement>('.exchange-pie')!
-function sliceAt(event:MouseEvent){
-  const r=ownershipPie.getBoundingClientRect(),x=event.clientX-r.left-r.width/2,y=event.clientY-r.top-r.height/2
-  const radius=Math.hypot(x,y)/(r.width/2)
-  if(radius<.64||radius>1)return -1
-  const fraction=((Math.atan2(x,-y)+Math.PI*2.5)%(2*Math.PI))/(Math.PI*2)
-  let count=0
-  return ownershipSegments().findIndex(([,size])=>{count+=size;return fraction<count/CAS_SHARES})
-}
-ownershipPie.addEventListener('pointermove',event=>{
-  if(selected!==CAS||event.pointerType!=='mouse')return
-  const index=sliceAt(event)
-  showOwnership(index<0?ownershipIndex:index)
-})
-ownershipPie.addEventListener('pointerleave',()=>{if(selected===CAS)showOwnership(ownershipIndex)})
-ownershipPie.addEventListener('click',event=>{
-  const index=sliceAt(event)
-  if(index>=0)chooseOwner(index)
-})
-function renderCas(){
-  const cas=state!.cas
-  el('cas-price').textContent=coins(cas.price)
-  el('cas-available').textContent=`${casinoCoins(cas.available)} shares available`
-  el('cas-spread').textContent=`Bid ${cas.bid?casinoCoins(cas.bid):'—'} · Ask ${cas.ask?casinoCoins(cas.ask):'—'}`
-  el('cas-total-shares').textContent=`${casinoCoins(CAS_SHARES)} shares issued`
-  el('cas-float-note').textContent=`Players hold ${casinoCoins(cas.float-cas.available)} of ${casinoCoins(cas.float)} public shares.`
-  const legend=document.querySelector<HTMLElement>('.exchange-ownership-list')!,segments=ownershipSegments()
-  const composition=segments.map(([,n])=>n).join(',')
-  if(legend.dataset.composition!==composition){
-    legend.dataset.composition=composition
-    legend.innerHTML=segments.map(([name,n,color],i)=>`<button type="button" data-owner="${i}" aria-pressed="false"><span><i style="background:${color}"></i><span>${name}<small>${casinoCoins(n)} shares</small></span></span><b>${casinoCoins(n/CAS_SHARES*100)}%</b></button>`).join('')
-    legend.querySelectorAll<HTMLButtonElement>('button').forEach((button,i)=>{
-      button.addEventListener('pointerenter',()=>showOwnership(i))
-      button.addEventListener('pointerleave',()=>showOwnership(ownershipIndex))
-      button.addEventListener('focus',()=>showOwnership(i))
-      button.addEventListener('blur',()=>showOwnership(ownershipIndex))
-      button.onclick=()=>chooseOwner(i)
-    })
-  }
-  showOwnership(ownershipIndex)
-  const dividend=cas.lastDividend
-  el('cas-dividends').innerHTML=dividend?`<div><dt>Last allocation · ${dividend.day}</dt><dd>${coins(dividend.pool)}</dd></div><div><dt>Paid to players</dt><dd>${coins(dividend.paid)}</dd></div>`:'<div><dt>First allocation</dt><dd>Pending</dd></div>'
-  el('cas-moves').innerHTML=cas.equityMoves.length?cas.equityMoves.slice(0,5).map(move=>`<div class="cas-move"><span>${move.side==='sell'?'Released to public':'Bought back'} · ${simpleDate(move.at)}</span><b>${casinoCoins(move.shares)} shares</b></div>`).join(''):'<p class="exchange-muted">No equity transactions yet.</p>'
-  casChart.set(cas.history,'#e6ba72')
-}
-function renderBankShare(){
-  const bank=state!.bank,info=el('stock-bank-info')
-  info.hidden=false
-  el('stock-title').textContent=label(BNK)
-  el('stock-sector').textContent='In-game equity'
-  const monogram=el('stock-monogram')
-  monogram.innerHTML=icon('bank');monogram.style.setProperty('--company-color','#a8d4eb')
-  el('stock-symbol').textContent=BNK
-  el('stock-watch').hidden=true
-  el('stock-price').textContent=coins(bank.price)
-  const change=el('stock-change')
-  change.textContent=`Bid ${bank.bid?casinoCoins(bank.bid):'—'} · Ask ${bank.ask?casinoCoins(bank.ask):'—'}`;change.className=''
-  el('stock-chart-status').textContent='Bank share prices · In-game orders'
-  const history=bank.history.filter(p=>p.at>=state!.now-range*dayMs)
-  stockChart.set(history,'#97d2ea')
-  const held=state!.portfolio.positions[BNK]?.shares??0
-  el('stock-range-stats').innerHTML=`<div><dt>Public shares</dt><dd>${casinoCoins(bank.float)}</dd></div><div><dt>Available</dt><dd>${casinoCoins(bank.available)}</dd></div><div><dt>You hold</dt><dd>${casinoCoins(held)}</dd></div><div><dt>Price records</dt><dd>${history.length}</dd></div>`
-  const accrual=bank.lastDividend
-  el('stock-bank-details').innerHTML=`<div><dt>Issued shares</dt><dd>${casinoCoins(BANK_SHARE_COUNT)}</dd></div><div><dt>Last allocation</dt><dd>${accrual?coins(accrual.pool):'Pending'}</dd></div><div><dt>Paid to you</dt><dd>${coins(state!.portfolio.bankDividendsPaid??0)}</dd></div>`
-}
 function renderStock(){
   el('stock-bank-info').hidden=true
   el('stock-watch').hidden=false
@@ -374,9 +278,7 @@ function renderStock(){
 }
 function renderDetail(){
   if(!selected||!state)return
-  if(selected===CAS)renderCas()
-  else if(selected===BNK)renderBankShare()
-  else renderStock()
+  renderStock()
   renderTicket()
 }
 async function loadHistory(symbol:string){
@@ -395,19 +297,15 @@ async function loadHistory(symbol:string){
 }
 function openStock(symbol:string){
   if(!state||isEquity(symbol)&&!issue(symbol)||!isEquity(symbol)&&!symbols.has(symbol))return
+  if(isEquity(symbol)){void companyDesk?.open('trader',symbol);return}
   selected=symbol
-  ownershipIndex=-1
-  if(symbol===CAS){
-    document.querySelectorAll<HTMLButtonElement>('[data-owner]').forEach(b=>b.setAttribute('aria-pressed','false'))
-  }else{
-    range=30
-    for(const b of document.querySelectorAll<HTMLButtonElement>('[data-range]'))b.setAttribute('aria-pressed',String(Number(b.dataset.range)===range))
-  }
+  range=30
+  for(const b of document.querySelectorAll<HTMLButtonElement>('[data-range]'))b.setAttribute('aria-pressed',String(Number(b.dataset.range)===range))
   const queued=pending?.symbol===symbol?pending:undefined
   side=queued?.side??'buy'
   ticket().querySelector('input')!.value=String(queued?.shares??1)
   orderMessage('')
-  el<HTMLDialogElement>(symbol===CAS?'exchange-cas-dialog':'exchange-stock-dialog').showModal()
+  el<HTMLDialogElement>('exchange-stock-dialog').showModal()
   renderDetail()
   if(!isEquity(symbol))void loadHistory(symbol)
 }
@@ -479,7 +377,7 @@ for(const prefix of ['cas','stock']){
     side=button.dataset.side as StockSide;orderMessage('');renderTicket()
   })
 }
-for(const id of ['exchange-stock-dialog','exchange-cas-dialog']){
+for(const id of ['exchange-stock-dialog']){
   el<HTMLDialogElement>(id).addEventListener('close',()=>selected='')
 }
 document.querySelector('.exchange')!.addEventListener('click',event=>{
@@ -528,6 +426,9 @@ async function start(){
   const auth=await initShell()
   if(!auth?.user){loading.hidden=false;loading.innerHTML='<a href="/chess/login.html">Log in to open the exchange ›</a>';return}
   accountName=auth.user
+  companyDesk=new CityServices(el<HTMLDialogElement>('company-desk'),auth.user,()=>{},coins=>{
+    if(profile){profile={...profile,coins};renderAccount(profile)}
+  })
   profile=auth.profile??undefined
   try{
     const saved=JSON.parse(localStorage.getItem('stock-watch:'+accountName)??'[]')

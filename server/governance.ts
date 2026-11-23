@@ -5,7 +5,7 @@ import type {UnitOfWork} from './storage.ts'
 import {DAY,income,updateCredit} from './credit.ts'
 import {wallet} from './economy.ts'
 import {portfolio} from './cas-shares.ts'
-import {PE,BUYBACK,dictionary,holderLabel,cashUnits,assets,liabilities,shortfall,lendable,cashForDistribution,eligible,sharesOf,ratio,journal,operating,repayCorporate,debt,companies,saveCompanies,setHolding,type Ballot,type Company,type Companies} from './corporate.ts'
+import {PE,BUYBACK,postCreditCollections,dictionary,holderLabel,cashUnits,assets,liabilities,shortfall,lendable,cashForDistribution,safetyReserve,eligible,sharesOf,ratio,journal,operating,repayCorporate,debt,companies,saveCompanies,setHolding,type Ballot,type Company,type Companies} from './corporate.ts'
 import {book,cancelOrders,maintainOrders,offerInventory,submit} from './order-book.ts'
 import {fail} from './http.ts'
 
@@ -23,11 +23,12 @@ function ballot(c:Company,policy:string,value:number,ends:number):Ballot{
   return {id:randomUUID(),symbol:c.symbol,policy,value,ends,snapshot:dictionary(c.holders),votes:dictionary()}
 }
 export function markSupport(c:Company,now:number){
+  const voting=eligible(c)
   for(const [policy,value] of proposalKeys(c)){
     const k=key(policy,value)
     let weight=0
     for(const [holder,support] of Object.entries(c.supports[policy]??{}))if(Object.hasOwn(support.options,String(value)))weight+=sharesOf(c,holder)
-    if((c.marks[k]?.shares??0)!==weight)c.marks[k]={shares:weight,reached:now}
+    if(weight!==c.marks[k]?.shares||voting!==c.marks[k]?.eligible)c.marks[k]={shares:weight,eligible:voting,reached:now}
   }
 }
 
@@ -101,7 +102,7 @@ export function castVote(e:Companies,name:string,id:unknown,choice:unknown,now:n
 function declare(c:Company,now:number){
   const need=shortfall(c,now)
   if(!need||c.bankruptcy)return
-  c.bankruptcy={at:now,need,stage:0,selected:[],support:dictionary(),snapshot:dictionary(c.holders)}
+  c.bankruptcy={at:now,need:Math.max(need,safetyReserve(c)+c.obligations-c.cash),stage:0,selected:[],support:dictionary(),snapshot:dictionary(c.holders)}
   journal(c,'Bankruptcy declared',0,now)
 }
 function cure(c:Company,now:number,kind:string){
@@ -114,7 +115,7 @@ function tryRescue(e:Companies,now:number){
   if(!principal||c.loan||principal>lendable(b,now)||
       principal>ratio(assets(b),b.policy.exposure)||principal>ratio(assets(c)+principal,c.policy.debt))
     return 'The bank could not fund the proposed contract within company risk limits'
-  if(assets(c)<=liabilities(c,now)||principal<shortfall(c,now))
+  if(assets(c)<=liabilities(c,now)||principal<Math.max(shortfall(c,now),safetyReserve(c)+c.obligations-c.cash))
     return 'The loan could not restore solvency and liquidity'
   c.cash+=principal;b.cash-=principal;b.receivables+=principal
   c.loan={principal,rate:p.selected[2],opened:now,due:now+p.selected[1]*DAY}
@@ -126,12 +127,17 @@ function rescueVote(e:Companies,now:number){
   const c=e.CAS,b=c.bankruptcy
   if(!b)return
   while(b.stage<3&&now>=b.at+(b.stage+1)*DAY){
+    if(b.snapshot[PE])b.support[PE]??=[[125],[14],[15]][b.stage]
     const totals=rescueTally(c),stage=rescueStages[b.stage]
     const winner=stage.options.reduce((best,v)=>(totals[v]??0)>(totals[best]??0)?v:best)
     b.selected.push(winner);b.stage++;b.support=dictionary();b.snapshot=dictionary(c.holders)
     if(b.stage===3)b.offer=ballot(e.BNK,'rescue',winner,b.at+4*DAY)
   }
   if(!b.offer||b.outcome)return
+  if(b.offer.snapshot[PE]&&now<b.offer.ends){
+    const principal=ratio(b.need,b.selected[0]),bank=e.BNK
+    b.offer.votes[PE]??=principal<=lendable(bank,now)&&principal<=ratio(assets(bank),bank.policy.exposure)&&assets(c)>liabilities(c,now)&&b.selected[2]>=10?'yes':'no'
+  }
   const {eligible,yes,no}=tally(b.offer)
   if(yes*2>eligible){b.outcome=tryRescue(e,Math.min(now,b.offer.ends));delete b.offer}
   else if(no*2>eligible||now>=b.offer.ends){b.outcome='The bank vote rejected the rescue';delete b.offer}
@@ -206,10 +212,9 @@ function invest(unit:UnitOfWork,e:Companies,now:number){
 }
 
 export function advanceEconomy(unit:UnitOfWork,e:Companies,now:number){
-  for(const name of unit.borrowers()){
-    const account=unit.users.get(name)
-    if(account)updateCredit(account,now)
-  }
+  const borrowers=unit.borrowers().map(name=>unit.users.get(name)!).filter(Boolean)
+  for(const account of borrowers)updateCredit(account,now)
+  postCreditCollections(unit,borrowers,now,e)
   const c=e.CAS,b=e.BNK
   if(c.loan&&now>=c.loan.due&&c.cash>=debt(c,now)+c.pending+c.obligations){
     repayCorporate(e,now)
@@ -236,7 +241,15 @@ export function advanceEconomy(unit:UnitOfWork,e:Companies,now:number){
         ?[{company,policy,value,mark,pct:mark.shares/voting}]:[]
     }))
     const next=candidates.sort((x,y)=>y.pct-x.pct||x.mark.reached-y.mark.reached)[0]
-    if(next&&!e.ballot)e.ballot=ballot(next.company,next.policy,next.value,slot*DAY+DAY/2+DAY)
+    if(next&&!e.ballot){
+      const b=e.ballot=ballot(next.company,next.policy,next.value,slot*DAY+DAY/2+DAY)
+      if(b.snapshot[PE]&&b.policy!=='open'){
+        const target=(rescuedPolicies[next.company.symbol] as Record<string,number>)[b.policy]
+        const current=next.company.policy[b.policy]
+        if(target!==undefined)b.votes[PE]=Math.abs(b.value-target)<Math.abs(current-target)?'yes':'no'
+      }
+      closeOrdinary(unit,e,now)
+    }
   }
   saveCompanies(unit,e)
 }
@@ -247,8 +260,8 @@ export function maintainEconomy(unit:UnitOfWork,now=Date.now()){
 const displayOrder=({id,holder,side,price,shares,at}:import('./corporate.ts').Order)=>({id,holder:holderLabel(holder),side,price:fromStockUnits(price),shares,at})
 export function companyView(e:Companies,c:Company,name:string,now:number):CompanyView{
   const b=c.bankruptcy,active=e.ballot?.symbol===c.symbol?e.ballot:c.symbol==='BNK'?e.CAS.bankruptcy?.offer:undefined
-  const view:BallotView|undefined=active&&{id:active.id,symbol:active.symbol,policy:active.policy,value:active.value,ends:active.ends,
-    ...tally(active),weight:active.snapshot[name]??0,choice:active.votes[name]}
+  const ballotFor=(active:Ballot):BallotView=>({id:active.id,symbol:active.symbol,policy:active.policy,value:active.value,ends:active.ends,
+    ...tally(active),weight:active.snapshot[name]??0,choice:active.votes[name]})
   return {symbol:c.symbol,issued:c.issued,inventory:c.inventory,privateEquity:sharesOf(c,PE),
     ownership:Object.entries(c.holders).sort((a,b)=>b[1]-a[1]).map(([name,shares])=>({name:holderLabel(name),shares})),
     cash:fromStockUnits(c.cash),assets:fromStockUnits(assets(c)),liabilities:fromStockUnits(liabilities(c,now)),
@@ -257,7 +270,7 @@ export function companyView(e:Companies,c:Company,name:string,now:number):Compan
     supported:Object.entries(c.supports).flatMap(([p,s])=>Object.keys(s[name]?.options??{}).map(v=>key(p,Number(v)))),
     eligible:eligible(c),votingShares:sharesOf(c,name),bids:book(c,'buy').slice(0,20).map(displayOrder),asks:book(c,'sell').slice(0,20).map(displayOrder),
     orders:c.orders.filter(o=>o.holder===name&&o.shares).map(displayOrder),trades:c.trades.slice(-35).reverse().map(t=>({...t,buy:holderLabel(t.buy),sell:holderLabel(t.sell),price:fromStockUnits(t.price)})),
-    ballot:view,lastBallot:c.lastBallot,recoveryUntil:c.recoveryUntil,
+    ballot:active&&ballotFor(active),rescueBallot:c.symbol==='BNK'&&e.CAS.bankruptcy?.offer?ballotFor(e.CAS.bankruptcy.offer):undefined,lastBallot:c.lastBallot,recoveryUntil:c.recoveryUntil,
     bankruptcy:b&&{at:b.at,day7:b.at+DAY*7,need:fromStockUnits(b.need),outcome:b.outcome,
       stage:c.symbol==='CAS'?{index:b.stage,ends:b.at+DAY*(b.stage+1),support:rescueTally(c),selected:b.selected,mine:b.support[name]}:undefined},
     history:c.ledger.slice(-28).reverse().map(row=>({at:row.at,kind:row.kind,coins:fromStockUnits(row.units),shares:row.shares}))}

@@ -44,7 +44,7 @@ export interface CompanyView {
   cash:number;assets:number;liabilities:number;profit:number;losses:number;availableCapital:number
   policies:Record<string,number>; cooldowns:Record<string,number>;supports:Record<string,number>; supported:string[];eligible:number;votingShares:number
   bids:MarketOrder[];asks:MarketOrder[];orders:MarketOrder[];trades:MarketTrade[]
-  ballot?:BallotView;lastBallot?:{policy:string;value:number;passed:boolean;at:number}
+  ballot?:BallotView;rescueBallot?:BallotView;lastBallot?:{policy:string;value:number;passed:boolean;at:number}
   bankruptcy?:{at:number;day7:number;need:number;stage?:{index:number;ends:number;support:Record<string,number>;selected:number[];mine?:number[]};outcome?:string}
   recoveryUntil:number;history:{at:number;kind:string;coins:number;shares?:number}[]
 }

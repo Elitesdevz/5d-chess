@@ -25,7 +25,7 @@ export interface Company {
   symbol:EquitySymbol;issued:number;inventory:number;holders:Record<string,number>;cash:number
   price:number;quotes:PricePoint[];orders:Order[];trades:Trade[];nextOrder:number
   policy:Record<string,number>;cooldowns:Record<string,number>;supports:Record<string,Record<string,Support>>
-  marks:Record<string,{shares:number;reached:number}>;lastBallot?:{policy:string;value:number;passed:boolean;at:number}
+  marks:Record<string,{shares:number;eligible:number;reached:number}>;lastBallot?:{policy:string;value:number;passed:boolean;at:number}
   loss:number;profit:number;nextDividend:number;lastDividend?:{day:string;pool:number;paid:number}
   ledger:LedgerEntry[];issuance:{at:number;shares:number;basis:number}[];buybackCash:number
   pending:number;receivables:number;nonperforming:number;obligations:number
@@ -142,7 +142,7 @@ export function safetyReserve(c:Company){
 }
 export function shortfall(c:Company,now:number){
   const due=c.loan&&now>=c.loan.due?debt(c,now):0
-  return Math.max(0,liabilities(c,now)-assets(c)+1,safetyReserve(c)+c.obligations+due-c.cash)
+  return Math.max(0,liabilities(c,now)-assets(c)+1,cashUnits(5_000)+c.pending+c.obligations+due-c.cash)
 }
 export function lendable(bank:Company,now:number){
   if(!bank.policy.open||bank.bankruptcy||shortfall(bank,now)>0)return 0
@@ -157,23 +157,29 @@ export function repayCorporate(e:Companies,now:number){
   if(!l)return
   const interest=corporateInterest(c,now),total=l.principal+interest
   c.cash-=total;b.cash+=total;b.receivables-=l.principal
-  operating(c,'Corporate interest paid',-interest,now);operating(b,'Corporate interest collected',interest,now)
+  operating(c,'Corporate interest paid',-interest,now);bankInterest(b,'Corporate interest collected',interest,now)
   journal(c,'Corporate principal repaid',-l.principal,now);journal(b,'Corporate principal received',l.principal,now)
   delete c.loan
 }
 
-export function postCreditCollections(unit:UnitOfWork,accounts:Account[],now=Date.now()){
+export function postCreditCollections(unit:UnitOfWork,accounts:Account[],now=Date.now(),existing?:Companies){
   const entries=accounts.map(collections).filter(e=>e!==undefined)
   if(!entries.length)return
-  const e=companies(unit),bank=e.BNK
+  const e=existing??companies(unit,now),bank=e.BNK
   for(const {principal,interest,loss,recovered} of entries){
     bank.receivables-=principal
     bank.nonperforming+=loss-recovered
     bank.cash+=principal+interest
     if(principal)journal(bank,'Personal principal received',principal,now)
-    if(interest)operating(bank,'Personal interest collected',interest,now)
+    if(interest)bankInterest(bank,'Personal interest collected',interest,now)
     if(loss)operating(bank,'Credit loss recognized',-loss,now)
     if(recovered)operating(bank,'Credit loss recovered',recovered,now)
   }
-  saveCompanies(unit,e)
+  if(!existing)saveCompanies(unit,e)
+}
+export function bankInterest(bank:Company,kind:string,interest:number,now:number){
+  operating(bank,kind,interest,now)
+  const cost=ratio(interest,5)
+  bank.cash-=cost
+  if(cost)operating(bank,'Loan servicing expenses',-cost,now)
 }

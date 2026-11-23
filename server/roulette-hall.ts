@@ -3,7 +3,7 @@ import type {ChessStore} from './storage.ts'
 import {casinoView,reserveRouletteStake,rouletteResult,settleReservedCasino,validateBet} from './casino.ts'
 import {grossMultiplier,type CasinoBet,type CasinoRound} from '../src/casino-model.ts'
 import {BET_WINDOW,COUCH_SEATS,HALL_CAPACITY,LOUNGES,RESULT_TIME,SEAT_OFFSETS,SPAWN,SPIN_TIME,TABLES,WALK_SPEED,chairPosition,loungePosition,walk,type Position,type HallPlayer,type HallSpin,type HallTable,type HallView,type TablePrize} from '../src/roulette-hall-model.ts'
-import {companies,ESCROW,saveCompanies,type Companies,COMPANIES} from './corporate.ts'
+import {companies,ESCROW,saveCompanies,shortfall,safetyReserve,type Companies,COMPANIES} from './corporate.ts'
 import {acceptWager,postPayout} from './casino-finance.ts'
 import {requireSpending} from './credit.ts'
 import {toStockUnits} from '../src/stock-model.ts'
@@ -204,7 +204,7 @@ export class RouletteHall {
     const own=me.chair?room.tables[me.chair.table]:undefined
     const receipt=own?.spin&&now>=own.spin.ends?own.receipts?.get(name):undefined
     const policy=(this.store.metadataValue(COMPANIES) as Companies|undefined)?.CAS
-    return {room:room.id,now,houseEdge:(policy?.policy.edge??200)/10000,maxStake:policy?.policy.stake??5000,open:!policy?.bankruptcy&&!!(policy?.policy.open??1),coins:current.coins??0,you:publicMember(me),players:[...room.players.values()].map(publicMember),
+    return {room:room.id,now,houseEdge:(policy?.policy.edge??200)/10000,maxStake:policy?.policy.stake??5000,open:!policy||!policy.bankruptcy&&!!policy.policy.open&&shortfall(policy,now)===0&&policy.cash>=safetyReserve(policy)+policy.obligations,coins:current.coins??0,you:publicMember(me),players:[...room.players.values()].map(publicMember),
       tables:room.tables.map((t,i):HallTable=>{
         const result=t.spin&&now>=t.spin.ends, tickets=this.escrow.find(item=>item.round===t.round)?.tickets??[]
         return {round:t.round,until:t.until,phase:t.spin?result?'result':'spin':t.until?'betting':'idle',spin:t.spin,

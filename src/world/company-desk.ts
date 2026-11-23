@@ -47,14 +47,14 @@ const optionLabel=(policy:string,value:number)=>{
   return value+'%'
 }
 function voting(c:CompanyView,data:StockView){
-  const active=c.ballot,cas=data.companies.CAS.bankruptcy
+  const ballots=[c.ballot,...(c.rescueBallot?.id!==c.ballot?.id?[c.rescueBallot]:[])].filter(b=>b!==undefined),cas=data.companies.CAS.bankruptcy
   const stage=c.bankruptcy?.stage,step=stage&&rescueStages[stage.index]
   const options=policies[c.symbol] as Record<string,{label:string;options:readonly number[]}>
   return `<div class="world-metrics"><div><small>Your voting shares</small><b>${fmt(c.votingShares)}</b></div><div><small>Eligible shares</small><b>${fmt(c.eligible)}</b></div></div>
-    ${active?`<section class="world-ballot"><h3>${active.policy==='rescue'?'CAS rescue loan':safeText(options[active.policy]?.label??active.policy)+' · '+optionLabel(active.policy,active.value)}</h3>
+    ${ballots.length?ballots.map(active=>`<section class="world-ballot"><h3>${active.policy==='rescue'?'CAS rescue loan':safeText(options[active.policy]?.label??active.policy)+' · '+optionLabel(active.policy,active.value)}</h3>
     ${active.policy==='rescue'&&cas?.stage?`<p>${coins(cas.need*cas.stage.selected[0]/100)} · ${cas.stage.selected[1]} days · ${optionLabel('interest',cas.stage.selected[2])} daily</p>`:''}
     <p>Yes ${pct(active.yes,active.eligible)} · No ${pct(active.no,active.eligible)} · Closes ${when(active.ends)}</p>
-    ${active.choice?`<p>You voted ${active.choice}.</p>`:active.weight?`<div class="world-button-row"><button data-vote="yes" data-ballot="${active.id}">Vote yes</button><button data-vote="no" data-ballot="${active.id}">Vote no</button></div>`:'<p>No voting shares at ballot opening.</p>'}</section>`:'<p class="world-muted">No active ballot.</p>'}
+    ${active.choice?`<p>You voted ${active.choice}.</p>`:active.weight?`<div class="world-button-row"><button data-vote="yes" data-ballot="${active.id}">Vote yes</button><button data-vote="no" data-ballot="${active.id}">Vote no</button></div>`:'<p>No voting shares at ballot opening.</p>'}</section>`).join(''):'<p class="world-muted">No active ballot.</p>'}
     ${step&&stage?`<section class="world-ballot"><h3>Rescue loan · ${step.label}</h3><p>Closes ${when(stage.ends)}</p><div class="world-policy-buttons">${step.options.map(v=>`<button type="button" data-rescue="${v}" data-on="${!stage.mine?.includes(v)}" aria-pressed="${!!stage.mine?.includes(v)}"><b>${optionLabel(step.key,v)}</b><small>${fmt(stage.support[v]??0)} shares</small></button>`).join('')}</div></section>`:''}
     ${c.lastBallot?`<p class="world-muted">Last vote · ${safeText(options[c.lastBallot.policy]?.label??c.lastBallot.policy)} ${c.lastBallot.passed?'passed':'closed without approval'}.</p>`:''}
     <h3>Support a policy</h3><p class="world-muted">More than 5% support qualifies an option for the daily vote.</p>
@@ -64,7 +64,7 @@ function voting(c:CompanyView,data:StockView){
 }
 function activity(c:CompanyView,data:StockView){
   const d=c.symbol==='CAS'?data.cas.lastDividend:data.bank.lastDividend
-  return `<h3>Dividends</h3><p>${d?'Last payment '+when(Date.parse(d.day))+' · '+coins(d.paid):'No dividend paid yet.'} You have received ${coins(c.symbol==='CAS'?data.portfolio.dividendsPaid:data.portfolio.bankDividendsPaid??0)}.</p>
+  return `<section class="world-company-chart"><h3>Price history</h3><div class="world-range" role="group" aria-label="Chart range"><button type="button" data-range="30">1M</button><button type="button" data-range="90">3M</button><button type="button" data-range="365">1Y</button></div><canvas data-chart tabindex="0" aria-label="Share price history"></canvas><p data-readout class="world-muted"></p></section><h3>Dividends</h3><p>${d?'Last payment '+when(Date.parse(d.day))+' · '+coins(d.paid):'No dividend paid yet.'} You have received ${coins(c.symbol==='CAS'?data.portfolio.dividendsPaid:data.portfolio.bankDividendsPaid??0)}.</p>
     <details open><summary>Recent trades</summary><ul class="world-ledger">${c.trades.map(t=>`<li><span>${safeText(t.sell)} → ${safeText(t.buy)}<small>${when(t.at)}</small></span><b>${fmt(t.shares)} at ${fmt(t.price)}</b></li>`).join('')||'<li>No trades yet</li>'}</ul></details>
     <details><summary>Company ledger</summary><ul class="world-ledger">${c.history.map(h=>`<li><span>${safeText(h.kind)}<small>${when(h.at)}</small></span><b>${h.shares===undefined?coins(h.coins):fmt(h.shares)+' shares'}</b></li>`).join('')}</ul></details>`
 }

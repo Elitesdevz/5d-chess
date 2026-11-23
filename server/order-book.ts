@@ -48,7 +48,7 @@ export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:strin
   }
   const order:Order={...input,initial:shares,at:now,seq:++c.nextOrder}
   const units=total(order)
-  if(!Number.isSafeInteger(shares)||shares<1||shares>EQUITY_ORDER_LIMIT||!Number.isSafeInteger(price)||price<1||!Number.isSafeInteger(units)||units>toStockUnits(100_000_000))fail(400,'Enter a valid limit price and 1–100,000 shares')
+  if(!Number.isSafeInteger(shares)||shares<1||shares>EQUITY_ORDER_LIMIT||!Number.isSafeInteger(price)||price<1||!Number.isSafeInteger(units))fail(400,'Enter a valid limit price and 1–100,000 shares')
   if(side==='sell'){
     const held=holder===INVENTORY?c.inventory:sharesOf(c,holder)
     if(held-reservedShares(c,holder)<shares)fail(409,'Not enough unreserved shares')
@@ -69,7 +69,8 @@ export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:strin
   for(const resting of book(c,side==='buy'?'sell':'buy')){
     if(!order.shares||!(side==='buy'?resting.price<=price:resting.price>=price))break
     const bid=side==='buy'?order:resting,ask=side==='sell'?order:resting
-    if(bid.holder===ask.holder||bid.holder===BUYBACK&&ask.holder===INVENTORY){
+    if(bid.holder===BUYBACK&&ask.holder===INVENTORY)continue
+    if(bid.holder===ask.holder){
       unlock(unit,e,c,order,now)
       break
     }
@@ -115,7 +116,7 @@ export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:strin
 export function offerInventory(unit:UnitOfWork,e:Companies,c:Company,now:number){
   let quantity=inventoryAvailable(c)
   while(quantity>0){
-    const shares=Math.min(quantity,EQUITY_ORDER_LIMIT)
+    const shares=Math.min(quantity,EQUITY_ORDER_LIMIT,Math.floor(Number.MAX_SAFE_INTEGER/c.price))
     submit(unit,e,c,{holder:INVENTORY,side:'sell',price:c.price,shares,id:randomUUID()},now)
     quantity-=shares
   }

@@ -87,11 +87,11 @@ const announce=(message:string)=>{
   window.clearTimeout(errorTimer);errorTimer=window.setTimeout(()=>el('#hall-error').hidden=true,5200)
 }
 function showSelection(){
-  const stake=Number(amount.value)||0,multiplier=grossMultiplier('roulette',choice),gross=stake*multiplier
+  const stake=Number(amount.value)||0,multiplier=grossMultiplier('roulette',choice,view?.houseEdge),gross=stake*multiplier
   const percent=winProbability('roulette',choice)*100
   el('#hall-selection').textContent=choiceTitle(choice)
   el('#hall-chance').textContent=`${Number(percent.toFixed(2))}% chance`
-  el('#hall-return').textContent=`${number(gross-Math.max(0,gross-stake)*.01)} coins if you win`
+  el('#hall-return').textContent=`${number(gross)} coins if you win`
   for(const b of root.querySelectorAll<HTMLButtonElement>('[data-choice]'))b.setAttribute('aria-pressed',String(b.dataset.choice===String(choice)))
   for(const b of root.querySelectorAll<HTMLButtonElement>('[data-stake]'))b.setAttribute('aria-pressed',String(Number(b.dataset.stake)===stake))
   stage?.select(choice)
@@ -284,7 +284,8 @@ el<HTMLFormElement>('#hall-wager').onsubmit=e=>{
   const table=selection()
   if(!table||sendBusy||!connected)return
   const stake=Number(amount.value)
-  if(!Number.isSafeInteger(stake)||stake<1||stake>MAX_CASINO_STAKE){announce('Choose a whole coin stake.');return}
+  if(view?.open===false){announce('New wagers are paused.');return}
+  if(!Number.isSafeInteger(stake)||stake<1||stake>(view?.maxStake??MAX_CASINO_STAKE)){announce('Choose a whole coin stake.');return}
   if(!pending&&stake>(view?.coins??0)){announce('Not enough coins for that stake.');return}
   pending??={round:table.round,requestId:crypto.randomUUID(),choice,stake}
   void action('bet',pending)

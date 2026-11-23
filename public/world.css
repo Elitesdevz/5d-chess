@@ -113,3 +113,7 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world-limit-order{grid-template-columns:repeat(3,minmax(0,1fr));margin:.8rem 0}
 .world-limit-order small,.world-limit-order strong{align-self:center}
 @media(max-width:530px){.world-limit-order{grid-template-columns:1fr 1fr}.world-limit-order label:nth-child(3){grid-column:1/-1}.world-equity-books{gap:.4rem}.world-equity-books .world-ledger li{font-size:.8rem}}
+.world-company-chart canvas{width:100%;height:155px;display:block;border-radius:6px;background:#142820}
+.world-equity-body button:not(.world-primary),.world-equity-tabs button,.world-equity-price button{background:#243d35;color:#eaf2e7;border:1px solid #96b5a95c;border-radius:6px;padding:6px 9px;cursor:pointer}
+.world-policy-buttons button[aria-pressed=true],.world-equity-tabs button[aria-pressed=true]{border-color:#93cfad;background:#284f41;color:#d5f5df}
+.world-equity-body button:disabled{filter:grayscale(.65);opacity:.6;cursor:default}

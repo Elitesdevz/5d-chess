@@ -194,6 +194,12 @@ export class CityServices {
     this.render(symbol,stockName(symbol),companyContent(symbol,data,this.equityTab,this.orderSide))
     this.host.querySelectorAll<HTMLDetailsElement>('.world-policy').forEach((d,i)=>{d.open=!!open[i]})
     this.message(notice)
+    const canvas=this.host.querySelector<HTMLCanvasElement>('canvas[data-chart]')
+    if(canvas){
+      const chart=new StockChart(canvas,this.host.querySelector('[data-readout]')!,true)
+      this.chart=chart
+      this.stockHistory(symbol,token,(symbol===CAS?data.cas:data.bank).history,symbol===CAS?'#e6ba72':'#8ce1b2',chart)
+    }
     const request=async(action:string,input:Record<string,unknown>,success:string)=>{
       if(this.busy)return
       this.busy=true

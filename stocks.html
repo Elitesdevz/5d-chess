@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/chess/styles.css">
 <link rel="stylesheet" href="/chess/shell.css">
 <link rel="stylesheet" href="/chess/stocks.css">
+<link rel="stylesheet" href="/chess/world.css">
 <script type="module" src="/chess/stocks.js"></script>
 </head>
 <body data-page="stocks">
@@ -101,33 +102,7 @@
     </article>
   </dialog>
 
-  <dialog class="exchange-dialog exchange-cas-dialog" id="exchange-cas-dialog" aria-labelledby="cas-title">
-    <article>
-      <form method="dialog" class="exchange-close"><button aria-label="Close casino shares">×</button></form>
-      <header class="exchange-detail-header exchange-cas-header"><div><p class="exchange-label">CAS · In-game equity</p><h2 id="cas-title">The Casino</h2><p id="cas-spread"></p></div><div class="exchange-detail-price"><strong id="cas-price"></strong><span id="cas-available"></span></div></header>
-      <div class="exchange-detail-grid exchange-cas-grid">
-        <section class="exchange-cas-ownership">
-          <div class="exchange-section-head"><h3>Ownership</h3><span id="cas-total-shares"></span></div>
-          <div class="exchange-ownership">
-            <div class="exchange-pie" aria-hidden="true"><div class="exchange-pie-core"><strong id="cas-pie-value"></strong><small id="cas-pie-label"></small></div></div>
-            <div class="exchange-ownership-list" aria-label="Ownership breakdown"></div>
-          </div>
-          <p class="exchange-muted" id="cas-float-note"></p>
-        </section>
-        <div id="cas-order"></div>
-      </div>
-      <div class="casino-share-data">
-        <section class="exchange-graph"><div class="exchange-section-head"><h3>Share price</h3><span>In-game orders</span></div>
-          <canvas class="exchange-chart" id="cas-chart" aria-label="CAS price history. Use the left and right arrow keys to inspect prices." role="img"></canvas>
-          <p class="exchange-chart-readout" id="cas-chart-readout"></p>
-        </section>
-        <div class="exchange-cas-ledgers">
-          <section><h3>Dividends</h3><p>At midnight in the Netherlands, 10% of positive house margin after a 30% cost deduction is allocated across the public float. Player-held shares receive their portion.</p><dl id="cas-dividends"></dl></section>
-          <section><h3>Private equity</h3><p>Private equity trades with the public pool to keep its stake between 15% and 30%.</p><div id="cas-moves"></div></section>
-        </div>
-      </div>
-    </article>
-  </dialog>
+  <dialog class="world-dialog" id="company-desk" aria-labelledby="world-dialog-title"><div class="world-dialog-body"></div></dialog>
 </main>
 </body>
 </html>

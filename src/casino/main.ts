@@ -52,9 +52,9 @@ function updateChoice(){
  })
  if(tableMode==='elo'){el('elo-live-status').textContent=`${stake()} Elo at risk. Win reward ${casinoCoins(eloQuote())} coins, no tax.`;el('return-estimate').textContent=`Win return ${casinoCoins(eloQuote())} coins`;updateScene();if(el('elo-fallback-quote'))el('elo-fallback-quote').textContent=`Win reward: ${casinoCoins(eloQuote())} coins · No tax`;return}
  if(game==='dice')el('elo-live-status').textContent=''
- const gross=stake()*(cave?CAVE_DICE_MULTIPLIER:grossMultiplier(game,choice)),tax=cave?0:Math.max(0,gross-stake())*.01
- el('return-estimate').textContent=Number.isFinite(gross)&&stake()>0?game==='roulette'?`${casinoCoins(gross-tax)} coins`:`Win return ${casinoCoins(gross-tax)}`:'Choose your offer'
- if(el('tax-estimate'))el('tax-estimate').textContent=stake()>0?`${casinoCoins(gross)} gross − ${casinoCoins(tax)} profit tax`:''
+ const gross=stake()*(cave?CAVE_DICE_MULTIPLIER:grossMultiplier(game,choice,state?.houseEdge))
+ el('return-estimate').textContent=Number.isFinite(gross)&&stake()>0?game==='roulette'?`${casinoCoins(gross)} coins`:`Win return ${casinoCoins(gross)}`:'Choose your offer'
+ if(el('tax-estimate'))el('tax-estimate').textContent=stake()>0?`${casinoCoins(gross)} total return`:''
  if(game==='roulette')setRouletteSelection(choice,stake())
  updateScene()
 }
@@ -79,7 +79,7 @@ async function reveal(round:CasinoRound){
   if(round.won){lock(true);setPhase('payout');say(round.currency==='elo'?'“Take them. While you still can.”':'“Your winnings. Every last coin.”');await scene?.reward()}
   const banished=round.currency==='elo'&&!!soul&&soul.used>=MAX_ELO_ROUNDS
   if(banished){lock(true);setPhase('banish');say('“Enough. We are finished here.”',2500);await scene?.banish();if(cave){exitCave();return}}
-  scene?.lockCamera(false);result.hidden=false;result.innerHTML=`<span>${round.won?'THE TABLE PAYS':'THE DIE HAS SPOKEN'}</span><strong>${round.currency==='elo'&&!round.won?`−${round.eloLost??round.stake} <small>Elo</small>`:`${round.net>=0?'+':''}${casinoCoins(round.net)} <small>coins</small>`}</strong><p>Face ${round.result} · ${round.currency==='elo'?`${round.stake} Elo risked · ${round.eloLost??0} Elo lost`:`Offered ${casinoCoins(round.stake)} · Tax ${casinoCoins(round.tax)}`}</p><button id="dismiss-result" type="button" aria-label="Dismiss round result">×</button>`
+  scene?.lockCamera(false);result.hidden=false;result.innerHTML=`<span>${round.won?'THE TABLE PAYS':'THE DIE HAS SPOKEN'}</span><strong>${round.currency==='elo'&&!round.won?`−${round.eloLost??round.stake} <small>Elo</small>`:`${round.net>=0?'+':''}${casinoCoins(round.net)} <small>coins</small>`}</strong><p>Face ${round.result} · ${round.currency==='elo'?`${round.stake} Elo risked · ${round.eloLost??0} Elo lost`:`Offered ${casinoCoins(round.stake)}`}</p><button id="dismiss-result" type="button" aria-label="Dismiss round result">×</button>`
   clearTimeout(resultTimer);resultTimer=window.setTimeout(()=>result.hidden=true,5500);el('dismiss-result').onclick=()=>result.hidden=true;say(round.won?'“A fair throw. Your winnings.”':'“Another offer, perhaps?”');setPhase('result');el('roll-die').hidden=true
  }else{
   result.innerHTML=`<span class="result-eyebrow">${round.won?'A FORTUNATE MOVE':'THE TABLE TAKES THIS ONE'}</span><h2>${round.result===0?'The rift · 0':`${round.result} · ${pocketColor(round.result)==='white'?'White':'Black'} court`}</h2><strong class="result-net">${round.net>=0?'+':''}${casinoCoins(round.net)} <small>coins</small></strong><div><span>Stake <b>${casinoCoins(round.stake)}</b></span><span>Gross return <b>${casinoCoins(round.gross)}</b></span><span>Profit tax <b>${casinoCoins(round.tax)}</b></span><span>Credited <b>${casinoCoins(round.credited)}</b></span></div>`
@@ -105,7 +105,7 @@ async function present(round:CasinoRound,recovered=false){
 async function settle(event?:Event){
  event?.preventDefault();if(tableMode==='offer'||encounterBusy)return;if(busy){if(phase==='ready')void throwDie();return}
  if(pending){choice=pending.choice;el<HTMLInputElement>('stake').value=String(pending.stake);updateChoice()}
- if(!Number.isSafeInteger(stake())||stake()<1||stake()>(tableMode==='elo'?Math.min(100,(soul?.quotes.length??1)-1):state.maxStake)){el('casino-error').textContent=tableMode==='elo'?'Choose 1–100 Elo, up to your current rating.':'Choose a whole number from 1 to 100,000 coins.';el('casino-error').hidden=false;return}
+ if(!Number.isSafeInteger(stake())||stake()<1||stake()>(tableMode==='elo'?Math.min(100,(soul?.quotes.length??1)-1):state.maxStake)){el('casino-error').textContent=tableMode==='elo'?'Choose 1–100 Elo, up to your current rating.':'Choose a whole number from 1 to '+casinoCoins(state.maxStake)+' coins.';el('casino-error').hidden=false;return}
  el('casino-error').hidden=true
  pending??={game,choice,stake:stake(),sequence:state.nextSequence,requestId:crypto.randomUUID(),...(tableMode==='elo'?{currency:'elo',quoteDay:soul!.day,eloRating:soul!.elo}:{} )}
  safeStore(requestKey,pending);lock(true);el('round-result').hidden=true

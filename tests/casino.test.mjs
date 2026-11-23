@@ -7,6 +7,8 @@ import {casinoBet,rouletteResult,casinoView} from '../server/casino.ts'
 import {grossMultiplier,winProbability,CASINO_OWNER} from '../src/casino-model.ts'
 import {ChessStore} from '../server/storage.ts'
 import {casinoApi} from '../server/casino-api.ts'
+import {companies,saveCompanies} from '../server/corporate.ts'
+import {acceptWager,postPayout} from '../server/casino-finance.ts'
 import {ensureAccount} from '../server/accounts.ts'
 
 const account=(name,coins=3480)=>ensureAccount({name,salt:'fixture',hash:'fixture',wallet:{coins,starterGranted:true,inventory:[],loadout:{icon:'default',pieces:{}}}})
@@ -19,13 +21,13 @@ test('casino odds, roulette boundaries and net payouts match the disclosed sched
  const alice=account('Alice'),owner=account(CASINO_OWNER,0),accounts=[alice,owner]
  owner.settings.moveNotifications=false
  const r=casinoBet(alice,accounts,bet(),1000,1)
- assert.equal(r.round.gross,588);assert.equal(r.round.tax,4.88);assert.equal(alice.wallet.coins,3963.12);assert.equal(owner.wallet.coins,4.88);assert.equal(owner.notifications.length,1);assert.equal(owner.notifications[0].kind,'casino');assert.equal(owner.notifications[0].game,'dice');assert.match(owner.notifications[0].title,/Alice won 488 coins/);assert.match(owner.notifications[0].detail,/received 4.88 coins/)
+ assert.equal(r.round.gross,588);assert.equal(r.round.tax,0);assert.equal(alice.wallet.coins,3968);assert.equal(owner.wallet.coins,0);assert.equal(owner.notifications.length,0)
  assert.deepEqual(casinoBet(alice,accounts,bet(),2000,6).round,r.round)
- assert.equal(alice.wallet.coins,3963.12)
+ assert.equal(alice.wallet.coins,3968)
  assert.throws(()=>casinoBet(alice,accounts,bet({stake:101}),2000,1),/different bet/)
  assert.throws(()=>casinoBet(alice,accounts,bet({requestId:'new-fixture-0002'}),2000,1),/sequence changed/)
  const losing=casinoBet(alice,accounts,bet({sequence:2,requestId:'casino-fixture-0002'}),3000,6)
- assert.equal(losing.round.tax,0);assert.equal(losing.round.gross,0);assert.equal(alice.wallet.coins,3863.12);assert.equal(owner.wallet.coins,4.88);assert.equal(owner.notifications.length,1)
+ assert.equal(losing.round.tax,0);assert.equal(losing.round.gross,0);assert.equal(alice.wallet.coins,3868);assert.equal(owner.wallet.coins,0);assert.equal(owner.notifications.length,0)
 })
 
 test('invalid and unsupported wagers cannot debit coins or create a receipt',()=>{
@@ -35,17 +37,20 @@ test('invalid and unsupported wagers cannot debit coins or create a receipt',()=
  const poor=account('Poor',1);assert.throws(()=>casinoBet(poor,[poor],bet(),0,1),/Not enough/);assert.equal(poor.wallet.coins,1)
 })
 
-test('SQLite commits treasury tax, user payout and receipt together and survives reopen',async t=>{
+test('SQLite commits house cash, user payout and receipt together and survives reopen',async t=>{
  const directory=await mkdtemp(join(tmpdir(),'chess-casino-'));t.after(()=>rm(directory,{recursive:true,force:true}))
  let store=new ChessStore(directory)
  store.transaction(unit=>unit.users.add('Alice',account('Alice')))
  let winning
  store.transaction(unit=>{
   const alice=unit.users.get('Alice'),accounts=[alice]
-  winning=casinoBet(alice,accounts,bet(),1000,1)
-  for(const a of accounts)if(!unit.findAccount(a.name))unit.users.add(a.name,a)
+  const maximum=acceptWager(unit,bet(),1000)
+  winning=casinoBet(alice,accounts,bet(),1000,1,false,maximum)
+  const e=companies(unit,1000)
+  postPayout(e,winning.round,maximum,1000)
+  saveCompanies(unit,e)
  })
- const after=store.snapshot();assert.equal(after.users.find(a=>a.name===CASINO_OWNER).wallet.coins,4.88)
+ const after=store.snapshot();assert.equal(after.users[0].wallet.coins,3968);assert.equal(after.economyV2.CAS.profit,-4881000)
  assert.throws(()=>store.transaction(unit=>{
   const alice=unit.users.get('Alice'),owner=unit.findAccount(CASINO_OWNER)
   casinoBet(alice,[alice,owner],bet({sequence:2,requestId:'casino-fixture-0002'}),2000,1)
