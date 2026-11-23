@@ -13,9 +13,11 @@ export type Loan={
   dueDay?:number;lastDay?:number;due?:number;lastAccrual?:number;rate?:number;late?:boolean;defaulted?:boolean
 }
 export interface BankAccount {
-  loan?:Loan;sequence:number;receipts:BankReceipt[];score?:number;positive?:number[]
+  loan?:Loan;additionalLoans?:Loan[];sequence:number;receipts:BankReceipt[];score?:number;positive?:number[]
   blockedUntil?:number;recoveryAt?:number
 }
+export const loansFor=(bank:BankAccount|undefined)=>bank?.loan?[bank.loan,...bank.additionalLoans??[]]:bank?.additionalLoans??[]
+export const inDefault=(bank:BankAccount|undefined)=>loansFor(bank).some(loan=>loan.defaulted)
 export function creditAccount(account:Account){
   const bank=account.bank??={sequence:0,receipts:[]}
   bank.score??=620
@@ -46,8 +48,8 @@ function creditEvent(account:Account,details:EconomyUsage,at:number){
   ledger(account).events.push({at,details:{symbol:'BNK',...details}})
 }
 export function updateCredit(account:Account,now:number){
-  const bank=creditAccount(account),loan=bank.loan
-  if(!loan){
+  const bank=creditAccount(account),loans=loansFor(bank)
+  if(!loans.length){
     if(bank.recoveryAt&&now>=bank.recoveryAt&&bank.score<600){
       const steps=1+Math.floor((now-bank.recoveryAt)/(14*DAY))
       bank.score=Math.min(600,bank.score+steps*10);bank.recoveryAt+=steps*14*DAY
@@ -55,6 +57,10 @@ export function updateCredit(account:Account,now:number){
     }
     return bank
   }
+  for(const loan of loans)accrue(account,bank,loan,now)
+  return bank
+}
+function accrue(account:Account,bank:ReturnType<typeof creditAccount>,loan:Loan,now:number){
   migrateLoan(loan)
   const last=loan.lastAccrual!,due=loan.due!,rate=loan.rate!
   if(loan.lastDay!==undefined){
@@ -76,19 +82,20 @@ export function updateCredit(account:Account,now:number){
     bank.score=Math.max(300,bank.score-120);loan.defaulted=true;ledger(account).loss+=loan.principal
     creditEvent(account,{action:'loan_default',reference:loan.id,score:bank.score,coins:fromStockUnits(loan.principal+loan.interest)},now)
   }
-  return bank
 }
 export function requireSpending(account:Account,now=Date.now()){
-  if(updateCredit(account,now).loan?.defaulted)fail(409,'Repay the defaulted loan before making new purchases or wagers')
+  if(inDefault(updateCredit(account,now)))fail(409,'Repay the defaulted loan before making new purchases or wagers')
 }
-export function collect(account:Account,amount:number,now:number,automatic=false){
-  const bank=creditAccount(account),loan=bank.loan!
+export function collect(account:Account,amount:number,now:number,automatic=false,loanId?:string){
+  const bank=creditAccount(account),loan=loansFor(bank).find(l=>loanId?l.id===loanId:true)
+  if(!loan)fail(409,'Choose an active loan')
   const interest=Math.min(amount,loan.interest),principal=amount-interest,flow=ledger(account)
   flow.interest+=interest;flow.principal+=principal
   if(loan.defaulted)flow.recovered+=principal
   loan.interest-=interest;loan.principal-=principal
   if(!loan.interest&&!loan.principal){
-    bank.loan=undefined
+    const remaining=loansFor(bank).filter(l=>l!==loan)
+    bank.loan=remaining[0];bank.additionalLoans=remaining.length>1?remaining.slice(1):undefined
     if(loan.defaulted){bank.blockedUntil=now+30*DAY;bank.recoveryAt=bank.blockedUntil+14*DAY}
     else if(loan.late&&bank.score<600){bank.recoveryAt=now+14*DAY}
     else if(now<=loan.due!&&loan.original>=toStockUnits(300)&&loan.days>=7&&now-loan.opened>=loan.days*DAY/2){
@@ -102,7 +109,7 @@ export function collect(account:Account,amount:number,now:number,automatic=false
   if(automatic){
     creditEvent(account,{action:'debt_collection',reference:loan.id,coins:fromStockUnits(amount),interest:fromStockUnits(interest)},now)
     const sequence=++bank.sequence
-    bank.receipts=[{id:'collection-'+sequence,sequence,kind:'collection',requested:null,amount:fromStockUnits(amount),interest:fromStockUnits(interest),at:now},...bank.receipts]
+    bank.receipts=[{id:'collection-'+sequence,sequence,kind:'collection',loanId:loan.id,requested:null,amount:fromStockUnits(amount),interest:fromStockUnits(interest),at:now},...bank.receipts]
   }
   return interest
 }
@@ -110,11 +117,13 @@ export function collect(account:Account,amount:number,now:number,automatic=false
 export function income(account:Account,units:number,now=Date.now()){
   if(!Number.isSafeInteger(units)||units<0)throw new Error('Invalid coin credit')
   let swept=0
-  if(account.bank?.loan){
-    const loan=updateCredit(account,now).loan!
-    if(loan.defaulted){
-      swept=Math.min(Math.floor(units/4),loan.principal+loan.interest)
-      if(swept)collect(account,swept,now,true)
+  if(loansFor(account.bank).length){
+    const loans=loansFor(updateCredit(account,now)).filter(l=>l.defaulted).sort((a,b)=>a.due!-b.due!)
+    const limit=Math.floor(units/4)
+    for(const loan of loans){
+      const amount=Math.min(limit-swept,loan.principal+loan.interest)
+      if(!amount)break
+      collect(account,amount,now,true,loan.id);swept+=amount
     }
   }
   const w=account.wallet!

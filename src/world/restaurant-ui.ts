@@ -67,7 +67,7 @@ export class RestaurantUI{
       const station=view.interaction?.startsWith('kfc:kitchen:')?view.interaction:undefined
       const instruction=station?.endsWith(':fryer')?'Dip the scoop down, then lift it right into the bag.':
         station?.endsWith(':soda')?'Raise the cup to the tap and hold it there.':
-        station?r.kitchen?.patty==='flipped'?'Move the cooked patty right onto the bun.':'Lift the spatula to flip the patty.':undefined
+        station?r.kitchen?.patty==='flipped'?'Slide under the cooked patty, then lift it right onto the bun.':'Slide the spatula down under the patty, then flick it up.':undefined
       const task=instruction??(r.tray?r.tray.seat===undefined?'Hand the tray to '+safeText(r.tray.name):'Serve '+labelTable(r.tray.seat):
         r.work?WORK[r.work.kind].name:
         shift?shift.role==='cook'?kitchenObjective(r.kitchen):shift.role==='cashier'?'Take orders at your till and watch the pickup shelf.':'Look for spills and used trays.':

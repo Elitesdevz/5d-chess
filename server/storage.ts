@@ -240,7 +240,7 @@ export class ChessStore {
       .get(name) as {coins:number|null;avatar:string|null;caveDay:string|null;caveActive:number|null}|undefined
   }
   accountNames(){return (this.statement('SELECT name FROM accounts ORDER BY id').all() as {name:string}[]).map(row=>row.name)}
-  borrowers(){return (this.statement("SELECT name FROM accounts WHERE json_type(payload,'$.bank.loan')='object'").all() as {name:string}[]).map(row=>row.name)}
+  borrowers(){return (this.statement("SELECT name FROM accounts WHERE json_type(payload,'$.bank.loan')='object' OR json_array_length(payload,'$.bank.additionalLoans')>0").all() as {name:string}[]).map(row=>row.name)}
   accountOrdinal(name:string):number|undefined {return (this.statement('SELECT id FROM accounts WHERE name=?').get(name) as {id:number}|undefined)?.id}
   accountName(name: string): string | undefined {return (this.statement('SELECT name FROM accounts WHERE name_key=?').get(name.toLowerCase()) as {name: string} | undefined)?.name}
   writeAccount(account: Account, json: string): void {

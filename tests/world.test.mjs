@@ -162,3 +162,21 @@ test('the valley has walkable meadow and a steep enclosing ridge',()=>{
   }
   assert.ok(terrainHeight(0,73)>0)
 })
+
+test('chat stays within a city instance and the bar settles a drink once',t=>{
+  const {names,action,room}=fixture(t),[alice,bob]=names
+  for(const name of names){
+    action(name,'teleport',{to:'casino'})
+    room(name,'casino',0,8.45)
+  }
+  const chatter=action(alice,'chat',{text:'Good evening!'})
+  assert.deepEqual(action(bob,'presence').chat,chatter.chat)
+  assert.throws(()=>action(alice,'chat',{text:'Again'}),{status:429})
+  room(alice,'casino',-6.2,6.13)
+  const drink={drink:'royal',id:'drink-receipt-once'}
+  const served=action(alice,'bar',drink)
+  assert.equal(served.coins,962)
+  assert.equal(served.bar.name,alice)
+  assert.equal(action(alice,'bar',drink).coins,962)
+  assert.equal(action(bob,'presence').bar.id,drink.id)
+})

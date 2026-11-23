@@ -1,11 +1,12 @@
 import {BAR,BAR_STOOLS,DRINKS,type BarService} from '../src/world/bar-menu.ts'
+import {requireSpending} from './credit.ts'
 import {wallet} from './economy.ts'
 import {operating,companies,saveCompanies,cashUnits} from './corporate.ts'
 import {Restaurant} from './restaurant.ts'
 import {RESTAURANT,restaurantPoints} from '../src/world/restaurant-model.ts'
 import {randomUUID} from 'node:crypto'
 import {dayKey} from '../src/collection.ts'
-import {DESTINATIONS,FLOOR_ARRIVAL,LIFT,WORLD_CAPACITY,WORLD_SPEED,floorHeight,groundZone,interactions,localSite,near,riderHeight,site,spawn,stockFloor,worldMove,type Destination,type WorldPlayer,type WorldUse,type WorldView,type WorldZone,type WorldChat} from '../src/world/model.ts'
+import {BOARD_SEATS,BOARD_TABLE,boardPoints,DESTINATIONS,FLOOR_ARRIVAL,LIFT,WORLD_CAPACITY,WORLD_SPEED,floorHeight,groundZone,interactions,localSite,near,riderHeight,site,spawn,stockFloor,worldMove,type Destination,type WorldPlayer,type WorldUse,type WorldView,type WorldZone,type WorldChat} from '../src/world/model.ts'
 import type {Position,HallView} from '../src/roulette-hall-model.ts'
 import type {ChessStore} from './storage.ts'
 import type {RouletteHall} from './roulette-hall.ts'
@@ -89,8 +90,15 @@ export class CityWorlds {
   }
 
   private points(world:World,member:Member,now:number){
-    if(member.zone!=='kfc')return interactions(member.zone)
+    if(member.zone!=='kfc')return [...interactions(member.zone),...boardPoints(member.zone,this.boardTaken(world,member))]
     return restaurantPoints(world.restaurant.view(member.name,now,true),member.dining).map(p=>({...p,...site('kfc',p.x,p.z)}))
+  }
+  private boardTaken(world:World,member:Member){
+    return [...world.members.values()].filter(p=>p!==member&&p.zone===member.zone&&p.boardSeat!==undefined).map(p=>p.boardSeat!)
+  }
+  canVote(name:string,symbol:unknown,now=Date.now()){
+    const member=this.occupants.get(name)?.members.get(name)
+    return Boolean(member&&now-member.seen<TIMEOUT&&member.interaction==='board'&&member.zone==='floor:'+symbol)
   }
   canTrade(name:string,symbol:unknown,now=Date.now()){
     const member=this.occupants.get(name)?.members.get(name)
@@ -148,6 +156,11 @@ export class CityWorlds {
       if(target.id.startsWith('seat:')||target.id.startsWith('couch:')){
         const [type,index]=target.id.split(':')
         hall=this.roulette.update(name,type==='seat'?'sit':'lounge',type==='seat'?{table:Number(index)}:{couch:Number(index)},now,{id:world.id,position:this.boundPosition(me)})
+      }else if(target.id.startsWith('board:')){
+        const i=Number(target.id.slice(6)),seat=BOARD_SEATS[i]
+        me.boardSeat=i
+        Object.assign(me,site(me.zone,seat.x,seat.z),{yaw:seat.yaw})
+        me.interaction='board'
       }else if(target.id.startsWith('bar-seat:')){
         const i=Number(target.id.slice(9)),seat=BAR_STOOLS[i]
         if([...world.members.values()].some(p=>p!==me&&p.barSeat===i))fail(409,'That stool is taken')
@@ -178,17 +191,24 @@ export class CityWorlds {
         this.store.transaction(u=>{
           const account=u.users.get(name)??fail(401,'Log in first'),purse=wallet(account)
           if(purse.coins<drink.price)fail(409,'Not enough coins for this drink')
+          requireSpending(account,now)
           purse.coins-=drink.price
           const economy=companies(u,now)
           economy.CAS.cash+=cashUnits(drink.price)
           operating(economy.CAS,'Bar sales',cashUnits(drink.price),now);saveCompanies(u,economy)
+          u.economyUsage(name,'/api/world/bar',{action:'bar_purchase',symbol:'CAS',reference:id,coins:drink.price},now)
         })
         world.bar={name,drink:drink.id,starts:now,ready:now+2800,id};world.barReceipts.set(key,drink.id)
         if(world.barReceipts.size>100)world.barReceipts.delete(world.barReceipts.keys().next().value!)
       }else if(world.barReceipts.get(key)!==drink.id)fail(409,'That receipt belongs to a different drink')
     }else if(action==='stand-scenery'){
       if(me.barSeat!==undefined){delete me.barSeat;me.z-=.37}
-      else if(me.boardSeat!==undefined){delete me.boardSeat;me.z+=.25}
+      else if(me.boardSeat!==undefined){
+        const seat=BOARD_SEATS[me.boardSeat]
+        delete me.boardSeat
+        const dx=Math.sign(seat.x)*(Math.abs(seat.x)>3.5?.34:0),dz=Math.sign(seat.z-BOARD_TABLE.z)*.34
+        Object.assign(me,site(me.zone,seat.x+dx,seat.z+dz))
+      }
       me.interaction=undefined
     }else if(action==='floor'){
       const local=localSite(me.zone,me.x,me.z)
@@ -218,6 +238,6 @@ export class CityWorlds {
     const tableMotion=shared&&!hall&&me.zone!=='private'&&level<5&&near(me,casino.x,casino.z,29)?this.roulette.tableMotion(world.id):undefined
     const restaurant=level<5&&(me.zone==='kfc'||near(me,RESTAURANT.x,RESTAURANT.z,26))?world.restaurant.view(name,now,me.zone==='kfc'):undefined
     const coins=action==='restaurant'||action==='bar'||action==='use'&&me.zone==='kfc'?this.store.rouletteWallet(name)?.coins:account.coins
-    return {id:world.id,now,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
+    return {id:world.id,now,boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
   }
 }

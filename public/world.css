@@ -90,32 +90,18 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world-range{display:flex;gap:4px;margin:6px 0}
 .world-range button{background:#243e34;border:1px solid var(--line);border-radius:4px;padding:3px 6px;font-size:10px}
 .world-range button[aria-pressed=true]{background:#567361;border-color:#b9d4ba;color:#f6f4dd}
-.world-ownership{display:grid;grid-template-columns:minmax(90px,.6fr) minmax(0,1fr);align-items:center;gap:10px;margin-top:7px}
-.world-pie{width:min(100%,140px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center;margin:auto}
-.world-pie>b{width:67%;height:67%;display:grid;place-content:center;text-align:center;border-radius:50%;background:#172e28;color:#fff2d0;font:normal 23px Georgia,serif}
-.world-pie small{font:10px system-ui;color:#c0d2c1}
-.world-ownership .world-ledger i{display:inline-block;width:7px;height:7px;border-radius:2px}
 .world-table-rules{margin-top:7px;border-top:1px solid var(--line);padding-top:4px}
 .world-table-rules summary{color:#d7e4d6;font-size:10px;cursor:pointer}
 .world-table-rules p{font-size:10px;color:#c6d4c7;margin:5px 0}
-.world-equity-price{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;margin:.55rem 0 1rem}
-.world-equity-price strong{font-size:1.5rem;color:#f6dca5}
-.world-equity-price span{color:#b8c4c1}.world-equity-price button{margin-left:auto}
-.world-equity-tabs,.world-policy-buttons{display:flex;gap:.4rem;flex-wrap:wrap}
-.world-equity-tabs{margin:.7rem 0 1rem;border-bottom:1px solid #ffffff25;padding-bottom:.6rem}
-.world-equity-tabs button[aria-pressed=true],.world-policy-buttons button[aria-pressed=true]{border-color:#93cfad;color:#c5f5dc;background:#23463d}
-.world-equity-books{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+.world-policy-buttons{display:flex;gap:.4rem;flex-wrap:wrap}
+.world-policy-buttons button[aria-pressed=true]{border-color:#93cfad;color:#c5f5dc;background:#23463d}
 .world-equity-body h3{font-size:1rem;margin:.55rem 0}
 .world-equity-body small,.world-ledger small{display:block;color:#acbfbb;font-size:.76rem}
 .world-equity-status,.world-ballot{padding:.65rem .8rem;background:#ccb06a15;border:1px solid #ccb06a60;border-radius:.65rem}
 .world-policy summary small{display:inline;margin-left:.65rem}
 .world-policy-buttons button{text-align:left;min-width:4rem}
-.world-limit-order{grid-template-columns:repeat(3,minmax(0,1fr));margin:.8rem 0}
-.world-limit-order small,.world-limit-order strong{align-self:center}
-@media(max-width:530px){.world-limit-order{grid-template-columns:1fr 1fr}.world-limit-order label:nth-child(3){grid-column:1/-1}.world-equity-books{gap:.4rem}.world-equity-books .world-ledger li{font-size:.8rem}}
-.world-company-chart canvas{width:100%;height:155px;display:block;border-radius:6px;background:#142820}
-.world-equity-body button:not(.world-primary),.world-equity-tabs button,.world-equity-price button{background:#243d35;color:#eaf2e7;border:1px solid #96b5a95c;border-radius:6px;padding:6px 9px;cursor:pointer}
-.world-policy-buttons button[aria-pressed=true],.world-equity-tabs button[aria-pressed=true]{border-color:#93cfad;background:#284f41;color:#d5f5df}
+.world-equity-body button:not(.world-primary){background:#243d35;color:#eaf2e7;border:1px solid #96b5a95c;border-radius:6px;padding:6px 9px;cursor:pointer}
+.world-policy-buttons button[aria-pressed=true]{border-color:#93cfad;background:#284f41;color:#d5f5df}
 .world-equity-body button:disabled{filter:grayscale(.65);opacity:.6;cursor:default}
 /* Krulliversal Fried Chicken */
 .world-dialog[data-restaurant]{--kfc-red:#a43844;--kfc-cream:#fff0d5;width:min(622px,calc(100% - 22px));padding:0;background:#fff3df;color:#392327;border-color:#e5ae92;border-radius:16px;box-shadow:0 26px 78px #2f171ac9}
@@ -184,17 +170,6 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .kfc-ticket-box{display:grid;align-content:center;text-align:center;gap:7px;border:3px solid #57352e;border-radius:8px;background:#a56a54;color:#fff1dc;font-size:.83rem}
 .kfc-ticket-box span{width:60%;margin-inline:auto;height:6px;border-radius:9px;background:#563635}
 .kfc-content .kfc-dragging{z-index:3;cursor:grabbing}
-.kfc-grill{height:184px;position:relative;border:4px solid #b5a799;border-radius:14px;background:#595a56;overflow:hidden}
-.kfc-griddle{position:absolute;border:4px inset #60504a;inset:42% 42% 12% 4%;border-radius:12px;background:repeating-linear-gradient(90deg,#44413d 0 7px,#55504b 7px 11px)}
-.kfc-content .kfc-patty{position:absolute;z-index:2;left:24%;top:51%;height:48px;width:65px;border-radius:48%;touch-action:none;background:radial-gradient(ellipse at 32% 25%,#c97b69,#a04c48 75%);border:2px solid #79403b;box-shadow:0 5px #613d35;cursor:grab}
-.kfc-grill[data-cooked=true] .kfc-patty{background:repeating-linear-gradient(105deg,#7e4533 0 8px,#5c392c 8px 11px)}
-.kfc-flip-zone{position:absolute;inset:5% 52% 63% 10%;color:#f8ead4;text-align:center;border:1px dashed #ddd7bc88;border-radius:9px;font-size:1.6rem;pointer-events:none}
-.kfc-bun{position:absolute;display:grid;place-items:center;inset:26% 6% 14% 68%;border-radius:11px;background:#bc9a75;border:3px solid #a37b5d}
-.kfc-food-bun i:first-child{inset:9px 2px;border-radius:64% 64% 34% 34%;background:#d49a56;box-shadow:inset 0 -4px #a77345,inset 0 3px #f5c77d}
-.kfc-fill{position:relative;height:128px;border:4px solid #aaa298;border-radius:10px;background:linear-gradient(145deg,#545752,#252b2a)}
-.kfc-fill .kfc-pick{position:absolute;left:14%;top:28%;background:#f5d9af;cursor:grab;touch-action:none;z-index:2}
-.kfc-fill-target{display:grid;place-content:center;position:absolute;inset:19% 7% 18% 49%;border:2px dashed #eccea5;border-radius:7px;background:#8e4744;color:#fff2db}
-.kfc-fountain .kfc-fill-target{background:linear-gradient(#981f30 40%,#32312d 40%);padding-top:16px}
 .world-pause{position:absolute;inset:0;z-index:11;background:#050707f5;display:grid;align-content:center;justify-items:center;gap:18px;color:#fff4dc}
 .world-pause h2{margin:0;font:normal clamp(2.6rem,8vw,5rem)/1 Georgia,serif}
 .world-pause>div{display:flex;gap:12px}.world-pause :is(a,button){background:#262f29;color:#f5e8cc;border:1px solid #708776;padding:10px 18px;border-radius:8px;text-decoration:none;cursor:pointer}
@@ -208,8 +183,46 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world-name.speech{max-width:180px;white-space:normal;padding:7px 9px;background:#fff2d5;color:#3b261d;border-color:#b79468;overflow-wrap:anywhere}
 .world-wagers h3{font-size:.78rem;color:#e9d2a1;margin:8px 0 3px}.world-wagers ul{list-style:none;margin:0;padding:0;display:grid;gap:3px}
 .world-wagers li{display:flex;justify-content:space-between;gap:7px;font-size:.72rem;padding:4px 5px;background:#ffffff0c;border-radius:4px}
-@media(pointer:coarse){.world-chat{bottom:auto;top:46px;left:7px;width:min(200px,52vw)}.world-chat ol{max-height:68px}}
-@media(pointer:coarse){.world[data-zone=kfc] .kfc-hud{top:92px}}
+@media(pointer:coarse){.world-chat{bottom:112px;left:7px;width:min(200px,52vw)}.world-chat ol{max-height:68px}}
+@media(pointer:coarse){.world[data-seated=true] .world-chat{bottom:16px}}
 .world-drinks{display:grid;gap:8px}.world-drinks article{display:grid;grid-template-columns:27px 1fr auto;gap:10px;align-items:center;background:#152c26;border:1px solid #b9ad7652;border-radius:8px;padding:9px}
 .world-drinks article i{width:19px;height:27px;border:2px solid #f1d4a790;border-radius:4px 4px 8px 8px;background:linear-gradient(transparent 26%,var(--drink) 27%)}
 .world-drinks h3{margin:0;font-size:.91rem;color:#e9d7a7}.world-drinks button{border-radius:6px;border:1px solid #dbbd8a83;padding:6px;color:#f0d4a0;background:#283e35}
+
+.world-dialog{padding:clamp(13px,3vw,24px);background:linear-gradient(145deg,#243b34,#112721)}
+.world-dialog .world-service-head{border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+.world-dialog h3{font:normal 1.15rem Georgia;color:#f2e2be;margin:.85rem 0 .45rem}
+.world-dialog .world-ledger li{padding:8px 4px}
+.world-dialog .world-metrics>div{padding:10px 11px}
+.world-dialog .world-metrics small{font-size:.71rem}
+.world-dialog .world-metrics b{font-size:.92rem}
+.world-dialog .world-service-form{padding:11px;gap:9px}
+.world-reception{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.world-reception article{border:1px solid var(--line);padding:12px 13px;border-radius:8px;background:linear-gradient(135deg,#39554968,#122923)}
+.world-reception article span,.world-portfolio-mast small,.world-board-mast small{font-size:.69rem;font-weight:750;letter-spacing:.09em;color:#d3be8c}
+.world-reception article h3{margin-top:.35rem}
+.world-portfolio-mast,.world-board-mast{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.world-portfolio-mast>div,.world-board-mast>div{background:linear-gradient(140deg,#35574a,#203e34);border:1px solid var(--line);border-radius:9px;padding:13px;display:grid;gap:4px;align-content:start}
+.world-portfolio-mast b,.world-board-mast b{font:normal clamp(1.05rem,4vw,1.62rem) Georgia;color:#fae9c1}
+.world-portfolio-mast span,.world-board-mast span{font-size:.8rem;color:#cadacf}
+.world-portfolio-ledger meter{display:block;width:min(140px,32vw);height:7px;margin-top:4px;accent-color:#aebe96}
+.world-portfolio-ledger li>b{text-align:right}
+.world span.world-gain{color:#a5e8ac}.world span.world-loss{color:#ffa99f}
+.world-board-mast{grid-template-columns:1fr 1fr auto;margin-bottom:10px}
+.world-board-mast button{align-self:start}
+.world-ballot{margin:8px 0;padding:11px 13px;background:linear-gradient(125deg,#4e422d74,#24382b);border-color:#c7a87562}
+.world-ballot-track{height:8px;border-radius:6px;background:linear-gradient(to right,#89c197 var(--yes),#ce8c82 var(--yes) calc(var(--yes) + var(--no)),#63746a calc(var(--yes) + var(--no)));margin-top:10px}
+.world-vote-tallies{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px;font-size:.75rem;margin:6px 0}
+.world-ballot [data-vote=yes]{color:#bde8c5}.world-ballot [data-vote=no]{color:#ffbaaa}
+.world-policy{border:1px solid var(--line);border-radius:7px;padding:8px 9px;margin:5px 0;background:#142b24}
+.world-policy summary{min-height:24px;align-content:center}
+.world-policy-buttons button{min-height:41px}
+.world[data-seated=true] .world-pause-toggle{top:auto;bottom:13px}
+@media(max-width:630px){.world[data-seated=true] .world-pause-toggle{top:9px;bottom:auto}.world[data-seated=true] .world-chat{top:13px;bottom:auto}.world[data-seated=true] .world-use{bottom:18px}}
+@media(max-width:430px){.world-reception{grid-template-columns:1fr}.world-board-mast,.world-portfolio-mast{gap:5px}.world-board-mast>div,.world-portfolio-mast>div{padding:8px}}
+@media(max-width:630px){
+  .world[data-seated=true] .world-panel{bottom:47px;max-height:50%}
+  .world[data-seated=true] .world-chat{top:auto;bottom:7px}
+  .world[data-seated=true] .world-chat ol{max-height:44px}
+  .world[data-seated=true] .world-use{bottom:49px}
+}

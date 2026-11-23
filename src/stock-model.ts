@@ -26,7 +26,17 @@ export interface CasPublic extends EquityPublic {equity:number;equityMoves:{at:n
 export interface StockView {
   coins:number; quotes:Record<string,StockQuote>; cas:CasPublic; bank:EquityPublic; portfolio:StockPortfolio; now:number; companies:Record<EquitySymbol,CompanyView>
 }
-export interface StockOrder {symbol:string;side:StockSide;shares:number;total:number;sequence:number;id:string;version?:number}
+export interface StockOrder {symbol:string;side:StockSide;shares:number;total:number;sequence:number;id:string;version?:number;price?:number}
+export function bookQuote(orders:readonly {shares:number;price:number;holder:string}[],owner:string,shares:number){
+  let left=shares,units=0,limit=0
+  for(const order of orders){
+    // The matching engine protects price priority and rejects an order that would cross its own.
+    if(order.holder===owner)return
+    const quantity=Math.min(left,order.shares)
+    limit=toStockUnits(order.price);units+=quantity*limit;left-=quantity
+    if(!left)return {total:fromStockUnits(units),limit:fromStockUnits(limit)}
+  }
+}
 export const toStockUnits=(coins:number)=>Math.round(coins*STOCK_UNITS)
 export const fromStockUnits=(amount:number)=>amount/STOCK_UNITS
 

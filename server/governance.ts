@@ -99,8 +99,8 @@ export function rescueSupport(c:Company,name:string,data:Record<string,unknown>)
   b.support[name]=[...choices]
   return had!==data.on
 }
-export function castVote(e:Companies,name:string,id:unknown,choice:unknown,now:number){
-  const b=[e.ballot,e.CAS.bankruptcy?.offer].find(b=>b?.id===id)
+export function castVote(e:Companies,name:string,id:unknown,choice:unknown,now:number,symbol?:Company['symbol']){
+  const b=[e.ballot,e.CAS.bankruptcy?.offer].find(b=>b&&b.id===id&&(!symbol||b.symbol===symbol))
   if(!b||now>=b.ends)fail(409,'This ballot has closed')
   if(choice!=='yes'&&choice!=='no')fail(400,'Select Yes or No')
   if(!b.snapshot[name])fail(403,'You had no eligible shares when voting opened')
@@ -218,18 +218,24 @@ function distribute(unit:UnitOfWork,e:Companies,c:Company,now:number){
 }
 
 function invest(unit:UnitOfWork,e:Companies,now:number){
-  if(now<e.nextPE)return
-  e.nextPE=now+DAY
+  if(now<e.nextPE&&(e.peLadder||e.nextPE>now+DAY))return
+  e.nextPE=now+DAY;e.peLadder=true
   for(const c of [e.CAS,e.BNK]){
     cancelOrders(unit,e,c,o=>o.holder===PE,now)
-    const balance=Math.max(0,assets(c)-liabilities(c,now))
-    const earnings=Math.max(0,c.profit-c.loss)
-    const base=Math.floor((balance+Math.min(balance,earnings*4))/c.issued)
-    if(base<2)continue
-    const buy=Math.floor(base*.76),sell=Math.ceil(base*1.34),held=sharesOf(c,PE)
-    const quantity=Math.min(5000,Math.floor(e.peCash*.12/buy),Math.max(0,Math.floor(c.issued*.45)-held))
-    if(quantity>0)submit(unit,e,c,{id:randomUUID(),holder:PE,side:'buy',price:buy,shares:quantity},now)
-    if(held>0)submit(unit,e,c,{id:randomUUID(),holder:PE,side:'sell',price:sell,shares:Math.min(5000,held)},now)
+    const balance=Math.max(0,assets(c)-liabilities(c,now)),earnings=Math.max(0,c.profit-c.loss)
+    const value=Math.floor((balance+Math.min(balance,earnings*4))/c.issued)
+    const held=sharesOf(c,PE),bestAsk=book(c,'sell')[0]?.price??Infinity,bestBid=book(c,'buy')[0]?.price??0
+    const budget=Math.floor(e.peCash*.055)
+    let buyRoom=Math.max(0,Math.floor(c.issued*.45)-held),sellRoom=held
+    for(const [index,discount] of [.91,.83,.72].entries()){
+      // Place backed standing orders on both sides without setting the market mark.
+      const bid=Math.min(bestAsk-1,Math.floor(c.price*discount),Math.max(1,Math.floor(value*(discount-.15))))
+      const ask=Math.max(bestBid+1,Math.ceil(c.price*(1+(index+1)*.08)),Math.ceil(value*(1.19+index*.11)))
+      const buy=Math.min(1500*(index+1),buyRoom,bid>0?Math.floor(budget/bid):0)
+      const sell=Math.min(1500*(index+1),sellRoom)
+      if(buy>0){submit(unit,e,c,{id:randomUUID(),holder:PE,side:'buy',price:bid,shares:buy},now);buyRoom-=buy}
+      if(sell>0){submit(unit,e,c,{id:randomUUID(),holder:PE,side:'sell',price:ask,shares:sell},now);sellRoom-=sell}
+    }
   }
 }
 

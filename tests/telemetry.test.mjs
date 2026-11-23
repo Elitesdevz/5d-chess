@@ -54,7 +54,9 @@ test('economy telemetry delivers committed events only and keeps company and pla
   assert.equal(log.events('Trader1')[0].actionId,'ui-action-001')
   assert.equal(log.events('Trader2').length,0)
   assert.equal(log.events('Trader101').length,0)
-  assert.deepEqual(log.events('@economy:CAS').map(e=>e.economy.action),['order_filled','order_filled','bankruptcy'])
+  const company=log.events('@economy:CAS').map(e=>e.economy.action)
+  assert.equal(company.filter(action=>action==='order_placed').length,6)
+  assert.deepEqual(company.filter(action=>action!=='order_placed'),['order_filled','order_filled','bankruptcy'])
   assert.equal(cleanUsage({id:'forged-event',kind:'economy',page:'/api/stocks',time:now}),undefined)
   assert.equal(cleanUsage({id:'regular-event',kind:'click',page:'/chess/',time:now,economy:{action:'loan_opened'}}).economy,undefined)
  }finally{log.close();store.close()}

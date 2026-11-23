@@ -4,7 +4,7 @@ import {CASINO_OWNER} from '../src/casino-model.ts'
 import type {Account} from './accounts.ts'
 import type {UnitOfWork} from './storage.ts'
 import {CAS_META,portfolio} from './cas-shares.ts'
-import {collections,creditAccount,DAY,migrateLoan} from './credit.ts'
+import {collections,creditAccount,DAY,loansFor,migrateLoan} from './credit.ts'
 
 export const BANK_META='bankExchange'
 export const COMPANIES='economyV2'
@@ -15,7 +15,7 @@ export const BUYBACK='\u0000buyback'
 export const holderLabel=(id:string)=>id===PE?'Private equity':id===INVENTORY?'Company inventory':id===BUYBACK?'Company buyback':id
 export const dictionary=<T>(contents:Record<string,T>={}):Record<string,T>=>Object.assign(Object.create(null),contents)
 export const symbols=[CAS,BNK] as const
-export type Order={id:string;holder:string;side:StockSide;price:number;shares:number;at:number;seq:number;initial:number}
+export type Order={id:string;holder:string;side:StockSide;price:number;shares:number;at:number;seq:number;initial:number;market?:{quote:number;total:number}}
 export type Trade={id:string;buy:string;sell:string;price:number;shares:number;at:number}
 type LedgerEntry={at:number;kind:string;units:number;shares?:number}
 export type Ballot={id:string;symbol:EquitySymbol;policy:string;value:number;ends:number;snapshot:Record<string,number>;votes:Record<string,'yes'|'no'>}
@@ -33,7 +33,7 @@ export interface Company {
   bankruptcy?:Insolvency;recoveryUntil:number
 }
 export interface Companies {
-  CAS:Company;BNK:Company;peCash:number;nextPE:number;lastSlot:number;ballot?:Ballot;reversals:Record<string,{buyer:string;at:number}>
+  CAS:Company;BNK:Company;peCash:number;nextPE:number;peLadder?:true;lastSlot:number;ballot?:Ballot;reversals:Record<string,{buyer:string;at:number}>
 }
 export const cashUnits=toStockUnits
 export function ratio(amount:number,numerator:number,denominator=100){
@@ -101,9 +101,8 @@ export function companies(unit:UnitOfWork,now=Date.now()):Companies{
       const p=player.stocks?.positions[c.symbol]
       if(p){p.shares*=100;setHolding(c,name,p.shares)}
     }
-    const loan=player.bank?.loan
     creditAccount(player)
-    if(loan){
+    for(const loan of loansFor(player.bank)){
       migrateLoan(loan)
       bank.receivables+=loan.principal
       if(loan.defaulted)bank.nonperforming+=loan.principal

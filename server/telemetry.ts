@@ -79,5 +79,5 @@ export function worldEconomyUsage(log:UsageStore,store:ChessStore,name:string,ac
  const floor=view.you.lift?.to,service=action==='floor'?'elevator':view.interaction
  if(!service)return
  log.bestEffort(name,{id:randomUUID(),kind:'economy',time:Date.now(),page:'/api/world/'+action,
-  economy:{action:'desk_opened',service,symbol:floor?.startsWith('floor:')?floor.slice(6):view.you.zone==='bank'?'BNK':undefined}})
+  economy:{action:'desk_opened',service,symbol:floor?.startsWith('floor:')?floor.slice(6):view.you.zone==='bank'?'BNK':view.you.zone.startsWith('floor:')?view.you.zone.slice(6):view.you.zone==='casino'?'CAS':undefined}})
 }

@@ -1,3 +1,4 @@
+import type {CompanyView} from '../equity-v2.ts'
 import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
 import {staffProps} from './restaurant-art.ts'
@@ -7,7 +8,7 @@ import * as T from 'three'
 import {liftPlatform,makeWorldArt,spinWheel} from './art.ts'
 import {Figure} from '../casino/hall-stage.ts'
 import {resultRotation,v} from '../casino/scene/geometry.ts'
-import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
+import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
 const TAU=Math.PI*2
@@ -141,6 +142,7 @@ export class CityStage {
     }
   }
   quote(symbol:string,points:{price:number}[],value?:number){this.art?.floor(symbol)?.screens.forEach(update=>update(points,value))}
+  ownership(symbol:string,company:CompanyView){this.art?.floor(symbol)?.ownership?.(company)}
   act(){this.onAction(this.nearest)}
   setStation(point:string|undefined,submit:(gesture:string)=>void){
     this.gesture=submit
@@ -154,14 +156,15 @@ export class CityStage {
     s.x=T.MathUtils.clamp(s.x+dx/110,-1,1);s.y=T.MathUtils.clamp(s.y-dy/110,-1,1)
     const now=Date.now()+this.clock
     if(s.point.endsWith(':soda')){
-      if(s.y>.32&&!s.fillAt)s.fillAt=performance.now()+560
-      if(s.y<.12)s.fillAt=0
+      if(s.y>.32&&Math.abs(s.x)<.23&&!s.fillAt)s.fillAt=performance.now()+560
+      if(s.y<.12||Math.abs(s.x)>.33)s.fillAt=0
     }else if(s.point.endsWith(':fryer')){
       if(s.y<-.25)s.phase=1
       if(s.phase&&s.x>.48&&s.y>-.07)this.completeTool('scoop')
     }else if(now>=job.readyAt){
-      if(job.patty==='raw'&&s.y>.58)this.completeTool('flip')
-      else if(job.patty==='flipped'&&s.x>.56)this.completeTool('assemble')
+      if(s.y<-.21&&Math.abs(s.x)<.5)s.phase=1
+      if(s.phase&&job.patty==='raw'&&s.y>.39)this.completeTool('flip')
+      else if(s.phase&&job.patty==='flipped'&&s.x>.56&&s.y>-.12)this.completeTool('assemble')
     }
   }
   private completeTool(gesture:string){
@@ -288,9 +291,11 @@ export class CityStage {
   }
   private prompt(){
     const zone=this.zone?.startsWith('floor:')?this.zone:groundZone(this.position.x,this.position.z)
-    const points=zone==='kfc'?restaurantPoints(this.view?.restaurant,this.view?.you.dining).map(p=>({...p,...site(zone,p.x,p.z)})):interactions(zone)
-    const candidate=this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift?points.map(p=>({...p,distance:Math.hypot(this.position.x-p.x,this.position.z-p.z)}))
-      .filter(p=>p.distance<=(p.range??1.65)).sort((a,b)=>a.distance-b.distance)[0]:undefined
+    const points=zone==='kfc'?restaurantPoints(this.view?.restaurant,this.view?.you.dining).map(p=>({...p,...site(zone,p.x,p.z)})):[...interactions(zone),...boardPoints(zone,this.view?.boardTaken)]
+    const seated=this.view?.you.boardSeat!==undefined||this.view?.you.barSeat!==undefined
+    const stand=seated?{id:'stand-scenery',label:'Stand up',x:this.position.x,z:this.position.z}:undefined
+    const candidate=stand??(this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift?points.map(p=>({...p,distance:Math.hypot(this.position.x-p.x,this.position.z-p.z)}))
+      .filter(p=>p.distance<=(p.range??1.65)).sort((a,b)=>a.distance-b.distance)[0]:undefined)
     const was=this.nearest?.id
     this.nearest=candidate
     if(was===candidate?.id)return
@@ -403,14 +408,26 @@ export class CityStage {
       this.camera.lookAt(p.x,1.16,p.z)
       if(!this.pause&&s.fillAt&&performance.now()>=s.fillAt)this.completeTool('fill')
     }
-    this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt)
+    this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt,!!s?.phase)
     this.camera.updateMatrixWorld()
   }
-  private motion(now:number){
+  private motion(now:number,dt:number){
     if(!this.art)return
     if(!this.reduced){this.art.ambient?.(now);this.art.restaurant.tick(now)}
     if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))
-    if(this.zone?.startsWith('floor:'))this.art.floor(this.zone.slice(6))?.actors.forEach(actor=>actor.pose(now))
+    const zones=[this.view?.you.zone,this.view?.you.lift?.to].filter((z):z is WorldZone=>!!z)
+    const open=(zone:WorldZone)=>[this.view?.you,...this.view?.players??[]].some(p=>{
+      if(!p||p.zone!==zone||p.lift)return false
+      const at=localSite(zone,p.x,p.z)
+      return Math.abs(at.x)<2.13&&at.z<-2.8
+    })
+    this.art.lobbyDoors(open('exchange'),dt)
+    for(const zone of new Set(zones)){
+      if(!zone.startsWith('floor:'))continue
+      const floor=this.art.floor(zone.slice(6))
+      floor?.actors.forEach(actor=>actor.pose(now))
+      floor?.doors(open(zone),dt)
+    }
     if(this.zone==='casino')this.art.bar.tick(this.view?.bar,now)
     const tables=this.view?.hall?.tables??this.view?.tableMotion
     for(const [i,actor] of this.art.actors.entries()){
@@ -447,7 +464,7 @@ export class CityStage {
     const dt=Math.min(.14,(time-this.last)/1000||.035);this.last=time
     if(this.art&&this.renderer){
       const now=Date.now()+this.clock
-      this.cameraView(now,dt);this.avatars(dt,now);this.motion(now)
+      this.cameraView(now,dt);this.avatars(dt,now);this.motion(now,dt)
       this.renderer.render(this.art.scene,this.camera)
       if(this.gl){this.fence=this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE,0);this.gl.flush()}
     }else if(!this.renderer)this.drawFlat()

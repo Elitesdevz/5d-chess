@@ -33,6 +33,18 @@ export const ZONE_ARRIVAL:Record<Exclude<WorldZone,`floor:${string}`>,Position>=
 export const FLOOR_ARRIVAL={x:0,z:6,yaw:0}
 export const FLOOR_HEIGHT=6
 export const CREDIT_ADVISOR={x:-6.86,z:3.56}
+export const FINANCIAL_ADVISOR={x:-5.47,z:2.42}
+export const BOARD_TABLE={x:0,z:3.39}
+export const BOARD_SEATS:Position[]=[
+  ...[-1,1].flatMap(side=>[-2.66,-1.33,0,1.33,2.66].map(x=>({x,z:BOARD_TABLE.z+side*1.43,yaw:side===1?0:Math.PI}))),
+  ...[-1,1].map(side=>({x:side*3.95,z:BOARD_TABLE.z,yaw:side*Math.PI/2})),
+]
+export const boardFloor=(zone:WorldZone)=>zone==='floor:CAS'||zone==='floor:BNK'
+export function boardPoints(zone:WorldZone,taken:readonly number[]=[]):WorldAction[]{
+  if(!boardFloor(zone))return []
+  const full=taken.length===BOARD_SEATS.length
+  return BOARD_SEATS.flatMap((seat,i)=>full||!taken.includes(i)?[{id:full?'board':'board:'+i,label:full?'Open shareholder voting':'Sit at the board table',...site(zone,seat.x,seat.z),range:1.13}]:[])
+}
 export const LIFT={x:0,z:-5.48}
 export const PLAN={
   hotel:{x:0,z:-14.78,width:9.5,back:-7.9,front:7.78},
@@ -83,7 +95,7 @@ function localInteractions(zone:WorldZone):WorldAction[]{
     ...LOUNGES.map((seat,i)=>({id:'couch:'+i,label:'Sit on couch',x:seat.x,z:seat.z,range:1.75})),
   ]
   if(zone==='bank')return [{id:'credit',label:'Speak to the credit advisor',...CREDIT_ADVISOR},{id:'loans',label:'Speak to the lender',x:-2.9,z:.73},{id:'payments',label:'Speak to the cashier',x:2.9,z:.73},{id:'reserve',label:'Speak to the reserve clerk',x:7.4,z:.6}]
-  if(zone==='exchange'||zone.startsWith('floor:'))return [{id:'elevator',label:'Use elevator',...LIFT,range:1.25},...(zone==='exchange'?[{id:'reception',label:'View your portfolio',x:.63,z:-.77}]:[{id:'trader',label:'Speak to the trader',x:-2.7,z:-.4},{id:'trader',label:'Speak to the trader',x:2.7,z:-.4}])]
+  if(zone==='exchange'||zone.startsWith('floor:'))return [{id:'elevator',label:'Use elevator',...LIFT,range:1.25},...(zone==='exchange'?[{id:'reception',label:'Talk to reception',x:.63,z:-.77},{id:'advisor',label:'Review your portfolio',...FINANCIAL_ADVISOR}]:[{id:'trader',label:'Speak to the trader',x:-2.7,z:-.4},{id:'trader',label:'Speak to the trader',x:2.7,z:-.4}])]
   return []
 }
 export const interactions=(zone:WorldZone)=>localInteractions(zone).map(action=>({...action,...site(zone,action.x,action.z)}))
@@ -109,7 +121,8 @@ function roomObstacles(zone:WorldZone,x:number,z:number){
   if(zone==='exchange'||zone.startsWith('floor:')){
     const side=Math.abs(x)
     if(side>1.28&&side<1.8&&z<-4.19&&z>-7.5)return true
-    if(zone==='exchange')return box(x,z,.63,-1.97,2.18,.62)
+    if(zone==='exchange')return box(x,z,.63,-1.97,2.18,.62)||box(x,z,FINANCIAL_ADVISOR.x,FINANCIAL_ADVISOR.z-1.08,1.32,.54)
+    if(boardFloor(zone)&&box(x,z,0,BOARD_TABLE.z,3.34,1.02))return true
     return [-2.7,2.7].some(desk=>box(x,z,desk,-1.77,1.29,.51))
   }
   return false

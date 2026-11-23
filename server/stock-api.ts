@@ -4,13 +4,14 @@ import type {UnitOfWork} from './storage.ts'
 import {wallet} from './economy.ts'
 import {fail} from './http.ts'
 import {portfolio} from './cas-shares.ts'
-import {companies,saveCompanies,PE,type Company} from './corporate.ts'
+import {companies,saveCompanies,PE,holderLabel,type Company} from './corporate.ts'
 import {book,cancelOrders,submit} from './order-book.ts'
 import {advanceEconomy,castVote,companyView,rescueSupport,supportPolicy,markSupport} from './governance.ts'
 import {income,requireSpending} from './credit.ts'
 import {STOCK_QUOTES} from './stock-quotes.ts'
 import {STOCK_SYMBOLS} from '../src/stock-catalog.ts'
-import {MAX_STOCK_ORDER,QUOTE_MAX_AGE,isEquity,fromStockUnits,toStockUnits,type StockQuote,type StockTrade,type StockView} from '../src/stock-model.ts'
+import {EQUITY_ORDER_LIMIT} from '../src/equity-v2.ts'
+import {bookQuote,MAX_STOCK_ORDER,QUOTE_MAX_AGE,isEquity,fromStockUnits,toStockUnits,type StockQuote,type StockTrade,type StockView} from '../src/stock-model.ts'
 
 const idFrom=(id:unknown)=>{
   if(typeof id!=='string'||!/^[\w-]{12,80}$/.test(id))fail(400,'A valid order ID is required')
@@ -22,7 +23,7 @@ const equityQuote=(c:Company)=>({float:c.issued,available:c.inventory,price:from
 
 export function stockApi(unit:UnitOfWork,account:Account,path:string,method:string,data:Record<string,unknown>,now=Date.now()):Reply|undefined{
   const read=path==='/api/stocks'&&method==='GET'
-  if(!read&&(method!=='POST'||!['trade','order','cancel','support','vote','rescue'].some(k=>path==='/api/stocks/'+k)))return
+  if(!read&&(method!=='POST'||!['trade','market','order','cancel','support','vote','rescue'].some(k=>path==='/api/stocks/'+k)))return
   const e=companies(unit,now),quotes=unit.metadata<Record<string,StockQuote>>(STOCK_QUOTES)??{}
   const positions=portfolio(account),purse=wallet(account)
   const view=():StockView=>({coins:purse.coins,portfolio:positions,quotes,cas:{...equityQuote(e.CAS),equity:e.CAS.holders[PE]??0,equityMoves:[]},
@@ -34,6 +35,28 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
   }
   const {symbol,side,shares,sequence,total}=data
   const action=path.split('/').at(-1)!
+  if(action==='market'){
+    if(typeof symbol!=='string'||!isEquity(symbol)||side!=='buy'&&side!=='sell'||typeof shares!=='number'||!Number.isSafeInteger(shares)||shares<1||shares>EQUITY_ORDER_LIMIT)fail(400,'Choose a share count and trade direction')
+    const id=idFrom(data.id),c=e[symbol]
+    const trade=(paid:number,at:number):StockTrade=>({id,sequence:positions.sequence,symbol,side,shares,total:paid,at})
+    const old=c.orders.find(o=>o.id===id&&o.holder===account.name)
+    if(old){
+      if(!old.market||old.side!==side||old.initial!==shares||old.market.quote!==total)fail(409,'That order ID belongs to another trade')
+      return {status:200,value:{...view(),trade:trade(old.market.total,old.at)}}
+    }
+    advanceEconomy(unit,e,now)
+    const quote=bookQuote(book(c,side==='buy'?'sell':'buy').map(o=>({...o,holder:holderLabel(o.holder),price:fromStockUnits(o.price)})),account.name,shares)
+    if(!quote)fail(409,'There is not enough liquidity for this trade. Try fewer shares.')
+    if(total!==quote.total)fail(409,'The quote changed. Review the trade again.')
+    const offset=c.trades.length
+    const order=submit(unit,e,c,{holder:account.name,side,price:toStockUnits(quote.limit),shares,id},now)
+    const fills=c.trades.slice(offset)
+    if(fills.reduce((n,t)=>n+t.shares,0)!==shares)fail(409,'The trade could not be filled at this price')
+    const paid=fromStockUnits(fills.reduce((n,t)=>n+t.shares*t.price,0))
+    order.market={quote:quote.total,total:paid}
+    markSupport(c,now);saveCompanies(unit,e)
+    return {status:200,value:{...view(),trade:trade(paid,now)}}
+  }
   if(action!=='trade'){
     if(typeof symbol!=='string'||!isEquity(symbol))fail(400,'Choose CAS or BNK')
     const c=e[symbol]
@@ -54,7 +77,7 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
       if(rescueSupport(c,account.name,data))unit.economyUsage(account.name,'/api/stocks/rescue',{action:'rescue_support',symbol,
         value:data.value as number,status:data.on?'enabled':'disabled'},now)
     }else {
-      const vote=castVote(e,account.name,data.id,data.choice,now)
+      const vote=castVote(e,account.name,data.id,data.choice,now,symbol)
       if(vote)unit.economyUsage(account.name,'/api/stocks/vote',{action:'ballot_vote',reference:vote.id,symbol:vote.symbol,
         policy:vote.policy,value:vote.value,status:vote.votes[account.name]},now)
       advanceEconomy(unit,e,now)

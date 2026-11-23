@@ -12,7 +12,13 @@ const host=cast('city-world'),connection=cast('world-connection'),panel=cast('wo
 const pause=cast('world-pause'),chatForm=cast<HTMLFormElement>('world-chat-form'),chatInput=chatForm.querySelector('input')!
 let paused=false,chatting=false
 function syncControls(){stage?.lock(paused||chatting||dialog.open)}
-function showPause(){if(closed||dialog.open||chatting)return;paused=true;pause.hidden=false;syncControls()}
+function showPause(){
+  if(closed||paused)return
+  paused=true;pause.hidden=false
+  if(chatting)chatInput.blur()
+  if(dialog.open){dialog.close();shownService=''}
+  syncControls()
+}
 function resume(){paused=false;pause.hidden=true;syncControls();stage?.resumeMouse()}
 cast('world-continue').onclick=resume
 cast('world-pause-toggle').onclick=()=>paused?resume():showPause()
@@ -33,7 +39,8 @@ chatForm.onsubmit=async e=>{
   e.preventDefault()
   const text=chatInput.value.trim()
   if(!text||performing)return
-  try{await action('chat',{text});chatInput.value='';chatInput.blur();stage?.resumeMouse()}catch{}
+  chatInput.blur();stage?.resumeMouse()
+  try{await action('chat',{text});if(chatInput.value.trim()===text)chatInput.value=''}catch{}
 }
 let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined,profile:Profile|undefined
@@ -140,7 +147,8 @@ async function floorScreens(zone:string){
     const data=await api<StockView>('/stocks'),issue=symbol===CAS?data.cas:symbol===BNK?data.bank:undefined
     if(view?.you.zone!==zone)return
     stage?.quote(symbol,issue?.history??data.quotes[symbol]?.history??[],issue?.price??data.quotes[symbol]?.price)
-    if(!isEquity(symbol)){
+    if(isEquity(symbol))stage?.ownership(symbol,data.companies[symbol])
+    else {
       const {points}=await api<{points:PricePoint[]}>('/stocks/history?symbol='+encodeURIComponent(symbol))
       if(view?.you.zone===zone)stage?.quote(symbol,points.slice(-60),data.quotes[symbol]?.price)
     }
@@ -155,7 +163,7 @@ function accepted(next:WorldView,start:number,reposition=false){
   }
   connection.hidden=true
   host.dataset.zone=next.you.zone
-  host.dataset.seated=String(Boolean(next.you.chair||next.you.lounge||next.you.dining!==undefined))
+  host.dataset.seated=String(Boolean(next.you.chair||next.you.lounge||next.you.dining!==undefined||next.you.barSeat!==undefined||next.you.boardSeat!==undefined))
   if(changed){
     viewKey=scope;shownService='';services?.close()
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
@@ -174,7 +182,7 @@ function accepted(next:WorldView,start:number,reposition=false){
     if(!station)return
     void action('restaurant',{command:'kitchen',point:station,gesture}).finally(()=>stage?.resetTool()).catch(()=>{})
   })
-  if(service&&shownService!==service){
+  if(!paused&&service&&shownService!==service){
     shownService=service
     if(station)return
     if(service==='bar'){
@@ -205,6 +213,7 @@ async function action(name:string,data:object){
     if(closed)return
     const t=Date.now()
     accepted(await api<WorldView>('/world/'+name,{...data,scene:true}),t,name==='teleport'||name==='exit-cave')
+    if(name==='stand'||name==='stand-scenery'||name==='teleport')stage?.resumeMouse()
   }catch(error){showError(error instanceof Error?error.message:'City action failed');throw error}
   finally{performing=false;updateSelection()}
 }
@@ -221,11 +230,11 @@ function use(point?:WorldAction){
   void action('use',{target:point.id}).catch(()=>undefined)
 }
 host.querySelector<HTMLButtonElement>('[data-world-use]')!.onclick=()=>stage?.act()
-dialog.addEventListener('close',syncControls)
+dialog.addEventListener('close',()=>{syncControls();if(!paused)stage?.resumeMouse()})
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
     if(chatting){chatInput.blur();stage?.resumeMouse();event.preventDefault()}
-    else if(!dialog.open){if(!paused)showPause();event.preventDefault()}
+    else if(!paused){showPause();event.preventDefault()}
     return
   }
   if((event.key==='/'||event.key.toLowerCase()==='t')&&!event.ctrlKey&&!event.metaKey&&!dialog.open&&!paused&&
@@ -242,7 +251,7 @@ async function start(){
     if(closeAfterFloor)return
     closeAfterFloor=true
     void action('floor',{symbol}).then(()=>services?.close()).catch(()=>undefined).finally(()=>closeAfterFloor=false)
-  },setCoins)
+  },setCoins,()=>void floorScreens(view?.you.zone??''))
   restaurant=new RestaurantUI(dialog,cast('world-kfc-hud'),(command,data)=>action('restaurant',{command,...data}))
   const {CityStage}=await import('./stage.ts')
   stage=new CityStage(cast('world-canvas'),host,use,showPause)
@@ -260,6 +269,7 @@ async function start(){
     window.setTimeout(beat,document.hidden?3000:stage?.moving?220:view?.you.chair?480:780)
   }
   void beat();window.setInterval(tableStatus,160)
+  window.setInterval(()=>{if(!document.hidden&&view&&/^floor:(CAS|BNK)$/.test(view.you.zone))void floorScreens(view.you.zone)},12_000)
 }
 document.addEventListener('click',event=>{
   const link=(event.target as Element).closest<HTMLAnchorElement>('a')

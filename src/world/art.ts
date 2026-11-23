@@ -1,3 +1,5 @@
+import {ownershipSegments} from './company-desk.ts'
+import type {CompanyView} from '../equity-v2.ts'
 import {salonBar} from './salon-bar.ts'
 import {buildRestaurant} from './restaurant-art.ts'
 import {landscape,Scenery} from './landscape.ts'
@@ -13,7 +15,7 @@ import {buildHall,buildHallTables,WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts
 import {ClubGuest} from '../casino/roulette-cast.ts'
 import {ROULETTE_ORDER} from '../casino-model.ts'
 import {SEAT_OFFSETS} from '../roulette-hall-model.ts'
-import {FLOOR_HEIGHT,FLOOR_LIST,CREDIT_ADVISOR,PLAN,PUBLIC_DICE,floorHeight,type WorldZone} from './model.ts'
+import {FLOOR_HEIGHT,FLOOR_LIST,CREDIT_ADVISOR,FINANCIAL_ADVISOR,BOARD_TABLE,BOARD_SEATS,PLAN,PUBLIC_DICE,floorHeight,type WorldZone} from './model.ts'
 
 const std=(color:number,metalness=0,roughness=.74)=>new T.MeshStandardMaterial({color,metalness,roughness})
 const brass=std(0xb78b57,.65,.35),oak=std(0x372725,.15,.48),ink=std(0x182930,.28,.57)
@@ -279,7 +281,13 @@ function gallery(scene:T.Object3D,type:'hotel'|'exchange'){
     box(scene,[4.06,1.08,1.01],[.63,.55,-1.97],blue,.09)
     box(scene,[4.16,.066,1.05],[.63,1.095,-1.97],ivory,.055)
     banner(scene,'EXCHANGE RECEPTION',[3.7,.32],[.63,2.52,-2.14])
-    for(const x of [-5.8,5.8])bench(scene,x,3,x>0?Math.PI/2:-Math.PI/2,leather)
+    bench(scene,5.8,3,Math.PI/2,leather)
+    const advisor=FINANCIAL_ADVISOR
+    box(scene,[2.4,.86,.86],[advisor.x,.46,advisor.z-1.08],oak,.07)
+    box(scene,[2.48,.07,.92],[advisor.x,.92,advisor.z-1.08],ivory,.032)
+    banner(scene,'FINANCIAL ADVISOR',[2.22,.28],[advisor.x,.61,advisor.z-.63],'#fae9c4')
+    box(scene,[.59,.32,.08],[advisor.x+.73,1.12,advisor.z-1.19],ink,.025)
+    potted(scene,-6.92,.2,.77)
   }
   for(const x of [-w*.38,w*.38])for(const z of [-3.0,1.4,5.6]){
     cylinder(scene,.13,5.66,[x,2.84,z],ivory,14)
@@ -295,6 +303,8 @@ function makeScreen(scene:T.Object3D,symbol:string,x:number){
   const canvas=document.createElement('canvas');canvas.width=704;canvas.height=368
   const ctx=canvas.getContext('2d')!,tex=new T.CanvasTexture(canvas)
   tex.colorSpace=T.SRGBColorSpace
+  box(scene,[4.17,.21,.67],[x,.15,-4.29],ink,.052)
+  for(const a of [-1.48,1.48])box(scene,[.18,2.21,.26],[x+a,1.15,-4.34],brass,.032)
   box(scene,[4.07,2.27,.15],[x,2.59,-4.25],ink,.064)
   mesh(new T.PlaneGeometry(3.96,2.16),new T.MeshBasicMaterial({map:tex}),scene,[x,2.59,-4.16])
   return (points:{price:number}[],current?:number)=>{
@@ -346,6 +356,103 @@ function liftDoorway(room:T.Object3D,finish:T.Material){
   for(const x of [-1.52,1.52])block(room,.065,3.44,.10,x,1.73,-4.20,brass)
   block(room,3.13,.075,.10,0,3.42,-4.20,brass)
 }
+function slidingDoors(room:T.Object3D){
+  const metal=std(0x82999d,.53,.30),edge=std(0x344c53,.55,.34)
+  const leaves=[-1,1].map(side=>{
+    const door=new T.Group();room.add(door)
+    box(door,[1.48,3.35,.13],[0,1.69,-4.18],metal,.024)
+    for(const x of [-.64,.64])block(door,.032,3.18,.016,x,1.70,-4.105,edge)
+    block(door,1.42,.105,.035,0,.14,-4.1,edge)
+    block(door,.39,.034,.03,side*.39,1.54,-4.09,brass)
+    door.position.x=side*.745
+    return door
+  })
+  for(const side of [-1,1])box(room,[1.43,3.44,.29],[side*2.23,1.72,-3.99],ink,.041)
+  let progress=0
+  return (open:boolean,dt:number)=>{
+    progress=T.MathUtils.damp(progress,Number(open),9.5,dt)
+    leaves.forEach((door,i)=>door.position.x=(i?1:-1)*(.745+1.47*progress))
+  }
+}
+function boardroom(room:T.Group,symbol:string){
+  const casino=symbol==='CAS',metal=casino?brass:std(0x77989f,.47,.29)
+  const cloth=std(casino?0x48303b:0x27434b),base=casino?oak:std(0x172930,.37,.5)
+  const face=casino?'#f5d08d':'#9addd5'
+  const {z}=BOARD_TABLE
+  plane(room,9.5,5.76,0,.018,z,cloth)
+  for(const x of [-4.66,4.66])plane(room,.071,5.67,x,.022,z,metal)
+  for(const x of [-1.84,1.84]){
+    box(room,[1.08,.72,.88],[x,.39,z],base,.093)
+    box(room,[1.26,.092,1.05],[x,.094,z],metal,.035)
+  }
+  box(room,[6.48,.154,1.90],[0,.89,z],base,.077)
+  box(room,[6.53,.039,1.93],[0,.973,z],metal,.018)
+  box(room,[6.40,.034,1.81],[0,1,z],cloth,.014)
+  for(const seat of BOARD_SEATS){
+    const g=new T.Group();room.add(g);g.position.set(seat.x,0,seat.z);g.rotation.y=seat.yaw
+    box(g,[.72,.17,.61],[0,.49,0],base,.066)
+    box(g,[.74,.52,.14],[0,.76,.28],cloth,.058)
+    for(const x of [-.26,.26])for(const z of [-.21,.21])cylinder(g,.028,.43,[x,.24,z],metal,9)
+    box(g,[.206,.014,.21],[0,1.026,-.60],ivory,.012)
+    mesh(new T.CylinderGeometry(.048,.035,.145,12),metal,g,[.24,1.1,-.61])
+  }
+  for(const x of [-6.86,6.86])for(const at of [1.1,4.5]){
+    block(room,.38,4.5,.48,x,2.25,at,base)
+    block(room,.12,3.31,.093,x,2.31,at+.27,metal)
+    block(room,.083,2.94,.04,x,2.31,at+.33,casino?gold:new T.MeshBasicMaterial({color:0xa8e6e7}))
+  }
+  for(const x of [-2.57,0,2.57]){
+    const pendant=new T.Group();room.add(pendant);pendant.position.set(x,0,z)
+    cylinder(pendant,.028,2.27,[0,4.63,0],metal,12)
+    if(casino){
+      cylinder(pendant,.43,.22,[0,3.52,0],gold,22)
+      cylinder(pendant,.49,.055,[0,3.65,0],metal,26)
+    }else{
+      box(pendant,[1.4,.09,.60],[0,3.63,0],metal,.031)
+      box(pendant,[1.27,.045,.51],[0,3.58,0],new T.MeshBasicMaterial({color:0xd6eedc}),.021)
+    }
+  }
+  const sign=banner(room,casino?'ROYAL SALON  /  CAS':'FIFTH DIMENSION  /  BNK',[5.24,.46],[0,2.78,7.08],face)
+  sign.rotation.y=Math.PI
+  for(const x of [-5.6,5.6])potted(room,x,6.43,.89)
+
+  const canvas=document.createElement('canvas');canvas.width=1152;canvas.height=640
+  const ctx=canvas.getContext('2d')!,map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace
+  const display=new T.Group();display.position.set(6.05,0,3.88);display.rotation.y=-Math.PI/2;room.add(display)
+  box(display,[4.5,.16,.64],[0,.09,0],base,.04)
+  for(const x of [-1.78,1.78])box(display,[.15,2.55,.32],[x,1.3,0],metal,.038)
+  box(display,[4.42,2.54,.14],[0,2.47,0],base,.062)
+  mesh(new T.PlaneGeometry(4.25,2.36),new T.MeshBasicMaterial({map}),display,[0,2.47,.082],false)
+  let previous=''
+  const update=(c?:CompanyView)=>{
+    const rows=c?ownershipSegments(c):[]
+    const key=JSON.stringify([c?.issued,c?.votingShares,rows])
+    if(key===previous)return
+    previous=key
+    const tint=ctx.createLinearGradient(0,0,1152,640);tint.addColorStop(0,casino?'#301e2b':'#102e37');tint.addColorStop(1,'#07171c')
+    ctx.fillStyle=tint;ctx.fillRect(0,0,1152,640)
+    ctx.fillStyle=face;ctx.font='650 35px system-ui';ctx.fillText(symbol+'   SHARE REGISTER',54,72)
+    ctx.fillRect(54,94,1044,2)
+    if(!c){ctx.font='26px system-ui';ctx.fillText('Connecting to the exchange…',54,154);map.needsUpdate=true;return}
+    const format=(share:number)=>new Intl.NumberFormat('en',{style:'percent',maximumFractionDigits:2}).format(share/c.issued)
+    let start=-Math.PI/2
+    rows.forEach(([name,shares,color],i)=>{
+      const end=start+tau*shares/c.issued,y=144+i*42
+      ctx.fillStyle=color;ctx.beginPath();ctx.arc(270,313,171,start,end);ctx.arc(270,313,109,end,start,true);ctx.closePath();ctx.fill()
+      ctx.fillRect(508,y-18,17,17);ctx.fillStyle='#e5f0ed';ctx.font='550 25px system-ui';ctx.fillText(name,543,y,406)
+      ctx.textAlign='right';ctx.fillText(format(shares),1094,y);ctx.textAlign='left'
+      start=end
+    })
+    ctx.fillStyle='#f1f3e6';ctx.textAlign='center';ctx.font='600 37px system-ui';ctx.fillText(c.issued.toLocaleString('en'),270,316)
+    ctx.fillStyle='#adc9c6';ctx.font='22px system-ui';ctx.fillText('shares issued',270,349);ctx.textAlign='left'
+    ctx.fillStyle='#ffffff15';ctx.fillRect(54,572,1044,43);ctx.fillStyle=face;ctx.font='650 26px system-ui'
+    ctx.fillText('YOUR SHARE   '+format(c.votingShares),74,602)
+    map.needsUpdate=true
+  }
+  update()
+  return update
+}
+
 function elevator(scene:T.Object3D){
   const shaft=new T.Group();shaft.position.set(PLAN.exchange.x,0,PLAN.exchange.z);scene.add(shaft)
   const height=(FLOOR_LIST.length+1)*FLOOR_HEIGHT
@@ -372,17 +479,10 @@ function tower(shaft:T.Object3D){
       block(room,2.33,.98,.70,x,.49,-1.77,symbol==='CAS'?oak:blue)
       block(room,2.45,.06,.74,x,1.015,-1.77,symbol==='CAS'?brass:ivory)
     }
-    for(const x of [-4.53,4.53])block(room,4.07,2.27,.15,x,2.59,-4.25,ink)
     for(const x of [-3.8,3.8])block(room,2.6,.055,.37,x,5.77,1.07,gold)
-    if(symbol==='CAS'){
-      mesh(new T.TorusGeometry(.76,.07,10,44),brass,room,[0,1.97,-3.27],false).rotation.x=.19
-      banner(room,'CASINO SHAREHOLDERS',[3.4,.23],[0,3.12,-3.12],'#ffdb92')
-    }else if(symbol==='BNK'){
-      box(room,[1.34,1.68,.55],[0,.87,-3.2],blue,.13);ringVault(room)
-    }
     batchStatic(room)
   }
-  const decor=new Map<string,{actors:ClubGuest[];screens:ReturnType<typeof makeScreen>[]}>()
+  const decor=new Map<string,{actors:ClubGuest[];screens:ReturnType<typeof makeScreen>[];doors:ReturnType<typeof slidingDoors>;ownership?:ReturnType<typeof boardroom>}>()
   return (symbol:string)=>{
     const room=rooms.get(symbol)
     if(!room)return
@@ -393,7 +493,8 @@ function tower(shaft:T.Object3D){
       banner(room,name,[6,.39],[0,4.17,-4.08],symbol==='CAS'?'#ffdca1':'#ccecee')
       const actors=[new ClubGuest(room,-2.7,-2.38,0xaa7c61,0x365263,true),new ClubGuest(room,2.7,-2.38,0xd2a17d,symbol==='CAS'?0x674451:0x374d5d,true,1)]
       const screens=[makeScreen(room,symbol,-4.53),makeScreen(room,symbol,4.53)]
-      entry={actors,screens};decor.set(symbol,entry)
+      const ownership=symbol==='CAS'||symbol==='BNK'?boardroom(room,symbol):undefined
+      entry={actors,screens,doors:slidingDoors(room),ownership};decor.set(symbol,entry)
     }
     return entry
   }
@@ -459,15 +560,12 @@ export function makeWorldArt(open:boolean){
   banner(bank,'CREDIT ADVISOR',[1.67,.25],[advisor.x,.56,deskZ+.367])
   const staff=[new ClubGuest(bank,-2.9,-2.72,0xb38469,0x284557,true,1),new ClubGuest(bank,2.9,-2.71,0xd5ad86,0x313c59,true,2),new ClubGuest(bank,7.4,-1.32,0x946344,0x213344,true),new ClubGuest(bank,advisor.x,deskZ-.63,0xbc8b68,0x49676c,true,2)]
   gallery(exchange,'exchange');venueDetail(exchange,'exchange');staff.push(new ClubGuest(exchange,.65,-3.11,0xc89b79,0x4b3d58,true,1))
-  const floor=tower(elevator(scene))
+  staff.push(new ClubGuest(exchange,FINANCIAL_ADVISOR.x,FINANCIAL_ADVISOR.z-1.82,0xa57556,0x304550,true,2))
+  const lobbyDoors=slidingDoors(exchange),floor=tower(elevator(scene))
   for(const zone of ['cave','oasis'] as const){rooms[zone].rotation.y=Math.PI;cave(rooms[zone],zone==='oasis');venueDetail(rooms[zone],zone)}
   const seal=mesh(new T.IcosahedronGeometry(1,2),rock,rooms.cave,[0,1.34,7.01]);seal.scale.set(1.84,1.8,1.1);seal.visible=!open
   const restaurant=buildRestaurant(rooms.kfc)
-  return {scene,actors,staff,wheels,publicDie,floor,ambient,seal,restaurant,bar}
-}
-function ringVault(scene:T.Object3D){
-  mesh(new T.TorusGeometry(.48,.041,8,44),brass,scene,[0,.89,-2.9],false)
-  mesh(new T.TorusGeometry(.17,.032,8,28),brass,scene,[0,.89,-2.89],false)
+  return {scene,actors,staff,wheels,publicDie,floor,ambient,seal,restaurant,bar,lobbyDoors}
 }
 export function spinWheel(wheel:ReturnType<typeof buildHallTables>[number],result:number,p:number){
   const step=tau/37,rot=(1-(1-p)**2.45)*(tau*5+.62)

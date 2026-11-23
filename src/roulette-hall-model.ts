@@ -14,7 +14,7 @@ export const TABLES = [
 export const LOUNGES=[
   {name:'West lounge',x:-9.65,z:2.75,yaw:-Math.PI/2},
   {name:'East lounge',x:9.65,z:2.75,yaw:Math.PI/2},
-  {name:'West bar couch',x:-8,z:6.7,yaw:0},
+  {name:'West alcove',x:-9.65,z:-.54,yaw:-Math.PI/2},
   {name:'East bar couch',x:8,z:6.7,yaw:0},
 ] as const
 export const COUCH_SEATS=[-.82,0,.82]

@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto'
 import {fromStockUnits,toStockUnits,type StockSide} from '../src/stock-model.ts'
 import {EQUITY_ORDER_LIMIT} from '../src/equity-v2.ts'
 import type {UnitOfWork} from './storage.ts'
-import {income,requireSpending,updateCredit,DAY} from './credit.ts'
+import {income,inDefault,requireSpending,updateCredit,DAY} from './credit.ts'
 import {wallet} from './economy.ts'
 import {portfolio} from './cas-shares.ts'
 import {BUYBACK,INVENTORY,PE,type Companies,type Company,type Order,sharesOf,equityPosition,setHolding,journal,cashForDistribution} from './corporate.ts'
@@ -81,7 +81,7 @@ export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:strin
       break
     }
     const buyer=institution(bid.holder)?undefined:unit.users.get(bid.holder)
-    if(buyer&&updateCredit(buyer,now).loan?.defaulted){
+    if(buyer&&inDefault(updateCredit(buyer,now))){
       unlock(unit,e,c,bid,now)
       if(bid===order)break
       continue
@@ -135,7 +135,7 @@ export function maintainOrders(unit:UnitOfWork,e:Companies,now:number){
   for(const [key,value] of Object.entries(e.reversals))if(now-value.at>=DAY)delete e.reversals[key]
   for(const c of [e.CAS,e.BNK]){
     cancelOrders(unit,e,c,o=>o.side==='buy'&&(o.holder===BUYBACK&&(!!c.bankruptcy||now-o.at>=7*DAY)||
-      !institution(o.holder)&&!!unit.users.get(o.holder)?.bank?.loan?.defaulted),now)
+      !institution(o.holder)&&inDefault(unit.users.get(o.holder)?.bank)),now)
     // Add new supply once. Old asks keep their original price and queue priority.
     offerInventory(unit,e,c,now)
   }
