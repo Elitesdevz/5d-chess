@@ -230,6 +230,10 @@ export class ChessStore {
     this.statement('DELETE FROM economy_usage_outbox WHERE id<=?').run(through)
   }
   accountJson(name: string): string | undefined {return (this.statement('SELECT payload FROM accounts WHERE name=?').get(name) as Row | undefined)?.payload}
+  restaurantMeal(name:string){
+    const row=this.statement("SELECT json_extract(payload,'$.restaurant') AS meal FROM accounts WHERE name=?").get(name) as {meal:string|null}|undefined
+    return row?.meal?JSON.parse(row.meal) as import('../src/world/restaurant-model.ts').KfcMeal:undefined
+  }
   rouletteWallet(name:string){
     return this.statement(`SELECT json_extract(payload,'$.wallet.coins') AS coins, json_extract(payload,'$.wallet.loadout.icon') AS avatar,
       json_extract(payload,'$.cave.day') AS caveDay,json_extract(payload,'$.cave.active') AS caveActive FROM accounts WHERE name=?`)

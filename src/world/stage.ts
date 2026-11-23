@@ -1,3 +1,5 @@
+import {restaurantPoints} from './restaurant-model.ts'
+import {staffProps} from './restaurant-art.ts'
 import {terrainHeight} from './terrain.ts'
 import * as T from 'three'
 import {liftPlatform,makeWorldArt,spinWheel} from './art.ts'
@@ -39,7 +41,7 @@ function shadow(){
   ctx.fillStyle=gradient;ctx.fillRect(0,0,64,64)
   return new T.CanvasTexture(canvas)
 }
-type Avatar={figure:Figure;tag?:HTMLElement}
+type Avatar={figure:Figure;tag?:HTMLElement;props?:ReturnType<typeof staffProps>}
 export class CityStage {
   private renderer?:T.WebGLRenderer
   private gl?:WebGL2RenderingContext
@@ -50,6 +52,7 @@ export class CityStage {
   private shadow?:T.CanvasTexture
   private figures=new Map<string,Avatar>()
   private npc:Figure[]=[]
+  private restaurantNpc=new Map<string,{figure:Figure;props:ReturnType<typeof staffProps>}>()
   private lifts=new Map<string,T.Group>()
   private liftFacing?:{from:number;delta:number;started:number}
   private arrows=new Set<string>()
@@ -97,7 +100,7 @@ export class CityStage {
   set(view:WorldView,offset:number,reposition=false){
     const prior=this.view?.you,next=view.you
     const changedWorld=view.id!==this.view?.id
-    const seat=(p:WorldView['you']|undefined)=>p?.chair?'chair:'+p.chair.table+':'+p.chair.index:p?.lounge?'couch:'+p.lounge.couch+':'+p.lounge.index:''
+    const seat=(p:WorldView['you']|undefined)=>p?.dining!==undefined?'dining:'+p.dining:p?.chair?'chair:'+p.chair.table+':'+p.chair.index:p?.lounge?'couch:'+p.lounge.couch+':'+p.lounge.index:''
     const seatChanged=seat(prior)!==seat(next)
     if(changedWorld||reposition||seatChanged||next.lift&&!prior?.lift||Math.hypot(next.x-this.position.x,next.z-this.position.z)>1.35){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
@@ -110,7 +113,8 @@ export class CityStage {
         this.yaw=Math.atan2(next.x-table.x,next.z-table.z)
         this.pitch=-.24
       }
-      if(next.chair||next.lounge)this.releaseMouse()
+      if(next.dining!==undefined)this.pitch=-.33
+      if(next.chair||next.lounge||next.dining!==undefined)this.releaseMouse()
     }
     if(next.lift&&!prior?.lift){
       const delta=Math.atan2(Math.sin(Math.PI-this.yaw),Math.cos(Math.PI-this.yaw))
@@ -121,6 +125,7 @@ export class CityStage {
     if(!this.art&&this.renderer)this.buildScene()
     if(this.art){
       this.art.seal.visible=!this.caveOpen
+      this.art.restaurant(view.restaurant)
       const target=next.lift?.to??next.zone
       if(target.startsWith('floor:'))this.art.floor(target.slice(6))
     }
@@ -144,6 +149,8 @@ export class CityStage {
   private clearScene(){
     for(const entry of this.figures.values()){entry.figure.dispose();entry.tag?.remove()}
     this.figures.clear()
+    for(const entry of this.restaurantNpc.values())entry.figure.dispose()
+    this.restaurantNpc.clear()
     if(this.art){
       if(this.art.scene.background instanceof T.Texture)this.art.scene.background.dispose()
       this.art.scene.traverse(obj=>{
@@ -228,7 +235,7 @@ export class CityStage {
     window.addEventListener('pagehide',e=>{if(!e.persisted){this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame);this.clearScene();this.renderer?.dispose()}},{signal})
   }
   private step(dt:number){
-    if(!this.zone||this.pause||this.view?.you.chair||this.view?.you.lounge||this.view?.you.lift)return
+    if(!this.zone||this.pause||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.lift)return
     const keys=this.arrows
     const x=this.stick.x+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'))
     const z=this.stick.z+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'))
@@ -242,7 +249,8 @@ export class CityStage {
   }
   private prompt(){
     const zone=this.zone?.startsWith('floor:')?this.zone:groundZone(this.position.x,this.position.z)
-    const candidate=this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift?interactions(zone).map(p=>({...p,distance:Math.hypot(this.position.x-p.x,this.position.z-p.z)}))
+    const points=zone==='kfc'?restaurantPoints(this.view?.restaurant,this.view?.you.dining).map(p=>({...p,...site(zone,p.x,p.z)})):interactions(zone)
+    const candidate=this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift?points.map(p=>({...p,distance:Math.hypot(this.position.x-p.x,this.position.z-p.z)}))
       .filter(p=>p.distance<=(p.range??1.65)).sort((a,b)=>a.distance-b.distance)[0]:undefined
     const was=this.nearest?.id
     this.nearest=candidate
@@ -267,9 +275,11 @@ export class CityStage {
         if(local)current.figure.hideHead()
       }
       const figure=current.figure
-      figure.target=member
+      figure.target=member.dining===undefined?member:{...member,lounge:{couch:0,index:0}}
       figure.root.position.y=local&&member.zone==='city'?terrainHeight(this.position.x,this.position.z):height
-      figure.pose(dt,now,local?this.position:undefined)
+      if(member.carrying&&!current.props)current.props=staffProps(figure.root)
+      if(current.props)current.props.tray.visible=!!member.carrying
+      figure.pose(dt,now,local?this.position:undefined,!!member.carrying||(member.workingUntil??0)>now,(member.eatingUntil??0)>now)
       const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
       if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
       if(interior){
@@ -287,7 +297,29 @@ export class CityStage {
     }
     for(const [key,cabin] of this.lifts)if(!neededLifts.has(key))cabin.visible=false
     for(const [name,entry] of this.figures)if(!active.has(name)){entry.figure.dispose();entry.tag?.remove();this.figures.delete(name)}
+    this.restaurantCast(dt,now)
     this.npc.forEach((figure,i)=>{if(!this.reduced)figure.target={...figure.target,...pedestrian(i,now)};figure.pose(dt,now)})
+  }
+  private restaurantCast(dt:number,now:number){
+    if(!this.art)return
+    const actors=this.view?.restaurant?.actors??[],active=new Set(actors.map(a=>a.id))
+    for(const actor of actors){
+      const seated=actor.pose==='eat'||actor.pose==='sit'
+      const character={...site('kfc',actor.x,actor.z),name:actor.name,online:true,avatar:'default',yaw:actor.yaw,
+        lounge:seated?{couch:0,index:0}:undefined}
+      let entry=this.restaurantNpc.get(actor.id)
+      if(!entry){
+        const figure=new Figure(this.art.scene,character,this.shadow!,actor.role??false)
+        entry={figure,props:staffProps(figure.root)};this.restaurantNpc.set(actor.id,entry)
+      }
+      const {figure,props}=entry
+      figure.target=character
+      props.tray.visible=actor.pose==='tray'
+      props.mop.visible=actor.pose==='mop'
+      props.mop.rotation.z=.19+Math.sin(now*.005)*.14
+      figure.pose(dt,now,undefined,actor.pose==='work'||actor.pose==='tray'||actor.pose==='mop',actor.pose==='eat')
+    }
+    for(const [id,entry] of this.restaurantNpc)if(!active.has(id)){entry.figure.dispose();this.restaurantNpc.delete(id)}
   }
   private cameraView(now:number){
     const me=this.view?.you,{x,z}=this.position
@@ -296,7 +328,7 @@ export class CityStage {
       this.yaw=from+delta*progress*progress*(3-2*progress)
       if(progress===1)this.liftFacing=undefined
     }
-    this.camera.position.set(x,(me?.zone==='city'?terrainHeight(x,z):me?riderHeight(me,now):0)+(me?.chair||me?.lounge?SEATED_EYE:STANDING_EYE),z)
+    this.camera.position.set(x,(me?.zone==='city'?terrainHeight(x,z):me?riderHeight(me,now):0)+(me?.chair||me?.lounge||me?.dining!==undefined?SEATED_EYE:STANDING_EYE),z)
     this.camera.rotation.set(this.pitch,this.yaw,0,'YXZ')
     this.camera.updateMatrixWorld()
   }

@@ -1,3 +1,4 @@
+import {buildRestaurant} from './restaurant-art.ts'
 import {landscape,Scenery} from './landscape.ts'
 import {neighborhood} from './neighborhood.ts'
 import {contactShade} from './shade.ts'
@@ -11,7 +12,7 @@ import {buildHall,buildHallTables,WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts
 import {ClubGuest} from '../casino/roulette-cast.ts'
 import {ROULETTE_ORDER} from '../casino-model.ts'
 import {SEAT_OFFSETS} from '../roulette-hall-model.ts'
-import {FLOOR_HEIGHT,FLOOR_LIST,PLAN,PUBLIC_DICE,floorHeight,type WorldZone} from './model.ts'
+import {FLOOR_HEIGHT,FLOOR_LIST,CREDIT_ADVISOR,PLAN,PUBLIC_DICE,floorHeight,type WorldZone} from './model.ts'
 
 const std=(color:number,metalness=0,roughness=.74)=>new T.MeshStandardMaterial({color,metalness,roughness})
 const brass=std(0xb78b57,.65,.35),oak=std(0x372725,.15,.48),ink=std(0x182930,.28,.57)
@@ -448,12 +449,20 @@ export function makeWorldArt(open:boolean){
   block(casino,22.5,1.65,.25,0,4.56,8.9,ink)
   venueDetail(bank,'bank');buildBankArchitecture(bank,true);buildBankVault(bank);frontWindow(bank,20.4,8.05,blue)
   block(bank,20.4,2.68,.25,0,5.33,8.05,blue)
-  const staff=[new ClubGuest(bank,-2.9,-2.72,0xb38469,0x284557,true,1),new ClubGuest(bank,2.9,-2.71,0xd5ad86,0x313c59,true,2),new ClubGuest(bank,7.4,-1.32,0x946344,0x213344,true)]
+  const advisor=CREDIT_ADVISOR,deskZ=advisor.z-1.25
+  box(bank,[1.92,.74,.72],[advisor.x,.39,deskZ],oak,.044)
+  box(bank,[2.02,.077,.79],[advisor.x,.81,deskZ],ivory,.049)
+  box(bank,[.41,.008,.37],[advisor.x-.46,.858,deskZ+.12],ivory,.013)
+  cylinder(bank,.04,.31,[advisor.x+.63,.99,deskZ],brass,10)
+  cylinder(bank,.16,.045,[advisor.x+.63,1.15,deskZ],gold,18)
+  banner(bank,'CREDIT ADVISOR',[1.67,.25],[advisor.x,.56,deskZ+.367])
+  const staff=[new ClubGuest(bank,-2.9,-2.72,0xb38469,0x284557,true,1),new ClubGuest(bank,2.9,-2.71,0xd5ad86,0x313c59,true,2),new ClubGuest(bank,7.4,-1.32,0x946344,0x213344,true),new ClubGuest(bank,advisor.x,deskZ-.63,0xbc8b68,0x49676c,true,2)]
   gallery(exchange,'exchange');venueDetail(exchange,'exchange');staff.push(new ClubGuest(exchange,.65,-3.11,0xc89b79,0x4b3d58,true,1))
   const floor=tower(elevator(scene))
   for(const zone of ['cave','oasis'] as const){rooms[zone].rotation.y=Math.PI;cave(rooms[zone],zone==='oasis');venueDetail(rooms[zone],zone)}
   const seal=mesh(new T.IcosahedronGeometry(1,2),rock,rooms.cave,[0,1.34,7.01]);seal.scale.set(1.84,1.8,1.1);seal.visible=!open
-  return {scene,actors,staff,wheels,publicDie,floor,ambient,seal}
+  const restaurant=buildRestaurant(rooms.kfc)
+  return {scene,actors,staff,wheels,publicDie,floor,ambient,seal,restaurant}
 }
 function ringVault(scene:T.Object3D){
   mesh(new T.TorusGeometry(.48,.041,8,44),brass,scene,[0,.89,-2.9],false)

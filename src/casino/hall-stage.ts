@@ -32,14 +32,14 @@ export class Figure {
   private motion=0
   private shadow:T.Mesh<T.PlaneGeometry,T.MeshBasicMaterial>
   private ownedMaterials:T.Material[]
-  constructor(scene:T.Scene,player:HallPlayer,shadow:T.Texture,staff=false){
+  constructor(scene:T.Scene,player:HallPlayer,shadow:T.Texture,staff:boolean|'cashier'|'cook'|'janitor'|'manager'=false){
     this.target=player
     this.root.position.set(player.x,0,player.z)
     this.root.rotation.y=player.yaw
     scene.add(this.root)
     this.root.add(this.body)
     const code=[...player.name].reduce((acc,c)=>(acc*31+c.charCodeAt(0))>>>0,0)
-    const suit=material(staff?0x202830:suits[code%suits.length]),skin=material(skins[(code>>>4)%skins.length])
+    const suit=material(staff==='cook'?0xdbc8ae:staff==='cashier'?0x962d39:staff==='janitor'?0x487274:staff?0x202830:suits[code%suits.length]),skin=material(skins[(code>>>4)%skins.length])
     this.ownedMaterials=[suit,skin]
     box(this.body,[.43,.50,.25],[0,1.18,0],suit,.074)
     box(this.body,[.30,.18,.23],[0,.885,0],suit,.041)
@@ -68,6 +68,13 @@ export class Figure {
     }
     mesh(new T.SphereGeometry(.035,10,8),skin,this.head,[0,1.603,-.117]).scale.set(.66,1.05,.73)
     box(this.head,[.045,.009,.007],[0,1.564,-.116],shoe,.003)
+    if(staff==='cook'){
+      box(this.head,[.28,.077,.245],[0,1.752,.014],shirt,.03)
+      for(const x of [-.074,0,.074])mesh(new T.SphereGeometry(.091,12,8),shirt,this.head,[x,1.82,.018])
+    }else if(staff==='cashier'||staff==='janitor'){
+      box(this.head,[.26,.077,.23],[0,1.76,.016],suit,.037)
+      box(this.head,[.21,.018,.15],[0,1.729,-.12],suit,.006)
+    }
     batchStatic(this.head)
     batchStatic(this.body)
     this.shadow=new T.Mesh(new T.PlaneGeometry(.97,.85),new T.MeshBasicMaterial({map:shadow,transparent:true,depthWrite:false}))
@@ -75,7 +82,7 @@ export class Figure {
     this.shadow.rotation.x=-Math.PI/2
   }
   hideHead(){this.head.visible=false}
-  pose(dt:number,now:number,local?:Position,serving=false){
+  pose(dt:number,now:number,local?:Position,serving=false,eating=false){
     const target=local??this.target,chair=this.target.chair||this.target.lounge
     const speed=Math.hypot(target.x-this.root.position.x,target.z-this.root.position.z)
     const f=local?1:1-Math.exp(-dt*10)
@@ -93,6 +100,7 @@ export class Figure {
       this.knees[i].rotation.x=chair?-1.35:-Math.max(0,swing*side)*.61
       this.arms[i].rotation.x=chair?.75:serving?1.12+breathe*side*.33:swing*-.38*side+breathe*.025
     }
+    if(eating)this.arms[0].rotation.x=1.18+Math.max(0,breathe)*.66
   }
   dispose(){
     this.root.traverse(o=>{if(o instanceof T.Mesh)o.geometry.dispose()})

@@ -58,7 +58,7 @@ export class CityServices {
       if(!this.dialog.open)this.dialog.showModal()
       return
     }
-    const heading=view==='reception'?'Your portfolio':view==='loans'?'Loans':view==='payments'?'Payments':view==='reserve'?'Bank reserve':stockName(symbol??'')
+    const heading=view==='reception'?'Your portfolio':view==='loans'?'Loans':view==='payments'?'Payments':view==='reserve'?'Bank reserve':view==='credit'?'Credit advisor':stockName(symbol??'')
     this.render(view==='trader'||view==='reception'?'EXCHANGE': 'FIFTH DIMENSION BANK',heading,'<p class="world-muted">Connecting…</p>')
     if(!this.dialog.open)this.dialog.showModal()
     try{
@@ -94,6 +94,18 @@ export class CityServices {
   private bank(view:WorldUse,data:BankView,token:number,notice=''){
     this.balance(data.coins)
     const loan=data.loan,pending=this.get<BankOrder>('bank')
+    if(view==='credit'){
+      const status=loan?.defaulted?'In default':loan?.overdue?'Payment overdue':loan?'Loan active':
+        data.blockedUntil&&data.blockedUntil>data.now?'Borrowing paused':data.score<600?'Building credit':'In good standing'
+      const note=loan?.defaulted?'Visit Payments to settle your debt. Automatic repayments also apply to incoming coins.':
+        loan?(`Your balance is ${coins(loan.total)}, due ${date.format(loan.due)}. Make a payment at the cashier’s desk.`):
+        data.blockedUntil&&data.blockedUntil>data.now?('Your borrowing hold ends '+date.format(data.blockedUntil)+'.'):
+        !data.lendingOpen?'The bank has paused new loans.':data.score<600?'You need a score of at least 600 to borrow.':
+        ('Visit the lender for loans of up to '+coins(data.limit)+'.')
+      this.render('FIFTH DIMENSION BANK','Credit advisor',`<div class="credit-summary"><div><small>Credit score</small><strong>${data.score}</strong><span>of 850</span></div><div><strong>${status}</strong><p>${note}</p></div></div>
+        <details><summary>Building your score</summary><p>Repay qualifying loans on time. To count, a loan must be at least 300 coins, last at least seven days, and stay open for at least half its term.</p><p>Late payments lower your score. If a default has been cleared, your score gradually recovers while you remain debt-free.</p></details>`)
+      return
+    }
     if(view==='reserve'){
       this.render('FIFTH DIMENSION BANK','Bank reserve',`<div class="world-metrics"><div><small>Lending reserve</small><b>${coins(data.reserve)}</b></div><div><small>Exchange ticker</small><b>BNK</b></div></div><p>Weekly dividends depend on profit and available reserves. Visit the BNK floor of the Exchange Tower to trade or vote.</p>`)
       return

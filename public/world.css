@@ -117,3 +117,61 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world-equity-body button:not(.world-primary),.world-equity-tabs button,.world-equity-price button{background:#243d35;color:#eaf2e7;border:1px solid #96b5a95c;border-radius:6px;padding:6px 9px;cursor:pointer}
 .world-policy-buttons button[aria-pressed=true],.world-equity-tabs button[aria-pressed=true]{border-color:#93cfad;background:#284f41;color:#d5f5df}
 .world-equity-body button:disabled{filter:grayscale(.65);opacity:.6;cursor:default}
+/* Krulliversal Fried Chicken */
+.world-dialog[data-restaurant]{--kfc-red:#a43844;--kfc-cream:#fff0d5;width:min(622px,calc(100% - 22px));padding:0;background:#fff3df;color:#392327;border-color:#e5ae92;border-radius:16px;box-shadow:0 26px 78px #2f171ac9}
+.world-dialog[data-restaurant]::backdrop{background:#27191c8a}
+.kfc-header{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:18px 20px;background:linear-gradient(115deg,#90323d,#bc4d4e);color:#fff3df}
+.kfc-header span{font-size:.75rem;font-weight:660;letter-spacing:.065em}
+.kfc-header h2{margin:3px 0 0;font:700 clamp(1.2rem,4vw,1.82rem)/1.03 Georgia,serif}
+.kfc-badge{display:grid;place-items:center;width:49px;height:49px;border-radius:50%;background:#fff0d6;color:#922c37;font-weight:880;letter-spacing:.08em;box-shadow:0 3px 13px #6c17284b}
+.kfc-header button,.kfc-content button{border:1px solid #ae706852;border-radius:8px;padding:8px 11px;background:#f4dfc5;color:#702933;font-weight:700;cursor:pointer}
+.kfc-header button{background:#76222f75;color:#fff4e4;font-size:1.25rem;padding:2px 8px;border-color:#f2c3aa77}
+.kfc-content{padding:16px 20px;display:grid;gap:11px}
+.kfc-content h3{font-size:.96rem;margin:0;color:#3e2425}
+.kfc-content :is(p,blockquote){color:#674647;font-size:.82rem;margin:3px 0;line-height:1.42}
+.kfc-content button:enabled:hover{background:#edc9a9}
+.kfc-content button.kfc-primary,.kfc-content .kfc-meal-buy{background:#942e3c;color:#fff3dd;border-color:#942e3c}
+.kfc-content button.kfc-primary:hover,.kfc-content .kfc-meal-buy:hover{background:#6f2731}
+.kfc-content button:disabled{opacity:.54;cursor:default}
+.kfc-menu,.kfc-pickup{display:grid;gap:7px}
+.kfc-menu article,.kfc-pickup article{display:flex;align-items:center;gap:10px;justify-content:space-between;border-bottom:1px solid #8c58432a;padding:8px 0}
+.kfc-menu article>div:nth-child(2),.kfc-pickup article>div{flex:1}
+.kfc-food-icon{display:grid;place-items:center;width:43px;height:40px;overflow:hidden;border-radius:9px;background:#f6dcc0}
+.kfc-menu button{white-space:nowrap}
+.kfc-jobs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kfc-jobs article{background:#f7e4ca;border:1px solid #e9caae;padding:10px;border-radius:9px;display:flex;align-items:flex-start;flex-direction:column;gap:6px}
+.kfc-jobs article span{font-size:.68rem;color:#7e3b3c}
+.kfc-jobs article button{margin-top:auto;padding:7px;text-align:left}
+.kfc-manager-intro{font-size:.84rem;color:#654544}
+.kfc-work,.kfc-dine{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:13px}
+.kfc-work-lens,.kfc-dine>div:first-child{width:76px;height:65px;border-radius:12px;background:radial-gradient(ellipse,#ffe6a9,#f1cfae);display:grid;place-items:center}
+.kfc-work-lens[data-step="1"] .kfc-food{animation:kfc-flip .65s ease both}
+@keyframes kfc-flip{0%{transform:translateY(5px) rotate(-8deg)}50%{transform:translateY(-10px) rotate(22deg)}100%{transform:translateY(0) rotate(0)}}
+.kfc-work ol{margin:0;padding-left:1.6rem;font-size:.82rem;color:#7c6260;line-height:1.7}
+.kfc-work .current{color:#762d3b;font-weight:800}.kfc-work .done{color:#576c4e}
+.kfc-choice{display:flex;gap:8px;flex-wrap:wrap}.kfc-quote{padding:11px;border-radius:8px;background:#f5e2c5;border-left:4px solid #aa4752}
+.kfc-bites{display:flex;gap:5px;margin:5px 0}.kfc-bites i{width:15px;height:6px;border-radius:8px;background:#ba4752}.kfc-bites i.finished{opacity:.23}
+.world-dialog .kfc-notice{margin:0 20px 13px;padding:8px 10px;border-radius:6px;background:#e8d5b8;color:#65353b;font-size:.78rem}
+.kfc-food{width:34px;height:34px;position:relative;display:inline-block;filter:drop-shadow(0 3px 3px #75424750)}
+.kfc-food i{position:absolute;display:block}
+.kfc-food-burger i:first-child,.kfc-food-combo i:first-child{inset:5px 3px 17px;border-radius:90% 90% 22% 22%;background:#ce873f;box-shadow:inset 0 3px 3px #ffdf92}
+.kfc-food-burger i:nth-child(2),.kfc-food-combo i:nth-child(2){inset:17px 2px 11px;border-radius:55%;background:#779365;box-shadow:0 4px #8d472f}
+.kfc-food-burger i:nth-child(3),.kfc-food-combo i:nth-child(3){inset:24px 3px 4px;border-radius:0 0 55% 55%;background:#df9b55}
+.kfc-food-combo i:last-child{width:8px;height:21px;right:0;top:2px;border-radius:3px;background:#9d3a42;transform:rotate(12deg);box-shadow:inset 0 4px #fff2d5}
+.kfc-food-fries i:not(:last-child){height:21px;width:6px;top:3px;border-radius:2px;left:7px;background:#e8ad51;transform:rotate(-15deg)}
+.kfc-food-fries i:nth-child(2){left:14px;top:1px;transform:none}.kfc-food-fries i:nth-child(3){left:21px;transform:rotate(12deg)}
+.kfc-food-fries i:last-child{inset:15px 5px 2px;background:#a53946;border-radius:5px 5px 7px 7px}
+.kfc-food-cola i:first-child{inset:11px 8px 2px;border-radius:4px 4px 7px 7px;background:linear-gradient(145deg,#eab98f,#8d3944 50%)}
+.kfc-food-cola i:nth-child(2){inset:8px 6px 23px;border-radius:6px;background:#fff3d9}
+.kfc-food-cola i:nth-child(3){width:3px;height:12px;left:18px;top:0;background:#8a4a44;transform:rotate(13deg)}
+.kfc-food-chicken i:first-child{inset:1px 2px 11px 3px;border-radius:48% 59% 51% 48%;background:#d38a3f;box-shadow:inset 3px 3px #f0b968}
+.kfc-food-chicken i:nth-child(2){width:8px;height:15px;left:20px;top:17px;background:#eed3a5;border-radius:5px;transform:rotate(-33deg)}
+.kfc-food-clean i:first-child{width:5px;height:26px;top:0;left:16px;background:#9d6f56;border-radius:1px;transform:rotate(16deg)}
+.kfc-food-clean i:nth-child(2){inset:23px 6px 2px;border-radius:4px;background:#548879}
+.kfc-hud{position:absolute;z-index:4;left:14px;top:13px;padding:8px 12px;display:grid;gap:2px;max-width:min(325px,calc(100% - 28px));background:#31191fe8;border:1px solid #b46b68;border-radius:10px;color:#ffedd8;pointer-events:none}
+.kfc-hud strong{font-size:.82rem}.kfc-hud span,.kfc-earned{font-size:.73rem}.kfc-earned{color:#ffce87}
+.credit-summary{display:grid;grid-template-columns:minmax(110px,auto) 1fr;gap:11px;margin:10px 0;align-items:center}
+.credit-summary>div:first-child{padding:9px 13px;border:1px solid #8cba9f65;background:#263c33;border-radius:8px;display:grid}
+.credit-summary small,.credit-summary span{font-size:.73rem;color:#b3cbbe}.credit-summary>div:first-child strong{font-size:1.75rem;color:#ebd49d}
+@media(max-width:440px){.kfc-header,.kfc-content{padding:12px}.kfc-header{gap:8px}.kfc-jobs{grid-template-columns:1fr}.kfc-hud{left:7px}.world-dialog .kfc-notice{margin-inline:12px}.kfc-menu article{gap:6px}.kfc-food-icon{width:33px}.kfc-content button{padding:7px}}
+@media(prefers-reduced-motion:reduce){.kfc-work-lens .kfc-food{animation:none!important}}

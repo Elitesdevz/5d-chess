@@ -1,3 +1,4 @@
+import {RestaurantUI} from './restaurant-ui.ts'
 import {api,ApiError,getSession,initShell,renderAccount} from '../shell.ts'
 import type {Profile} from '../account-model.ts'
 import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type CasinoView,type RouletteChoice} from '../casino-model.ts'
@@ -8,6 +9,7 @@ import type {CityStage} from './stage.ts'
 
 const cast=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as E
 const host=cast('city-world'),connection=cast('world-connection'),panel=cast('world-table'),dialog=cast<HTMLDialogElement>('world-service')
+let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined,profile:Profile|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
 let viewKey='',shownService='',lastFloor='';let closeAfterFloor=false
@@ -126,14 +128,14 @@ function accepted(next:WorldView,start:number,reposition=false){
   }
   connection.hidden=true
   host.dataset.zone=next.you.zone
-  host.dataset.seated=String(Boolean(next.you.chair||next.you.lounge))
+  host.dataset.seated=String(Boolean(next.you.chair||next.you.lounge||next.you.dining!==undefined))
   if(changed){
     viewKey=scope;shownService='';services?.close()
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
   }
   stage?.set(next,offset,reposition);stage?.lock(dialog.open)
-  setCoins(next.coins)
-  const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
+  setCoins(next.coins);restaurant?.update(next)
+  const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
   for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
     if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
     else a.removeAttribute('aria-current')
@@ -142,7 +144,8 @@ function accepted(next:WorldView,start:number,reposition=false){
   const service=next.interaction
   if(service&&shownService!==service){
     shownService=service
-    void services?.open(service,next.you.zone.startsWith('floor:')?next.you.zone.slice(6):undefined)
+    if(service.startsWith('kfc:'))restaurant?.open(service)
+    else void services?.open(service,next.you.zone.startsWith('floor:')?next.you.zone.slice(6):undefined)
     stage?.lock(true)
   }else if(!service)shownService=''
 }
@@ -189,6 +192,7 @@ async function start(){
     closeAfterFloor=true
     void action('floor',{symbol}).then(()=>services?.close()).catch(()=>undefined).finally(()=>closeAfterFloor=false)
   },setCoins)
+  restaurant=new RestaurantUI(dialog,cast('world-kfc-hud'),(command,data)=>action('restaurant',{command,...data}))
   const {CityStage}=await import('./stage.ts')
   stage=new CityStage(cast('world-canvas'),host,use)
   const url=new URL(location.href),go=url.searchParams.get('go')??''

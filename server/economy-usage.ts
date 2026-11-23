@@ -7,7 +7,7 @@ export interface EconomyUsage {
     |'loan_opened'|'loan_payment'|'debt_collection'|'credit_changed'|'loan_default'
     |'policy_support'|'ballot_opened'|'ballot_vote'|'ballot_closed'
     |'dividend'|'bankruptcy'|'rescue_support'|'rescue_stage'|'rescue_decision'
-    |'recapitalization'|'company_recovered'|'corporate_payment'|'desk_opened'|'share_issuance'|'buyback'|'wager_locked'|'wager_settled'
+    |'restaurant_action'|'recapitalization'|'company_recovered'|'corporate_payment'|'desk_opened'|'share_issuance'|'buyback'|'wager_locked'|'wager_settled'
   symbol?:EquitySymbol|string
   side?:StockSide
   coins?:number
