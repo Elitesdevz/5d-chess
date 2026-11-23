@@ -2,7 +2,7 @@ import {dayKey} from '../src/collection.ts'
 import {randomBytes,randomInt} from 'node:crypto'
 import {wallet,type EconomicAccount} from './economy.ts'
 import {notify,type Account} from './accounts.ts'
-import {CASINO_OWNER,HOUSE_EDGE,PROFIT_TAX,MAX_CASINO_STAKE,casinoCoins,grossMultiplier,rouletteWins,type CasinoBet,type CasinoRound,type CasinoState} from '../src/casino-model.ts'
+import {CASINO_OWNER,CAVE_DICE_EDGE,CAVE_DICE_MULTIPLIER,HOUSE_EDGE,PROFIT_TAX,MAX_CASINO_STAKE,casinoCoins,grossMultiplier,rouletteWins,type CasinoBet,type CasinoRound,type CasinoState} from '../src/casino-model.ts'
 
 type CasinoAccount=EconomicAccount&{casino?:CasinoState}
 const reject=(status:number,message:string):never=>{throw Object.assign(new Error(message),{status})}
@@ -23,9 +23,9 @@ export function ensureCasinoOwner(accounts:Account[]){
  }
  return owner
 }
-export function casinoView(account:CasinoAccount){
+export function casinoView(account:CasinoAccount,cave=false){
  const s=state(account)
- return {coins:wallet(account).coins,nextSequence:s.sequence+1,recent:s.recent,houseEdge:HOUSE_EDGE,profitTax:PROFIT_TAX,taxAccount:CASINO_OWNER,maxStake:MAX_CASINO_STAKE}
+ return {coins:wallet(account).coins,nextSequence:s.sequence+1,recent:s.recent,houseEdge:cave?CAVE_DICE_EDGE:HOUSE_EDGE,profitTax:cave?0:PROFIT_TAX,taxAccount:CASINO_OWNER,maxStake:MAX_CASINO_STAKE}
 }
 export function validateBet(value:unknown):CasinoBet{
  if(!value||typeof value!=='object')reject(400,'A bet is required')
@@ -41,18 +41,18 @@ export function validateBet(value:unknown):CasinoBet{
  return {requestId:b.requestId,sequence:b.sequence,game:b.game,stake:b.stake,choice:b.choice}
 }
 /** Called inside one SQL unit of work: debit, return, treasury tax and receipt commit together. */
-export function casinoBet(account:Account,accounts:Account[],input:unknown,now=Date.now(),draw?:number){
+export function casinoBet(account:Account,accounts:Account[],input:unknown,now=Date.now(),draw?:number,cave=false){
  const bet=validateBet(input),s=state(account),old=s.recent.find(r=>r.requestId===bet.requestId)
  if(old){
   if(old.currency||old.sequence!==bet.sequence||old.game!==bet.game||old.stake!==bet.stake||old.choice!==bet.choice)reject(409,'This request ID already belongs to a different bet')
-  return {...casinoView(account),round:old}
+  return {...casinoView(account,cave),round:old}
  }
  if(bet.game==='dice'&&account.eloGambling?.day===dayKey(now)&&account.eloGambling.stage!=='normal')reject(409,'A different offer is open. Refresh the dice table.')
  if(bet.sequence!==s.sequence+1)reject(409,'This round has already settled or the sequence changed. Refresh the table.')
  const w=wallet(account),balance=safeUnits(w.coins),stake=bet.stake*10000
  if(balance<stake)reject(409,'Not enough coins')
  const result=bet.game==='roulette'?rouletteResult(draw):draw??randomInt(1,7)
- return settleCasinoRound(account,accounts,bet,result,now,false)
+ return settleCasinoRound(account,accounts,bet,result,now,false,cave)
 }
 
 export function reserveRouletteStake(account:Account,stake:number){
@@ -62,16 +62,16 @@ export function reserveRouletteStake(account:Account,stake:number){
 }
 
 /** A shared spin uses the same receipts, odds, precision and tax as a private wager. */
-export function settleReservedRoulette(account:Account,accounts:Account[],bet:CasinoBet,result:number,now:number){
+export function settleReservedCasino(account:Account,accounts:Account[],bet:CasinoBet,result:number,now:number){
  return settleCasinoRound(account,accounts,{...bet,sequence:state(account).sequence+1},result,now,true).round
 }
 
-function settleCasinoRound(account:Account,accounts:Account[],bet:CasinoBet,result:number,now:number,reserved:boolean){
+function settleCasinoRound(account:Account,accounts:Account[],bet:CasinoBet,result:number,now:number,reserved:boolean,cave=false){
  const s=state(account),w=wallet(account),balance=safeUnits(w.coins),stake=units(bet.stake)
  if(bet.game==='dice'&&(!Number.isInteger(result)||result<1||result>6))throw new Error('Invalid dice draw')
  const won=bet.game==='dice'?result===bet.choice:rouletteWins(bet.choice,result)
- const gross=won?Math.round(stake*grossMultiplier(bet.game,bet.choice)):0,profit=Math.max(0,gross-stake)
- const tax=profit/100,credited=gross-tax,next=balance-(reserved?0:stake)+credited
+ const gross=won?Math.round(stake*(cave?CAVE_DICE_MULTIPLIER:grossMultiplier(bet.game,bet.choice))):0,profit=Math.max(0,gross-stake)
+ const tax=cave?0:profit/100,credited=gross-tax,next=balance-(reserved?0:stake)+credited
  // Integer stakes and the supported payout schedule make all amounts exact to 0.0001 coin.
  if(!Number.isSafeInteger(next)||!Number.isSafeInteger(tax))reject(409,'This bet exceeds the supported balance precision')
  let owner:Account|undefined,treasury=0
@@ -89,5 +89,5 @@ function settleCasinoRound(account:Account,accounts:Account[],bet:CasinoBet,resu
   })
  }
  s.sequence=bet.sequence;s.recent.unshift(round);s.recent.length=Math.min(100,s.recent.length)
- return {...casinoView(account),round}
+ return {...casinoView(account,cave),round}
 }

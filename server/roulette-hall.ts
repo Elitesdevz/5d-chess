@@ -1,9 +1,10 @@
-import {randomUUID} from 'node:crypto'
+import {randomInt,randomUUID} from 'node:crypto'
 import type {ChessStore} from './storage.ts'
-import {casinoView,reserveRouletteStake,rouletteResult,settleReservedRoulette,validateBet} from './casino.ts'
+import {casinoView,reserveRouletteStake,rouletteResult,settleReservedCasino,validateBet} from './casino.ts'
 import {CASINO_OWNER,type CasinoBet,type CasinoRound} from '../src/casino-model.ts'
-import {BET_WINDOW,COUCH_SEATS,HALL_CAPACITY,LOUNGES,RESULT_TIME,SEAT_OFFSETS,SPAWN,SPIN_TIME,TABLES,WALK_SPEED,chairPosition,loungePosition,walk,type HallPlayer,type HallSpin,type HallTable,type HallView,type TablePrize} from '../src/roulette-hall-model.ts'
+import {BET_WINDOW,COUCH_SEATS,HALL_CAPACITY,LOUNGES,RESULT_TIME,SEAT_OFFSETS,SPAWN,SPIN_TIME,TABLES,WALK_SPEED,chairPosition,loungePosition,walk,type Position,type HallPlayer,type HallSpin,type HallTable,type HallView,type TablePrize} from '../src/roulette-hall-model.ts'
 import {casState,recordCasinoMargins} from './cas-shares.ts'
+import {DICE_TABLE_INDEX,WORLD_TABLES} from '../src/world/model.ts'
 import {fail} from './http.ts'
 
 const ESCROW='rouletteHallEscrow'
@@ -13,6 +14,10 @@ type Escrow={room:string;table:number;round:string;until:number;tickets:Ticket[]
 type Member=HallPlayer&{seen:number;moved:number}
 type Table={round:string;until:number;recent:number[];spin?:HallSpin;prizes?:TablePrize[];receipts?:Map<string,CasinoRound>}
 type Room={id:string;players:Map<string,Member>;tables:Table[]}
+type Binding={id:string;position:Position}
+const gameAt=(i:number)=>i===DICE_TABLE_INDEX?'dice' as const:'roulette' as const
+const betWindow=(i:number)=>gameAt(i)==='dice'?20_000:BET_WINDOW
+const chairAt=(table:number,index:number)=>table===DICE_TABLE_INDEX?{x:WORLD_TABLES[table].x+SEAT_OFFSETS[index],z:WORLD_TABLES[table].z+1.68,yaw:0}:chairPosition({table,index})
 const newTable=():Table=>({round:randomUUID(),until:0,recent:[]})
 const publicMember=({name,avatar,x,z,yaw,chair,lounge,online}:Member):HallPlayer=>({name,avatar,x,z,yaw,chair,lounge,online})
 
@@ -31,7 +36,7 @@ export class RouletteHall {
       Object.assign(room.tables[pending.table],{round:pending.round,until:pending.until})
       for(const ticket of pending.tickets){
         const chair={table:pending.table,index:ticket.seat}
-        room.players.set(ticket.name,{name:ticket.name,avatar:ticket.avatar,chair,...chairPosition(chair),seen:0,moved:0,online:false})
+        room.players.set(ticket.name,{name:ticket.name,avatar:ticket.avatar,chair,...chairAt(chair.table,chair.index),seen:0,moved:0,online:false})
       }
     }
     this.timer=setInterval(()=>{try{this.tick(Date.now())}catch(error){console.error('Roulette round settlement deferred',error)}},250)
@@ -40,13 +45,13 @@ export class RouletteHall {
   stop(){clearInterval(this.timer)}
 
   private createRoom(id=randomUUID().slice(0,6).toUpperCase()){
-    const room:Room={id,players:new Map(),tables:TABLES.map(newTable)}
+    const room:Room={id,players:new Map(),tables:(id.startsWith('W-')?WORLD_TABLES:TABLES).map(newTable)}
     this.rooms.set(id,room)
     return room
   }
 
   private settle(room:Room,index:number,now:number,pending:Escrow){
-    const table=room.tables[index],pocket=rouletteResult()
+    const table=room.tables[index],pocket=gameAt(index)==='dice'?randomInt(1,7):rouletteResult()
     const remaining=this.escrow.filter(item=>item!==pending)
     const receipts=this.store.transaction(unit=>{
       const dayState=casState(unit,now)
@@ -55,7 +60,7 @@ export class RouletteHall {
       for(const ticket of pending.tickets){
         const account=unit.users.get(ticket.name)
         if(!account)throw new Error('Reserved roulette account is missing')
-        rounds.set(ticket.name,settleReservedRoulette(account,accounts,ticket.bet,pocket,now))
+        rounds.set(ticket.name,settleReservedCasino(account,accounts,ticket.bet,pocket,now))
       }
       for(const account of accounts)if(!unit.findAccount(account.name))unit.users.add(account.name,account)
       recordCasinoMargins(unit,rounds.values(),now,dayState)
@@ -63,7 +68,7 @@ export class RouletteHall {
       return rounds
     })
     this.escrow=remaining
-    table.spin={round:table.round,pocket,started:now,ends:now+SPIN_TIME}
+    table.spin={round:table.round,pocket,started:now,ends:now+(gameAt(index)==='dice'?3200:SPIN_TIME)}
     table.until=table.spin.ends+RESULT_TIME
     table.receipts=receipts
     table.prizes=[...receipts].map(([name,{won,net}])=>({name,won,net}))
@@ -88,24 +93,37 @@ export class RouletteHall {
           table.until=0
         }else if(!table.until||now>=table.until){
           table.round=randomUUID()
-          table.until=now+BET_WINDOW
+          table.until=now+betWindow(index)
         }
       })
       if(!room.players.size&&!room.tables.some(t=>t.spin))this.rooms.delete(id)
     }
   }
 
-  update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):HallView{
+  detach(name:string,id:string){
+    const room=this.rooms.get(id),p=room?.players.get(name)
+    if(!room||!p)return
+    if(this.escrow.some(round=>round.room===id&&round.tickets.some(b=>b.name===name))){
+      p.seen=0;p.online=false
+    }else room.players.delete(name)
+  }
+
+  update(name:string,action:string,data:Record<string,unknown>,now=Date.now(),binding?:Binding):HallView{
     this.tick(now)
     const account=this.store.rouletteWallet(name)??fail(401,'Log in first')
     const avatar=account.avatar??'default'
-    let room=[...this.rooms.values()].find(r=>r.players.has(name))
+    let room=binding?(this.rooms.get(binding.id)??this.createRoom(binding.id)):
+      [...this.rooms.values()].find(r=>!r.id.startsWith('W-')&&r.players.has(name))
     if(!room){
       if(action!=='presence')fail(409,'Rejoin the hall first')
-      room=[...this.rooms.values()].find(r=>r.players.size<HALL_CAPACITY)??this.createRoom()
-      room.players.set(name,{name,avatar,...SPAWN,seen:now,moved:now,online:true})
+      room=[...this.rooms.values()].find(r=>!r.id.startsWith('W-')&&r.players.size<HALL_CAPACITY)??this.createRoom()
+    }
+    if(!room.players.has(name)){
+      if(!binding&&action!=='presence')fail(409,'Rejoin the hall first')
+      room.players.set(name,{name,avatar,...(binding?.position??SPAWN),seen:now,moved:now,online:true,chair:undefined,lounge:undefined})
     }
     const me=room.players.get(name)!
+    if(binding&&!me.chair&&!me.lounge)Object.assign(me,{x:binding.position.x,z:binding.position.z,yaw:binding.position.yaw})
     me.seen=now
     me.online=true
     me.avatar=avatar
@@ -114,7 +132,7 @@ export class RouletteHall {
     const locked=pending?.tickets.find(ticket=>ticket.name===name)
     if(action==='presence'){
       const {x,z,yaw}=data
-      if(!me.chair&&!me.lounge&&data.room===room.id&&typeof x==='number'&&typeof z==='number'&&typeof yaw==='number'&&Number.isFinite(x)&&Number.isFinite(z)&&Number.isFinite(yaw)){
+      if(!binding&&!me.chair&&!me.lounge&&data.room===room.id&&typeof x==='number'&&typeof z==='number'&&typeof yaw==='number'&&Number.isFinite(x)&&Number.isFinite(z)&&Number.isFinite(yaw)){
         Object.assign(me,walk(me,x,z,WALK_SPEED*Math.min(1.5,Math.max(0,(now-me.moved)/1000))),{yaw:Math.atan2(Math.sin(yaw),Math.cos(yaw))})
       }
       me.moved=now
@@ -122,14 +140,15 @@ export class RouletteHall {
       if(me.chair||me.lounge)fail(409,'Stand up before changing seats')
       const index=data.table
       if(typeof index!=='number'||!Number.isInteger(index)||!room.tables[index])fail(400,'Choose a table')
+      if(binding&&this.escrow.some(round=>round.room!==room!.id&&round.tickets.some(b=>b.name===name)))fail(409,'Wait for your other wager to settle')
       const target=room.tables[index]
       if(target.spin)fail(409,'This table is finishing a round')
       const used=new Set([...room.players.values()].filter(p=>p.chair?.table===index).map(p=>p.chair!.index))
-      const available=SEAT_OFFSETS.map((_,i)=>i).filter(i=>!used.has(i)).sort((a,b)=>Math.abs(TABLES[index].x+SEAT_OFFSETS[a]-me.x)-Math.abs(TABLES[index].x+SEAT_OFFSETS[b]-me.x))
+      const available=SEAT_OFFSETS.map((_,i)=>i).filter(i=>!used.has(i)).sort((a,b)=>Math.abs(WORLD_TABLES[index].x+SEAT_OFFSETS[a]-me.x)-Math.abs(WORLD_TABLES[index].x+SEAT_OFFSETS[b]-me.x))
       if(!available.length)fail(409,'This table is full')
       me.chair={table:index,index:available[0]}
-      Object.assign(me,chairPosition(me.chair))
-      if(!target.until)target.until=now+BET_WINDOW
+      Object.assign(me,chairAt(index,available[0]))
+      if(!target.until)target.until=now+betWindow(index)
     }else if(action==='lounge'){
       if(me.chair||me.lounge)fail(409,'Stand up before changing seats')
       const couch=data.couch
@@ -151,7 +170,7 @@ export class RouletteHall {
       }
     }else if(action==='bet'){
       if(!me.chair||!table||!table.until||data.round!==table.round)fail(409,'Betting has closed for this round')
-      const bet=validateBet({game:'roulette',sequence:1,requestId:data.requestId,stake:data.stake,choice:data.choice})
+      const bet=validateBet({game:gameAt(me.chair.table),sequence:1,requestId:data.requestId,stake:data.stake,choice:data.choice})
       const accepted=locked?.bet??table.receipts?.get(name)
       if(accepted){
         if(accepted.requestId!==bet.requestId||accepted.choice!==bet.choice||accepted.stake!==bet.stake)fail(409,'Your bet is already locked')

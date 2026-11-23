@@ -1,3 +1,5 @@
+export const CAVE_DICE_EDGE=.0025
+export const CAVE_DICE_MULTIPLIER=6*(1-CAVE_DICE_EDGE)
 export const HOUSE_EDGE=0.02
 export const PROFIT_TAX=0.01
 export const CASINO_OWNER='CasinoOwner'

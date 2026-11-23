@@ -8,6 +8,12 @@ import {casState,recordCasinoMargins} from './cas-shares.ts'
 import {fail} from './http.ts'
 
 export function casinoApi(unit: UnitOfWork, account: Account, path: string, method: string, data: Record<string, unknown>): Reply | undefined {
+  if(path==='/api/casino/cave'||path==='/api/casino/cave/bet'){
+    if(!account.cave?.active)fail(403,'Enter the cave from the city')
+    if(path.endsWith('/cave')&&method==='GET')return {status:200,value:casinoView(account,true)}
+    if(path.endsWith('/bet')&&method==='POST'&&data.game==='dice')return {status:200,value:{...casinoBet(account,[account],data,Date.now(),undefined,true),profile:profile(account)}}
+    return
+  }
   if (path === '/api/casino' && method === 'GET') return {status:200,value:casinoView(account)}
   if (path !== '/api/casino/bet' || method !== 'POST') return
   if(data.game==='roulette')fail(409,'Roulette has moved to the Royal Salon. Refresh to join a table.')

@@ -11,6 +11,7 @@ import {accountApi} from './account-api.ts'
 import {economyApi} from './economy-api.ts'
 import {gameApi} from './game-api.ts'
 import {eloApi} from './elo-gambling.ts'
+import {CityWorlds} from './world.ts'
 import {RouletteHall} from './roulette-hall.ts'
 import {StockHistory} from './stock-history.ts'
 import {bankApi} from './bank.ts'
@@ -24,6 +25,7 @@ export function createApplication(store: ChessStore) {
   const usage=new UsageStore(usagePath(store))
   const ai=new AiScheduler(store)
   const roulette=new RouletteHall(store)
+  const city=new CityWorlds(store,roulette)
   const stockHistory=new StockHistory()
   ai.kick()
   const limiter = new LoginLimiter()
@@ -61,6 +63,13 @@ export function createApplication(store: ChessStore) {
         }
         // Never hold the writer lock while awaiting a network request body.
         const data = method === 'POST' && path !== '/api/logout' ? await body(req) : {}
+        if(path.startsWith('/api/world/')&&method==='POST'){
+          actor=user(store,req)??fail(401,'Log in first')
+          const action=path.slice('/api/world/'.length)
+          json(res,200,city.update(actor,action,data))
+          if(action!=='presence')logUsage(200)
+          return
+        }
         if(path.startsWith('/api/roulette-hall/')&&method==='POST'){
           actor=user(store,req)??fail(401,'Log in first')
           const action=path.slice('/api/roulette-hall/'.length)
@@ -80,7 +89,7 @@ export function createApplication(store: ChessStore) {
             ?? playerProfileApi(store,unit,account,url,method,data)
             ?? accountApi(store,account,path,method,data)
             ?? economyApi(unit,account,path,method,data)
-            ?? eloApi(unit,store,account,path,method,data)
+            ?? (path.startsWith('/api/casino/elo')&&!account.cave?.active?fail(403,'Enter the cave from the city'):eloApi(unit,store,account,path,method,data))
             ?? casinoApi(unit,account,path,method,data)
             ?? stockApi(unit,account,path,method,data)
             ?? bankApi(unit,account,path,method,data)

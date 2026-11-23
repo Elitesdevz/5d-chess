@@ -198,8 +198,9 @@ export class ChessStore {
   }
   accountJson(name: string): string | undefined {return (this.statement('SELECT payload FROM accounts WHERE name=?').get(name) as Row | undefined)?.payload}
   rouletteWallet(name:string){
-    return this.statement("SELECT json_extract(payload,'$.wallet.coins') AS coins, json_extract(payload,'$.wallet.loadout.icon') AS avatar FROM accounts WHERE name=?")
-      .get(name) as {coins:number|null;avatar:string|null}|undefined
+    return this.statement(`SELECT json_extract(payload,'$.wallet.coins') AS coins, json_extract(payload,'$.wallet.loadout.icon') AS avatar,
+      json_extract(payload,'$.cave.day') AS caveDay,json_extract(payload,'$.cave.active') AS caveActive FROM accounts WHERE name=?`)
+      .get(name) as {coins:number|null;avatar:string|null;caveDay:string|null;caveActive:number|null}|undefined
   }
   accountOrdinal(name:string):number|undefined {return (this.statement('SELECT id FROM accounts WHERE name=?').get(name) as {id:number}|undefined)?.id}
   accountName(name: string): string | undefined {return (this.statement('SELECT name FROM accounts WHERE name_key=?').get(name.toLowerCase()) as {name: string} | undefined)?.name}
