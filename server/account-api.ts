@@ -7,6 +7,20 @@ import type {Movement, PlayerCount} from '../src/model.ts'
 import type {ChessStore} from './storage.ts'
 import type {Reply} from './model.ts'
 import {ensureAccount} from './accounts.ts'
+import {CAS_META} from './cas-shares.ts'
+import {BANK_META} from './bank.ts'
+import {STOCK_QUOTES} from './stock-quotes.ts'
+import {BNK,CAS,equityPrice,type EquityPublic,type StockQuote} from '../src/stock-model.ts'
+
+function netWorthPrices(store:ChessStore){
+  const quotes=store.metadataValue(STOCK_QUOTES) as Record<string,StockQuote>|undefined
+  const prices=new Map(Object.entries(quotes??{}).map(([symbol,quote])=>[symbol,quote.price]))
+  for(const [symbol,key] of [[CAS,CAS_META],[BNK,BANK_META]] as const){
+    const issue=store.metadataValue(key) as Pick<EquityPublic,'float'|'available'>|undefined
+    if(issue)prices.set(symbol,equityPrice(symbol,issue))
+  }
+  return prices
+}
 
 export function accountApi(store: ChessStore, source: Account, path: string, method: string, data: Record<string, unknown>): Reply | undefined {
   const account = ensureAccount(source)
@@ -22,9 +36,13 @@ export function accountApi(store: ChessStore, source: Account, path: string, met
     for (const notice of account.notifications) if (data.all === true || ids.has(notice.id)) notice.read = true
     return {status: 200, value: {items: account.notifications, unread: account.notifications.filter(n=>!n.read).length}}
   }
-  if ((path==='/api/leaderboard/coins'||path==='/api/leaderboard/coins/full')&&method==='GET') {
-    const rows=store.coinLeaderboard(),self=rows.find(row=>row.name===account.name)
-    return {status:200,value:{players:path.endsWith('/full')?rows:rows.slice(0,100),me:{name:account.name,coins:self?.coins??wallet(account).coins,rank:self?.rank??null}}}
+  const moneyRanking=method==='GET'&&/^\/api\/leaderboard\/(coins|net-worth)(\/full)?$/.exec(path)
+  if(moneyRanking){
+    const netWorth=moneyRanking[1]==='net-worth',field=netWorth?'netWorth':'coins'
+    const rows=store.coinLeaderboard(netWorth?netWorthPrices(store):undefined)
+    const self=rows.find(row=>row.name===account.name)
+    const players=(moneyRanking[2]?rows:rows.slice(0,100)).map(({value,...row})=>({...row,[field]:value}))
+    return {status:200,value:{players,me:{name:account.name,[field]:self?.value??wallet(account).coins,rank:self?.rank??null}}}
   }
   if ((path === '/api/leaderboard'||path === '/api/leaderboard/full') && method === 'GET') {
     const rows = store.leaderboard(), self = rows.find(row=>row.name===account.name)!

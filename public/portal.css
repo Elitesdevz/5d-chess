@@ -302,8 +302,10 @@ body[data-page=lobby] .dashboard .activity-and-deals>.home-deals{background:none
 .deal-tower-orbit,.deal-tower-structure{pointer-events:none}.deal-tower-face.home-deal,.deal-tower-shop,.deal-tower-turn{pointer-events:auto}
 .rankings-reader{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .leaderboard-switch{display:inline-flex;gap:3px;border:1px solid #78916a44;padding:2px;border-radius:7px;background:#151c17}
-.leaderboard-switch button{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border:1px solid transparent;border-radius:5px;background:none;color:#acb6a7;font-size:12px;font-weight:700}
+.leaderboard-switch button{display:inline-flex;align-items:center;gap:4px;padding:5px clamp(3px,.55vw,8px);border:1px solid transparent;border-radius:5px;background:none;color:#acb6a7;font-size:12px;font-weight:700;white-space:nowrap}
 .leaderboard-switch button[aria-pressed=true]{background:#304533;border-color:#90b98355;color:#e0f2d7}
 .leaderboard-switch button .icon{width:14px;height:14px}
-.leaderboard[data-mode=coins] th:last-child{width:clamp(72px,29%,118px)}
-.leaderboard[data-mode=coins] td:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
+.leaderboard:is([data-mode=coins],[data-mode=net-worth]) th:last-child{width:clamp(72px,29%,118px)}
+.leaderboard:is([data-mode=coins],[data-mode=net-worth]) td:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
+
+@media(max-width:450px){.leaderboard-switch button>span{display:none}.leaderboard-switch button{font-size:11px}}

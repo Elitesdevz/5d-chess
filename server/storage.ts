@@ -8,6 +8,7 @@ import type {Listing} from '../src/collection.ts'
 import type {LegacyDatabase, Login, Room} from './model.ts'
 import {roomSummary, type RoomSummary} from './room-summary.ts'
 import {players, playerCount, survivors} from '../src/model.ts'
+import {fromStockUnits,toStockUnits,type StockHolding} from '../src/stock-model.ts'
 import {syncDirectory} from './files.ts'
 
 export const STORAGE_SCHEMA = 1
@@ -254,16 +255,25 @@ export class ChessStore {
     let rank = 1
     return sorted.map((row,i) => {if (i && row.rating !== sorted[i-1].rating) rank=i+1; return {...row, rank}})
   }
-  coinLeaderboard() {
+  coinLeaderboard(prices?:ReadonlyMap<string,number>) {
     const rows=this.statement(`SELECT name,COALESCE(json_extract(payload,'$.wallet.loadout.icon'),'default') AS avatar,
       json_extract(payload,'$.wallet.loadout.frame') AS frame,
-      COALESCE(json_extract(payload,'$.wallet.coins'),0) AS coins FROM accounts`).all() as Array<{name:string;avatar:string;frame:string|null;coins:number}>
-    const sorted=rows.map(row=>({...row,frame:row.frame??undefined,coins:Math.round(row.coins*10_000)/10_000}))
-      .sort((a,b)=>b.coins-a.coins||a.name.localeCompare(b.name))
+      COALESCE(json_extract(payload,'$.wallet.coins'),0) AS coins,
+      CASE WHEN ? THEN json_extract(payload,'$.stocks.positions') END AS positions FROM accounts`).all(prices?1:0) as
+      Array<{name:string;avatar:string;frame:string|null;coins:number;positions:string|null}>
+    const sorted=rows.map(({name,avatar,frame,coins,positions})=>{
+      let value=toStockUnits(coins)
+      if(prices&&positions){
+        for(const [symbol,holding] of Object.entries(JSON.parse(positions) as Record<string,StockHolding>)){
+          value+=toStockUnits(prices.get(symbol)??0)*holding.shares
+        }
+      }
+      return {name,avatar,frame:frame??undefined,value}
+    }).sort((a,b)=>b.value-a.value||a.name.localeCompare(b.name))
     let rank=1
     return sorted.map((row,i)=>{
-      if(i&&row.coins!==sorted[i-1].coins)rank=i+1
-      return {...row,rank}
+      if(i&&row.value!==sorted[i-1].value)rank=i+1
+      return {...row,value:fromStockUnits(row.value),rank}
     })
   }
   listingRows(): Row[] {return this.statement('SELECT payload FROM listings ORDER BY ordinal').all() as Row[]}

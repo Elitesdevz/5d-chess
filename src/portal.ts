@@ -1,3 +1,4 @@
+import {rankingHref,rankingMode,rankingModes,rankingValue,type RankingMode,type RankingPage} from './ranking-model.ts'
 import {type AI_OPPONENTS} from './ai-model.ts'
 import {pieceIcon} from './art.ts'
 import {profileHref} from './profile-model.ts'
@@ -104,7 +105,7 @@ async function lobby(){
     }catch(cause){error('ai-error',cause instanceof Error?cause.message:'Opponents unavailable. Try again.')}
   }
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!el('ai').hidden)void loadAi()})
-  let games:Games={available:[],mine:[],limit:50},notices:Notice[]=[],leaderboardRequest=0,leaderboardMode:'elo'|'coins'='elo'
+  let games:Games={available:[],mine:[],limit:50},notices:Notice[]=[],leaderboardRequest=0,leaderboardMode:RankingMode='elo'
   const localURL=()=>`/chess/?local=1&players=${count}&movement=${movement}`
   const updateLocalLinks=()=>document.querySelectorAll<HTMLAnchorElement>('.mode-choice a').forEach(link=>{const url=new URL(link.href);url.searchParams.set('movement',el<HTMLSelectElement>('local-movement').value);link.href=url.toString()})
   const renderGames=()=>{
@@ -134,30 +135,28 @@ async function lobby(){
   }
   document.addEventListener('notifications-changed',()=>void loadNotices())
   const loadNotices=async()=>{const data=await fetchNotices();notices=data.items;renderNotices()}
-  const formatRankValue=new Intl.NumberFormat('en',{maximumFractionDigits:4})
   const loadLeaderboard=async()=>{
-    const request=++leaderboardRequest,coins=leaderboardMode==='coins',label=coins?'Coins':'Elo'
+    const request=++leaderboardRequest,mode=leaderboardMode,config=rankingModes[mode]
     const root=el('leaderboard'),summary=el('my-rating-summary')
-    el('rating-pool-label').textContent=coins?'Ranked by coin balance':'All modes · All player counts'
-    el('rating-info').hidden=coins
+    el('rating-pool-label').textContent=config.caption
+    el('rating-info').hidden=mode!=='elo'
     root.dataset.mode=leaderboardMode
     root.setAttribute('aria-busy','true')
     try{
-      const data=await api<{players:{name:string;avatar:string;frame?:string;rating?:number;coins?:number;rank:number}[];me:{rating?:number;coins?:number;rank:number|null}}>(coins?'/leaderboard/coins':'/leaderboard')
+      const data=await api<RankingPage>(config.path)
       if(request!==leaderboardRequest)return
-      const value=(p:{coins?:number;rating?:number})=>coins?formatRankValue.format(p.coins??0):String(p.rating??0)
-      const href='/chess/leaderboard.html'+(coins?'?mode=coins':'')
+      const href=rankingHref(mode)
       const table=document.createElement('table')
-      table.innerHTML=`<thead><tr><th scope="col">#</th><th scope="col">Player</th><th scope="col">${label}</th></tr></thead><tbody></tbody>`
+      table.innerHTML=`<thead><tr><th scope="col">#</th><th scope="col">Player</th><th scope="col">${config.label}</th></tr></thead><tbody></tbody>`
       for(const p of data.players){
         const row=document.createElement('tr');row.classList.toggle('self',p.name===profile.name)
         row.innerHTML=`<td></td><td><a class="rank-player player-profile-link" href="${profileHref(p.name)}"><span class="small-avatar">${framedAvatar(p.avatar,p.frame)}</span><strong></strong></a></td><td></td>`
-        row.cells[0].textContent=String(p.rank);row.querySelector('strong')!.textContent=p.name;row.cells[2].textContent=value(p);table.tBodies[0].append(row)
+        row.cells[0].textContent=String(p.rank);row.querySelector('strong')!.textContent=p.name;row.cells[2].textContent=rankingValue(p,mode);table.tBodies[0].append(row)
       }
       const full=document.createElement('a');full.href=href;full.className='full-leaderboard-link';full.textContent='Open full leaderboard'
       root.replaceChildren(table,full)
       if(!data.players.length){const empty=document.createElement('p');empty.className='card-empty';empty.textContent='No players are ranked yet.';root.prepend(empty)}
-      summary.textContent=`Your ${coins?'coins':'Elo'}: ${value(data.me)}${data.me.rank?` · #${data.me.rank}`:''}`
+      summary.textContent=`${config.summary}: ${rankingValue(data.me,mode)}${data.me.rank?` · #${data.me.rank}`:''}`
       const fullSummary=document.createElement('a');fullSummary.href=href;fullSummary.textContent='Open full leaderboard'
       summary.append(' · ',fullSummary)
     }catch(cause){
@@ -166,7 +165,7 @@ async function lobby(){
   }
   const leaderboardTabs=document.querySelectorAll<HTMLButtonElement>('[data-leaderboard]')
   for(const button of leaderboardTabs)button.onclick=()=>{
-    const next=button.dataset.leaderboard==='coins'?'coins':'elo'
+    const next=rankingMode(button.dataset.leaderboard??null)
     if(next===leaderboardMode)return
     leaderboardMode=next
     leaderboardTabs.forEach(tab=>tab.setAttribute('aria-pressed',String(tab===button)))
