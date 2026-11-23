@@ -191,6 +191,8 @@ export class CityStage {
       this.canvas.focus({preventScroll:true})
       if(e.pointerType==='mouse'){
         if(!this.view?.you.chair&&!this.view?.you.lounge&&document.pointerLockElement!==this.canvas){
+          // Chromium can send its recentering mousemove before pointerlockchange.
+          this.lockedAt=performance.now()
           this.canvas.requestPointerLock?.()?.catch(()=>{})
         }
         return
