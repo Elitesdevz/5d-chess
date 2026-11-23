@@ -4,7 +4,9 @@ import {ChessStore} from '../server/storage.ts'
 import {CityWorlds} from '../server/world.ts'
 import {RouletteHall} from '../server/roulette-hall.ts'
 import {casinoBet} from '../server/casino.ts'
-import {DICE_TABLE_INDEX,LIFT,floorHeight,riderHeight,site} from '../src/world/model.ts'
+import {DICE_TABLE_INDEX,LIFT,worldMove,floorHeight,riderHeight,site} from '../src/world/model.ts'
+
+import {HOMES,passableLand,terrainHeight} from '../src/world/terrain.ts'
 
 function fixture(t,count=2){
   const store=new ChessStore('.',{memory:true}),roulette=new RouletteHall(store),world=new CityWorlds(store,roulette)
@@ -65,10 +67,10 @@ test('public dice shares one result and a locked bet survives leaving the casino
 test('the entrance is once per Dutch day and the private room has no public presence or profit tax',t=>{
   const {store,names,action,move,room}=fixture(t),[alice,bob]=names
   action(alice,'presence')
-  move(alice,-37,24)
-  const mouth=move(alice,-37,30.25)
+  move(alice,0,58);move(alice,-40,68)
+  const mouth=move(alice,-40,73.25)
   assert.equal(mouth.you.zone,'cave')
-  assert.ok(Math.abs(mouth.you.z-30.25)<.14)
+  assert.ok(Math.abs(mouth.you.z-73.25)<.14)
   const hid=room(alice,'cave',0,-7.35)
   assert.equal(hid.you.zone,'private')
   assert.deepEqual(hid.players,[])
@@ -79,15 +81,15 @@ test('the entrance is once per Dutch day and the private room has no public pres
   const exited=action(alice,'teleport',{to:'bank'})
   assert.equal(exited.you.zone,'oasis')
   assert.equal(exited.caveOpen,false)
-  const exit=move(alice,37,29.65)
+  const exit=move(alice,40,72.65)
   assert.equal(exit.you.zone,'city')
-  assert.ok(Math.abs(exit.you.z-29.65)<.14)
+  assert.ok(Math.abs(exit.you.z-72.65)<.14)
   assert.equal(action(alice,'teleport',{to:'bank'}).you.zone,'bank')
   assert.equal(JSON.parse(store.accountJson(alice)).cave.active,false)
   store.transaction(unit=>unit.users.get(bob).wallet.coins=0)
   assert.equal(action(bob,'presence').caveOpen,false)
-  move(bob,-37,24)
-  assert.equal(move(bob,-37,31).you.zone,'city')
+  move(bob,0,58);move(bob,-40,68)
+  assert.equal(move(bob,-40,74).you.zone,'city')
 })
 
 test('tower floors and bank transactions require the right physical interaction',t=>{
@@ -140,4 +142,23 @@ test('hotel and casino doors preserve position, heading and visibility across th
   room(walker,'casino',4,8.38)
   const wall=room(walker,'hotel',4,-7.1)
   assert.equal(wall.you.zone,'casino')
+})
+
+test('each home opens onto the street and its walls and furniture stop movement',()=>{
+  for(const [x,z] of HOMES){
+    const walk=(from,tx,tz)=>worldMove('city',from,tx,tz,14)
+    const inside=walk({x,z:z+4,yaw:0},x,z)
+    assert.ok(Math.abs(inside.z-z)<.05)
+    assert.ok(walk(inside,x-4,z).x>x-1.7)
+    assert.ok(walk(inside,x+5,z).x<x+3)
+    assert.ok(Math.abs(walk(inside,x,z+4).z-z-4)<.05)
+  }
+})
+test('the valley has walkable meadow and a steep enclosing ridge',()=>{
+  for(let i=0;i<72;i++){
+    const a=i*Math.PI/36,s=Math.sin(a),c=Math.cos(a)
+    assert.ok(passableLand(s*67,c*67))
+    assert.ok(Array.from({length:56},(_,j)=>78+j).some(r=>!passableLand(s*r,c*r)))
+  }
+  assert.ok(terrainHeight(0,73)>0)
 })

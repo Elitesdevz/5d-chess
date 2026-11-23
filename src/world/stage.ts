@@ -1,3 +1,4 @@
+import {terrainHeight} from './terrain.ts'
 import * as T from 'three'
 import {liftPlatform,makeWorldArt,spinWheel} from './art.ts'
 import {Figure} from '../casino/hall-stage.ts'
@@ -263,7 +264,7 @@ export class CityStage {
       }
       const figure=current.figure
       figure.target=member
-      figure.root.position.y=height
+      figure.root.position.y=local&&member.zone==='city'?terrainHeight(this.position.x,this.position.z):height
       figure.pose(dt,now,local?this.position:undefined)
       const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
       if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
@@ -291,7 +292,7 @@ export class CityStage {
       this.yaw=from+delta*progress*progress*(3-2*progress)
       if(progress===1)this.liftFacing=undefined
     }
-    this.camera.position.set(x,(me?riderHeight(me,now):0)+(me?.chair||me?.lounge?SEATED_EYE:STANDING_EYE),z)
+    this.camera.position.set(x,(me?.zone==='city'?terrainHeight(x,z):me?riderHeight(me,now):0)+(me?.chair||me?.lounge?SEATED_EYE:STANDING_EYE),z)
     this.camera.rotation.set(this.pitch,this.yaw,0,'YXZ')
     this.camera.updateMatrixWorld()
   }

@@ -1,3 +1,4 @@
+import {CAVE_MOUTH,CAVE_X,OASIS_X,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
 import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
 export const WORLD_CAPACITY=50
@@ -14,8 +15,8 @@ export const CITY_PORTALS=[
   {to:'hotel',x:0,z:-7,label:'Royal Hotel & Casino'},
   {to:'bank',x:-24,z:5,label:'Fifth Dimension Bank'},
   {to:'exchange',x:24,z:5,label:'Exchange Tower'},
-  {to:'cave',x:-37,z:30,label:''},
-  {to:'oasis',x:37,z:30,label:''},
+  {to:'cave',x:CAVE_X,z:CAVE_MOUTH,label:''},
+  {to:'oasis',x:OASIS_X,z:CAVE_MOUTH,label:''},
 ] as const
 export const PUBLIC_DICE={name:'Ivory Dice',x:6.1,z:3.0,color:'#e5bd86'} as const
 export const WORLD_TABLES=[...TABLES,PUBLIC_DICE]
@@ -33,7 +34,7 @@ export const PLAN={
   casino:{x:0,z:-31.58,width:11.25,back:-6.7,front:8.9},
   bank:{x:-24,z:-3.05,width:10.2,back:-6.57,front:8.05},
   exchange:{x:24,z:-2.48,width:8,back:-7.45,front:7.48},
-  cave:{x:-37,z:37.7},oasis:{x:37,z:37.7},
+  cave:{x:CAVE_X,z:CAVE_MOUTH+7.7},oasis:{x:OASIS_X,z:CAVE_MOUTH+7.7},
 } as const
 type Building=keyof typeof PLAN
 const building=(zone:WorldZone)=>zone.startsWith('floor:')?'exchange':Object.hasOwn(PLAN,zone)?zone as Building:undefined
@@ -57,7 +58,7 @@ export type LiftRide={to:WorldZone;started:number;ends:number}
 export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide}
 export function riderHeight(player:WorldPlayer,now:number){
   const from=floorHeight(player.zone),ride=player.lift
-  if(!ride)return from
+  if(!ride)return player.zone==='city'?terrainHeight(player.x,player.z):from
   const progress=Math.max(0,Math.min(1,(now-ride.started)/(ride.ends-ride.started)))
   return from+(floorHeight(ride.to)-from)*progress*progress*(3-2*progress)
 }
@@ -78,7 +79,6 @@ function localInteractions(zone:WorldZone):WorldAction[]{
 export const interactions=(zone:WorldZone)=>localInteractions(zone).map(action=>({...action,...site(zone,action.x,action.z)}))
 export const near=(p:Position,x:number,z:number,max=1.65)=>Math.hypot(p.x-x,p.z-z)<=max
 const box=(x:number,z:number,a:number,b:number,w:number,d:number)=>Math.abs(x-a)<w&&Math.abs(z-b)<d
-export const HOUSE_ROWS=[[-40,-15],[-32,-20],[-22,-21],[22,-22],[32,-19],[42,-15],[-42,11],[-27,18],[-17,24],[16,25],[27,18],[42,10]] as const
 const buildings=['hotel','casino','bank','exchange'] as const
 export function groundZone(x:number,z:number):PublicZone{
   for(const zone of buildings){
@@ -108,7 +108,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
     const p=localSite(zone,x,z),shaft=Math.abs(p.x)<1.42
     return Math.abs(p.x)<7.72&&p.z<7.29&&p.z>(shaft?-6.21:-5.98)&&!roomObstacles(zone,p.x,p.z)
   }
-  if(Math.abs(x)>52||z<-47||z>51||Math.hypot(x,z)<2.88||HOUSE_ROWS.some(([a,b])=>box(x,z,a,b,3.15,3.15)))return false
+  if(!passableLand(x,z)||Math.hypot(x,z)<2.88||houseObstacle(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x),opening=room==='bank'?1.13:room==='exchange'?1.02:1.25
     if(side<width+.28&&side>width-.28&&p.z>back-.28&&p.z<front+.28)return false

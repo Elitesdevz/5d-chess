@@ -1,3 +1,6 @@
+import {landscape,Scenery} from './landscape.ts'
+import {neighborhood} from './neighborhood.ts'
+import {HOMES} from './terrain.ts'
 import * as T from 'three'
 import {box,cylinder,mesh,v,dice,resultRotation} from '../casino/scene/geometry.ts'
 import {materials} from '../casino/scene/materials.ts'
@@ -7,7 +10,7 @@ import {buildHall,buildHallTables,WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts
 import {ClubGuest} from '../casino/roulette-cast.ts'
 import {ROULETTE_ORDER} from '../casino-model.ts'
 import {SEAT_OFFSETS} from '../roulette-hall-model.ts'
-import {FLOOR_HEIGHT,FLOOR_LIST,HOUSE_ROWS,PLAN,PUBLIC_DICE,floorHeight,type WorldZone} from './model.ts'
+import {FLOOR_HEIGHT,FLOOR_LIST,PLAN,PUBLIC_DICE,floorHeight,type WorldZone} from './model.ts'
 
 const std=(color:number,metalness=0,roughness=.74)=>new T.MeshStandardMaterial({color,metalness,roughness})
 const brass=std(0xb78b57,.65,.35),oak=std(0x372725,.15,.48),ink=std(0x182930,.28,.57)
@@ -92,33 +95,6 @@ function glazing(parent:T.Object3D,x:number,y:number,z:number,w:number,h:number)
   pane.renderOrder=2
   block(parent,.043,h,.067,x,y,z+.027,brass);block(parent,w,.035,.061,x,y+.12,z+.027,brass)
 }
-function frontage(parent:T.Object3D,width:number,depth:number,levels:number,columns:number,finish:T.Material,ornate=false,entry=true){
-  const xEdge=width/2,z=depth/2,step=width/columns
-  for(let floor=0;floor<levels;floor++){
-    const base=floor*2.9
-    block(parent,width,.24,depth,0,base+.095,0,ivory)
-    block(parent,width,.28,.32,0,base+2.76,z,finish)
-    if(floor>0)block(parent,width,.55,.32,0,base+.39,z,finish)
-    for(let i=0;i<=columns;i++){
-      const x=-xEdge+i*step,pier=i===0||i===columns?.36:ornate?.29:.15
-      block(parent,pier,2.53,.34,x,base+1.45,z,finish)
-      if(ornate){block(parent,pier+.13,.11,.41,x,base+2.64,z,brass);block(parent,pier+.13,.1,.39,x,base+.22,z,brass)}
-      if(i===columns)continue
-      const bay=x+step/2,door=floor===0&&entry&&Math.abs(bay)<.1
-      if(!door){
-        const height=floor===0?2.14:1.79
-        glazing(parent,bay,base+(floor===0?1.37:1.68),z+.012,step-.26,height)
-        if(floor===0)block(parent,step-.24,.26,.27,bay,.28,z,finish)
-      }
-    }
-    // Side returns, rear wall and visible floor slabs give the openings depth.
-    block(parent,.27,2.85,depth,-xEdge,base+1.46,0,finish)
-    block(parent,.27,2.85,depth,xEdge,base+1.46,0,finish)
-    block(parent,width,2.85,.27,0,base+1.46,-z,finish)
-  }
-  block(parent,width+.5,.22,depth+.47,0,levels*2.9,0,ornate?ivory:finish)
-  batchStatic(parent)
-}
 function landmarks(parent:T.Object3D){
   for(const [type,label,material] of [['hotel','ROYAL HOTEL & CASINO',rug],['bank','FIFTH DIMENSION BANK',blue],['exchange','THE EXCHANGE',blue]] as const){
     const {x,z,width,front}=PLAN[type],root=new T.Group();root.position.set(x,0,z);parent.add(root)
@@ -131,17 +107,6 @@ function landmarks(parent:T.Object3D){
     }
     box(root,[3.75,.16,1.43],[0,3.4,front+.66],material,.045)
   }
-}
-function houses(parent:T.Object3D){
-  HOUSE_ROWS.forEach(([x,z],idx)=>{
-    const g=new T.Group();g.position.set(x,0,z);parent.add(g)
-    const m=std([0x5b7c76,0x88716f,0x889396,0x8a8466][idx%4],.09,.7)
-    frontage(g,6,5.8,2,3,m,false,false)
-      box(g,[6.34,.25,6.13],[0,5.84,0],ink,.035)
-      box(g,[.88,1.70,.1],[0,.98,2.96],oak,.03)
-      box(g,[.65,.18,.3],[1.64,.82,3.04],brass,.024)
-      cylinder(g,.09,.14,[1.64,1.4,3.15],gold,9)
-  })
 }
 function fountain(scene:T.Scene){
   const plaza=new T.Group();scene.add(plaza)
@@ -178,7 +143,7 @@ function street(){
   for(const z of [-27,-21,-15,-9,-3,3,18,24,30,36])plane(group,.11,1.95,0,-.010,z,mark)
   for(const sign of [-1,1])for(let n=1;n<=11;n++)plane(group,1.98,.095,n*4*sign,-.009,11,mark)
   plane(group,23.6,17.85,0,.014,1.925,paving())
-  landmarks(group);houses(group)
+  landmarks(group);neighborhood(group)
   for(const [x,z] of [[-10,2],[10,2],[-11,13],[11,13],[-15,-8],[15,-8],[-17,12],[17,12],[-33,12],[33,12],[-44,-5],[44,-5],[-9,26],[9,26],[-25,26],[25,26]]){
     lamp(group,x,z)
   }
@@ -377,7 +342,8 @@ export function makeWorldArt(open:boolean){
   scene.fog=new T.FogExp2(scene.background as T.Color,.0064)
   scene.add(new T.HemisphereLight(0xdbe9ff,0xa89072,1.95))
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
-  scene.add(street());const ambient=fountain(scene)
+  scene.add(street());const water=fountain(scene),wind=landscape(scene)
+  const ambient=(time:number)=>{water(time);wind(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>
   for(const zone of Object.keys(PLAN) as (keyof typeof PLAN)[]){
     const group=new T.Group(),{x,z}=PLAN[zone];group.position.set(x,0,z);scene.add(group);rooms[zone]=group
