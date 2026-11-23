@@ -122,3 +122,5 @@ body[data-page=collection] .equipment-slots button,body[data-page=collection] .o
 @media (max-width:600px) {
   .masthead.app-topbar.guest-header:has(+ .workspace) > .header-actions { grid-column:2/4; }
 }
+.has-economy .economy-nav .bank-nav-button{border:1px solid #80b4cb65;background:#22465365;color:#aed3e4}
+.has-economy .economy-nav .bank-nav-button:hover,.has-economy .economy-nav .bank-nav-button[aria-current=page]{background:#315e72a0;border-color:#91c3d5;color:#e7f6ff}

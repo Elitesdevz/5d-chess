@@ -18,7 +18,7 @@
 </header>
 <main class="exchange">
   <header class="exchange-hero">
-    <div class="exchange-hero-copy"><p class="exchange-label">5D Chess Exchange</p><h1>Stocks<span>.</span></h1><p class="exchange-intro">Trade companies and casino shares with your game coins.</p></div>
+    <div class="exchange-hero-copy"><p class="exchange-label">5D Chess Exchange</p><h1>Stocks<span>.</span></h1><p class="exchange-intro">Trade company, casino, and bank shares with game coins.</p></div>
     <div class="exchange-feed"><i></i><div><strong>Nasdaq reference prices</strong><span id="exchange-feed-time">Connecting to the exchange…</span></div></div>
   </header>
   <p id="exchange-load-error" role="status" class="exchange-load-error" hidden></p>
@@ -27,7 +27,7 @@
       <article><span>Cash available</span><strong id="exchange-cash"></strong><small>Coins in wallet</small></article>
       <article><span>Holdings value</span><strong id="exchange-value"></strong><small id="exchange-holding-count"></small></article>
       <article><span>Unrealized return</span><strong id="exchange-gain"></strong><small id="exchange-gain-percent"></small></article>
-      <article class="exchange-summary-cas"><span>CAS dividends</span><strong id="exchange-dividends"></strong><small>Total coins paid to you</small></article>
+      <article class="exchange-summary-cas"><span>Dividends received</span><strong id="exchange-dividends"></strong><small>Total coins paid to you</small></article>
     </div>
     <div class="exchange-nav" role="group" aria-label="Exchange views">
       <button type="button" data-exchange-view="market" aria-pressed="true">Market</button>
@@ -47,6 +47,11 @@
           <span class="exchange-cas-copy"><small>CAS</small><strong>The Casino</strong><span id="exchange-cas-float"></span></span>
           <span id="exchange-cas-art" class="exchange-cas-art"></span>
           <span class="exchange-cas-price"><strong id="exchange-cas-price"></strong><span>Ownership &amp; shares <b aria-hidden="true">›</b></span></span>
+        </button>
+        <button type="button" class="exchange-cas exchange-bank" data-stock="BNK" hidden>
+          <span class="exchange-cas-copy"><small>BNK</small><strong>Fifth Dimension Bank</strong><span id="exchange-bank-float"></span></span>
+          <span id="exchange-bank-art" class="exchange-cas-art"></span>
+          <span class="exchange-cas-price"><strong id="exchange-bank-price"></strong><span>Dividend shares <b aria-hidden="true">›</b></span></span>
         </button>
       </div>
       <section class="exchange-panel exchange-browser" aria-labelledby="exchange-browser-title">
@@ -86,7 +91,12 @@
           <p class="exchange-chart-readout" id="stock-chart-readout"></p>
           <dl class="exchange-graph-stats" id="stock-range-stats"></dl>
         </section>
-        <div id="stock-order"></div>
+        <div><div id="stock-order"></div>
+          <section class="exchange-bank-issue" id="stock-bank-info" hidden>
+            <h3>Bank dividends</h3><p>25% of the interest collected by the bank is allocated across its public shares at midnight in the Netherlands.</p>
+            <dl id="stock-bank-details"></dl><a href="/chess/bank.html">Visit the Bank ›</a>
+          </section>
+        </div>
       </div>
     </article>
   </dialog>

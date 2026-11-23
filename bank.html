@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#14232f">
+<title>Bank | 5D Chess</title>
+<link rel="icon" href="/chess/emblem.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/chess/styles.css">
+<link rel="stylesheet" href="/chess/shell.css">
+<link rel="stylesheet" href="/chess/bank.css">
+<script type="module" src="/chess/bank.js"></script>
+</head>
+<body data-page="bank">
+<header class="masthead app-topbar">
+  <a class="brand" id="brand-home" href="/chess/lobby.html"><img src="/chess/logo.png" width="48" height="48" alt=""><span><b>5D</b> Chess</span></a>
+  <div id="account-area" class="account-area"><a class="button" href="/chess/login.html">Log in</a></div>
+</header>
+<main class="bank-hall" id="bank-hall" data-view="lobby">
+  <canvas id="bank-canvas" tabindex="0" aria-label="Walk around the bank hall with WASD or arrow keys. Drag to look around. Use the bank directory to visit a counter."></canvas>
+  <div class="bank-overlay" aria-hidden="true"></div>
+  <a class="bank-back" href="/chess/lobby.html" id="bank-back">Back to Home</a>
+  <header class="bank-hero">
+    <small>5D CHESS</small><h1>Fifth Dimension Bank</h1><p id="bank-welcome">Connecting to your account…</p>
+  </header>
+  <div class="bank-world-actions">
+    <button type="button" data-bank-visit="loans" data-desk-point="loans" hidden><span></span> Loans</button>
+    <button type="button" data-bank-visit="payments" data-desk-point="payments" hidden><span></span> Payments</button>
+    <button type="button" data-bank-visit="vault" data-desk-point="vault" hidden><span></span> Reserve</button>
+  </div>
+  <aside class="bank-panel bank-directory" id="bank-directory" aria-label="Bank directory" hidden>
+    <h2>Bank directory</h2>
+    <button type="button" data-bank-visit="loans"><span class="bank-door-icon" data-icon="coin"></span><span><strong>Loans</strong><small>Choose an amount and a term</small></span><b aria-hidden="true">›</b></button>
+    <button type="button" data-bank-visit="payments"><span class="bank-door-icon" data-icon="check"></span><span><strong>Payments</strong><small>Check or repay your balance</small></span><b aria-hidden="true">›</b></button>
+    <button type="button" data-bank-visit="vault"><span class="bank-door-icon" data-icon="bank"></span><span><strong>Reserve</strong><small>Bank shares and dividends</small></span><b aria-hidden="true">›</b></button>
+  </aside>
+  <section class="bank-panel bank-service" id="bank-service" aria-label="Bank counter" hidden>
+    <div class="bank-service-head"><div><small id="bank-desk-label"></small><h2 id="bank-desk-title"></h2></div><button type="button" data-bank-visit="lobby">Back to lobby</button></div>
+    <div id="bank-loans" hidden>
+      <dl class="bank-metrics"><div><dt>In your wallet</dt><dd data-bank-coins></dd></div><div><dt>Available to borrow</dt><dd id="bank-limit"></dd></div></dl>
+      <p id="bank-loan-unavailable" class="bank-note" hidden></p>
+      <form id="bank-borrow">
+        <label for="bank-loan-amount">Loan amount</label>
+        <div class="bank-amount"><input id="bank-loan-amount" type="number" min="100" step="1" inputmode="numeric" value="100" required><button type="button" id="bank-loan-max">Max</button></div>
+        <fieldset class="bank-terms"><legend>Repayment term</legend><div id="bank-term-buttons"></div></fieldset>
+        <dl class="bank-estimate"><div><dt>Interest at term</dt><dd id="bank-estimate-interest"></dd></div><div><dt>Total at term</dt><dd id="bank-estimate-total"></dd></div></dl>
+        <button type="submit" class="bank-primary" id="bank-sign">Take out loan</button>
+      </form>
+      <details class="bank-rules"><summary>How loans work</summary><p>Borrow up to half of your wallet balance, subject to the reserve and the 12,000 coin limit. Interest is added at midnight in the Netherlands on unpaid principal. Pay early or in parts. Overdue loans accrue 0.9% per day, and total interest is capped at 25% of the original loan.</p></details>
+    </div>
+    <div id="bank-payments" hidden>
+      <div id="bank-current-loan"></div>
+      <form id="bank-repay" hidden>
+        <label for="bank-payment-amount">Make a partial payment</label>
+        <div class="bank-amount"><input id="bank-payment-amount" type="number" min="0.0001" step="0.0001" inputmode="decimal" required><button type="submit" id="bank-pay-some">Pay</button></div>
+        <button type="button" class="bank-primary" id="bank-pay-all">Repay in full</button>
+        <p class="bank-note">Payments cover interest first, then reduce principal.</p>
+      </form>
+      <details class="bank-rules" id="bank-ledger"><summary>Transaction history</summary><div id="bank-receipts"></div></details>
+    </div>
+    <div id="bank-vault" hidden>
+      <dl class="bank-metrics"><div><dt>Lending reserve</dt><dd id="bank-reserve"></dd></div><div><dt>Bank stock</dt><dd>BNK</dd></div></dl>
+      <p class="bank-note">A quarter of the interest collected from loans is allocated to the public shares at Dutch midnight. The payout goes into shareholders’ coin wallets.</p>
+      <a href="/chess/stocks.html#bnk" class="bank-primary">View Bank Shares <span aria-hidden="true">›</span></a>
+    </div>
+  </section>
+  <p id="bank-feedback" class="bank-feedback" role="status" hidden></p>
+  <p class="bank-walk-hint"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to walk <i></i> Drag to look</p>
+  <div class="bank-walk" role="group" aria-label="Walk around">
+    <button type="button" data-bank-walk="w" aria-label="Walk forward">↑</button><button type="button" data-bank-walk="a" aria-label="Walk left">←</button><button type="button" data-bank-walk="s" aria-label="Walk back">↓</button><button type="button" data-bank-walk="d" aria-label="Walk right">→</button>
+  </div>
+</main>
+</body>
+</html>

@@ -98,6 +98,7 @@ export function bankApi(unit:UnitOfWork,account:Account,path:string,method:strin
     if(loan)fail(409,'Repay your current loan before borrowing again')
     if(typeof requested!=='number'||!Number.isSafeInteger(requested)||requested<BANK_MIN_LOAN||requested>limit())fail(409,'Choose an amount within your borrowing limit')
     amount=toStockUnits(requested)
+    if(!Number.isSafeInteger(balance+amount))fail(409,'This loan exceeds the wallet limit')
     const today=dayNumber(now)
     loan={id:randomUUID(),days:term.days,original:amount,principal:amount,interest:0,charged:0,opened:now,lastDay:today,dueDay:today+term.days}
     exchange.reserve-=amount

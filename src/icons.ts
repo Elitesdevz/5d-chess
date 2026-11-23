@@ -7,6 +7,7 @@ const paths: Record<string,string> = {
  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>',
  dice:'<rect x="3" y="3" width="18" height="18" rx="4"/><circle cx="8" cy="8" r="1"/><circle cx="16" cy="8" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="8" cy="16" r="1"/><circle cx="16" cy="16" r="1"/>',
  coin:'<circle cx="12" cy="12" r="10" fill="#c89b3b" stroke="#f4d785"/><circle cx="12" cy="12" r="7" stroke="#86631f"/><path d="M14 8h-4v8h4m-5-4h5" stroke="#fff1b4"/>',
+ bank:'<path d="M2 9h20L12 3 2 9Zm1 12h18M6 11v7m6-7v7m6-7v7"/>',
  shop:'<path d="M3 10v12h18V10M2 10l3-8h14l3 8M8 22v-8h8v8M2 10q3 4 5 0 3 4 5 0 3 4 5 0 3 4 5 0"/>',
  inventory:'<path d="M3 7h18v15H3V7ZM2 2h20v5H2V2Zm7 10h6"/>',
  market:'<path d="M3 7h17l-4-4m5 14H4l4 4M20 7l-4 4M4 17l4-4"/>',

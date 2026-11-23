@@ -4,12 +4,13 @@ import {StockChart,sparkline} from './stock-chart.ts'
 import {casinoCoins} from './casino-model.ts'
 import type {Profile} from './account-model.ts'
 import {STOCKS,SECTORS} from './stock-catalog.ts'
-import {CAS,CAS_SHARES,MAX_STOCK_ORDER,QUOTE_MAX_AGE,casOrderTotal,type PricePoint,type StockOrder,type StockSide,type StockTrade,type StockView} from './stock-model.ts'
+import {BANK_SHARE_COUNT} from './bank-model.ts'
+import {BNK,CAS,CAS_SHARES,MAX_STOCK_ORDER,QUOTE_MAX_AGE,isEquity,equityOrderTotal,type PricePoint,type StockOrder,type StockSide,type StockTrade,type StockView} from './stock-model.ts'
 
 const el=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as E
 const nodes=[...document.querySelectorAll<HTMLButtonElement>('[data-exchange-view]')]
 const symbols=new Map<string,{name:string;sector:string}>(STOCKS.map(s=>[s.symbol,s]))
-const label=(symbol:string)=>symbol===CAS?'The Casino':symbols.get(symbol)?.name??symbol
+const label=(symbol:string)=>symbol===CAS?'The Casino':symbol===BNK?'Fifth Dimension Bank':symbols.get(symbol)?.name??symbol
 const coins=(value:number)=>casinoCoins(value)+' coins'
 const signed=(value:number)=>value===0?'0':(value>0?'+':'−')+casinoCoins(Math.abs(value))
 const changeClass=(v:number)=>v>0?'is-gain':v<0?'is-loss':''
@@ -36,11 +37,13 @@ const loading=el('exchange-load-error')
 const app=el('exchange-app')
 el('exchange-search-icon').innerHTML=icon('search')
 el('exchange-cas-art').innerHTML=icon('wheel')
+el('exchange-bank-art').innerHTML=icon('bank')
 el('stock-watch').innerHTML='<span aria-hidden="true">☆</span>'
 el<HTMLSelectElement>('exchange-sector').insertAdjacentHTML('beforeend',SECTORS.map(sector=>`<option>${sector}</option>`).join(''))
 const input=<I extends HTMLInputElement|HTMLSelectElement>(id:string)=>el<I>(id).value
-const mark=(symbol:string)=>symbol===CAS?state!.cas.price:state!.quotes[symbol]?.price
-const validQuote=(symbol:string)=>symbol===CAS||Boolean(state?.quotes[symbol]&&state.now-state.quotes[symbol].updated<QUOTE_MAX_AGE)
+const issue=(symbol:string)=>symbol===CAS?state?.cas:symbol===BNK?state?.bank:undefined
+const mark=(symbol:string)=>issue(symbol)?.price??state?.quotes[symbol]?.price
+const validQuote=(symbol:string)=>Boolean(issue(symbol)||(state?.quotes[symbol]&&state.now-state.quotes[symbol].updated<QUOTE_MAX_AGE))
 
 function setState(next:StockView){
   if(state&&(next.now<state.now||next.portfolio.sequence<state.portfolio.sequence))return
@@ -66,7 +69,7 @@ function renderExchange(){
   el('exchange-value').title=unmarked?`${unmarked} positions have no displayed price`:''
   el('exchange-gain').textContent=signed(gain)
   el('exchange-gain').className=changeClass(gain)
-  el('exchange-dividends').textContent=casinoCoins(state.portfolio.dividendsPaid)
+  el('exchange-dividends').textContent=casinoCoins(state.portfolio.dividendsPaid+(state.portfolio.bankDividendsPaid??0))
   const positions=Object.keys(state.portfolio.positions).length
   el('exchange-holding-count').textContent=positions===1?'1 position':`${positions} positions`
   el('exchange-gain-percent').textContent=cost?`${signed(Math.round(gain/cost*10000)/100)}% vs. cost`:'Across open positions'
@@ -76,6 +79,11 @@ function renderExchange(){
   document.querySelector('.exchange-feed')!.classList.toggle('is-waiting',marketFailed||!last||state.now-last>2*60*60*1000)
   el('exchange-cas-price').textContent=coins(state.cas.price)
   el('exchange-cas-float').textContent=`${state.cas.float/CAS_SHARES*100}% public float · ${casinoCoins(state.cas.available)} available`
+  document.querySelector<HTMLElement>('.exchange-bank')!.hidden=!state.bank
+  if(state.bank){
+    el('exchange-bank-price').textContent=coins(state.bank.price)
+    el('exchange-bank-float').textContent=`${state.bank.float/BANK_SHARE_COUNT*100}% public float · ${casinoCoins(state.bank.available)} available`
+  }
   if(mode==='market'){renderPulse();renderMarket()}
   else if(mode==='portfolio')renderPortfolio()
   else renderActivity()
@@ -171,7 +179,7 @@ function renderMarket(){
     rows.map(s=>{
       const q=quote[s.symbol]
       return `<tr class="exchange-list-row" data-open-stock="${s.symbol}"><td><button type="button" class="exchange-watch" data-watch="${s.symbol}"></button></td><th scope="row"><button type="button" class="exchange-company" data-stock="${s.symbol}"><i aria-hidden="true" style="--company-color:${sectorColor(s.sector)}">${s.symbol.slice(0,2)}</i><span><b>${s.symbol}</b><small>${s.name}</small></span></button></th><td class="exchange-sector-name">${s.sector}</td><td class="exchange-trend"><canvas aria-hidden="true"></canvas></td><td><strong>${q?casinoCoins(q.price):'—'}</strong></td><td>${q?quoteTag(q.percent):'—'}</td></tr>`
-    }).join('')+'</tbody></table>':'<div class="exchange-empty"><strong>'+ (scope==='watch'&&!watched.size?'Your watchlist is empty':scope==='owned'&&!Object.keys(state.portfolio.positions).some(s=>s!==CAS)?'No US stocks owned':'No stocks match these filters')+'</strong><span> '+(scope==='watch'&&!watched.size?'Star a stock to add it here.':'Try a different scope or clear your filters.')+'</span></div>'
+    }).join('')+'</tbody></table>':'<div class="exchange-empty"><strong>'+ (scope==='watch'&&!watched.size?'Your watchlist is empty':scope==='owned'&&!Object.keys(state.portfolio.positions).some(s=>!isEquity(s))?'No US stocks owned':'No stocks match these filters')+'</strong><span> '+(scope==='watch'&&!watched.size?'Star a stock to add it here.':'Try a different scope or clear your filters.')+'</span></div>'
   visibleTrendRows().forEach(row=>{
     setWatch(row.querySelector('button[data-watch]')!,row.dataset.openStock!)
     paintTrend(row)
@@ -201,7 +209,7 @@ function renderActivity(){
   const {trades,dividends}=state!.portfolio
   const entries=[
     ...trades.map(t=>({at:t.at,html:`<li><div><strong>${t.side==='buy'?'Bought':'Sold'} ${casinoCoins(t.shares)} ${t.symbol}</strong><small>${stamp(t.at)}</small></div><b class="${t.side==='sell'?'is-gain':''}">${t.side==='sell'?'+':'−'}${coins(t.total)}</b></li>`})),
-    ...dividends.map(d=>({at:Date.parse(d.day+'T23:00:00'),html:`<li><div><strong>CAS dividend</strong><small>${d.day} · ${casinoCoins(d.shares)} shares</small></div><b class="is-gain">+${coins(d.amount)}</b></li>`})),
+    ...dividends.map(d=>({at:Date.parse(d.day+'T23:00:00'),html:`<li><div><strong>${d.symbol??CAS} dividend</strong><small>${d.day} · ${casinoCoins(d.shares)} shares</small></div><b class="is-gain">+${coins(d.amount)}</b></li>`})),
   ].sort((a,b)=>b.at-a.at)
   el('exchange-activity').innerHTML=entries.length?`<ul class="exchange-ledger">${entries.map(entry=>entry.html).join('')}</ul>`:'<p class="exchange-empty">Trades and dividends will appear here.</p>'
 }
@@ -220,9 +228,10 @@ const ticket=()=>el(selected===CAS?'cas-order':'stock-order').querySelector<HTML
 const quantity=()=>Number(ticket().querySelector<HTMLInputElement>('input')!.value)
 function estimate(shares:number){
   if(!state||!validQuote(selected)||!Number.isSafeInteger(shares)||shares<1||shares>MAX_STOCK_ORDER)return undefined
-  if(selected===CAS){
-    if(side==='buy'&&shares>state.cas.available||side==='sell'&&shares>state.cas.float-state.cas.available)return undefined
-    return casOrderTotal(state.cas,side,shares)
+  if(isEquity(selected)){
+    const equity=issue(selected)
+    if(!equity||side==='buy'&&shares>equity.available||side==='sell'&&shares>equity.float-equity.available)return undefined
+    return equityOrderTotal(selected,equity,side,shares)
   }
   return Math.round(state.quotes[selected].price*100)*shares/100
 }
@@ -241,7 +250,7 @@ function renderTicket(){
   const submit=form.querySelector<HTMLButtonElement>('[data-submit]')!
   const allowed=value!==undefined&&(side==='buy'?value<=state!.coins:shares<=held)
   const limit=form.querySelector<HTMLElement>('[data-order-limit]')!
-  limit.textContent=shares>0&&!working&&!allowed?(side==='sell'&&shares>held?'You have fewer shares than this order.':!validQuote(selected)?'This price is unavailable for trading.':selected===CAS&&side==='buy'&&shares>state!.cas.available?'This order exceeds the available float.':value!==undefined&&side==='buy'?'Insufficient coins for this order.':''):''
+  limit.textContent=shares>0&&!working&&!allowed?(side==='sell'&&shares>held?'You have fewer shares than this order.':!validQuote(selected)?'This price is unavailable for trading.':isEquity(selected)&&side==='buy'&&shares>(issue(selected)?.available??0)?'This order exceeds the available float.':value!==undefined&&side==='buy'?'Insufficient coins for this order.':''):''
   limit.hidden=!limit.textContent
   const retry=pending?.symbol===selected
   submit.disabled=working||(!allowed&&!retry)
@@ -322,7 +331,29 @@ function renderCas(){
   el('cas-moves').innerHTML=cas.equityMoves.length?cas.equityMoves.slice(0,5).map(move=>`<div class="cas-move"><span>${move.side==='sell'?'Released to public':'Bought back'} · ${simpleDate(move.at)}</span><b>${casinoCoins(move.shares)} shares</b></div>`).join(''):'<p class="exchange-muted">No equity transactions yet.</p>'
   casChart.set(cas.history,'#e6ba72')
 }
+function renderBankShare(){
+  const bank=state!.bank,info=el('stock-bank-info')
+  info.hidden=false
+  el('stock-title').textContent=label(BNK)
+  el('stock-sector').textContent='In-game equity'
+  const monogram=el('stock-monogram')
+  monogram.innerHTML=icon('bank');monogram.style.setProperty('--company-color','#a8d4eb')
+  el('stock-symbol').textContent=BNK
+  el('stock-watch').hidden=true
+  el('stock-price').textContent=coins(bank.price)
+  const change=el('stock-change')
+  change.textContent=`Bid ${bank.bid?casinoCoins(bank.bid):'—'} · Ask ${bank.ask?casinoCoins(bank.ask):'—'}`;change.className=''
+  el('stock-chart-status').textContent='Bank share prices · In-game orders'
+  const history=bank.history.filter(p=>p.at>=state!.now-range*dayMs)
+  stockChart.set(history,'#97d2ea')
+  const held=state!.portfolio.positions[BNK]?.shares??0
+  el('stock-range-stats').innerHTML=`<div><dt>Public shares</dt><dd>${casinoCoins(bank.float)}</dd></div><div><dt>Available</dt><dd>${casinoCoins(bank.available)}</dd></div><div><dt>You hold</dt><dd>${casinoCoins(held)}</dd></div><div><dt>Price records</dt><dd>${history.length}</dd></div>`
+  const accrual=bank.lastDividend
+  el('stock-bank-details').innerHTML=`<div><dt>Issued shares</dt><dd>${casinoCoins(BANK_SHARE_COUNT)}</dd></div><div><dt>Last allocation</dt><dd>${accrual?coins(accrual.pool):'Pending'}</dd></div><div><dt>Paid to you</dt><dd>${coins(state!.portfolio.bankDividendsPaid??0)}</dd></div>`
+}
 function renderStock(){
+  el('stock-bank-info').hidden=true
+  el('stock-watch').hidden=false
   const active=selected,q=state!.quotes[active],symbol=symbols.get(active)!,history=historyBySymbol.get(active)
   el('stock-title').textContent=symbol.name
   el('stock-sector').textContent=symbol.sector
@@ -344,6 +375,7 @@ function renderStock(){
 function renderDetail(){
   if(!selected||!state)return
   if(selected===CAS)renderCas()
+  else if(selected===BNK)renderBankShare()
   else renderStock()
   renderTicket()
 }
@@ -362,7 +394,7 @@ async function loadHistory(symbol:string){
   }
 }
 function openStock(symbol:string){
-  if(!state||symbol!==CAS&&!symbols.has(symbol))return
+  if(!state||isEquity(symbol)&&!issue(symbol)||!isEquity(symbol)&&!symbols.has(symbol))return
   selected=symbol
   ownershipIndex=-1
   if(symbol===CAS){
@@ -377,7 +409,7 @@ function openStock(symbol:string){
   orderMessage('')
   el<HTMLDialogElement>(symbol===CAS?'exchange-cas-dialog':'exchange-stock-dialog').showModal()
   renderDetail()
-  if(symbol!==CAS)void loadHistory(symbol)
+  if(!isEquity(symbol))void loadHistory(symbol)
 }
 function savePending(value?:StockOrder){
   pending=value
@@ -404,7 +436,7 @@ async function trade(event:SubmitEvent){
   if(!request){
     const shares=quantity(),total=estimate(shares)
     if(total===undefined)return
-    request={symbol:selected,side,shares,total,sequence:state.portfolio.sequence+1,id:crypto.randomUUID(),version:selected===CAS?state.cas.version:undefined}
+    request={symbol:selected,side,shares,total,sequence:state.portfolio.sequence+1,id:crypto.randomUUID(),version:issue(selected)?.version}
     savePending(request)
   }
   working=true;orderMessage('');renderTicket()
@@ -433,7 +465,7 @@ for(const prefix of ['cas','stock']){
     if(!selected||!state)return
     let max=side==='sell'?Math.min(MAX_STOCK_ORDER,state.portfolio.positions[selected]?.shares??0):0
     if(side==='buy'){
-      let high=selected===CAS?Math.min(MAX_STOCK_ORDER,state.cas.available):MAX_STOCK_ORDER
+      let high=Math.min(MAX_STOCK_ORDER,issue(selected)?.available??MAX_STOCK_ORDER)
       while(max<high){
         const mid=Math.ceil((max+high)/2)
         if((estimate(mid)??Infinity)<=state.coins)max=mid
@@ -461,7 +493,7 @@ el('stock-watch').onclick=()=>{if(selected)toggleWatch(selected)}
 document.querySelectorAll<HTMLButtonElement>('[data-range]').forEach(b=>b.onclick=()=>{
   range=Number(b.dataset.range)
   document.querySelectorAll<HTMLButtonElement>('[data-range]').forEach(button=>button.setAttribute('aria-pressed',String(button===b)))
-  if(selected&&selected!==CAS)renderStock()
+  if(selected&&selected!==CAS)renderDetail()
 })
 function changeScope(next:string){
   scope=next;page=0
@@ -504,6 +536,7 @@ async function start(){
   try{pending=JSON.parse(sessionStorage.getItem('stock-order:'+accountName)??'null')??undefined}catch{}
   await refresh()
   if(state&&location.hash==='#cas')openStock(CAS)
+  if(state&&location.hash==='#bnk')openStock(BNK)
   const monitor=async()=>{
     if(!document.hidden)await refresh()
     window.setTimeout(monitor,state&&Object.keys(state.quotes).length?60_000:12_000)

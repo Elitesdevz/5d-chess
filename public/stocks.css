@@ -300,3 +300,19 @@ button.exchange-company {text-align:left;background:none;border:0;padding:0;widt
   .exchange-pills button,.exchange-budget {font-size:9px}
   .exchange-movers button {display:grid;justify-content:start}
 }
+.exchange-overview:has(.exchange-bank:not([hidden])){grid-template-columns:minmax(0,1.25fr) minmax(225px,.64fr) minmax(250px,.73fr)}
+.exchange-bank{border-color:#9cc6d475;background:linear-gradient(108deg,#244350,#20342c)}
+.exchange-bank::before{background:repeating-radial-gradient(circle at 66% 50%,transparent 0 10px,#9ccbda28 11px 12px,transparent 13px 18px)}
+.exchange-bank:hover{border-color:#b0d6e5;background:linear-gradient(108deg,#325868,#29463f)}
+.exchange-bank .exchange-cas-art,.exchange-bank .exchange-cas-price,.exchange-bank .exchange-cas-copy small{color:#a9d9ef}
+.exchange-bank .exchange-cas-copy strong{font-size:20px;color:#e4f2f5}
+.exchange-bank .exchange-cas-copy>span,.exchange-bank .exchange-cas-price span{color:#bdd5d9}
+.exchange-bank-issue{margin-top:8px;padding:11px;background:#142c32;border:1px solid #90bcce55;border-radius:8px}
+.exchange-bank-issue h3{margin:0;color:#d7e7f0;font:19px Georgia,serif}
+.exchange-bank-issue p,.exchange-bank-issue a{font-size:11px;color:#bfd4dd}
+.exchange-bank-issue p{line-height:1.4;margin:7px 0}
+.exchange-bank-issue dl{margin:7px 0}
+.exchange-bank-issue dl div{display:flex;justify-content:space-between;gap:6px;font-size:11px;padding:2px 0}
+.exchange-bank-issue dd{margin:0;font-weight:700}
+@media(max-width:1000px){.exchange-overview:has(.exchange-bank:not([hidden])){grid-template-columns:repeat(2,minmax(0,1fr))}.exchange-overview:has(.exchange-bank:not([hidden])) .exchange-pulse{grid-column:1/-1}}
+@media(max-width:540px){.exchange-overview:has(.exchange-bank:not([hidden])){grid-template-columns:minmax(0,1fr)}.exchange-bank .exchange-cas-copy strong{font-size:19px}}
