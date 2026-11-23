@@ -20,7 +20,7 @@ function contactTexture(){
   ctx.fillStyle=gradient;ctx.fillRect(0,0,64,64)
   return new T.CanvasTexture(c)
 }
-class Figure {
+export class Figure {
   root=new T.Group()
   target:HallPlayer
   private body=new T.Group()

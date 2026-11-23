@@ -84,6 +84,8 @@ export function createApplication(store: ChessStore) {
           if (auth){const named=(auth.value as {user?:unknown}).user;if(typeof named==='string')actor=named;return auth}
           const me = user(unit,req) ?? fail(401,'Log in first')
           const account = ensureAccount(unit.users.get(me) ?? fail(401,'Log in first'));actor=me;beforeUsage={coins:account.wallet?.coins,elo:account.rating?.value}
+          if(method==='POST'&&path==='/api/stocks/trade'&&!city.canTrade(me,data.symbol))fail(403,'Talk to the trader on that stock floor')
+          if(method==='POST'&&(path==='/api/bank/borrow'||path==='/api/bank/repay')&&!city.canBank(me,path.split('/').at(-1)!))fail(403,'Visit the appropriate bank counter')
           return usageApi(usage,store,me,path,method,data)
             ?? puzzleApi(account,path,method,data)
             ?? playerProfileApi(store,unit,account,url,method,data)

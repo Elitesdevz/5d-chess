@@ -31,6 +31,7 @@ export class StockChart {
     this.observer=new ResizeObserver(()=>this.draw())
     this.observer.observe(canvas)
   }
+  dispose(){this.observer.disconnect()}
   set(points:PricePoint[],accent:string){
     if(points.length!==this.points.length||points[0]?.at!==this.points[0]?.at||points.at(-1)?.at!==this.points.at(-1)?.at)this.current=-1
     this.points=points;this.accent=accent

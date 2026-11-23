@@ -74,6 +74,14 @@ export class CityWorlds {
     else if((zone==='exchange'||zone.startsWith('floor:'))&&near(member,0,-4.5,1.15))member.interaction='elevator'
   }
 
+  canTrade(name:string,symbol:unknown,now=Date.now()){
+    const member=this.occupants.get(name)?.members.get(name)
+    return Boolean(member&&now-member.seen<TIMEOUT&&member.interaction==='trader'&&member.zone==='floor:'+symbol)
+  }
+  canBank(name:string,kind:string,now=Date.now()){
+    const member=this.occupants.get(name)?.members.get(name)
+    return Boolean(member&&now-member.seen<TIMEOUT&&member.zone==='bank'&&member.interaction===(kind==='borrow'?'loans':'payments'))
+  }
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
     this.clean(now)
     const account=this.store.rouletteWallet(name)??fail(401,'Log in first')

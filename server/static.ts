@@ -9,6 +9,10 @@ const types: Record<string, string> = {'.html': 'text/html; charset=utf-8', '.js
 export async function staticFile(req: IncomingMessage, res: ServerResponse, path: string) {
   if (req.method !== 'GET' && req.method !== 'HEAD') fail(405, 'Method not allowed')
   if (path === '/') { res.writeHead(302, {location: '/chess/'}).end(); return }
+  const destination=({'/chess/roulette.html':'casino','/chess/dice.html':'casino','/chess/bank.html':'bank','/chess/stocks.html':'stocks'} as Record<string,string>)[path]
+  if(destination&&!(path==='/chess/dice.html'&&new URL(req.url??'/','http://localhost').searchParams.get('cave')==='1')){
+    res.writeHead(302,{location:'/chess/world.html?go='+destination,'cache-control':'no-store'}).end();return
+  }
   if (!path.startsWith('/chess/')) fail(404, 'Not found')
   const name = path.slice('/chess/'.length) || 'index.html'
   if (!/^[a-zA-Z0-9._/-]+$/.test(name) || name.split('/').includes('..')) fail(404, 'Not found')

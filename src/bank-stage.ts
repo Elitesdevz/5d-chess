@@ -115,7 +115,7 @@ function bench(parent:T.Object3D,x:number,z:number,yaw:number){
   }
   batchStatic(b)
 }
-function desk(parent:T.Object3D,x:number,title:string){
+export function bankDesk(parent:T.Object3D,x:number,title:string){
   const g=new T.Group();parent.add(g);g.position.set(x,0,-1.53)
   box(g,[4.02,1.12,.92],[0,.56,0],oak,.105)
   box(g,[4.14,.09,1.08],[0,1.145,0],ivory,.042)
@@ -137,10 +137,10 @@ function desk(parent:T.Object3D,x:number,title:string){
   batchStatic(g)
 }
 
-function building(scene:T.Scene){
+export function buildBankArchitecture(scene:T.Scene,city=false){
   const room=new T.Group();scene.add(room);makeFloor(scene)
   box(room,[21,6.7,.36],[0,3.35,-6.57],blue,.025)
-  box(room,[21,6.7,.36],[0,3.35,8.4],blue,.025)
+  if(!city)box(room,[21,6.7,.36],[0,3.35,8.4],blue,.025)
   for(const x of [-10.2,10.2]){
     box(room,[.30,6.7,15.1],[x,3.35,.96],blue,.025)
     for(const z of [-5.0,-.7,3.5,7.3]){
@@ -152,7 +152,7 @@ function building(scene:T.Scene){
   box(room,[20.7,.25,15.2],[0,6.62,.97],ink,.025)
   for(const z of [-6.15,-2.35,1.3,4.95,8.05])box(room,[20,.18,.17],[0,6.39,z],bronze,.024)
   for(const x of [-8,-4,0,4,8])box(room,[.11,.14,14.5],[x,6.37,.84],bronze,.015)
-  for(const x of [-6.85,-3.48,0,3.48])windowArch(room,x)
+  if(!city)for(const x of [-6.85,-3.48,0,3.48])windowArch(room,x)
   for(const x of [-8.86,-5.12,-1.72,1.72,5.2]){
     cylinder(room,.19,5.65,[x,2.98,-6.02],ivory,22)
     for(const y of [.18,.43,5.77,6.01])cylinder(room,.29,.13,[x,y,-6.02],gilt,18)
@@ -163,7 +163,7 @@ function building(scene:T.Scene){
   }
   spotlight(scene,0x8dcaef,63,13,0,4,-5.4)
   bench(room,-8.94,4.3,-Math.PI/2);bench(room,8.94,4.3,Math.PI/2)
-  desk(room,-2.9,'LOANS');desk(room,2.9,'PAYMENTS')
+  bankDesk(room,-2.9,'LOANS');bankDesk(room,2.9,'PAYMENTS')
   box(room,[3.25,.14,.30],[0,.62,-1.52],oak,.045)
   for(const x of [-.69,.69]){
     cylinder(room,.053,.88,[x,.44,-.31],gilt,16)
@@ -178,7 +178,7 @@ function building(scene:T.Scene){
   sign(room,'FIFTH DIMENSION BANK',4.03,.43,[0,3.60,-1.88])
   batchStatic(room)
 }
-function makeVault(scene:T.Scene){
+export function buildBankVault(scene:T.Scene){
   const vault=new T.Group();scene.add(vault);vault.position.set(7.35,0,-6.11)
   box(vault,[3.72,4.45,.52],[0,2.23,-.15],ink,.14)
   box(vault,[3.41,3.88,.24],[0,2.21,.18],steel,.13)
@@ -217,7 +217,7 @@ export class BankStage {
   private raf=0
   private input=new AbortController()
   private tellers:ClubGuest[]
-  private vault:ReturnType<typeof makeVault>
+  private vault:ReturnType<typeof buildBankVault>
   private coins:T.InstancedMesh
   private goldEvent=0
   private outgoing=false
@@ -230,7 +230,7 @@ export class BankStage {
     this.scene.background=new T.Color(0x243b46);this.scene.fog=new T.FogExp2(0x243b46,.026)
     this.scene.add(new T.HemisphereLight(0xd5e6ed,0x6f5d4a,2))
     const sun=new T.DirectionalLight(0xffe3b9,1.6);sun.position.set(-3,7,2);this.scene.add(sun)
-    building(this.scene);this.vault=makeVault(this.scene)
+    buildBankArchitecture(this.scene);this.vault=buildBankVault(this.scene)
     this.tellers=[
       new ClubGuest(this.scene,-2.9,-2.72,0xb38469,0x284557,true,1),
       new ClubGuest(this.scene,2.9,-2.71,0xd5ad86,0x313c59,true,2),

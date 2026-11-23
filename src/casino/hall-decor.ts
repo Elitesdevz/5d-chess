@@ -145,11 +145,11 @@ function plant(parent:T.Object3D,x:number,z:number){
   }
   batchStatic(g)
 }
-export function buildHall(scene:T.Scene){
+export function buildHall(scene:T.Scene,city=false){
   const architecture=new T.Group();scene.add(architecture)
   floor(architecture)
   box(architecture,[24,5.5,.3],[0,2.75,-6.7],wall)
-  box(architecture,[24,5.5,.3],[0,2.75,8.9],wall)
+  if(!city)box(architecture,[24,5.5,.3],[0,2.75,8.9],wall)
   box(architecture,[.3,5.5,15.5],[-11.25,2.75,1.1],wall)
   box(architecture,[.3,5.5,15.5],[11.25,2.75,1.1],wall)
   box(architecture,[23,.25,16],[0,5.42,1.15],ebony)
@@ -157,7 +157,7 @@ export function buildHall(scene:T.Scene){
     cylinder(architecture,.20,4.5,[x,2.35,-6.28],stone,20)
     for(const y of [.23,.48,4.55,4.78])cylinder(architecture,.27,.1,[x,y,-6.28],brass,20)
   }
-  for(const x of [-9.25,-5.55,-1.85,1.85,5.55,9.25])archWindow(architecture,x)
+  if(!city)for(const x of [-9.25,-5.55,-1.85,1.85,5.55,9.25])archWindow(architecture,x)
   for(const x of [-10.95,10.95]){
     for(const z of [-5.4,-2.1,1.2,4.5,7.7]){
       box(architecture,[.26,4.6,.18],[x,2.3,z],stone)
@@ -176,7 +176,7 @@ export function buildHall(scene:T.Scene){
   scene.add(light(0x95c8ec,40,14,0,3,-5.8))
   for(const site of LOUNGES)lounge(architecture,site.x,site.z,site.yaw)
   for(const [x,z] of [[-9.5,-5.3],[9.5,-5.3],[-10,5.8],[10,5.8]])plant(architecture,x,z)
-  const bar=new T.Group();bar.position.set(0,0,8.23);scene.add(bar)
+  const bar=new T.Group();bar.position.set(city?-5.9:0,0,8.23);scene.add(bar)
   box(bar,[7.6,1,.66],[0,.50,0],oak,.075);box(bar,[7.86,.08,.77],[0,1.03,0],brass,.038)
   for(let i=0;i<15;i++)box(bar,[.22,.67,.025],[(i-7)*.48,.5,-.343],trim,.006)
   const bottleGlass=[0x356569,0x8d6343,0x3b6252].map(color=>standard(color,.25,.35))

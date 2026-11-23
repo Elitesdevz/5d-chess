@@ -128,3 +128,4 @@ body[data-casino=dice] .table-modal form{display:block}
 body[data-casino=dice] .table-fallback{display:grid}
 
 .table-result[data-won=true]{border-color:#edcf78;background:linear-gradient(115deg,#55411ddf,#142119e8);box-shadow:0 0 30px #d3ac4022}.table-result[data-won=true]>strong{color:#ffe8a2;text-shadow:0 0 20px #e6b64e66;animation:winnings-arrive .7s ease-out both}@keyframes winnings-arrive{0%{opacity:.2;transform:translateY(8px) scale(.94)}60%{transform:translateY(-2px) scale(1.04)}100%{opacity:1;transform:none}}@media(prefers-reduced-motion:reduce){.table-result[data-won=true]>strong{animation:none}}
+body[data-cave=true] .scene-ready #exit-cave-fallback{display:none}

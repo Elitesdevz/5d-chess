@@ -1,7 +1,7 @@
 import {api,ApiError,getSession,initShell,renderAccount} from '../shell.ts'
 import {icon} from '../icons.ts'
 import type {Profile} from '../account-model.ts'
-import {casinoCoins,grossMultiplier,pocketColor,type CasinoGame,type RouletteChoice,type CasinoBet,type CasinoView,type CasinoRound,type CasinoReply,type EloGamblingView,type EncounterReason,cycleEloStake,MAX_ELO_ROUNDS} from '../casino-model.ts'
+import {CAVE_DICE_MULTIPLIER,casinoCoins,grossMultiplier,pocketColor,type CasinoGame,type RouletteChoice,type CasinoBet,type CasinoView,type CasinoRound,type CasinoReply,type EloGamblingView,type EncounterReason,cycleEloStake,MAX_ELO_ROUNDS} from '../casino-model.ts'
 import {rouletteArena,rouletteHeading,rouletteWager,animateRoulette,setRouletteSelection,setRouletteBusy,renderRouletteHistory,bindRouletteTable,landRouletteResult} from './roulette.ts'
 import {encounterTrigger,encounterQuestion} from './encounter.ts'
 import {dayKey} from '../collection.ts'
@@ -11,6 +11,22 @@ import type {DiceScene,TableAction} from './dice-scene.ts'
 
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T
 const game=document.body.dataset.casino as CasinoGame
+const cave=new URLSearchParams(location.search).get('cave')==='1'
+const casinoPath=cave?'/casino/cave':'/casino'
+if(cave)document.body.dataset.cave='true'
+let exiting=false
+function exitCave(){
+ if(!cave||exiting)return
+ exiting=true
+ location.assign('/chess/world.html?exit=cave')
+}
+if(cave)document.addEventListener('click',event=>{
+ const link=(event.target as Element).closest<HTMLAnchorElement>('.app-topbar a')
+ if(!link||event.defaultPrevented)return
+ event.preventDefault()
+ exitCave()
+})
+
 let state:CasinoView,profile:Profile,choice:RouletteChoice=game==='dice'?1:'white',busy=false,rolling=false,pending:CasinoBet|undefined,awaitingThrow:CasinoRound|undefined,scene:DiceScene|undefined,storageKey='',requestKey='',phase='idle'
 let rouletteRoom:RouletteRoom|undefined
 let soul:EloGamblingView|undefined,tableMode:'normal'|'offer'|'elo'='normal',coinStake=100,normalRolls=0,encounterBusy=false,resetTimer=0
@@ -22,8 +38,8 @@ const eloQuote=()=>awaitingThrow?.currency==='elo'?awaitingThrow.coinReward??0:s
 const safeStore=(key:string,value:unknown)=>{try{value===undefined?sessionStorage.removeItem(key):sessionStorage.setItem(key,JSON.stringify(value))}catch{}}
 function say(text:string,duration=5000){if(game!=='dice')return;clearTimeout(dialogueTimer);el('keeper-dialogue').textContent=text;scene?.speak(text,duration);dialogueTimer=window.setTimeout(()=>{el('keeper-dialogue').textContent=''},duration)}
 function diceRoom(){
- const buttons=[...[1,2,3,4,5,6].map(n=>({id:'face-'+n,label:'Choose face '+n})),...[25,100,500,1000].map(n=>({id:'stake-'+n,label:`Stake ${n} coins`})),{id:'minus',label:'Decrease stake by 25'},{id:'plus',label:'Increase stake by 25'},{id:'amount',label:'Edit stake amount'},{id:'offer',label:'Offer coins'},{id:'yes',label:'Yes, explore Elo wagers'},{id:'no',label:'No, return to coins'},{id:'return-coins',label:'Return to coin wagers and close Elo wagers for today'},...[1,10,50].map(n=>({id:'elo-plus-'+n,label:'Add '+n+' Elo'}))]
- return `<section class="silent-room" data-phase="idle"><canvas id="dice-canvas" tabindex="0" aria-label="Seated at a felt table opposite a shadowed figure. Drag empty space to look; use the brass keys to wager." aria-describedby="table-instructions soul-disclosure"></canvas><div class="silent-vignette"></div><div class="table-tools"><button id="center-view" type="button">${icon('target')}<span>Center view</span></button><button id="open-rules" type="button">${icon('info')}<span>Rules</span></button><button id="open-history" type="button">${icon('clock')}<span>History</span></button></div><div class="physical-controls" aria-label="Controls on the table">${buttons.map(b=>`<button type="button" class="physical-control" data-control="${b.id}" aria-describedby="soul-disclosure" aria-label="${b.label}"><span>${b.label}</span></button>`).join('')}</div><div class="dice-accessible-status"><span id="soul-disclosure" hidden>Elo wagers risk permanent rating loss. Win: keep your Elo and collect the quoted coins. Lose: lose the staked Elo. Each face has a 1/6 chance; no tax applies.</span><p id="keeper-dialogue" aria-live="polite"></p><span id="table-instructions">Drag empty space to look · Home to center · Pick up the die to throw</span></div><div class="dice-accessible-status"><span id="elo-live-status" aria-live="polite"></span><span id="chosen-label">Face 1</span><span id="return-estimate"></span><span class="table-purse">Purse <strong id="table-balance"></strong></span></div><form id="wager-form" class="table-fallback"><label id="stake-label" for="stake">Stake in coins</label><input id="stake" type="number" min="1" max="100000" step="1" value="100" required><div id="elo-fallback-increments" hidden>${[1,10,50].map(n=>`<button type="button" data-elo-add="${n}">+${n} Elo</button>`).join('')}</div><p id="elo-fallback-quote" hidden></p><div class="fallback-faces">${[1,2,3,4,5,6].map(n=>`<button type="button" data-face="${n}" aria-label="Choose face ${n}">${pips(n)}</button>`).join('')}</div><button id="place-bet" type="submit">Offer coins</button><button id="roll-die" type="button" hidden>Throw die</button></form><div id="encounter-fallback" class="encounter-fallback" hidden><p id="encounter-question"></p><p>Risk Elo for a coin reward. Win: keep your Elo and collect the quoted coins. Lose: the staked Elo is removed. Each face has a 1/6 chance. Up to five wagers per Dutch day.</p><button type="button" data-encounter-decision="yes">Yes</button><button type="button" data-encounter-decision="no">No</button></div><p id="casino-error" class="table-error" role="alert" hidden></p><section id="round-result" class="table-result" aria-live="polite" hidden></section><dialog id="amount-dialog" class="table-modal"><form id="amount-form"><span class="eyebrow">YOUR OFFER</span><h2>How many coins?</h2><label for="custom-stake">Whole coins, from 1 to 100,000</label><input id="custom-stake" type="number" min="1" max="100000" step="1" required><div class="modal-actions"><button id="cancel-amount" type="button">Cancel</button><button type="submit">Set stake</button></div></form></dialog><dialog id="table-information" class="table-modal"><button id="close-information" type="button" class="modal-close" aria-label="Close table information">×</button><section id="table-rules"><section id="elo-rules" hidden><h2>Elo wagers</h2><p>Choose one face and stake 1–100 Elo. A correct face (1/6 chance) keeps your Elo and pays the full quoted coin reward. A loss removes the staked Elo and pays no coins. Elo wagers pay no tax.</p><p>Each point in your stake has its own daily coin value, from your current Elo downwards. The curve uses the player rating distribution and is frozen at midnight in the Netherlands.</p><p id="elo-rule-stats"></p><button id="leave-elo" type="button">Return to coin wagers</button></section>${rules(game)}</section><section id="table-history"><span class="eyebrow">ROUND RECEIPTS</span><h2>Your time at the table</h2><div id="round-history"></div></section></dialog></section>`
+ const buttons=[...[1,2,3,4,5,6].map(n=>({id:'face-'+n,label:'Choose face '+n})),...[25,100,500,1000].map(n=>({id:'stake-'+n,label:`Stake ${n} coins`})),{id:'minus',label:'Decrease stake by 25'},{id:'plus',label:'Increase stake by 25'},{id:'amount',label:'Edit stake amount'},{id:'offer',label:'Offer coins'},{id:'yes',label:'Yes, explore Elo wagers'},{id:'no',label:'No, return to coins'},{id:'return-coins',label:cave?'Leave through the green door':'Return to coin wagers and close Elo wagers for today'},...[1,10,50].map(n=>({id:'elo-plus-'+n,label:'Add '+n+' Elo'}))]
+ return `<section class="silent-room" data-phase="idle"><canvas id="dice-canvas" tabindex="0" aria-label="Seated at a felt table opposite a shadowed figure. Drag empty space to look; use the brass keys to wager." aria-describedby="table-instructions soul-disclosure"></canvas><div class="silent-vignette"></div><div class="table-tools"><button id="center-view" type="button">${icon('target')}<span>Center view</span></button><button id="open-rules" type="button">${icon('info')}<span>Rules</span></button><button id="open-history" type="button">${icon('clock')}<span>History</span></button>${cave?'<button type="button" id="exit-cave-fallback">Leave through the green door</button>':''}</div><div class="physical-controls" aria-label="Controls on the table">${buttons.map(b=>`<button type="button" class="physical-control" data-control="${b.id}" aria-describedby="soul-disclosure" aria-label="${b.label}"><span>${b.label}</span></button>`).join('')}</div><div class="dice-accessible-status"><span id="soul-disclosure" hidden>Elo wagers risk permanent rating loss. Win: keep your Elo and collect the quoted coins. Lose: lose the staked Elo. Each face has a 1/6 chance; no tax applies.</span><p id="keeper-dialogue" aria-live="polite"></p><span id="table-instructions">Drag empty space to look · Home to center · Pick up the die to throw</span></div><div class="dice-accessible-status"><span id="elo-live-status" aria-live="polite"></span><span id="chosen-label">Face 1</span><span id="return-estimate"></span><span class="table-purse">Purse <strong id="table-balance"></strong></span></div><form id="wager-form" class="table-fallback"><label id="stake-label" for="stake">Stake in coins</label><input id="stake" type="number" min="1" max="100000" step="1" value="100" required><div id="elo-fallback-increments" hidden>${[1,10,50].map(n=>`<button type="button" data-elo-add="${n}">+${n} Elo</button>`).join('')}</div><p id="elo-fallback-quote" hidden></p><div class="fallback-faces">${[1,2,3,4,5,6].map(n=>`<button type="button" data-face="${n}" aria-label="Choose face ${n}">${pips(n)}</button>`).join('')}</div><button id="place-bet" type="submit">Offer coins</button><button id="roll-die" type="button" hidden>Throw die</button></form><div id="encounter-fallback" class="encounter-fallback" hidden><p id="encounter-question"></p><p>Risk Elo for a coin reward. Win: keep your Elo and collect the quoted coins. Lose: the staked Elo is removed. Each face has a 1/6 chance. Up to five wagers per Dutch day.</p><button type="button" data-encounter-decision="yes">Yes</button><button type="button" data-encounter-decision="no">No</button></div><p id="casino-error" class="table-error" role="alert" hidden></p><section id="round-result" class="table-result" aria-live="polite" hidden></section><dialog id="amount-dialog" class="table-modal"><form id="amount-form"><span class="eyebrow">YOUR OFFER</span><h2>How many coins?</h2><label for="custom-stake">Whole coins, from 1 to 100,000</label><input id="custom-stake" type="number" min="1" max="100000" step="1" required><div class="modal-actions"><button id="cancel-amount" type="button">Cancel</button><button type="submit">Set stake</button></div></form></dialog><dialog id="table-information" class="table-modal"><button id="close-information" type="button" class="modal-close" aria-label="Close table information">×</button><section id="table-rules"><section id="elo-rules" hidden><h2>Elo wagers</h2><p>Choose one face and stake 1–100 Elo. A correct face (1/6 chance) keeps your Elo and pays the full quoted coin reward. A loss removes the staked Elo and pays no coins. Elo wagers pay no tax.</p><p>Each point in your stake has its own daily coin value, from your current Elo downwards. The curve uses the player rating distribution and is frozen at midnight in the Netherlands.</p><p id="elo-rule-stats"></p><button id="leave-elo" type="button">Return to coin wagers</button></section>${rules(game,cave)}</section><section id="table-history"><span class="eyebrow">ROUND RECEIPTS</span><h2>Your time at the table</h2><div id="round-history"></div></section></dialog></section>`
 }
 function renderLayout(){el('casino-root').innerHTML=game==='dice'?diceRoom():`${rouletteHeading()}<div class="casino-layout royal-layout">${rouletteArena()}${rouletteWager()}</div><dialog id="roulette-history-dialog" class="table-modal roulette-history-modal"><button id="close-roulette-history" type="button" class="modal-close" aria-label="Close roulette history">×</button><div class="ledger-heading"><div><h2>Your roulette history</h2><p>Past results do not predict the next draw.</p></div><div id="roulette-ledger"></div></div><div id="round-history"></div></dialog>`}
 function setPhase(value:string){phase=value;clearTimeout(impatienceTimer);if(value==='ready')impatienceTimer=window.setTimeout(()=>{if(phase==='ready')say(['“The die will not throw itself.”','“Take your time. Fortune is patient.”','“Still deciding? The ivory is yours.”'][Math.floor(Math.random()*3)])},18000);if(game==='dice')document.querySelector('.silent-room')!.setAttribute('data-phase',value);updateScene()}
@@ -36,7 +52,7 @@ function updateChoice(){
  })
  if(tableMode==='elo'){el('elo-live-status').textContent=`${stake()} Elo at risk. Win reward ${casinoCoins(eloQuote())} coins, no tax.`;el('return-estimate').textContent=`Win return ${casinoCoins(eloQuote())} coins`;updateScene();if(el('elo-fallback-quote'))el('elo-fallback-quote').textContent=`Win reward: ${casinoCoins(eloQuote())} coins · No tax`;return}
  if(game==='dice')el('elo-live-status').textContent=''
- const gross=stake()*grossMultiplier(game,choice),tax=Math.max(0,gross-stake())*.01
+ const gross=stake()*(cave?CAVE_DICE_MULTIPLIER:grossMultiplier(game,choice)),tax=cave?0:Math.max(0,gross-stake())*.01
  el('return-estimate').textContent=Number.isFinite(gross)&&stake()>0?game==='roulette'?`${casinoCoins(gross-tax)} coins`:`Win return ${casinoCoins(gross-tax)}`:'Choose your offer'
  if(el('tax-estimate'))el('tax-estimate').textContent=stake()>0?`${casinoCoins(gross)} gross − ${casinoCoins(tax)} profit tax`:''
  if(game==='roulette')setRouletteSelection(choice,stake())
@@ -62,7 +78,7 @@ async function reveal(round:CasinoRound){
   if(round.currency==='elo')updateDealerMood()
   if(round.won){lock(true);setPhase('payout');say(round.currency==='elo'?'“Take them. While you still can.”':'“Your winnings. Every last coin.”');await scene?.reward()}
   const banished=round.currency==='elo'&&!!soul&&soul.used>=MAX_ELO_ROUNDS
-  if(banished){lock(true);setPhase('banish');say('“Enough. We are finished here.”',2500);await scene?.banish()}
+  if(banished){lock(true);setPhase('banish');say('“Enough. We are finished here.”',2500);await scene?.banish();if(cave){exitCave();return}}
   scene?.lockCamera(false);result.hidden=false;result.innerHTML=`<span>${round.won?'THE TABLE PAYS':'THE DIE HAS SPOKEN'}</span><strong>${round.currency==='elo'&&!round.won?`−${round.eloLost??round.stake} <small>Elo</small>`:`${round.net>=0?'+':''}${casinoCoins(round.net)} <small>coins</small>`}</strong><p>Face ${round.result} · ${round.currency==='elo'?`${round.stake} Elo risked · ${round.eloLost??0} Elo lost`:`Offered ${casinoCoins(round.stake)} · Tax ${casinoCoins(round.tax)}`}</p><button id="dismiss-result" type="button" aria-label="Dismiss round result">×</button>`
   clearTimeout(resultTimer);resultTimer=window.setTimeout(()=>result.hidden=true,5500);el('dismiss-result').onclick=()=>result.hidden=true;say(round.won?'“A fair throw. Your winnings.”':'“Another offer, perhaps?”');setPhase('result');el('roll-die').hidden=true
  }else{
@@ -94,19 +110,19 @@ async function settle(event?:Event){
  pending??={game,choice,stake:stake(),sequence:state.nextSequence,requestId:crypto.randomUUID(),...(tableMode==='elo'?{currency:'elo',quoteDay:soul!.day,eloRating:soul!.elo}:{} )}
  safeStore(requestKey,pending);lock(true);el('round-result').hidden=true
  try{
-  const data=await api<CasinoReply&{profile:Profile;eloGambling?:EloGamblingView}>(pending.currency==='elo'?'/casino/elo/bet':'/casino/bet',pending);state=data;profile=data.profile;if(data.eloGambling)soul=data.eloGambling;pending=undefined;safeStore(requestKey,undefined);await present(data.round)
+  const data=await api<CasinoReply&{profile:Profile;eloGambling?:EloGamblingView}>(pending.currency==='elo'?'/casino/elo/bet':casinoPath+'/bet',pending);state=data;profile=data.profile;if(data.eloGambling)soul=data.eloGambling;pending=undefined;safeStore(requestKey,undefined);await present(data.round)
  }catch(cause){
   // A proxy failure can arrive after commit. Reconcile by receipt before allowing
   // a fresh id; an uncertain retry always retains the original wager.
   let recovered:CasinoRound|undefined
-  try{state=await api<CasinoView>('/casino');if(game==='dice')soul=await api<EloGamblingView>('/casino/elo');recovered=state.recent.find(r=>r.requestId===pending?.requestId)}catch{}
+  try{state=await api<CasinoView>(casinoPath);if(game==='dice')soul=await api<EloGamblingView>('/casino/elo');recovered=state.recent.find(r=>r.requestId===pending?.requestId)}catch{}
   if(recovered){pending=undefined;safeStore(requestKey,undefined);await present(recovered,true);return}
   if(cause instanceof ApiError&&cause.status>=400&&cause.status<500&&![408,429].includes(cause.status)){pending=undefined;safeStore(requestKey,undefined)}
   el('casino-error').textContent=cause instanceof Error?cause.message:'The offer could not be confirmed. Retry the same wager.';el('casino-error').hidden=false;renderBalance();renderHistory();lock(false);if(game==='dice'&&soul){if(pending){setTableMode(pending.currency==='elo'?'elo':'normal');el<HTMLInputElement>('stake').value=String(pending.stake);updateChoice()}else applySoul(soul)}
  }
 }
 function action(a:TableAction|{kind:'throw'}){
- if(a.kind==='returnCoins'){if(!busy&&!encounterBusy&&tableMode==='elo')void decideEncounter(false);return}
+ if(a.kind==='returnCoins'){if(!busy&&!encounterBusy){if(tableMode==='elo')void decideEncounter(false);else if(tableMode==='normal')exitCave()}return}
  if(a.kind==='yes'||a.kind==='no'){void decideEncounter(a.kind==='yes');return}
  if(tableMode==='offer')return
  if(a.kind==='eloAdd'){if(!busy&&!encounterBusy){el<HTMLInputElement>('stake').value=String(cycleEloStake(stake(),a.value!,Math.min(100,(soul?.quotes.length??1)-1)));updateChoice()}return}
@@ -197,10 +213,12 @@ function bindDice(){
    const button=document.querySelector<HTMLButtonElement>(`[data-control="${c.id}"]`)!
    const enlarge=innerWidth<600&&(tableMode==='offer'||tableMode==='elo'&&(c.action.kind==='eloAdd'||c.id==='offer'||c.id==='return-coins')),width=enlarge?Math.max(44,c.width):c.width,height=enlarge?Math.max(44,c.height):c.height
    button.hidden=!c.visible;button.disabled=c.disabled;button.style.cssText=`left:${(c.x+(c.width-width)/2).toFixed(1)}px;top:${(c.y+(c.height-height)/2).toFixed(1)}px;width:${width.toFixed(1)}px;height:${height.toFixed(1)}px;pointer-events:${phase==='ready'&&c.id!=='offer'?'none':'auto'}`
+   if(c.id==='return-coins'&&cave)button.setAttribute('aria-label',tableMode==='elo'?'Return to coin wagers':'Leave the cave')
    if(c.id==='offer')button.setAttribute('aria-label',phase==='ready'?'Throw die':pending?'Retry the same offer':tableMode==='elo'?'DEAL':'Offer coins')
   }
   projectionFrame=requestAnimationFrame(project)
  };projectionFrame=requestAnimationFrame(project)
+ if(cave)el('exit-cave-fallback').onclick=()=>action({kind:'returnCoins'})
  const information=el<HTMLDialogElement>('table-information')
  el('open-rules').onclick=()=>{cancel();el('table-rules').hidden=false;el('table-history').hidden=true;information.showModal();information.querySelector('details')!.open=true;el('elo-rules').hidden=tableMode!=='elo';information.querySelector('details')!.hidden=tableMode==='elo'}
  el('open-history').onclick=()=>{cancel();renderHistory();el('table-rules').hidden=true;el('table-history').hidden=false;information.showModal()}
@@ -215,7 +233,11 @@ function bindDice(){
 }
 async function init(){
  await initShell();const session=await getSession();if(!session.user){location.replace('/chess/login.html');return}
- profile=session.profile!;state=await api<CasinoView>('/casino');storageKey=`5d-casino-presentation:${session.user}:${game}`;requestKey=`5d-casino-request:${session.user}:${game}`
+  profile=session.profile!
+ try{state=await api<CasinoView>(casinoPath)}
+ catch(error){if(cave&&error instanceof ApiError&&error.status===403){location.replace('/chess/world.html');return}throw error}
+ const venue=cave?'cave':game
+ storageKey=`5d-casino-presentation:${session.user}:${venue}`;requestKey=`5d-casino-request:${session.user}:${venue}`
  renderLayout();renderBalance();updateChoice();renderHistory();el<HTMLFormElement>('wager-form').onsubmit=e=>void settle(e);el('stake').oninput=updateChoice
  document.querySelectorAll<HTMLButtonElement>('[data-stake]').forEach(b=>b.onclick=()=>{if(!busy){el<HTMLInputElement>('stake').value=b.dataset.stake!;updateChoice()}})
  document.querySelectorAll<HTMLButtonElement>('[data-pocket],[data-outside],[data-face]').forEach(b=>b.onclick=()=>{if(busy)return;choice=b.dataset.pocket!==undefined?Number(b.dataset.pocket):b.dataset.face!==undefined?Number(b.dataset.face):b.dataset.outside as RouletteChoice;updateChoice()})

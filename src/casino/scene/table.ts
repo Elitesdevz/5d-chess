@@ -1,6 +1,6 @@
 import * as T from 'three'
 import {mesh,box,cylinder,coinGeometry,v} from './geometry.ts'
-import {casinoCoins} from '../../casino-model.ts'
+import {CAVE_DICE_MULTIPLIER,casinoCoins} from '../../casino-model.ts'
 import {label,type Materials} from './materials.ts'
 
 export type TableAction={kind:'face'|'stake'|'minus'|'plus'|'offer'|'amount'|'yes'|'no'|'eloAdd'|'returnCoins';value?:number}
@@ -95,12 +95,12 @@ export class Table {
   if(mode!==this.mode){this.mode=mode;this.morph=0;this.lastStake=-1}
   this.offerUnit.update(mode==='elo'?'ELO':'COINS');this.payoutTitle.update(mode==='elo'?'COIN REWARD':'WIN RETURN');this.soulStake=stake;this.reward=reward;this.question.visible=mode==='offer';this.payoutPlate.visible=mode!=='offer'
   this.questionLabel.update(reason==='broke'?'DEAL WITH YOUR SOUL?':'TRY SOMETHING NEW?')
-  for(const c of this.controls)c.object.visible=mode==='offer'?['yes','no'].includes(c.id):mode==='elo'?c.action.kind==='face'||c.action.kind==='eloAdd'||['amount','offer','return-coins'].includes(c.id):!['yes','no','return-coins'].includes(c.id)&&c.action.kind!=='eloAdd'
+  for(const c of this.controls)c.object.visible=mode==='offer'?['yes','no'].includes(c.id):mode==='elo'?c.action.kind==='face'||c.action.kind==='eloAdd'||['amount','offer','return-coins'].includes(c.id):!['yes','no'].includes(c.id)&&(c.id!=='return-coins'||document.body.dataset.cave==='true')&&c.action.kind!=='eloAdd'
  }
  animate(dt:number){this.morph=Math.min(1,this.morph+dt*1.6);for(const c of this.controls)c.object.scale.y=.02+.98*this.morph;const felt=this.felt.material as T.MeshStandardMaterial;felt.color.lerp(new T.Color(this.mode==='normal'?0x123e35:this.mode==='offer'?0x24212a:0x39131e),Math.min(1,dt*3))}
  setState(coins:number,stake:number,face:number,phase:string,disabled:boolean){
   if(coins!==this.coins){this.coins=coins;this.makePiles(coins)}
-  if(this.mode==='elo'){this.payout.update(casinoCoins(this.reward))}else if(stake!==this.lastStake){this.payout.update(casinoCoins(stake*(5.88-4.88*.01)));this.lastStake=stake}
+  if(this.mode==='elo'){this.payout.update(casinoCoins(this.reward))}else if(stake!==this.lastStake){this.payout.update(casinoCoins(stake*(document.body.dataset.cave==='true'?CAVE_DICE_MULTIPLIER:5.88-4.88*.01)));this.lastStake=stake}
   this.amount.update(this.mode==='elo'?this.soulStake+' ELO':stake.toLocaleString());this.offer.update(phase==='ready'?'THROW':phase==='rolling'?'…':this.mode==='elo'?'DEAL':'OFFER')
   for(const c of this.controls){
    c.disabled=(disabled&&!(c.id==='offer'&&phase==='ready'))||(this.mode==='elo'&&(c.id==='amount'||c.id==='offer'&&this.soulStake<1))
