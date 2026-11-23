@@ -223,7 +223,7 @@ function invest(unit:UnitOfWork,e:Companies,now:number){
   for(const c of [e.CAS,e.BNK]){
     cancelOrders(unit,e,c,o=>o.holder===PE,now)
     const balance=Math.max(0,assets(c)-liabilities(c,now)),earnings=Math.max(0,c.profit-c.loss)
-    const value=Math.floor((balance+Math.min(balance,earnings*4))/c.issued)
+    const value=Math.floor((balance*(c.symbol==='CAS'?3.6:1)+Math.min(balance,earnings*4))/c.issued)
     const held=sharesOf(c,PE),bestAsk=book(c,'sell')[0]?.price??Infinity,bestBid=book(c,'buy')[0]?.price??0
     const budget=Math.floor(e.peCash*.055)
     let buyRoom=Math.max(0,Math.floor(c.issued*.45)-held),sellRoom=held

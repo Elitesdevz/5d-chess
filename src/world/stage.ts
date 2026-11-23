@@ -435,6 +435,7 @@ export class CityStage {
       actor.pose(now,spin&&now<spin.started+800?.25:0)
     }
     this.art.wheels?.forEach((wheel,i)=>{
+      this.art?.wagerTokens[i](this.view?.hall?.tables[i]?.wagers)
       const table=tables?.[i],spin=table?.spin,n=spin?.pocket??table?.recent[0]
       if(n===undefined)return
       const progress=spin&&!this.reduced?T.MathUtils.clamp((now-spin.started)/(spin.ends-spin.started),0,1):1

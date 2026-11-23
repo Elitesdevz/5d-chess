@@ -226,3 +226,5 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
   .world[data-seated=true] .world-chat ol{max-height:44px}
   .world[data-seated=true] .world-use{bottom:49px}
 }
+.world-wagers [data-chip] b::before{content:"";display:inline-block;width:8px;height:8px;margin-right:5px;border-radius:50%;background:#e9c186}
+.world-wagers [data-chip="1"] b::before{background:#72bcbc}.world-wagers [data-chip="2"] b::before{background:#cf8799}.world-wagers [data-chip="3"] b::before{background:#c2a8e5}
