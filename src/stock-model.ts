@@ -1,4 +1,7 @@
 export const CAS='CAS'
+export const BNK='BNK'
+export type EquitySymbol=typeof CAS|typeof BNK
+export const isEquity=(symbol:string):symbol is EquitySymbol=>symbol===CAS||symbol===BNK
 export const CAS_SHARES=10_000
 export const MAX_STOCK_ORDER=1_000
 export const QUOTE_MAX_AGE=72*60*60*1000
@@ -8,20 +11,19 @@ export interface StockHolding {shares:number;cost:number}
 export interface StockTrade {
   id:string; sequence:number; symbol:string; side:StockSide; shares:number; total:number; at:number
 }
-export interface StockDividend {day:string;shares:number;amount:number}
+export interface StockDividend {day:string;shares:number;amount:number;symbol?:EquitySymbol}
 export interface StockPortfolio {
-  sequence:number; positions:Record<string,StockHolding>; trades:StockTrade[]; dividends:StockDividend[]; dividendsPaid:number
+  sequence:number; positions:Record<string,StockHolding>; trades:StockTrade[]; dividends:StockDividend[]; dividendsPaid:number;bankDividendsPaid?:number
 }
 export interface PricePoint {at:number;price:number;volume?:number}
 export interface StockQuote {price:number;change:number;percent:number;updated:number;history:{at:number;price:number}[]}
-export interface CasPublic {
-  equity:number; float:number; available:number; price:number; bid:number; ask:number; version:number
+export interface EquityPublic { float:number; available:number; price:number; bid:number; ask:number; version:number
   history:{at:number;price:number}[]
-  equityMoves:{at:number;shares:number;side:StockSide}[]
   lastDividend?:{day:string;pool:number;paid:number}
 }
+export interface CasPublic extends EquityPublic {equity:number;equityMoves:{at:number;shares:number;side:StockSide}[]}
 export interface StockView {
-  coins:number; quotes:Record<string,StockQuote>; cas:CasPublic; portfolio:StockPortfolio; now:number
+  coins:number; quotes:Record<string,StockQuote>; cas:CasPublic; bank:EquityPublic; portfolio:StockPortfolio; now:number
 }
 export interface StockOrder {symbol:string;side:StockSide;shares:number;total:number;sequence:number;id:string;version?:number}
 export const toStockUnits=(coins:number)=>Math.round(coins*STOCK_UNITS)
@@ -33,11 +35,16 @@ export function casPrice(publicShares:number,available:number){
   const addedSupply=(publicShares-1000)/1000
   return Math.round((20+18*demand-7*addedSupply)*100)/100
 }
-export function casOrderTotal(cas:Pick<CasPublic,'float'|'available'>,side:StockSide,shares:number){
+export function equityPrice(symbol:EquitySymbol,issue:Pick<EquityPublic,'float'|'available'>){
+  return symbol===CAS?casPrice(issue.float,issue.available):Math.round((16+11*(issue.float-issue.available)/issue.float)*100)/100
+}
+export function equityOrderTotal(symbol:EquitySymbol,issue:Pick<EquityPublic,'float'|'available'>,side:StockSide,shares:number){
   let totalCents=0
   for(let i=0;i<shares;i++){
-    const marginal=casPrice(cas.float,cas.available+(side==='buy'?-i:i+1))
+    const marginal=equityPrice(symbol,{float:issue.float,available:issue.available+(side==='buy'?-i:i+1)})
     totalCents+=Math.round(marginal*100)+(side==='buy'?15:-15)
   }
   return totalCents/100
 }
+
+export const casOrderTotal=(issue:Pick<EquityPublic,'float'|'available'>,side:StockSide,shares:number)=>equityOrderTotal(CAS,issue,side,shares)

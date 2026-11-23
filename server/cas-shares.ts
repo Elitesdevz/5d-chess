@@ -1,7 +1,7 @@
 import {randomInt} from 'node:crypto'
 import {dayKey} from '../src/collection.ts'
 import type {CasinoRound} from '../src/casino-model.ts'
-import {CAS,casOrderTotal,casPrice,fromStockUnits,toStockUnits,type CasPublic,type StockSide} from '../src/stock-model.ts'
+import {CAS,casOrderTotal,casPrice,fromStockUnits,toStockUnits,type CasPublic,type EquitySymbol,type StockSide} from '../src/stock-model.ts'
 import type {Account} from './accounts.ts'
 import type {UnitOfWork} from './storage.ts'
 import {wallet} from './economy.ts'
@@ -25,25 +25,28 @@ function newState(now:number):CasState{
     history:[{at:now,price:20}],equityMoves:[],nextEquity:nextEquityOrder(now)}
 }
 
-function dividend(unit:UnitOfWork,state:CasState){
-  // Apply 30% operating costs and then assign 10% of the remainder to the current float.
-  const pool=Math.floor(Math.max(0,state.margin)*7/100)
+export function payEquityDividend(unit:UnitOfWork,symbol:EquitySymbol,day:string,float:number,holders:Record<string,number>,pool:number){
   let paid=0
-  if(pool){
-    for(const [key,shares] of Object.entries(state.holders)){
-      const amount=Math.floor(pool*shares/state.float)
-      if(!amount)continue
-      const account=unit.users.get(key.slice(1))
-      if(!account)continue
-      const w=wallet(account),holdings=portfolio(account),after=toStockUnits(w.coins)+amount
-      if(!Number.isSafeInteger(after))continue
-      w.coins=fromStockUnits(after)
-      holdings.dividends.unshift({day:state.day,shares,amount:fromStockUnits(amount)})
-      holdings.dividends.length=Math.min(60,holdings.dividends.length)
-      holdings.dividendsPaid=fromStockUnits(toStockUnits(holdings.dividendsPaid)+amount)
-      paid+=amount
-    }
+  for(const [key,shares] of Object.entries(holders)){
+    const amount=Math.floor(pool*shares/float)
+    if(!amount)continue
+    const account=unit.users.get(key.slice(1))
+    if(!account)continue
+    const w=wallet(account),holdings=portfolio(account),after=toStockUnits(w.coins)+amount
+    if(!Number.isSafeInteger(after))continue
+    w.coins=fromStockUnits(after)
+    holdings.dividends.unshift({day,shares,amount:fromStockUnits(amount),...(symbol===CAS?{}:{symbol})})
+    holdings.dividends.length=Math.min(60,holdings.dividends.length)
+    const total=symbol===CAS?'dividendsPaid':'bankDividendsPaid'
+    holdings[total]=fromStockUnits(toStockUnits(holdings[total]??0)+amount)
+    paid+=amount
   }
+  return paid
+}
+
+function dividend(unit:UnitOfWork,state:CasState){
+  const pool=Math.floor(Math.max(0,state.margin)*7/100)
+  const paid=pool?payEquityDividend(unit,CAS,state.day,state.float,state.holders,pool):0
   state.lastDividend={day:state.day,pool:fromStockUnits(pool),paid:fromStockUnits(paid)}
   state.margin=0
 }

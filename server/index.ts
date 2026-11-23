@@ -1,3 +1,4 @@
+import {bankState} from './bank.ts'
 import {casState} from './cas-shares.ts'
 import {startStockQuotes} from './stock-quotes.ts'
 import {maintainGames} from './game-lifecycle.ts'
@@ -22,7 +23,7 @@ const maintain=()=>{try{store.transaction(unit=>maintainGames(store,unit))}catch
 maintain()
 const gameTimer=setInterval(maintain,60_000);gameTimer.unref()
 const stopStockQuotes=startStockQuotes(store)
-const maintainShares=()=>{try{store.transaction(unit=>casState(unit,Date.now()))}catch{console.error('Casino share maintenance deferred')}}
+const maintainShares=()=>{try{store.transaction(unit=>{const now=Date.now();casState(unit,now);bankState(unit,now)})}catch{console.error('Share maintenance deferred')}}
 maintainShares()
 const sharesTimer=setInterval(maintainShares,30_000);sharesTimer.unref()
 const application = createApplication(store)
