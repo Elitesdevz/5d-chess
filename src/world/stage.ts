@@ -1,5 +1,7 @@
+import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
 import {staffProps} from './restaurant-art.ts'
+import {WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts'
 import {terrainHeight} from './terrain.ts'
 import * as T from 'three'
 import {liftPlatform,makeWorldArt,spinWheel} from './art.ts'
@@ -57,7 +59,15 @@ export class CityStage {
   private liftFacing?:{from:number;delta:number;started:number}
   private arrows=new Set<string>()
   private stick={x:0,z:0}
-  private mouse?:{x:number;y:number}
+  private voluntaryUnlock=false
+  private wasLocked=false
+  private onPause:()=>void
+  private cameraSeatKey=''
+  private viewBlend=0
+  private cameraAim=new T.Vector3()
+  private tools?:ReturnType<typeof kitchenTools>
+  private station?:{point:string;x:number;y:number;phase:number;sent:boolean;fillAt:number}
+  private gesture?:(gesture:string)=>void
   private lockedAt=0
   private drag?:{id:number;x:number;y:number}
   private last=0
@@ -78,8 +88,8 @@ export class CityStage {
   private onAction:(point?:WorldAction)=>void
   position:Position={...CITY}
   get moving(){return (this.arrows.size>0||Math.hypot(this.stick.x,this.stick.z)>.09)&&!this.pause}
-  constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void){
-    this.canvas=canvas;this.parent=parent;this.onAction=onAction
+  constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void,onPause:()=>void=()=>{}){
+    this.canvas=canvas;this.parent=parent;this.onAction=onAction;this.onPause=onPause
     try{
       const renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'})
       this.renderer=renderer
@@ -95,12 +105,12 @@ export class CityStage {
   }
   lock(value:boolean){
     this.pause=value
-    if(value){this.arrows.clear();this.stick={x:0,z:0};this.drag=undefined;this.mouse=undefined;this.releaseMouse()}
+    if(value){this.arrows.clear();this.stick={x:0,z:0};this.drag=undefined;this.releaseMouse()}
   }
   set(view:WorldView,offset:number,reposition=false){
     const prior=this.view?.you,next=view.you
     const changedWorld=view.id!==this.view?.id
-    const seat=(p:WorldView['you']|undefined)=>p?.dining!==undefined?'dining:'+p.dining:p?.chair?'chair:'+p.chair.table+':'+p.chair.index:p?.lounge?'couch:'+p.lounge.couch+':'+p.lounge.index:''
+    const seat=(p:WorldView['you']|undefined)=>p?.barSeat!==undefined?'bar:'+p.barSeat:p?.boardSeat!==undefined?'board:'+p.boardSeat:p?.dining!==undefined?'dining:'+p.dining:p?.chair?'chair:'+p.chair.table+':'+p.chair.index:p?.lounge?'couch:'+p.lounge.couch+':'+p.lounge.index:''
     const seatChanged=seat(prior)!==seat(next)
     if(changedWorld||reposition||seatChanged||next.lift&&!prior?.lift||Math.hypot(next.x-this.position.x,next.z-this.position.z)>1.35){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
@@ -114,7 +124,7 @@ export class CityStage {
         this.pitch=-.24
       }
       if(next.dining!==undefined)this.pitch=-.33
-      if(next.chair||next.lounge||next.dining!==undefined)this.releaseMouse()
+      if(next.chair||next.lounge||next.dining!==undefined||next.barSeat!==undefined||next.boardSeat!==undefined)this.releaseMouse()
     }
     if(next.lift&&!prior?.lift){
       const delta=Math.atan2(Math.sin(Math.PI-this.yaw),Math.cos(Math.PI-this.yaw))
@@ -132,15 +142,54 @@ export class CityStage {
   }
   quote(symbol:string,points:{price:number}[],value?:number){this.art?.floor(symbol)?.screens.forEach(update=>update(points,value))}
   act(){this.onAction(this.nearest)}
-  private releaseMouse(){if(document.pointerLockElement===this.canvas)document.exitPointerLock()}
+  setStation(point:string|undefined,submit:(gesture:string)=>void){
+    this.gesture=submit
+    if(point===this.station?.point)return
+    this.station=point?{point,x:0,y:0,phase:0,sent:false,fillAt:0}:undefined
+    this.arrows.clear()
+  }
+  private moveTool(dx:number,dy:number){
+    const s=this.station,r=this.view?.restaurant,job=r?.kitchen
+    if(!s||!job||s.sent)return
+    s.x=T.MathUtils.clamp(s.x+dx/110,-1,1);s.y=T.MathUtils.clamp(s.y-dy/110,-1,1)
+    const now=Date.now()+this.clock
+    if(s.point.endsWith(':soda')){
+      if(s.y>.32&&!s.fillAt)s.fillAt=performance.now()+560
+      if(s.y<.12)s.fillAt=0
+    }else if(s.point.endsWith(':fryer')){
+      if(s.y<-.25)s.phase=1
+      if(s.phase&&s.x>.48&&s.y>-.07)this.completeTool('scoop')
+    }else if(now>=job.readyAt){
+      if(job.patty==='raw'&&s.y>.58)this.completeTool('flip')
+      else if(job.patty==='flipped'&&s.x>.56)this.completeTool('assemble')
+    }
+  }
+  private completeTool(gesture:string){
+    const s=this.station
+    if(!s||s.sent)return
+    s.sent=true;this.gesture?.(gesture)
+  }
+  resetTool(){if(this.station)Object.assign(this.station,{x:0,y:0,phase:0,sent:false,fillAt:0})}
+  resumeMouse(){
+    if(this.pause||!this.renderer||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||
+      !matchMedia('(any-pointer: fine)').matches||document.pointerLockElement===this.canvas)return
+    this.lockedAt=performance.now()
+    this.canvas.requestPointerLock?.()?.catch(()=>{})
+  }
+  private releaseMouse(){
+    if(document.pointerLockElement!==this.canvas)return
+    this.voluntaryUnlock=true;document.exitPointerLock()
+  }
   private turn(dx:number,dy:number){
-    if(this.pause||!this.renderer)return
+    if(this.pause||!this.renderer||this.view?.you.chair)return
+    if(this.station){this.moveTool(dx,dy);return}
     this.liftFacing=undefined
     this.yaw-=dx*.0032
     this.pitch=T.MathUtils.clamp(this.pitch-dy*.0032,-1.34,1.34)
   }
   private buildScene(){
     this.art=makeWorldArt(this.caveOpen)
+    this.tools=kitchenTools(this.art.scene)
     this.npc=routes.map((_,i)=>{
       const target=pedestrian(i,Date.now()+this.clock)
       return new Figure(this.art!.scene,{...target,name:['Iris','Marlowe','June','Dion','Rafi','Hana','Vera','Otis'][i],avatar:'default',online:true},this.shadow!)
@@ -176,17 +225,19 @@ export class CityStage {
     window.addEventListener('keydown',e=>{
       if(this.pause||e.ctrlKey||e.altKey||e.metaKey||document.activeElement?.matches('input,select,textarea,[contenteditable]'))return
       const k=e.key.toLowerCase()
+      if(this.station&&k.startsWith('arrow')){
+        e.preventDefault();this.moveTool(k==='arrowleft'?-24:k==='arrowright'?24:0,k==='arrowup'?-24:k==='arrowdown'?24:0);return
+      }
       if(k==='e'&&!e.repeat){e.preventDefault();this.act();return}
       if(allowed.includes(k)){this.arrows.add(k);e.preventDefault()}
     },{signal})
     window.addEventListener('keyup',e=>this.arrows.delete(e.key.toLowerCase()),{signal})
-    window.addEventListener('blur',()=>{this.arrows.clear();this.drag=undefined;this.mouse=undefined;this.stick={x:0,z:0}},{signal})
-    this.canvas.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')this.mouse={x:e.clientX,y:e.clientY}},{signal})
-    this.canvas.addEventListener('pointerleave',()=>{this.mouse=undefined},{signal})
+    window.addEventListener('blur',()=>{this.arrows.clear();this.drag=undefined;this.stick={x:0,z:0}},{signal})
     document.addEventListener('pointerlockchange',()=>{
-      this.mouse=undefined
-      this.lockedAt=performance.now()
-      if(this.pause||this.view?.you.chair||this.view?.you.lounge)this.releaseMouse()
+      const locked=document.pointerLockElement===this.canvas
+      if(!locked&&this.wasLocked&&!this.voluntaryUnlock)this.onPause()
+      this.wasLocked=locked;this.voluntaryUnlock=false
+      if(locked&&(this.pause||this.view?.you.chair||this.view?.you.lounge))this.releaseMouse()
     },{signal})
     document.addEventListener('mousemove',e=>{
       if(document.pointerLockElement!==this.canvas)return
@@ -196,25 +247,13 @@ export class CityStage {
     this.canvas.addEventListener('pointerdown',e=>{
       if(this.pause||!this.renderer||e.button!==0)return
       this.canvas.focus({preventScroll:true})
-      if(e.pointerType==='mouse'){
-        if(!this.view?.you.chair&&!this.view?.you.lounge&&document.pointerLockElement!==this.canvas){
-          // Chromium can send its recentering mousemove before pointerlockchange.
-          this.lockedAt=performance.now()
-          this.canvas.requestPointerLock?.()?.catch(()=>{})
-        }
-        return
-      }
+      if(e.pointerType==='mouse'){this.resumeMouse();if(!this.station)return}
       if(this.drag)return
       this.canvas.setPointerCapture(e.pointerId);this.drag={id:e.pointerId,x:e.clientX,y:e.clientY}
     },{signal})
     this.canvas.addEventListener('pointermove',e=>{
       if(this.pause||document.pointerLockElement===this.canvas)return
-      if(e.pointerType==='mouse'){
-        const prior=this.mouse
-        this.mouse={x:e.clientX,y:e.clientY}
-        if(prior)this.turn(e.clientX-prior.x,e.clientY-prior.y)
-        return
-      }
+      if(e.pointerType==='mouse'&&!this.station)return
       const d=this.drag
       if(!d||d.id!==e.pointerId)return
       this.turn(e.clientX-d.x,e.clientY-d.y)
@@ -235,7 +274,7 @@ export class CityStage {
     window.addEventListener('pagehide',e=>{if(!e.persisted){this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame);this.clearScene();this.renderer?.dispose()}},{signal})
   }
   private step(dt:number){
-    if(!this.zone||this.pause||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.lift)return
+    if(!this.zone||this.pause||this.station||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||this.view?.you.lift)return
     const keys=this.arrows
     const x=this.stick.x+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'))
     const z=this.stick.z+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'))
@@ -275,7 +314,7 @@ export class CityStage {
         if(local)current.figure.hideHead()
       }
       const figure=current.figure
-      figure.target=member.dining===undefined?member:{...member,lounge:{couch:0,index:0}}
+      figure.target=member.dining===undefined&&member.barSeat===undefined&&member.boardSeat===undefined?member:{...member,lounge:{couch:0,index:0}}
       figure.root.position.y=local&&member.zone==='city'?terrainHeight(this.position.x,this.position.z):height
       const cleaning=(member.workingUntil??0)>now&&(member.workKind==='mop'||member.workKind==='wipe')
       if((member.carrying||cleaning||member.kfcRole)&&!current.props)current.props=staffProps(figure.root)
@@ -299,6 +338,10 @@ export class CityStage {
       if(current.tag){
         const mark=figure.root.position.clone().add(v(0,1.91,0)).project(this.camera)
         current.tag.hidden=member.zone!==this.view.you.zone||mark.z<=-1||mark.z>=1||Math.abs(mark.x)>.98||Math.abs(mark.y)>.96||this.camera.position.distanceTo(figure.root.position)>16
+        const latest=this.view.chat?.findLast(line=>line.name===member.name&&now-line.at<6500)
+        const label=latest?.text??member.name
+        if(current.tag.textContent!==label)current.tag.textContent=label
+        current.tag.classList.toggle('speech',!!latest)
         if(!current.tag.hidden){current.tag.style.left=(50+50*mark.x)+'%';current.tag.style.top=(50-50*mark.y)+'%'}
       }
     }
@@ -330,15 +373,37 @@ export class CityStage {
     }
     for(const [id,entry] of this.restaurantNpc)if(!active.has(id)){entry.figure.dispose();this.restaurantNpc.delete(id)}
   }
-  private cameraView(now:number){
+  private cameraView(now:number,dt:number){
     const me=this.view?.you,{x,z}=this.position
     if(this.liftFacing){
       const {started,from,delta}=this.liftFacing,progress=Math.min(1,(performance.now()-started)/420)
       this.yaw=from+delta*progress*progress*(3-2*progress)
       if(progress===1)this.liftFacing=undefined
     }
-    this.camera.position.set(x,(me?.zone==='city'?terrainHeight(x,z):me?riderHeight(me,now):0)+(me?.chair||me?.lounge||me?.dining!==undefined?SEATED_EYE:STANDING_EYE),z)
+    this.camera.position.set(x,(me?.zone==='city'?terrainHeight(x,z):me?riderHeight(me,now):0)+(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE),z)
     this.camera.rotation.set(this.pitch,this.yaw,0,'YXZ')
+    const chair=me?.chair,round=chair&&this.view?.hall?.tables[chair.table]
+    if(chair&&round){
+      const table=WORLD_TABLES[chair.table],dice=chair.table===DICE_TABLE_INDEX
+      const key=chair.table+':'+chair.index
+      if(key!==this.cameraSeatKey){this.cameraSeatKey=key;this.viewBlend=0}
+      const wheel=site('casino',table.x+(dice?0:WHEEL_X),table.z+(dice?0:WHEEL_Z))
+      const overhead=!dice&&!!round.spin&&now<round.spin.ends+2100
+      this.viewBlend=this.reduced?Number(overhead):T.MathUtils.damp(this.viewBlend,Number(overhead),4.8,dt)
+      const blend=this.viewBlend
+      this.cameraAim.set(T.MathUtils.lerp(wheel.x,me.x*.12+wheel.x*.88,1-blend),1.12,wheel.z)
+      this.camera.position.lerp(v(wheel.x,4.85,wheel.z+.72),blend)
+      this.camera.lookAt(this.cameraAim)
+    }else this.cameraSeatKey=''
+    const s=this.station,r=this.view?.restaurant
+    if(s&&r?.kitchen&&this.tools){
+      const {p,fryer,soda}=this.tools.aim(s.point,r)
+      const side=fryer||soda
+      this.camera.position.set(p.x-(side?1.16:0),1.90,p.z+(side?0:1.09))
+      this.camera.lookAt(p.x,1.16,p.z)
+      if(!this.pause&&s.fillAt&&performance.now()>=s.fillAt)this.completeTool('fill')
+    }
+    this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt)
     this.camera.updateMatrixWorld()
   }
   private motion(now:number){
@@ -346,6 +411,7 @@ export class CityStage {
     if(!this.reduced){this.art.ambient?.(now);this.art.restaurant.tick(now)}
     if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))
     if(this.zone?.startsWith('floor:'))this.art.floor(this.zone.slice(6))?.actors.forEach(actor=>actor.pose(now))
+    if(this.zone==='casino')this.art.bar.tick(this.view?.bar,now)
     const tables=this.view?.hall?.tables??this.view?.tableMotion
     for(const [i,actor] of this.art.actors.entries()){
       const spin=tables?.[i]?.spin
@@ -381,7 +447,7 @@ export class CityStage {
     const dt=Math.min(.14,(time-this.last)/1000||.035);this.last=time
     if(this.art&&this.renderer){
       const now=Date.now()+this.clock
-      this.cameraView(now);this.avatars(dt,now);this.motion(now)
+      this.cameraView(now,dt);this.avatars(dt,now);this.motion(now)
       this.renderer.render(this.art.scene,this.camera)
       if(this.gl){this.fence=this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE,0);this.gl.flush()}
     }else if(!this.renderer)this.drawFlat()

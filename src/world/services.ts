@@ -1,3 +1,4 @@
+import {DRINKS,type BarService} from './bar-menu.ts'
 import {companyContent,type DeskTab} from './company-desk.ts'
 import {api,ApiError} from '../shell.ts'
 import {casinoCoins} from '../casino-model.ts'
@@ -73,6 +74,19 @@ export class CityServices {
         if(token===this.token)this.bank(view,data,token)
       }
     }catch(error){if(token===this.token)this.message(error instanceof Error?error.message:'Unavailable')}
+  }
+  bar(order:BarService|undefined,buy:(drink:string,id:string)=>Promise<void>,stand:()=>Promise<void>,seated:boolean){
+    this.render('ROYAL SALON','The bar',`<div class="world-drinks">${DRINKS.map(drink=>`<article><i style="--drink:#${drink.color.toString(16)}"></i><div><h3>${drink.name}</h3><p>${drink.note}</p></div><button type="button" data-drink="${drink.id}">${coins(drink.price)}</button></article>`).join('')}</div>${seated?'<button type="button" data-bar-stand>Leave stool</button>':''}`)
+    if(!this.dialog.open)this.dialog.showModal()
+    if(order)this.message('Your drink is at the counter.')
+    this.host.querySelectorAll<HTMLButtonElement>('[data-drink]').forEach(button=>button.onclick=async()=>{
+      button.disabled=true
+      try{await buy(button.dataset.drink!,crypto.randomUUID());this.close()}
+      catch(error){this.message(error instanceof Error?error.message:'Please try again')}
+      finally{button.disabled=false}
+    })
+    const leave=this.host.querySelector<HTMLButtonElement>('[data-bar-stand]')
+    if(leave)leave.onclick=()=>void stand().then(()=>this.close()).catch(()=>{})
   }
   private elevator(){
     this.render('EXCHANGE TOWER','Choose a floor','<input type="search" aria-label="Search stocks" placeholder="Company, ticker or floor" class="world-floor-search"><div class="world-floor-list"></div>')

@@ -1,3 +1,4 @@
+import {salonBar} from './salon-bar.ts'
 import {buildRestaurant} from './restaurant-art.ts'
 import {landscape,Scenery} from './landscape.ts'
 import {neighborhood} from './neighborhood.ts'
@@ -427,7 +428,7 @@ export function makeWorldArt(open:boolean){
   }
   const {hotel,casino,bank,exchange}=rooms
   gallery(hotel,'hotel');venueDetail(hotel,'hotel')
-  buildHall(casino,true);venueDetail(casino,'casino')
+  buildHall(casino,true);const bar=salonBar(casino);venueDetail(casino,'casino')
   const wheels=buildHallTables(casino),actors:ClubGuest[]=[]
   for(const [x,z] of [[-5,-4.9],[5,-4.9],[0,.61]])actors.push(new ClubGuest(casino,x-.35,z,0xb78968,0x29323d,true))
   const table=new T.Group();casino.add(table);table.position.set(PUBLIC_DICE.x,0,PUBLIC_DICE.z)
@@ -462,7 +463,7 @@ export function makeWorldArt(open:boolean){
   for(const zone of ['cave','oasis'] as const){rooms[zone].rotation.y=Math.PI;cave(rooms[zone],zone==='oasis');venueDetail(rooms[zone],zone)}
   const seal=mesh(new T.IcosahedronGeometry(1,2),rock,rooms.cave,[0,1.34,7.01]);seal.scale.set(1.84,1.8,1.1);seal.visible=!open
   const restaurant=buildRestaurant(rooms.kfc)
-  return {scene,actors,staff,wheels,publicDie,floor,ambient,seal,restaurant}
+  return {scene,actors,staff,wheels,publicDie,floor,ambient,seal,restaurant,bar}
 }
 function ringVault(scene:T.Object3D){
   mesh(new T.TorusGeometry(.48,.041,8,44),brass,scene,[0,.89,-2.9],false)

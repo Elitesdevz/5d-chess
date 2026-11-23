@@ -212,6 +212,7 @@ export class RouletteHall {
       tables:room.tables.map((t,i):HallTable=>{
         const result=t.spin&&now>=t.spin.ends, tickets=this.escrow.find(item=>item.round===t.round)?.tickets??[]
         return {round:t.round,until:t.until,phase:t.spin?result?'result':'spin':t.until?'betting':'idle',spin:t.spin,
+          wagers:t.spin&&t.receipts?[...t.receipts].map(([name,{stake,choice}])=>({name,stake,choice})):undefined,
           prizes:result?t.prizes:undefined,recent:t.spin&&!result?t.recent.slice(1):t.recent,
           seats:SEAT_OFFSETS.map((_,index)=>{
             const player=[...room.players.values()].find(p=>p.chair?.table===i&&p.chair.index===index)

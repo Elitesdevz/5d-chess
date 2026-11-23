@@ -401,6 +401,7 @@ export class Restaurant {
   act(member:WorldPlayer,command:unknown,data:Record<string,unknown>,now:number){
     if(member.zone!=='kfc')fail(409,'Visit Krulliversal Fried Chicken first')
     this.restore(member.name,now)
+    if(command==='leave-station')return
     if(command==='buy')this.buy(member,data,now)
     else if(command==='hire')this.hire(member,data.role,now)
     else if(command==='quit'){this.requirePoint(member,'kfc:manager',now);this.endShift(member.name)}

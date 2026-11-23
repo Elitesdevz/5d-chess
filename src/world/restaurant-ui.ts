@@ -64,10 +64,14 @@ export class RestaurantUI{
     if(!this.hud.hidden&&r){
       const shift=r.shift
       const title=shift?`${workNames[shift.role]} · ${shift.role==='janitor'?'Cleaning crew':'Station '+(shift.slot+1)}`:'Your meal'
-      const task=r.tray?r.tray.seat===undefined?'Hand the tray to '+safeText(r.tray.name):'Serve '+labelTable(r.tray.seat):
+      const station=view.interaction?.startsWith('kfc:kitchen:')?view.interaction:undefined
+      const instruction=station?.endsWith(':fryer')?'Dip the scoop down, then lift it right into the bag.':
+        station?.endsWith(':soda')?'Raise the cup to the tap and hold it there.':
+        station?r.kitchen?.patty==='flipped'?'Move the cooked patty right onto the bun.':'Lift the spatula to flip the patty.':undefined
+      const task=instruction??(r.tray?r.tray.seat===undefined?'Hand the tray to '+safeText(r.tray.name):'Serve '+labelTable(r.tray.seat):
         r.work?WORK[r.work.kind].name:
         shift?shift.role==='cook'?kitchenObjective(r.kitchen):shift.role==='cashier'?'Take orders at your till and watch the pickup shelf.':'Look for spills and used trays.':
-          view.you.dining!==undefined?(r.meal?.status==='paid'?'Waiting for your order.':'You’re seated.'):'Find a seat by the window.'
+          view.you.dining!==undefined?(r.meal?.status==='paid'?'Waiting for your order.':'You’re seated.'):'Find a seat by the window.')
       if(r.pay&&r.pay.id!==this.pay){this.pay=r.pay.id;this.payUntil=view.now+3300}
       const pay=r.pay&&view.now<this.payUntil?`<small class="kfc-earned">+${coins(r.pay.coins)}</small>`:''
       const job=r.kitchen,check=job?`<small>${orderText(job.ticket.items)} · ${orderSize(job.done)}/${orderSize(job.ticket.items)} on tray</small>`:''
@@ -134,25 +138,6 @@ export class RestaurantUI{
       </button><div class="kfc-ticket-box" data-drop="ticket"><span aria-hidden="true"></span>Kitchen ticket box</div></div>
       <p>Drag the filled ticket into the box.</p>`
   }
-  private grill(r:RestaurantView){
-    const job=r.kitchen,station=this.point.split(':').at(-1)
-    if(station==='fryer'||station==='soda'){
-      const fries=station==='fryer'
-      if(job?.hand!==(fries?'bag':'cup'))return '<p>Bring an empty container to this station.</p>'
-      return `<div class="kfc-fill ${fries?'kfc-fryer':'kfc-fountain'}">
-        <button type="button" class="kfc-pick" data-drag="${fries?'scoop':'fill'}" aria-label="${fries?'Scoop fries into bag':'Fill the cup'}">${foodSymbol(fries?'fries':'cola')}</button>
-        <div class="kfc-fill-target" data-drop="${fries?'scoop':'fill'}"><b>${fries?'Fries bag':'Fountain tap'}</b></div></div>
-        <p>${fries?'Drag the scoop from the fryer into the bag.':'Slide the cup under the fountain tap.'}</p>`
-    }
-    if(!job||job.patty==='empty')return `<p>${kitchenObjective(job)}</p>`
-    const cook=job.patty==='raw',wait=job.readyAt>this.current!.now
-    return `<div class="kfc-grill" data-cooked="${!cook}">
-      <div class="kfc-griddle" aria-hidden="true"></div>
-      <button type="button" class="kfc-patty" data-drag="${cook?'flip':'assemble'}" aria-label="${cook?'Flip patty':'Stack patty on bun'}" ${wait?'disabled':''}></button>
-      <div class="kfc-bun" data-drop="assemble" aria-label="Bun">${foodSymbol('bun')}</div>
-      <div class="kfc-flip-zone" data-drop="flip" aria-hidden="true">↑</div></div>
-      <p>${wait?'Let it cook for a moment.':cook?'Drag the patty up to flip it.':'Drag the cooked patty onto the bun.'}</p>`
-  }
   private dining(r:RestaurantView){
     const meal=r.meal,ready=meal?.status==='served',items=meal&&orderItems(meal)
     const portions=items?Math.max(3,orderSize(items)):3
@@ -202,7 +187,7 @@ export class RestaurantUI{
       desk==='dining'?labelTable(this.current!.you.dining??0):desk==='kitchen'?this.point.endsWith(':fryer')?'Fryer':this.point.endsWith(':soda')?'Soda fountain':'Your cooking station':desk==='clean'?'Cleaning crew':
       desk==='till'?'Take an order':desk==='deliver'?'Serve the table':'Pickup shelf'
     const body=desk==='menu'?this.menu(r,Number(this.point.split(':')[2])):desk==='manager'?this.manager(r):
-      desk==='dining'?this.dining(r):desk==='kitchen'?this.grill(r):desk==='clean'?this.cleaning(r):this.cashier(r)
+      desk==='dining'?this.dining(r):desk==='clean'?this.cleaning(r):this.cashier(r)
     const markup=`<header class="kfc-header"><div class="kfc-badge">KFC</div><div><span>${RESTAURANT_NAME}</span><h2 id="world-dialog-title">${title}</h2></div><form method="dialog"><button type="submit" aria-label="Close">×</button></form></header>
       <section class="kfc-content">${body}</section><p class="kfc-notice" role="status" ${this.notice?'':'hidden'}>${safeText(this.notice)}</p>`
     if(this.markup===markup)return

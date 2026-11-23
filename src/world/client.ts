@@ -9,6 +9,32 @@ import type {CityStage} from './stage.ts'
 
 const cast=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as E
 const host=cast('city-world'),connection=cast('world-connection'),panel=cast('world-table'),dialog=cast<HTMLDialogElement>('world-service')
+const pause=cast('world-pause'),chatForm=cast<HTMLFormElement>('world-chat-form'),chatInput=chatForm.querySelector('input')!
+let paused=false,chatting=false
+function syncControls(){stage?.lock(paused||chatting||dialog.open)}
+function showPause(){if(closed||dialog.open||chatting)return;paused=true;pause.hidden=false;syncControls()}
+function resume(){paused=false;pause.hidden=true;syncControls();stage?.resumeMouse()}
+cast('world-continue').onclick=resume
+cast('world-pause-toggle').onclick=()=>paused?resume():showPause()
+document.addEventListener('visibilitychange',()=>{if(document.hidden)showPause()})
+window.addEventListener('blur',showPause)
+let chatKey=''
+function renderChat(next:WorldView){
+  const key=next.id+':'+(next.chat?.at(-1)?.id??0)
+  if(key===chatKey)return
+  chatKey=key
+  const list=cast('world-messages')
+  list.innerHTML=(next.chat??[]).slice(-8).map(m=>`<li><b>${safeText(m.name)}</b> ${safeText(m.text)}</li>`).join('')
+  list.scrollTop=list.scrollHeight
+}
+chatInput.onfocus=()=>{chatting=true;syncControls()}
+chatInput.onblur=()=>{chatting=false;syncControls()}
+chatForm.onsubmit=async e=>{
+  e.preventDefault()
+  const text=chatInput.value.trim()
+  if(!text||performing)return
+  try{await action('chat',{text});chatInput.value='';chatInput.blur();stage?.resumeMouse()}catch{}
+}
 let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined,profile:Profile|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
@@ -57,7 +83,7 @@ function renderTable(){
   if(activeTable!==chair.table){choice=dice?1:'white';activeTable=chair.table}
   const locked=Boolean(table.seats[chair.index]?.locked)
   if(pending&&(pending.round!==table.round||locked))pending=undefined
-  const key=JSON.stringify([chair.table,table.round,table.phase,locked,table.prizes,view.hall?.maxStake,view.hall?.open])
+  const key=JSON.stringify([chair.table,table.round,table.phase,locked,table.prizes,table.wagers,view.hall?.maxStake,view.hall?.open])
   if(key!==tableKey){
     tableKey=key
     const faces=dice?Array.from({length:6},(_,i)=>i+1):Array.from({length:37},(_,i)=>i)
@@ -69,6 +95,7 @@ function renderTable(){
       ${table.phase==='betting'&&!locked?`<form class="world-wager">${mat}<div class="world-wager-row"><label>Stake<input type="number" min="1" max="${view.hall?.maxStake??MAX_CASINO_STAKE}" step="1" required value="${stake}" inputmode="numeric"></label><button type="submit" class="world-primary" data-lock>Lock bet</button></div><small data-payout></small></form>`:
       table.phase==='spin'?'<p class="world-muted">Bets are closed. Watch the table.</p>':
       table.phase==='result'?`<div class="world-result"><strong>${dice?'Face':'Pocket'} ${table.spin?.pocket}</strong><ul class="world-ledger">${(table.prizes??[]).map(p=>`<li><span>${safeText(p.name)}</span><b class="${p.won?'is-winner':''}">${p.net>=0?'+':'−'}${casinoCoins(Math.abs(p.net))}</b></li>`).join('')}</ul></div>`:'<p class="world-muted">Your bet is locked. Waiting for the table.</p>'}`
+    if(table.wagers?.length)panel.insertAdjacentHTML('beforeend',`<section class="world-wagers" aria-label="Bets this round"><h3>Bets this round</h3><ul>${table.wagers.map(b=>`<li><b>${safeText(b.name)}</b><span>${dice?'Face ':''}${safeText(title(b.choice))} · ${coins(b.stake)}</span></li>`).join('')}</ul></section>`)
     panel.insertAdjacentHTML('beforeend',`<details class="world-table-rules"><summary>Rules and recent results</summary><p>${dice?'Pick one face. The croupier rolls one shared die. The return for your selected face is shown above.':'Bet on a pocket or choose an outside bet. The wheel result is shared by the table.'}</p><p>${table.recent.length?'Recent: '+table.recent.join(' · '):'No recent results yet.'}</p></details>${dice?'':'<details class="world-table-rules" data-history><summary>Your roulette history</summary><ul class="world-ledger"></ul></details>'}`)
     const history=panel.querySelector<HTMLDetailsElement>('[data-history]')
     if(history)history.ontoggle=()=>{
@@ -133,7 +160,7 @@ function accepted(next:WorldView,start:number,reposition=false){
     viewKey=scope;shownService='';services?.close()
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
   }
-  stage?.set(next,offset,reposition);stage?.lock(dialog.open)
+  stage?.set(next,offset,reposition);syncControls();renderChat(next)
   setCoins(next.coins);restaurant?.update(next)
   const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
   for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
@@ -142,8 +169,18 @@ function accepted(next:WorldView,start:number,reposition=false){
   }
   renderTable()
   const service=next.interaction
+  const station=service?.startsWith('kfc:kitchen:')?service:undefined
+  stage?.setStation(station,gesture=>{
+    if(!station)return
+    void action('restaurant',{command:'kitchen',point:station,gesture}).finally(()=>stage?.resetTool()).catch(()=>{})
+  })
   if(service&&shownService!==service){
     shownService=service
+    if(station)return
+    if(service==='bar'){
+      services?.bar(next.bar?.name===next.you.name?next.bar:undefined,(drink,id)=>action('bar',{drink,id}),()=>action('stand-scenery',{}),next.you.barSeat!==undefined)
+      return
+    }
     if(service.startsWith('kfc:'))restaurant?.open(service)
     else void services?.open(service,next.you.zone.startsWith('floor:')?next.you.zone.slice(6):undefined)
     stage?.lock(true)
@@ -172,15 +209,29 @@ async function action(name:string,data:object){
   finally{performing=false;updateSelection()}
 }
 function use(point?:WorldAction){
+  if(view?.interaction?.startsWith('kfc:kitchen:')){
+    void action('restaurant',{command:'leave-station'}).catch(()=>{});return
+  }
+  if(view?.you.barSeat!==undefined||view?.you.boardSeat!==undefined){
+    if(!dialog.open)void action('stand-scenery',{}).catch(()=>{});return
+  }
   if(seated()||view?.you.lounge){void action('stand',{}).catch(()=>undefined);return}
   if(!point||dialog.open)return
   if(shownService===point.id)shownService=''
   void action('use',{target:point.id}).catch(()=>undefined)
 }
 host.querySelector<HTMLButtonElement>('[data-world-use]')!.onclick=()=>stage?.act()
-dialog.addEventListener('close',()=>stage?.lock(false))
+dialog.addEventListener('close',syncControls)
 document.addEventListener('keydown',event=>{
-  if(event.key==='Escape'&&!dialog.open&&(seated()||view?.you.lounge))use()
+  if(event.key==='Escape'){
+    if(chatting){chatInput.blur();stage?.resumeMouse();event.preventDefault()}
+    else if(!dialog.open){if(!paused)showPause();event.preventDefault()}
+    return
+  }
+  if((event.key==='/'||event.key.toLowerCase()==='t')&&!event.ctrlKey&&!event.metaKey&&!dialog.open&&!paused&&
+      !(event.target instanceof HTMLElement&&event.target.matches('input,textarea,select,[contenteditable]'))){
+    event.preventDefault();chatInput.focus()
+  }
 })
 window.addEventListener('pagehide',e=>{if(!e.persisted)closed=true})
 async function start(){
@@ -194,7 +245,7 @@ async function start(){
   },setCoins)
   restaurant=new RestaurantUI(dialog,cast('world-kfc-hud'),(command,data)=>action('restaurant',{command,...data}))
   const {CityStage}=await import('./stage.ts')
-  stage=new CityStage(cast('world-canvas'),host,use)
+  stage=new CityStage(cast('world-canvas'),host,use,showPause)
   const url=new URL(location.href),go=url.searchParams.get('go')??''
   if(url.searchParams.get('exit')==='cave')await action('exit-cave',{})
   else if(like(go))await action('teleport',{to:go})
@@ -219,6 +270,7 @@ document.addEventListener('click',event=>{
   if(!like(to))return
   event.preventDefault()
   services?.close()
+  if(paused){paused=false;pause.hidden=true;syncControls()}
   void action('teleport',{to}).catch(()=>undefined)
 })
 void start().catch(error=>{connection.hidden=false;connection.textContent=error instanceof Error?error.message:'The city could not open.'})

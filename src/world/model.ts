@@ -1,3 +1,4 @@
+import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
 import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type OrderItems} from './restaurant-model.ts'
 import {CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
 import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
@@ -60,20 +61,24 @@ export function spawn(zone:WorldZone,point=zone.startsWith('floor:')?FLOOR_ARRIV
   return {...site(zone,point.x,point.z),yaw:point.yaw+(reverse(zone)<0?Math.PI:0)}
 }
 export type LiftRide={to:WorldZone;started:number;ends:number}
-export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems}
+export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems;barSeat?:number;boardSeat?:number}
 export function riderHeight(player:WorldPlayer,now:number){
   const from=floorHeight(player.zone),ride=player.lift
   if(!ride)return player.zone==='city'?terrainHeight(player.x,player.z):from
   const progress=Math.max(0,Math.min(1,(now-ride.started)/(ride.ends-ride.started)))
   return from+(floorHeight(ride.to)-from)*progress*progress*(3-2*progress)
 }
-export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|`kfc:${string}`
+export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`kfc:${string}`
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
+export type WorldChat={id:number;name:string;text:string;at:number}
 export interface WorldView{
+  chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
   id:string;now:number;you:WorldPlayer;players:WorldPlayer[];coins:number;caveOpen:boolean;hall?:HallView;tableMotion?:Pick<HallTable,'spin'|'recent'>[];interaction?:WorldUse;restaurant?:RestaurantView
 }
 function localInteractions(zone:WorldZone):WorldAction[]{
   if(zone==='casino')return [
+    {id:'bar',label:'Talk to the bartender',...BAR,range:1.62},
+    ...BAR_STOOLS.map((seat,i)=>({id:'bar-seat:'+i,label:'Sit at the bar',...seat,range:.75})),
     ...WORLD_TABLES.map((t,i)=>({id:'seat:'+i,label:t.name,x:t.x,z:t.z+1.68,range:2.15})),
     ...LOUNGES.map((seat,i)=>({id:'couch:'+i,label:'Sit on couch',x:seat.x,z:seat.z,range:1.75})),
   ]
@@ -97,7 +102,7 @@ export function groundZone(x:number,z:number):PublicZone{
   return 'city'
 }
 function roomObstacles(zone:WorldZone,x:number,z:number){
-  if(zone==='casino')return WORLD_TABLES.some(t=>box(x,z,t.x,t.z,2.35,1.28))||box(x,z,-5.9,8.23,4.05,.54)
+  if(zone==='casino')return WORLD_TABLES.some(t=>box(x,z,t.x,t.z,2.35,1.28))||box(x,z,BAR_COUNTER.x,BAR_COUNTER.z,3.72,.48)
   if(zone==='kfc')return restaurantObstacle(x,z)
   if(zone==='hotel')return box(x,z,-6.25,-6.26,2.33,.67)
   if(zone==='bank')return z<-.41||box(x,z,CREDIT_ADVISOR.x,CREDIT_ADVISOR.z-1.25,1.12,.47)

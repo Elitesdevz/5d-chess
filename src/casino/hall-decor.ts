@@ -175,6 +175,7 @@ export function buildHall(scene:T.Object3D,city=false){
   scene.add(light(0x95c8ec,40,14,0,3,-5.8))
   for(const site of LOUNGES)lounge(architecture,site.x,site.z,site.yaw)
   for(const [x,z] of [[-9.5,-5.3],[9.5,-5.3],[-10,5.8],[10,5.8]])plant(architecture,x,z)
+  if(city){batchStatic(architecture);return}
   const bar=new T.Group();bar.position.set(city?-5.9:0,0,8.23);scene.add(bar)
   box(bar,[7.6,1,.66],[0,.50,0],oak,.075);box(bar,[7.86,.08,.77],[0,1.03,0],brass,.038)
   for(let i=0;i<15;i++)box(bar,[.22,.67,.025],[(i-7)*.48,.5,-.343],trim,.006)

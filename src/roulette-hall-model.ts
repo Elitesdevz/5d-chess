@@ -1,4 +1,4 @@
-import type {CasinoRound} from './casino-model.ts'
+import type {CasinoRound,RouletteChoice} from './casino-model.ts'
 
 export const HALL_CAPACITY = 10
 export const BET_WINDOW = 60_000
@@ -36,6 +36,7 @@ export interface HallTable {
   seats:({name:string;avatar:string;locked:boolean;online:boolean}|null)[]
   spin?:HallSpin
   prizes?:TablePrize[]
+  wagers?:{name:string;stake:number;choice:RouletteChoice}[]
   recent:number[]
 }
 export interface HallView {
