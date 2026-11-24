@@ -65,17 +65,21 @@ test('residential walkthrough through both buildings, house styles, furniture an
       offset+=400
       await action('presence')
       const grid=.15,zone=homeZone(b.id,level),key=(x,z)=>x+','+z
-      const [sx,sz]=[Math.round((current.you.x-b.x)*b.facing/grid),Math.round((current.you.z-b.z)*b.facing/grid)]
-      const parent=new Map(),nodes=[[sx,sz]],visited=new Set([key(sx,sz)])
+      const ox=(current.you.x-b.x)*b.facing,oz=(current.you.z-b.z)*b.facing
+      const gx=Math.round(ox/grid),gz=Math.round(oz/grid)
       const walkable=(x,z)=>{
         const p=residentialSite(b,x*grid,z*grid)
         return residentialStep(zone,p.x,p.z,keys,current.residential,current.now)===zone
       }
+      const [sx,sz]=[-1,0,1].flatMap(x=>[-1,0,1].map(z=>[gx+x,gz+z]))
+        .sort((a,b)=>Math.hypot(a[0]*grid-ox,a[1]*grid-oz)-Math.hypot(b[0]*grid-ox,b[1]*grid-oz))
+        .find(p=>walkable(...p))??[gx,gz]
+      const parent=new Map(),nodes=[[sx,sz]],visited=new Set([key(sx,sz)])
       const unit=b.levels[level].units.find(u=>u.id===goal.unit)
       let route=[]
       for(let k=0;k<nodes.length;k++){
         const [x,z]=nodes[k]
-        if((!unit||contains(unit.rect,x*grid,z*grid))&&Math.hypot(x*grid-goal.x,z*grid-goal.z)<(goal.range??.23)){
+        if((!unit||contains(unit.rect,x*grid,z*grid))&&(goal.rect?contains(goal.rect,x*grid,z*grid):Math.hypot(x*grid-goal.x,z*grid-goal.z)<(goal.range??.23))){
           for(let step=[x,z];step;step=parent.get(key(...step)))route.unshift(step)
           break
         }
@@ -86,7 +90,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
           if(walkable(...next)){nodes.push(next);parent.set(code,[x,z])}
         }
       }
-      assert.ok(route.length,b.id+' path to '+JSON.stringify(goal))
+      assert.ok(route.length,b.id+' path from '+[ox,oz]+' to '+JSON.stringify(goal))
       await local(b,sx*grid,sz*grid)
       for(let i=1;i<route.length;i++){
         const [x,z]=route[i],prior=route[i-1],next=route[i+1]
@@ -192,8 +196,8 @@ test('residential walkthrough through both buildings, house styles, furniture an
             await page.getByRole('button',{name:'Close',exact:true}).click()
           })
         }else await capture(b.id+'-'+index+'-kitchen')
-        for(const fixture of floor.fixtures.filter(f=>f.unit===u.id&&f.kind==='toilet')){
-          await path(b,2,{...fixture,range:1.03,yaw:Math.PI/2})
+        for(const tile of floor.tiles.filter(t=>t.kind==='bath'&&contains(u.rect,(t.rect.l+t.rect.r)/2,(t.rect.b+t.rect.f)/2))){
+          await path(b,2,{rect:tile.rect,unit:u.id,yaw:Math.PI/2})
           if(b.block===0)await capture(b.id+'-'+index+'-bath')
         }
         for(const [j,bed] of floor.points.filter(p=>p.unit===u.id&&p.pose?.kind==='rest').entries()){

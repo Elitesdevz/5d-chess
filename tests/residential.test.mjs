@@ -8,7 +8,7 @@ import {CityWorlds} from '../server/world.ts'
 import {RouletteHall} from '../server/roulette-hall.ts'
 import {Restaurant} from '../server/restaurant.ts'
 import {residentialFood} from '../server/residential-food.ts'
-import {BUILDINGS,STOREY,buildingById,homeZone,residentialSite,residentialStep} from '../src/world/residential.ts'
+import {BUILDINGS,STOREY,buildingById,contains,homeZone,residentialSite,residentialStep} from '../src/world/residential.ts'
 import {UNITS} from '../src/world/housing.ts'
 import {riderHeight,walkingHeight,worldMove,site} from '../src/world/model.ts'
 import {COUNTERS,blankOrder} from '../src/world/restaurant-model.ts'
@@ -210,6 +210,9 @@ test('shared layouts keep every doorway and usable residential fixture connected
       if(residentialStep(zone,p.x,p.z,keys,state,1000)===zone)points.push([x,z])
     }
     const close=(p,distance)=>points.some(([x,z])=>Math.hypot(x*spacing-p.x,z*spacing-p.z)<distance)
+    for(const tile of f.tiles.filter(tile=>tile.kind==='bath')){
+      assert.ok(points.some(([x,z])=>contains(tile.rect,x*spacing,z*spacing)),zone+' has an inaccessible bathroom')
+    }
     for(const point of f.points){
       assert.ok(close(point,point.range),zone+' lacks access to '+point.id)
       if(point.exit){
