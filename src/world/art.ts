@@ -534,6 +534,14 @@ export function liftPlatform(parent:T.Object3D){
   car.position.set(PLAN.exchange.x,0,PLAN.exchange.z)
   block(car,2.93,.16,3.06,0,-.075,-5.74,bronzeFloor)
   block(car,2.93,.052,.1,0,.038,-4.22,brass)
+  const doors=new T.Group();car.add(doors);doors.name='travel-doors';doors.visible=false
+  for(const side of [-1,1]){
+    block(doors,1.46,3.38,.09,side*.734,1.69,-4.29,bronzeFloor)
+    block(doors,.035,3.29,.04,side*.061,1.67,-4.36,brass)
+    block(car,.07,3.42,2.98,side*1.46,1.71,-5.78,ink)
+  }
+  block(car,2.93,3.4,.08,0,1.7,-7.23,ink)
+  block(car,2.92,.08,2.98,0,3.44,-5.75,ivory)
   return car
 }
 const bronzeFloor=std(0x60584c,.35,.74)

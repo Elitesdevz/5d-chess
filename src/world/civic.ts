@@ -8,9 +8,10 @@ export function avenues(parent:T.Object3D){
   const slab=(x:number,z:number,w:number,d:number,color:number,y:number)=>p.add('box',x,y,z,w,.012,d,color)
   function road(x:number,z:number,length:number,width:number,vertical=false,major=false){
     const rect=(offset:number,along:number,w:number,l:number,color:number,y:number)=>slab(x+(vertical?offset:along),z+(vertical?along:offset),vertical?w:l,vertical?l:w,color,y)
-    rect(0,0,width+2.8,length,0xb4aaa0,-.041);rect(0,0,width,length,major?0x535a5b:0x726d64,-.024)
-    for(const side of [-1,1])rect(side*(width/2+.09),0,.18,length,0xd1c5af,-.005)
-    if(major)for(let a=2-length/2;a<length/2-1;a+=4.4)rect(0,a,.085,1.48,0xcfbf9a,-.009)
+    const level=vertical?.008:0
+    rect(0,0,width+2.8,length,0xb4aaa0,-.045+level);rect(0,0,width,length,major?0x535a5b:0x726d64,-.026+level)
+    for(const side of [-1,1])rect(side*(width/2+.09),0,.18,length,0xd1c5af,-.006+level)
+    if(major)for(let a=2-length/2;a<length/2-1;a+=4.4)rect(0,a,.085,1.48,0xcfbf9a,-.010+level)
   }
   road(0,11,122,5.4,false,true)
   road(0,29,32,4.3,true,true)

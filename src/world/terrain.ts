@@ -16,7 +16,7 @@ export function terrainVertex(x:number,z:number){
   const radius=Math.hypot(x,z),d=ridgeDistance(x,z)
   const plain=Math.min(1,Math.max(0,(radius-63)/16))*(.85+.48*Math.sin(x*.11)+.35*Math.cos(z*.15))
   const t=Math.max(0,d)
-  const ridge=Math.min(t*t*.062,38+8*Math.sin(x*.17)+6*Math.cos(z*.14))
+  const ridge=(1-Math.exp(-t*t/1750))*(42+5*Math.sin(x*.055)+5*Math.cos(z*.048))
   // Keep both tunnel approaches level through the foot of the ridge.
   const channel=Math.max(Math.min(Math.abs(x-CAVE_X),Math.abs(x-OASIS_X))-5, CAVE_MOUTH-4-z,z-CAVE_MOUTH-18,0)
   return (plain+ridge)*Math.min(1,channel/7)
@@ -31,7 +31,7 @@ export function terrainHeight(x:number,z:number){
 export function passableLand(x:number,z:number){
   if(ridgeDistance(x,z)<1)return true
   const height=terrainHeight(x,z)
-  return height<22&&Math.hypot(terrainHeight(x+.5,z)-terrainHeight(x-.5,z),terrainHeight(x,z+.5)-terrainHeight(x,z-.5))<.91
+  return ridgeDistance(x,z)<30&&height<22&&Math.hypot(terrainHeight(x+.5,z)-terrainHeight(x-.5,z),terrainHeight(x,z+.5)-terrainHeight(x,z-.5))<.91
 }
 export function houseObstacle(x:number,z:number){
   for(const [cx,cz] of HOMES){

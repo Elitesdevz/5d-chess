@@ -51,7 +51,7 @@ export class CityStage {
   private fence:WebGLSync|null=null
   private art?:ReturnType<typeof makeWorldArt>
   private view?:WorldView
-  private camera=new T.PerspectiveCamera(58,1,.05,720)
+  private camera=new T.PerspectiveCamera(58,1,.16,720)
   private shadow?:T.CanvasTexture
   private figures=new Map<string,Avatar>()
   private npc:Figure[]=[]
@@ -349,6 +349,7 @@ export class CityStage {
         let cabin=this.lifts.get(key)
         if(!cabin){cabin=liftPlatform(this.art.scene);this.lifts.set(key,cabin)}
         cabin.visible=true;cabin.position.y=height
+        cabin.getObjectByName('travel-doors')!.visible=!!member.lift
       }
       if(current.tag){
         const mark=figure.root.position.clone().add(v(0,1.91,0)).project(this.camera)
