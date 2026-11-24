@@ -1,3 +1,4 @@
+import type {HomePose} from '../world/residential.ts'
 import * as T from 'three'
 import {ROULETTE_ORDER,pocketColor,type RouletteChoice} from '../casino-model.ts'
 import {LOUNGES,SEAT_OFFSETS,SPAWN,TABLES,WALK_SPEED,walk,type HallPlayer,type HallView,type Position} from '../roulette-hall-model.ts'
@@ -82,7 +83,7 @@ export class Figure {
     this.shadow.rotation.x=-Math.PI/2
   }
   hideHead(){this.head.visible=false}
-  pose(dt:number,now:number,local?:Position,serving=false,eating=false){
+  pose(dt:number,now:number,local?:Position,serving=false,eating=false,homePose?:HomePose){
     const target=local??this.target,chair=this.target.chair||this.target.lounge
     const speed=Math.hypot(target.x-this.root.position.x,target.z-this.root.position.z)
     const f=local?1:1-Math.exp(-dt*10)
@@ -100,6 +101,14 @@ export class Figure {
       this.knees[i].rotation.x=chair?-1.35:-Math.max(0,swing*side)*.61
       this.arms[i].rotation.x=chair?.75:serving?1.12+breathe*side*.33:swing*-.38*side+breathe*.025
     }
+    const resting=homePose?.kind==='rest'
+    this.body.position.z=0
+    this.shadow.visible=!homePose
+    if(resting){
+      this.body.rotation.x=-Math.PI/2
+      this.body.position.y=homePose.height+.12
+      for(let i=0;i<2;i++){this.legs[i].rotation.x=0;this.knees[i].rotation.x=0;this.arms[i].rotation.x=0}
+    }else if(homePose)this.body.position.y=homePose.height-.87
     if(eating)this.arms[0].rotation.x=1.18+Math.max(0,breathe)*.66
   }
   dispose(){

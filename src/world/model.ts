@@ -1,7 +1,8 @@
-import {propertyPoints,propertyObstacle,type HousingView} from './housing.ts'
+import {residentialAt,residentialHeight,residentialStep,type HomeZone,type HomePose,type ResidentialView} from './residential.ts'
+import {propertyPoints,officeObstacle,type HousingView} from './housing.ts'
 import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
 import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type OrderItems} from './restaurant-model.ts'
-import {basinBed,tunnelBed,inPool,poolLevel,OASIS_MOUTH,CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
+import {basinBed,tunnelBed,inPool,poolLevel,OASIS_MOUTH,CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,passableLand,terrainHeight} from './terrain.ts'
 import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
 export const WORLD_CAPACITY=50
@@ -10,7 +11,7 @@ export const CITY={x:0,z:8,yaw:0}
 export const FLOOR_LIST:{symbol:string;name:string}[]=[...STOCKS].sort((a,b)=>a.symbol.localeCompare(b.symbol))
 FLOOR_LIST.push({symbol:'CAS',name:'The Casino'},{symbol:'BNK',name:'Fifth Dimension Bank'})
 export const stockFloor=(symbol:string)=>symbol==='CAS'||symbol==='BNK'||STOCK_SYMBOLS.has(symbol)
-export type PublicZone='city'|'hotel'|'casino'|'bank'|'exchange'|'kfc'|'cave'|'oasis'|`floor:${string}`
+export type PublicZone='city'|'hotel'|'casino'|'bank'|'exchange'|'kfc'|'cave'|'oasis'|`floor:${string}`|HomeZone
 export type WorldZone=PublicZone|'private'
 export type Destination='city'|'casino'|'bank'|'stocks'|'kfc'
 export const DESTINATIONS={city:'city',casino:'hotel',bank:'bank',stocks:'exchange',kfc:'kfc'} as const
@@ -25,7 +26,7 @@ export const CITY_PORTALS=[
 export const PUBLIC_DICE={name:'Ivory Dice',x:6.1,z:3.0,color:'#e5bd86'} as const
 export const WORLD_TABLES=[...TABLES,PUBLIC_DICE]
 export const DICE_TABLE_INDEX=TABLES.length
-export const ZONE_ARRIVAL:Record<Exclude<WorldZone,`floor:${string}`>,Position>={
+export const ZONE_ARRIVAL:Record<Exclude<WorldZone,HomeZone|`floor:${string}`>,Position>={
   city:CITY,hotel:{x:0,z:5.7,yaw:0},casino:{x:0,z:7.1,yaw:0},
   bank:{x:0,z:6.6,yaw:0},exchange:{x:0,z:6.6,yaw:0},
   kfc:{x:0,z:5.6,yaw:0},
@@ -74,15 +75,17 @@ export function spawn(zone:WorldZone,point=zone.startsWith('floor:')?FLOOR_ARRIV
   return {...site(zone,point.x,point.z),yaw:point.yaw+(reverse(zone)<0?Math.PI:0)}
 }
 export type LiftRide={to:WorldZone;started:number;ends:number}
-export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems;barSeat?:number;boardSeat?:number}
+export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems;barSeat?:number;boardSeat?:number;homePose?:HomePose}
 export function riderHeight(player:WorldPlayer,now:number){
-  const from=floorHeight(player.zone),ride=player.lift
+  const from=residentialHeight(player.zone,player.x,player.z)??floorHeight(player.zone),ride=player.lift
   if(!ride)return walkingHeight(player.zone,player.x,player.z)
 
   const progress=Math.max(0,Math.min(1,(now-ride.started)/(ride.ends-ride.started)))
-  return from+(floorHeight(ride.to)-from)*progress*progress*(3-2*progress)
+  return from+((residentialHeight(ride.to,player.x,player.z)??floorHeight(ride.to))-from)*progress*progress*(3-2*progress)
 }
 export function walkingHeight(zone:WorldZone,x:number,z:number){
+  const home=residentialHeight(zone,x,z)
+  if(home!==undefined)return home
   if(zone==='cave'||zone==='oasis'){
     const local=localSite(zone,x,z)
     if(zone==='oasis')return inPool(local.x,local.z)?Math.max(basinBed(local.z),poolLevel-1.28):basinBed(local.z)
@@ -90,15 +93,17 @@ export function walkingHeight(zone:WorldZone,x:number,z:number){
   }
   return zone==='city'?terrainHeight(x,z):floorHeight(zone)
 }
-export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`
+export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
 export type WorldChat={id:number;name:string;text:string;at:number}
 export interface WorldView{
-  housing?:HousingView;chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
+  housing?:HousingView;residential?:ResidentialView;food?:import('./food.ts').FoodView;chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
   id:string;now:number;you:WorldPlayer;players:WorldPlayer[];coins:number;caveOpen:boolean;hall?:HallView;tableMotion?:Pick<HallTable,'spin'|'recent'>[];interaction?:WorldUse;restaurant?:RestaurantView
 }
 function localInteractions(zone:WorldZone):WorldAction[]{
-  if(zone==='city')return propertyPoints()
+  if(zone==='city')return propertyPoints().filter(p=>!p.id.startsWith('property:desk-'))
+  const home=residentialAt(zone)
+  if(home?.building.block!==undefined&&home.level===0&&!home.stairs)return propertyPoints().filter(p=>p.id==='property:desk-'+home.building.block)
   if(zone==='casino')return [
     {id:'bar',label:'Talk to the bartender',...BAR,range:1.62},
     ...BAR_STOOLS.map((seat,i)=>({id:'bar-seat:'+i,label:'Sit at the bar',...seat,range:.75})),
@@ -138,13 +143,13 @@ function roomObstacles(zone:WorldZone,x:number,z:number){
   }
   return false
 }
-function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean,keys:readonly string[]){
+function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
   if(zone==='private')return false
   if(zone.startsWith('floor:')){
     const p=localSite(zone,x,z),shaft=Math.abs(p.x)<1.42
     return Math.abs(p.x)<7.72&&p.z<7.29&&p.z>(shaft?-6.21:-5.98)&&!roomObstacles(zone,p.x,p.z)
   }
-  if(propertyObstacle(x,z,keys)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z)||houseObstacle(x,z))return false
+  if(officeObstacle(x,z)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x),opening=room==='bank'?1.13:room==='exchange'?1.02:room==='kfc'?1.28:1.25
     if(side<width+.28&&side>width-.28&&p.z>back-.28&&p.z<front+.28)return false
@@ -161,15 +166,24 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean,keys:readonl
   }
   return true
 }
-export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true,keys:readonly string[]=[]):Position{
+export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true,keys:readonly string[]=[],residential?:ResidentialView,now=Date.now()):Position&{homeZone?:HomeZone}{
   const d=Math.hypot(x-from.x,z-from.z)
-  if(!Number.isFinite(d)||d===0||limit<=0)return from
-  const scale=Math.min(1,limit/d),steps=Math.max(1,Math.ceil(d*scale/.21))
+  if(!Number.isFinite(d)||d===0||limit<=0)return {...from,homeZone:residentialAt(zone)?zone as HomeZone:undefined}
+  const scale=Math.min(1,limit/d),steps=Math.max(1,Math.ceil(d*scale/.13))
   const dx=(x-from.x)*scale/steps,dz=(z-from.z)*scale/steps
-  let ax=from.x,az=from.z
-  for(let i=0;i<steps;i++){
-    if(walkable(zone,ax+dx,az,caveOpen,keys))ax+=dx
-    if(walkable(zone,ax,az+dz,caveOpen,keys))az+=dz
+  let ax=from.x,az=from.z,current=zone
+  function step(x:number,z:number){
+    if(current==='city'||residentialAt(current)){
+      const next=residentialStep(current,x,z,keys,residential,now) as WorldZone|false
+      if(!next)return false
+      if(residentialAt(next)){current=next;return true}
+      if(residentialAt(current))current='city'
+    }
+    return walkable(current,x,z,caveOpen)
   }
-  return {x:ax,z:az,yaw:from.yaw}
+  for(let i=0;i<steps;i++){
+    if(dx&&step(ax+dx,az))ax+=dx
+    if(dz&&step(ax,az+dz))az+=dz
+  }
+  return {x:ax,z:az,yaw:from.yaw,homeZone:residentialAt(current)?current as HomeZone:undefined}
 }

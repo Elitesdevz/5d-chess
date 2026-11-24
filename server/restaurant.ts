@@ -214,7 +214,7 @@ export class Restaurant {
     const mealsAt=this.tickets.flatMap(t=>!t.player&&t.phase==='served'&&t.seat!==undefined?[{seat:t.seat,items:t.items}]:[])
     for(const [user,seat] of this.seats){
       const meal=this.meal(user)
-      if(meal?.status==='served')mealsAt.push({seat,items:orderItems(meal)})
+      if(meal?.status==='served'&&!meal.takeaway)mealsAt.push({seat,items:orderItems(meal)})
     }
     const stations=[...this.kitchen].flatMap(([player,job])=>{
       const slot=this.staff.get(player)?.slot
@@ -270,14 +270,14 @@ export class Restaurant {
     if(!this.closeTo(member,id,now))fail(409,'Move closer to that station first')
   }
   private buy(member:WorldPlayer,data:Record<string,unknown>,now:number){
-    const items=parseOrder(data.items),lane=data.lane
+    const items=parseOrder(data.items),lane=data.lane,takeaway=data.takeaway===true
     if(typeof lane!=='number'||!Number.isInteger(lane)||lane<0||lane>=COUNTERS.length||typeof data.id!=='string'||!/^[\w-]{12,80}$/.test(data.id))fail(400,'Choose a menu item')
     this.requirePoint(member,'kfc:menu:'+lane,now)
     this.store.transaction(u=>{
       const a=u.users.get(member.name)??fail(401,'Log in first'),purse=wallet(a)
       const receipt=a.restaurantOrders?.find(o=>o.id===data.id)
       if(receipt){
-        if(!sameItems(orderItems(receipt),items)||receipt.lane!==lane)fail(409,'This receipt belongs to another meal')
+        if(!sameItems(orderItems(receipt),items)||receipt.lane!==lane||!!receipt.takeaway!==takeaway)fail(409,'This receipt belongs to another meal')
         return
       }
       if(a.restaurant?.id===data.id||a.restaurantLast===data.id)return
@@ -285,8 +285,8 @@ export class Restaurant {
       const price=orderPrice(items),balance=toStockUnits(purse.coins)-toStockUnits(price)
       if(balance<0)fail(409,'You need '+price+' coins for this order')
       purse.coins=fromStockUnits(balance)
-      a.restaurant={id:data.id as string,items,lane,status:'paid',bites:0}
-      a.restaurantOrders=[{id:a.restaurant.id,items,lane},...(a.restaurantOrders??[])].slice(0,40)
+      a.restaurant={id:data.id as string,items,lane,status:'paid',bites:0,takeaway}
+      a.restaurantOrders=[{id:a.restaurant.id,items,lane,takeaway},...(a.restaurantOrders??[])]
       u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_ordered',reference:a.restaurant.id,coins:price},now)
     })
     this.restore(member.name,now)
@@ -403,6 +403,21 @@ export class Restaurant {
     this.restore(member.name,now)
     if(command==='leave-station')return
     if(command==='buy')this.buy(member,data,now)
+    else if(command==='collect'){
+      this.store.transaction(u=>{
+        const account=u.users.get(member.name)??fail(401,'Log in first')
+        if(typeof data.id!=='string')fail(400,'Choose a takeaway order')
+        if(account.foodReceipts?.['takeaway:'+data.id])return
+        const meal=account.restaurant
+        if(!meal||meal.id!==data.id||!meal.takeaway||meal.status!=='served')fail(409,'Your takeaway is not ready')
+        this.requirePoint(member,'kfc:collect',now)
+        const food=account.food??=blankOrder(),items=orderItems(meal)
+        for(const item of MENU)food[item.id]+=items[item.id]
+        ;(account.foodReceipts??={})['takeaway:'+meal.id]='collected'
+        delete account.restaurant
+        u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'takeaway_collected',reference:meal.id},now)
+      })
+    }
     else if(command==='hire')this.hire(member,data.role,now)
     else if(command==='quit'){this.requirePoint(member,'kfc:manager',now);this.endShift(member.name)}
     else if(command==='start'&&typeof data.point==='string')this.start(member,data.point,now)
@@ -425,7 +440,7 @@ export class Restaurant {
       this.store.transaction(u=>{
         const a=u.users.get(member.name)??fail(401,'Log in first')
         const meal=a.restaurant
-        if(meal?.status!=='served')fail(409,'Your meal is still being prepared')
+        if(meal?.status!=='served'||meal.takeaway)fail(409,'Your meal is still being prepared')
         meal.bites++
         if(meal.bites>=Math.max(3,orderSize(orderItems(meal)))){
           delete a.restaurant

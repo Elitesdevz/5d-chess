@@ -230,3 +230,10 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world-wagers [data-chip="1"] b::before{background:#72bcbc}.world-wagers [data-chip="2"] b::before{background:#cf8799}.world-wagers [data-chip="3"] b::before{background:#c2a8e5}
 
 .world-pause-toggle span{display:block;width:8px;height:12px;border-inline:2px solid currentColor}
+
+.world-food-toggle{position:absolute;right:3.55rem;top:.72rem;z-index:3;padding:.48rem .68rem;border:1px solid #a7b3a54d;border-radius:.55rem;background:#182c29;color:#f5ead4;font-weight:650}
+.residential-food-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,14rem),1fr));gap:1rem}
+.residential-food input{width:4.3rem;min-width:0}
+.residential-food h3{margin:0 0 .55rem}
+.residential-food h3 small{color:#b1c2b4}
+.residential-bank button{min-width:3rem;font-size:1.16rem}

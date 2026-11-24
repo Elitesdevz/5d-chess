@@ -185,6 +185,17 @@ function accepted(next:WorldView,start:number,reposition=false){
   if(!paused&&service&&shownService!==service){
     shownService=service
     if(station)return
+    if(service.startsWith('lift:')){
+      stage?.lock(true)
+      services?.residentialLift(next.you.zone,async level=>{await action('home-floor',{level});services?.close()})
+      return
+    }
+    if(service==='food'||service.startsWith('fridge:')){
+      stage?.lock(true)
+      const render=()=>{if(view?.food)services?.food(view.food,async data=>{await action('food',data);render()})}
+      render()
+      return
+    }
     if(service.startsWith('property:')){
       stage?.lock(true)
       const render=()=>{if(view)services?.property(service,view,async unit=>{await action('housing',{unit});render()})}
@@ -227,7 +238,7 @@ function use(point?:WorldAction){
   if(view?.interaction?.startsWith('kfc:kitchen:')){
     void action('restaurant',{command:'leave-station'}).catch(()=>{});return
   }
-  if(view?.you.barSeat!==undefined||view?.you.boardSeat!==undefined){
+  if(view?.you.homePose||view?.you.barSeat!==undefined||view?.you.boardSeat!==undefined){
     if(!dialog.open)void action('stand-scenery',{}).catch(()=>{});return
   }
   if(seated()||view?.you.lounge){void action('stand',{}).catch(()=>undefined);return}
@@ -236,7 +247,11 @@ function use(point?:WorldAction){
   void action('use',{target:point.id}).catch(()=>undefined)
 }
 host.querySelector<HTMLButtonElement>('[data-world-use]')!.onclick=()=>stage?.act()
-dialog.addEventListener('close',()=>{syncControls();if(!paused)stage?.resumeMouse()})
+dialog.addEventListener('close',()=>{
+  syncControls();if(!paused)stage?.resumeMouse()
+  if(view?.interaction==='food'||view?.interaction?.startsWith('fridge:'))void action('close-fridge',{}).catch(()=>{})
+})
+host.querySelector<HTMLButtonElement>('[data-world-food]')!.onclick=()=>{shownService='';void action('food',{}).catch(()=>{})}
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){
     if(chatting){chatInput.blur();stage?.resumeMouse();event.preventDefault()}

@@ -39,15 +39,6 @@ export function passableLand(x:number,z:number){
   return ridgeDistance(x,z)<30&&height<22&&Math.hypot(terrainHeight(x+.5,z)-terrainHeight(x-.5,z),terrainHeight(x,z+.5)-terrainHeight(x,z-.5))<.91
 }
 export const homeFacing=(z:number)=>z===19||z===25||z===26||z===23||z===18?-1:1
-export function houseObstacle(x:number,z:number){
-  for(const [cx,cz] of HOMES){
-    const dx=(x-cx)*homeFacing(cz),dz=(z-cz)*homeFacing(cz),side=Math.abs(dx)
-    if(side>3.28||Math.abs(dz)>3.19)continue
-    if(side>2.74||dz< -2.65||dz>2.65&&side>.75)return true
-    if(dx< -1.46&&dz>-.9&&dz<1.48||dx>1.32&&dz<-.57||dz< -1.93&&side<1.55)return true
-  }
-  return false
-}
 export const MARKET=[[-14,18],[14,18]] as const
 export const BOULEVARD_TREES=[19,30,39,54] as const
 export function townFixture(x:number,z:number){

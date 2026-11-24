@@ -5,7 +5,7 @@ import type {CompanyView} from '../equity-v2.ts'
 import {salonBar} from './salon-bar.ts'
 import {buildRestaurant} from './restaurant-art.ts'
 import {landscape,Scenery} from './landscape.ts'
-import {neighborhood} from './neighborhood.ts'
+import {residentialArt} from './residential-art.ts'
 import {contactShade} from './shade.ts'
 import {avenues,venueDetail} from './civic.ts'
 import * as T from 'three'
@@ -220,7 +220,7 @@ function street(){
   const group=new T.Group()
   avenues(group)
   plane(group,23.6,14.8,0,-.016,.52,paving())
-  landmarks(group);neighborhood(group)
+  landmarks(group)
   for(const [x,z] of [[-10,2],[10,2],[-11,13],[11,13],[-15,-8],[15,-8],[-17,12],[17,12],[-33,12],[33,12],[-44,-5],[44,-5],[-9,26],[9,26],[-25,26],[25,26]]){
     lamp(group,x,z)
   }
@@ -637,7 +637,7 @@ export function makeWorldArt(open:boolean){
   scene.add(skylight)
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());contactShade(scene);const water=fountain(scene),{wind,seal}=landscape(scene)
-  const quarter=district(scene,banner)
+  const quarter=district(scene),homes=residentialArt(scene,banner)
   const ambient=(time:number)=>{water(time);wind(time);quarter.tick(time);poolRipples(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>
   for(const zone of Object.keys(PLAN) as (keyof typeof PLAN)[]){
@@ -687,7 +687,7 @@ export function makeWorldArt(open:boolean){
     const target=zone==='cave'?.38:zone==='oasis'?.84:zone==='casino'?1.24:zone==='city'?1.95:1.62
     skylight.intensity=T.MathUtils.damp(skylight.intensity,target,3,dt)
   }
-  return {scene,lightZone,quarter,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
+  return {scene,lightZone,homes,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
 }
 function rouletteWagers(table:T.Group){
   const tones=[0xe9c186,0x72bcbc,0xcf8799,0xc2a8e5]

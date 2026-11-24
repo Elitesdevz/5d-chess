@@ -1,3 +1,5 @@
+import {aboard,access,DOOR_TRAVEL,homeZone,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
+import {residentialFood} from './residential-food.ts'
 import {UNITS,type Deeds,type HousingView} from '../src/world/housing.ts'
 import {BAR,BAR_STOOLS,DRINKS,type BarService} from '../src/world/bar-menu.ts'
 import {requireSpending} from './credit.ts'
@@ -14,10 +16,10 @@ import type {RouletteHall} from './roulette-hall.ts'
 import {fail} from './http.ts'
 
 const TIMEOUT=27_000
-type Member=WorldPlayer&{seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean}
-type World={id:string;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>}
+type Member=WorldPlayer&{seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position}
+type World={id:string;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView}
 export interface CaveVisit {day:string;active:boolean}
-const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat})
+const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose})
 
 export class CityWorlds {
   private worlds=new Map<string,World>()
@@ -39,7 +41,7 @@ export class CityWorlds {
   }
   private enter(name:string,avatar:string,zone:WorldZone,now:number){
     let world=[...this.worlds.values()].find(w=>w.members.size<WORLD_CAPACITY)
-    if(!world){world={id:'W-'+randomUUID().slice(0,8),members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map()};this.worlds.set(world.id,world)}
+    if(!world){world={id:'W-'+randomUUID().slice(0,8),members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}}};this.worlds.set(world.id,world)}
     const member:Member={name,avatar,zone,...FLOOR_ARRIVAL,seen:now,moved:now,online:true}
     this.arrive(world,member,zone,now)
     world.members.set(name,member);this.occupants.set(name,world)
@@ -48,7 +50,7 @@ export class CityWorlds {
   private arrive(world:World,member:Member,zone:WorldZone,now:number,point?:Position){
     if(member.zone==='casino'&&zone!=='casino')this.roulette.detach(member.name,world.id)
     if(member.zone==='kfc'){world.restaurant.leave(member.name);delete member.dining;delete member.eatingUntil;delete member.workingUntil;delete member.carrying;delete member.kfcRole;delete member.kitchenHand;delete member.carriedItems}
-    delete member.barSeat;delete member.boardSeat
+    delete member.barSeat;delete member.boardSeat;delete member.homePose;delete member.homeExit
     member.zone=zone;member.interaction=undefined;member.chair=undefined;member.lounge=undefined;member.lift=undefined;member.liftArrived=undefined
     Object.assign(member,spawn(zone,point),{moved:now})
   }
@@ -71,7 +73,7 @@ export class CityWorlds {
     this.arrive(world,member,'oasis',now)
   }
   private walkthrough(world:World,member:Member,open:boolean,now:number){
-    const before=member.zone,zone=before.startsWith('floor:')?before:groundZone(member.x,member.z)
+    const before=member.zone,zone=before.startsWith('floor:')||residentialAt(before)?before:groundZone(member.x,member.z)
     if(before!==zone){
       if(before==='kfc'){
         world.restaurant.leave(member.name)
@@ -93,7 +95,7 @@ export class CityWorlds {
   }
 
   private points(world:World,member:Member,now:number){
-    if(member.zone!=='kfc')return [...interactions(member.zone),...boardPoints(member.zone,this.boardTaken(world,member))]
+    if(member.zone!=='kfc')return [...interactions(member.zone),...boardPoints(member.zone,this.boardTaken(world,member)),...this.homePoints(world,member,now)]
     return restaurantPoints(world.restaurant.view(member.name,now,true),member.dining).map(p=>({...p,...site('kfc',p.x,p.z)}))
   }
   private boardTaken(world:World,member:Member){
@@ -117,6 +119,47 @@ export class CityWorlds {
     const mine=active.filter(([,d])=>d.holder===name)
     return {keys:mine.map(([id])=>id),occupied:active.map(([id])=>id),expires:Object.fromEntries(mine.map(([id,d])=>[id,d.until]))}
   }
+  private homePoints(world:World,member:Member,now:number){
+    const keys=this.housing(member.name,now).keys
+    return residentialPoints(member.zone,member,keys,world.residential)
+  }
+  private homeUse(world:World,me:Member,target:HomePoint,keys:string[],now:number){
+    const b=residentialAt(me.zone),state=world.residential
+    if(me.homePose)fail(409,'Stand up first')
+    if(target.door){
+      const d=target.door
+      if(!access(d.unit,keys))fail(403,'Locked — private residence')
+      const stamp=state.doors[d.id]??0
+      if(stamp&&now-Math.abs(stamp)<DOOR_TRAVEL)fail(409,'Wait for the door to finish moving')
+      if(stamp>0){
+        if([...world.members.values()].some(p=>Math.abs(riderHeight(p,now)-riderHeight(me,now))<1&&near(p,target.x,target.z,.57)))
+          fail(409,'Clear the doorway before closing it')
+        state.doors[d.id]=-now
+      }else state.doors[d.id]=now
+      me.interaction=undefined
+    }else if(target.pose&&target.exit){
+      if([...world.members.values()].some(p=>p.homePose?.id===target.pose!.id&&p.zone===me.zone))fail(409,'That place is occupied')
+      me.homePose=target.pose
+      me.homeExit={...target.exit,yaw:target.pose.yaw}
+      Object.assign(me,{x:target.pose.x,z:target.pose.z,yaw:target.pose.yaw})
+      me.interaction=undefined
+    }else if(target.id.startsWith('call:')&&b){
+      const lift=state.lifts[b.building.id]??={level:0,opened:0}
+      if(lift.to!==undefined)fail(409,'Elevator is on its way')
+      if(lift.level!==b.level){
+        const source=homeZone(b.building.id,lift.level)
+        if([...world.members.values()].some(p=>p.zone===source&&aboard(source,p.x,p.z)))fail(409,'Elevator is occupied')
+        Object.assign(lift,{to:b.level,started:now+380,ends:now+1150+Math.abs(lift.level-b.level)*280})
+      }
+    }else if(target.id.startsWith('lift:')&&b){
+      if(!aboard(me.zone,me.x,me.z)||!openLift(state.lifts[b.building.id]??{level:0,opened:0},b.level,now))fail(409,'Step inside the elevator first')
+      me.interaction=target.id as WorldUse
+    }else if(target.id.startsWith('fridge:')){
+      if(!access(target.unit,keys))fail(403,'This refrigerator is private')
+      me.interaction=target.id as WorldUse
+    }
+  }
+
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
     this.clean(now)
     const account=this.store.rouletteWallet(name)??fail(401,'Log in first')
@@ -132,25 +175,34 @@ export class CityWorlds {
     const shared=data.scene===true
     world.restaurant.tick(now)
     me.seen=now;me.avatar=avatar
-    if(me.zone==='city'){
-      const expired=UNITS.find(u=>!housing.keys.includes(u.id)&&Math.abs(me.x-u.x)<u.width/2-.15&&(me.z-u.z)*u.facing<2.7&&(me.z-u.z)*u.facing>(u.block===undefined?-2.7:-4))
-      if(expired)Object.assign(me,{x:expired.x,z:expired.z+3.5*expired.facing})
+    for(const lift of Object.values(world.residential.lifts))if(lift.to!==undefined&&now>=lift.ends!+220){
+      lift.level=lift.to;lift.opened=lift.ends!+220
+      delete lift.to;delete lift.started;delete lift.ends
     }
     if(me.lift&&now>=me.lift.ends){me.zone=me.lift.to;me.lift=undefined;me.liftArrived=true;me.moved=now}
+    const expired=unauthorizedHome(me.zone,me.x,me.z,housing.keys)
+    if(expired){
+      const b=residentialAt(me.zone)!.building
+      Object.assign(me,residentialSite(b,expired.exit.x,expired.exit.z))
+      if(b.block===undefined)me.zone='city'
+      delete me.homePose;delete me.homeExit;me.interaction=undefined
+    }
     if(me.zone==='private'&&action!=='presence'&&action!=='exit-cave'&&action!=='teleport')fail(409,'Leave the room first')
     if(me.lift&&action!=='presence'&&action!=='teleport')fail(409,'Wait for the elevator to arrive')
-    let hall:HallView|undefined
+    let hall:HallView|undefined,food:ReturnType<typeof residentialFood>|undefined
     if(action==='presence'){
       const {x,z,yaw}=data
-      if(data.world===world.id&&(shared||data.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
+      if(data.world===world.id&&(shared||data.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&!me.homePose&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
         const limit=WORLD_SPEED*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
-        Object.assign(me,worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys),{yaw:Math.atan2(Math.sin(yaw as number),Math.cos(yaw as number)),moved:now})
+        const {homeZone:home,...pos}=worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys,world.residential,now)
+        if(home!==me.zone&&(home||residentialAt(me.zone))){me.zone=home??'city';me.interaction=undefined}
+        Object.assign(me,pos,{yaw:Math.atan2(Math.sin(yaw as number),Math.cos(yaw as number)),moved:now})
         this.walkthrough(world,me,open,now)
       }
     }else if(action==='housing'){
       const unit=UNITS.find(u=>u.id===data.unit)??fail(400,'Unknown address')
       const counter='property:'+(unit.block===undefined?unit.id:'desk-'+unit.block)
-      if(me.zone!=='city'||!this.points(world,me,now).some(p=>p.id===counter&&near(me,p.x,p.z,p.range)))fail(409,'Visit the listing or clerk first')
+      if(!this.points(world,me,now).some(p=>p.id===counter&&near(me,p.x,p.z,p.range)))fail(409,'Visit the listing or clerk first')
       this.store.transaction(u=>{
         const deeds=u.metadata<Deeds>('cityDeeds')??{},old=deeds[unit.id]
         if(old&&(!old.until||old.until>now)){
@@ -167,6 +219,31 @@ export class CityWorlds {
         u.economyUsage(name,'/api/world/housing',{action:unit.tenure==='rent'?'housing_lease':'housing_purchase',reference:unit.id,coins:unit.price},now)
       })
       housing=this.housing(name,now)
+    }else if(action==='home-floor'){
+      const a=residentialAt(me.zone),to=data.level
+      if(typeof to!=='number'||!Number.isInteger(to)||to<0||to>4)fail(400,'Choose a residential floor')
+      if(!a||!a.building.lift||me.interaction!=='lift:'+a.building.id||!aboard(me.zone,me.x,me.z))fail(409,'Step inside the elevator first')
+      const lift=world.residential.lifts[a.building.id]??={level:0,opened:0}
+      if(!openLift(lift,a.level,now)||lift.to!==undefined)fail(409,'Wait for the elevator to arrive')
+      if(to!==a.level){
+        const started=now+420,ends=started+780+Math.abs(to-a.level)*310
+        Object.assign(lift,{to,started,ends})
+        const arrival=homeZone(a.building.id,to)
+        for(const p of world.members.values())if(p.zone===me.zone&&aboard(p.zone,p.x,p.z)){
+          const exit=residentialSite(a.building,a.building.lift.x,1.73)
+          p.lift={to:arrival,started,ends};p.interaction=undefined;p.yaw=Math.atan2(p.x-exit.x,p.z-exit.z)
+        }
+      }else me.interaction=undefined
+    }else if(action==='food'||action==='close-fridge'){
+      const id=me.interaction
+      const target=id?.startsWith('fridge:')?this.homePoints(world,me,now).find(p=>p.id===id&&near(me,p.x,p.z,p.range)):undefined
+      if(action==='close-fridge'){
+        if(id==='food'||id?.startsWith('fridge:'))me.interaction=undefined
+      }else{
+        if(data.operation!=='eat'&&data.operation!==undefined&&!target)fail(409,'Open an accessible refrigerator first')
+        food=residentialFood(this.store,name,housing.keys,target?.unit,data.operation===undefined?undefined:data)
+        if(!target)me.interaction='food'
+      }
     }else if(action==='chat'){
       const text=typeof data.text==='string'?data.text.replace(/[\p{Cc}\p{Cf}]/gu,' ').trim():''
       if(!text||[...text].length>180)fail(400,'Say something in 180 characters or fewer')
@@ -187,7 +264,9 @@ export class CityWorlds {
     }else if(action==='use'){
       const target=this.points(world,me,now).find(p=>p.id===data.target&&near(me,p.x,p.z,p.range))
       if(!target)fail(409,'Move closer to interact')
-      if(target.id.startsWith('seat:')||target.id.startsWith('couch:')){
+      if(/^(door|furniture|call|lift|fridge):/.test(target.id)){
+        this.homeUse(world,me,target as HomePoint,housing.keys,now)
+      }else if(target.id.startsWith('seat:')||target.id.startsWith('couch:')){
         const [type,index]=target.id.split(':')
         hall=this.roulette.update(name,type==='seat'?'sit':'lounge',type==='seat'?{table:Number(index)}:{couch:Number(index)},now,{id:world.id,position:this.boundPosition(me)})
       }else if(target.id.startsWith('board:')){
@@ -236,7 +315,9 @@ export class CityWorlds {
         if(world.barReceipts.size>100)world.barReceipts.delete(world.barReceipts.keys().next().value!)
       }else if(world.barReceipts.get(key)!==drink.id)fail(409,'That receipt belongs to a different drink')
     }else if(action==='stand-scenery'){
-      if(me.barSeat!==undefined){delete me.barSeat;me.z-=.37}
+      if(me.homePose&&me.homeExit){
+        Object.assign(me,me.homeExit);delete me.homePose;delete me.homeExit
+      }else if(me.barSeat!==undefined){delete me.barSeat;me.z-=.37}
       else if(me.boardSeat!==undefined){
         const seat=BOARD_SEATS[me.boardSeat]
         delete me.boardSeat
@@ -272,6 +353,14 @@ export class CityWorlds {
     const tableMotion=shared&&!hall&&me.zone!=='private'&&level<5&&near(me,casino.x,casino.z,29)?this.roulette.tableMotion(world.id):undefined
     const restaurant=level<5&&(me.zone==='kfc'||near(me,RESTAURANT.x,RESTAURANT.z,26))?world.restaurant.view(name,now,me.zone==='kfc'):undefined
     const coins=action==='housing'||action==='restaurant'||action==='bar'||action==='use'&&me.zone==='kfc'?this.store.rouletteWallet(name)?.coins:account.coins
-    return {id:world.id,now,housing,boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
+    if(me.interaction==='food')food??=residentialFood(this.store,name,housing.keys)
+    if(me.interaction?.startsWith('fridge:')){
+      const target=this.homePoints(world,me,now).find(p=>p.id===me.interaction&&near(me,p.x,p.z,p.range))
+      if(target?.unit)food??=residentialFood(this.store,name,housing.keys,target.unit)
+      else me.interaction=undefined
+    }
+    const residential={...world.residential,fridge:me.interaction?.startsWith('fridge:')?me.interaction:undefined,
+      fridges:[...world.members.values()].flatMap(p=>p.interaction?.startsWith('fridge:')?[p.interaction]:[])}
+    return {id:world.id,now,housing,food,residential,boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
   }
 }

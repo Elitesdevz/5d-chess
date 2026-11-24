@@ -1,3 +1,4 @@
+import {residentialAt,residentialPoints,type HomeZone} from './residential.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
@@ -78,6 +79,7 @@ export class CityStage {
   private pitch=0
   private clock=0
   private zone?:WorldZone
+  private predictedHome?:HomeZone
   private caveOpen=true
   private pause=false
   private lastMessage=0
@@ -113,10 +115,12 @@ export class CityStage {
   set(view:WorldView,offset:number,reposition=false){
     const prior=this.view?.you,next=view.you
     const changedWorld=view.id!==this.view?.id
-    const seat=(p:WorldView['you']|undefined)=>p?.barSeat!==undefined?'bar:'+p.barSeat:p?.boardSeat!==undefined?'board:'+p.boardSeat:p?.dining!==undefined?'dining:'+p.dining:p?.chair?'chair:'+p.chair.table+':'+p.chair.index:p?.lounge?'couch:'+p.lounge.couch+':'+p.lounge.index:''
+    const seat=(p:WorldView['you']|undefined)=>p?.homePose?'home:'+p.homePose.id:p?.barSeat!==undefined?'bar:'+p.barSeat:p?.boardSeat!==undefined?'board:'+p.boardSeat:p?.dining!==undefined?'dining:'+p.dining:p?.chair?'chair:'+p.chair.table+':'+p.chair.index:p?.lounge?'couch:'+p.lounge.couch+':'+p.lounge.index:''
     const seatChanged=seat(prior)!==seat(next)
-    if(changedWorld||reposition||seatChanged||next.lift&&!prior?.lift||Math.hypot(next.x-this.position.x,next.z-this.position.z)>1.35){
+    const housingChanged=this.view?.housing?.keys.some(key=>!view.housing?.keys.includes(key))
+    if(changedWorld||reposition||seatChanged||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-this.position.x,next.z-this.position.z)>1.35){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
+      this.predictedHome=residentialAt(next.zone)?next.zone as HomeZone:undefined
     }
     if(changedWorld||reposition||seatChanged){
       this.liftFacing=undefined
@@ -129,7 +133,9 @@ export class CityStage {
       if(next.dining!==undefined)this.pitch=-.33
       if(next.chair||next.lounge||next.dining!==undefined||next.barSeat!==undefined||next.boardSeat!==undefined)this.releaseMouse()
     }
-    if(next.lift&&!prior?.lift){
+    if(next.lift&&residentialAt(next.zone)){
+      this.yaw=next.yaw;this.pitch=0
+    }else if(next.lift&&!prior?.lift){
       const delta=Math.atan2(Math.sin(Math.PI-this.yaw),Math.cos(Math.PI-this.yaw))
       if(this.reduced){this.yaw=Math.PI;this.pitch=0}
       else this.liftFacing={from:this.yaw,delta,started:performance.now()}
@@ -147,7 +153,6 @@ export class CityStage {
     }
     if(!this.art&&this.renderer)this.buildScene()
     if(this.art){
-      this.art.quarter.update(view.housing)
       this.art.seal.visible=!this.caveOpen&&next.zone!=='cave'
       this.art.grotto.visible=!this.art.seal.visible
       this.art.restaurant.update(view.restaurant)
@@ -291,7 +296,7 @@ export class CityStage {
     window.addEventListener('pagehide',e=>{if(!e.persisted){this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame);this.clearScene();this.renderer?.dispose()}},{signal})
   }
   private step(dt:number){
-    if(!this.zone||this.pause||this.station||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||this.view?.you.lift)return
+    if(!this.zone||this.pause||this.station||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||this.view?.you.lift||this.view?.you.homePose)return
     const keys=this.arrows
     const x=this.stick.x+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'))
     const z=this.stick.z+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'))
@@ -299,20 +304,23 @@ export class CityStage {
     if(x||z){
       const dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=z*Math.cos(this.yaw)-x*Math.sin(this.yaw)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
-      this.position=worldMove(this.zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave,this.view?.housing?.keys)
+      const zone=this.predictedHome??(residentialAt(this.zone)?'city':this.zone)
+      const {homeZone,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock)
+      this.position=position;this.predictedHome=homeZone
     }
     this.position.yaw=this.yaw
   }
   private prompt(){
-    const zone=this.zone?.startsWith('floor:')?this.zone:groundZone(this.position.x,this.position.z)
-    const points=zone==='kfc'?restaurantPoints(this.view?.restaurant,this.view?.you.dining).map(p=>({...p,...site(zone,p.x,p.z)})):[...interactions(zone),...boardPoints(zone,this.view?.boardTaken)]
+    const zone=this.predictedHome??(this.zone?.startsWith('floor:')?this.zone:groundZone(this.position.x,this.position.z))
+    const points=zone==='kfc'?restaurantPoints(this.view?.restaurant,this.view?.you.dining).map(p=>({...p,...site(zone,p.x,p.z)})):[...interactions(zone),...boardPoints(zone,this.view?.boardTaken),...residentialPoints(zone,this.position,this.view?.housing?.keys??[],this.view?.residential)]
     const seated=this.view?.you.boardSeat!==undefined||this.view?.you.barSeat!==undefined
-    const stand=seated?{id:'stand-scenery',label:'Stand up',x:this.position.x,z:this.position.z}:undefined
+    const pose=this.view?.you.homePose
+    const stand=seated||pose?{id:'stand-scenery',label:pose?.kind==='rest'?'Get up':'Stand up',x:this.position.x,z:this.position.z}:undefined
     const candidate=stand??(this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift?points.map(p=>({...p,distance:Math.hypot(this.position.x-p.x,this.position.z-p.z)}))
       .filter(p=>p.distance<=(p.range??1.65)).sort((a,b)=>a.distance-b.distance)[0]:undefined)
-    const was=this.nearest?.id
+    const was=this.nearest?.id,previousLabel=this.nearest?.label
     this.nearest=candidate
-    if(was===candidate?.id)return
+    if(was===candidate?.id&&previousLabel===candidate?.label)return
     const prompt=this.parent.querySelector<HTMLButtonElement>('[data-world-use]')!
     prompt.hidden=!candidate
     prompt.querySelector('span')!.textContent=candidate?.label??''
@@ -333,8 +341,8 @@ export class CityStage {
         if(local)current.figure.hideHead()
       }
       const figure=current.figure
-      figure.target=member.dining===undefined&&member.barSeat===undefined&&member.boardSeat===undefined?member:{...member,lounge:{couch:0,index:0}}
-      figure.root.position.y=local&&member.zone==='city'?terrainHeight(this.position.x,this.position.z):height
+      figure.target=member.dining===undefined&&member.barSeat===undefined&&member.boardSeat===undefined&&member.homePose?.kind!=='sit'?member:{...member,lounge:{couch:0,index:0}}
+      figure.root.position.y=local&&!member.lift?walkingHeight(this.predictedHome??member.zone,this.position.x,this.position.z):height
       const cleaning=(member.workingUntil??0)>now&&(member.workKind==='mop'||member.workKind==='wipe')
       if((member.carrying||cleaning||member.kfcRole)&&!current.props)current.props=staffProps(figure.root)
       if(current.props){
@@ -344,7 +352,7 @@ export class CityStage {
         current.props.mop.visible=cleaning&&member.workKind==='mop'
         current.props.mop.rotation.z=.19+Math.sin(now*.008)*.13
       }
-      figure.pose(dt,now,local?this.position:undefined,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now)
+      figure.pose(dt,now,local?this.position:undefined,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now,member.homePose)
       const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
       if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
       if(interior){
@@ -401,12 +409,12 @@ export class CityStage {
       this.yaw=from+delta*progress*progress*(3-2*progress)
       if(progress===1)this.liftFacing=undefined
     }
-    this.camera.position.set(x,(me&&!me.lift?walkingHeight(me.zone,x,z):me?riderHeight(me,now):0)+(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE),z)
+    this.camera.position.set(x,(me&&!me.lift?walkingHeight(this.predictedHome??(residentialAt(me.zone)?'city':me.zone),x,z):me?riderHeight(me,now):0)+(me?.homePose?(me.homePose.kind==='rest'?me.homePose.height+.16:me.homePose.height+.91):(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE)),z)
     if(me?.zone==='oasis'){
       const p=localSite('oasis',x,z)
       if(inPool(p.x,p.z))this.camera.position.y+=Math.sin(now*.0027)*.055
     }
-    this.camera.rotation.set(this.pitch,this.yaw,0,'YXZ')
+    this.camera.rotation.set(this.pitch+(me?.homePose?.kind==='rest'?1.05:0),this.yaw,0,'YXZ')
     const chair=me?.chair,round=chair&&this.view?.hall?.tables[chair.table]
     if(chair&&round){
       const table=WORLD_TABLES[chair.table],dice=chair.table===DICE_TABLE_INDEX
@@ -433,6 +441,7 @@ export class CityStage {
   private motion(now:number,dt:number){
     if(!this.art)return
     this.art.lightZone(this.zone,dt)
+    this.art.homes.update(this.view?.residential,this.view?.housing?.occupied,now,dt,this.position.x,this.position.z)
     if(!this.reduced){this.art.ambient?.(now);this.art.restaurant.tick(now)}
     if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))
     const zones=[this.view?.you.zone,this.view?.you.lift?.to].filter((z):z is WorldZone=>!!z)

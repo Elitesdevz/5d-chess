@@ -1,3 +1,4 @@
+import type {FoodAccount} from '../src/world/food.ts'
 import type {KfcMeal,Meal,OrderItems} from '../src/world/restaurant-model.ts'
 import {income} from './credit.ts'
 import {toStockUnits} from '../src/stock-model.ts'
@@ -11,7 +12,7 @@ import {wallet,type EconomicAccount} from './economy.ts'
 import {randomBytes} from 'node:crypto'
 import {type Resolution,type State,type Player,playerCount,players,survivors} from '../src/model.ts'
 import {type Notice,type Preferences,type Profile,type Rating,type RatingPool,POOLS,poolFor} from '../src/account-model.ts'
-export interface Account extends EconomicAccount {restaurant?:KfcMeal;restaurantLast?:string;restaurantOrders?:{id:string;item?:Meal;items?:OrderItems;lane:number}[];cave?:CaveVisit;bank?:BankAccount;stocks?:StockPortfolio;puzzleCompleted?:number[]; aiDaily?:AiDaily;gameRewardDaily?:{day:string;coins:number;events:number}; publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
+export interface Account extends EconomicAccount,FoodAccount {restaurant?:KfcMeal;restaurantLast?:string;restaurantOrders?:{id:string;item?:Meal;items?:OrderItems;lane:number;takeaway?:boolean}[];cave?:CaveVisit;bank?:BankAccount;stocks?:StockPortfolio;puzzleCompleted?:number[]; aiDaily?:AiDaily;gameRewardDaily?:{day:string;coins:number;events:number}; publicIdentity?:PublicIdentity;eloGambling?:EloGamblingState;name: string; salt: string; hash: string; rating?: Rating; settings?: Preferences; ratings?: Record<RatingPool,Rating>; notifications?: Notice[]}
 export interface RatingChange {before: number; after: number; delta: number}
 export interface RatedRoom {legacyEloBackfill?:{batch:string;appliedAt:number;baseline:number};gameRewardTotals?:Partial<Record<Player,number>>;gameSettlementCoins?:Partial<Record<Player,number>>;gameRewardNotified?:Partial<Record<Player,boolean>>;code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
 export function pruneNotices(account: Account, now=Date.now()) {

@@ -40,7 +40,8 @@ export class RestaurantUI{
   private host:HTMLElement
   private order=blankOrder()
   private draftTicket=''
-  private bought?:{id:string;items:OrderItems;lane:number}
+  private bought?:{id:string;items:OrderItems;lane:number;takeaway:boolean}
+  private takeaway=false
   constructor(private dialog:HTMLDialogElement,private hud:HTMLElement,private send:(command:string,data:object)=>Promise<void>){
     this.host=dialog.querySelector('.world-dialog-body')!
     dialog.addEventListener('close',()=>{
@@ -51,7 +52,7 @@ export class RestaurantUI{
   }
   open(point:string){
     if(!this.current?.restaurant)return
-    if(point!==this.point){this.order=blankOrder();this.draftTicket=''}
+    if(point!==this.point){this.order=blankOrder();this.draftTicket='';this.takeaway=false}
     this.point=point;this.markup='';this.notice=''
     this.dialog.dataset.restaurant='true'
     this.render()
@@ -71,6 +72,7 @@ export class RestaurantUI{
       const task=instruction??(r.tray?r.tray.seat===undefined?'Hand the tray to '+safeText(r.tray.name):'Serve '+labelTable(r.tray.seat):
         r.work?WORK[r.work.kind].name:
         shift?shift.role==='cook'?kitchenObjective(r.kitchen):shift.role==='cashier'?'Take orders at your till and watch the pickup shelf.':'Look for spills and used trays.':
+          r.meal?.takeaway?(r.meal.status==='served'?'Collect your takeaway at queue '+(r.meal.lane+1)+'.':'The kitchen is preparing your takeaway.'):
           view.you.dining!==undefined?(r.meal?.status==='paid'?'Waiting for your order.':'You’re seated.'):'Find a seat by the window.')
       if(r.pay&&r.pay.id!==this.pay){this.pay=r.pay.id;this.payUntil=view.now+3300}
       const pay=r.pay&&view.now<this.payUntil?`<small class="kfc-earned">+${coins(r.pay.coins)}</small>`:''
@@ -91,11 +93,12 @@ export class RestaurantUI{
   }
   private menu(r:RestaurantView,lane:number){
     if(r.meal){
+      if(r.meal.takeaway)return `<h3>${orderText(orderItems(r.meal))}</h3><p>${r.meal.status==='served'?'Collect your order at queue '+(r.meal.lane+1)+'.':'The kitchen is preparing your takeaway.'}</p>`
       const served=r.meal.status==='served'
       return `<h3>${orderText(orderItems(r.meal))}</h3><p>${served?'Your meal is ready. Have a seat at any free table.':'Your order is in. You can take a seat while the kitchen prepares it.'}</p>`
     }
     const total=orderPrice(this.order)
-    return this.choices(true)+`<div class="kfc-bill"><strong>${coins(total)}</strong>${button('buy','Place order',`data-lane="${lane}" ${!total||(this.current?.coins??0)<total?'disabled':''}`,'kfc-primary')}</div>`
+    return this.choices(true)+`<div class="world-button-row"><button type="button" data-kfc-action="dine-in" aria-pressed="${!this.takeaway}">Dine in</button><button type="button" data-kfc-action="takeaway" aria-pressed="${this.takeaway}">Takeaway</button></div><div class="kfc-bill"><strong>${coins(total)}</strong>${button('buy','Place order',`data-lane="${lane}" ${!total||(this.current?.coins??0)<total?'disabled':''}`,'kfc-primary')}</div>`
   }
   private manager(r:RestaurantView){
     return `<div class="kfc-manager-intro">Take over an open station from the crew. You earn coins for each order or cleanup you complete.</div>
@@ -183,10 +186,10 @@ export class RestaurantUI{
     const r=this.current?.restaurant
     if(!r||!this.point||this.dragging)return
     const desk=this.point.split(':')[1]
-    const title=desk==='menu'?'Order at queue '+(Number(this.point.split(':')[2])+1):desk==='manager'?'Speak to the manager':
+    const title=desk==='collect'?'Collect takeaway':desk==='menu'?'Order at queue '+(Number(this.point.split(':')[2])+1):desk==='manager'?'Speak to the manager':
       desk==='dining'?labelTable(this.current!.you.dining??0):desk==='kitchen'?this.point.endsWith(':fryer')?'Fryer':this.point.endsWith(':soda')?'Soda fountain':'Your cooking station':desk==='clean'?'Cleaning crew':
       desk==='till'?'Take an order':desk==='deliver'?'Serve the table':'Pickup shelf'
-    const body=desk==='menu'?this.menu(r,Number(this.point.split(':')[2])):desk==='manager'?this.manager(r):
+    const body=desk==='collect'?r.meal?.takeaway?`<p>${orderText(orderItems(r.meal))}</p>${button('collect','Collect order','','kfc-primary')}`:'<p>Order collected.</p>':desk==='menu'?this.menu(r,Number(this.point.split(':')[2])):desk==='manager'?this.manager(r):
       desk==='dining'?this.dining(r):desk==='clean'?this.cleaning(r):this.cashier(r)
     const markup=`<header class="kfc-header"><div class="kfc-badge">KFC</div><div><span>${RESTAURANT_NAME}</span><h2 id="world-dialog-title">${title}</h2></div><form method="dialog"><button type="submit" aria-label="Close">×</button></form></header>
       <section class="kfc-content">${body}</section><p class="kfc-notice" role="status" ${this.notice?'':'hidden'}>${safeText(this.notice)}</p>`
@@ -203,10 +206,12 @@ export class RestaurantUI{
         this.host.querySelector<HTMLButtonElement>(`[data-item="${item}"][data-delta="${delta}"]:enabled`)?.focus()
         return
       }
+      if(command==='takeaway'||command==='dine-in'){this.takeaway=command==='takeaway';this.render();return}
+      if(command==='collect'&&r.meal){void this.run('collect',{id:r.meal.id});return}
       if(command==='buy'){
         const i=Number(lane)
-        if(!this.bought||this.bought.lane!==i||!sameItems(this.bought.items,this.order))
-          this.bought={id:crypto.randomUUID(),items:{...this.order},lane:i}
+        if(!this.bought||this.bought.lane!==i||this.bought.takeaway!==this.takeaway||!sameItems(this.bought.items,this.order))
+          this.bought={id:crypto.randomUUID(),items:{...this.order},lane:i,takeaway:this.takeaway}
         void this.run(command,this.bought)
       }else void this.run(command,{ticket,key,role,step:step===undefined?undefined:Number(step)})
     }
@@ -219,7 +224,7 @@ export class RestaurantUI{
     try{
       await this.send(command,{...data,point:this.point})
       if(command==='buy')this.bought=undefined
-      if(command==='stand'||command==='pickup'||command==='hire'||command==='deliver'||command==='kitchen'&&'gesture' in data&&data.gesture!=='flip')this.dialog.close()
+      if(command==='collect'||command==='stand'||command==='pickup'||command==='hire'||command==='deliver'||command==='kitchen'&&'gesture' in data&&data.gesture!=='flip')this.dialog.close()
       this.notice=command==='eat'&&!this.current?.restaurant?.meal?'Meal finished.':command==='take'?'Ticket sent to the kitchen.':command==='step'&&!this.current?.restaurant?.work?'Task complete. Payment sent.':''
     }catch(error){this.notice=error instanceof Error?error.message:'Please try again.'}
     finally{

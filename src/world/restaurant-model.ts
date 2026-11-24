@@ -59,7 +59,7 @@ export const WORK={
   wipe:{name:'Clean the table',steps:['Clear the tray','Spray the table','Wipe the table'],pay:3},
 } satisfies Record<WorkKind,{name:string;steps:string[];pay:number}>
 export type KfcShift={role:KfcRole;slot:number}
-export type KfcMeal={id:string;item?:Meal;items?:OrderItems;lane:number;status:'paid'|'served';bites:number}
+export type KfcMeal={id:string;item?:Meal;items?:OrderItems;lane:number;status:'paid'|'served';bites:number;takeaway?:boolean}
 export type TicketPhase='queue'|'kitchen'|'ready'|'carrying'|'served'
 export type TicketView={id:string;items:OrderItems;lane:number;name:string;phase:TicketPhase;seat?:number}
 export type KfcMess={id:string;kind:'wipe'|'mop';x:number;z:number}
@@ -76,8 +76,9 @@ export function restaurantPoints(view?:RestaurantView,seat?:number):KfcPoint[]{
   if(seat!==undefined)return [{id:'kfc:dining',label:'Your table',...SEATS[seat]}]
   if(!view)return []
   const shift=view.shift,points:KfcPoint[]=[{id:'kfc:manager',label:'Speak to the manager',...MANAGER}]
+  if(view.meal?.takeaway&&view.meal.status==='served')points.push({id:'kfc:collect',label:'Collect takeaway',x:COUNTERS[view.meal.lane],z:-.55,range:1.32})
   COUNTERS.forEach((x,i)=>{
-    points.push({id:`kfc:menu:${i}`,label:`Order food · Queue ${i+1}`,x,z:-.55,range:1.2})
+    if(!(view.meal?.takeaway&&view.meal.status==='served'&&view.meal.lane===i))points.push({id:`kfc:menu:${i}`,label:`Order food · Queue ${i+1}`,x,z:-.55,range:1.2})
     if(shift?.role==='cashier'&&shift.slot===i)points.push({id:`kfc:till:${i}`,label:'Take the next order',x,z:-2.72,range:1.25})
   })
   SEATS.forEach(({x,z},i)=>{

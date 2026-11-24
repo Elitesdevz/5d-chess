@@ -19,8 +19,8 @@ export class Scenery{
     if(!parts){parts=[];this.parts.set(shape,parts)}
     parts.push({matrix:t.matrix.clone(),color})
   }
-  finish(parent:T.Object3D){
-    const material=new T.MeshStandardMaterial({roughness:.81,flatShading:true,map:grain()}),color=new T.Color()
+  finish(parent:T.Object3D,material=new T.MeshStandardMaterial({roughness:.81,flatShading:true,map:grain()})){
+    const color=new T.Color()
     for(const [shape,parts] of this.parts){
       const mesh=new T.InstancedMesh(shapes[shape],material,parts.length)
       parts.forEach((v,i)=>{mesh.setMatrixAt(i,v.matrix);mesh.setColorAt(i,color.setHex(v.color))})
