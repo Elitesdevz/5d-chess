@@ -57,7 +57,9 @@ function showError(text:string){
   clearTimeout(errorTimer);errorTimer=window.setTimeout(()=>p.hidden=true,4800)
 }
 function setCoins(coins:number){
-  if(profile&&profile.coins!==coins){profile={...profile,coins};renderAccount(profile)}
+  if(!profile||profile.coins===coins)return false
+  profile={...profile,coins};renderAccount(profile)
+  return true
 }
 const seated=()=>view?.you.chair
 function tableStatus(){
@@ -172,8 +174,9 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
   }
   stage?.set(next,offset,reposition,sent);syncControls();renderChat(next)
-  setCoins(next.coins);restaurant?.update(next)
-  if(changed){
+  const rebuiltHeader=setCoins(next.coins)
+  restaurant?.update(next)
+  if(changed||rebuiltHeader){
     const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
     for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
       if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
