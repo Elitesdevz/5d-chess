@@ -133,12 +133,23 @@ const fridgeLeaf=new T.MeshStandardMaterial({color:0xd1dedb,roughness:.46,metaln
 const metal=new T.MeshStandardMaterial({color:0xb99b64,metalness:.65,roughness:.38})
 const liftWall=new T.MeshStandardMaterial({color:0x626f72,roughness:.58,metalness:.18})
 
+function furnitureShadow(){
+  const canvas=document.createElement('canvas')
+  canvas.width=canvas.height=64
+  const c=canvas.getContext('2d')!,gradient=c.createRadialGradient(32,32,5,32,32,31)
+  gradient.addColorStop(0,'#32282158')
+  gradient.addColorStop(.62,'#32282128')
+  gradient.addColorStop(1,'#32282100')
+  c.fillStyle=gradient;c.fillRect(0,0,64,64)
+  return new T.MeshBasicMaterial({map:new T.CanvasTexture(canvas),transparent:true,depthWrite:false})
+}
 function slabs(rect:Rect,hole?:Rect){
   return hole?[
     {...rect,r:hole.l},{...rect,l:hole.r},{l:hole.l,r:hole.r,b:rect.b,f:hole.b},{l:hole.l,r:hole.r,b:hole.f,f:rect.f},
   ]:[rect]
 }
 export function residentialArt(parent:T.Object3D,letter:Letter){
+  const shadows=furnitureShadow(),stamp=new T.Object3D()
   const doors=new Map<string,{hinge:T.Group;angle:number}>(),fridges=new Map<string,T.Group>()
   const signs=new Map<string,T.Object3D>(),clerks:ClubGuest[]=[]
   const lifts:{id:string;x:number;group:T.Group;leaves:T.Mesh[];landings:T.Mesh[][];indicator:HTMLCanvasElement;texture:T.CanvasTexture;shown:number}[]=[]
@@ -185,6 +196,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
           for(const d of [-.49,.49])box(x,.028,.35+d,3.16,.007,.023,tone.trim)
         }
         if(!level){
+          box(4.87,.015,-6.11,4.4,.015,3.21,0x8b7564)
           box(-4.29,.012,-5.71,4.62,.014,3.46,0x97765f)
           for(const z of [-7.14,-4.28])box(-4.29,.021,z,4.11,.007,.067,0xc1a57d)
           for(const x of [-6.28,-2.30])box(x,.022,-5.71,.062,.007,2.91,0xc1a57d)
@@ -254,7 +266,14 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
         const direction=(d.reverse?-1:1)*(d.axis==='x'?1:-1)
         doors.set(d.id,{hinge,angle:direction})
       }
+      const contacts=new T.InstancedMesh(windowQuad,shadows,f.fixtures.length)
+      inside.add(contacts)
       for(const [i,item] of f.fixtures.entries()){
+        stamp.position.set(item.x,.036,item.z)
+        stamp.rotation.set(-Math.PI/2,item.yaw,0,'YXZ')
+        stamp.scale.set(item.w+.72,item.d+.67,1)
+        stamp.updateMatrix()
+        contacts.setMatrixAt(i,stamp.matrix)
         modelFurniture(item,p,0,tone.fabric)
         if(item.kind==='fridge'){
           const fridge=new T.Group();fridge.position.set(item.x,0,item.z);fridge.rotation.y=item.yaw;inside.add(fridge)
@@ -343,6 +362,15 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
           smallBox(inside,x,2.252,-4.04,.32,.032,.32,luminaire)
         }
       }
+      for(const unit of f.units){
+        const wall=f.walls.find(w=>!w.outer&&w.axis==='x'&&w.x>unit.rect.l&&w.x<unit.rect.r&&w.z<unit.rect.f-2.5&&w.z>unit.rect.b+1)
+        if(!wall||b.block===undefined&&b.stairs)continue
+        const x=unit.rect.l+.72,z=wall.z+.091
+        box(x,1.53,z,.96,.55,.037,iron)
+        box(x,1.53,z+.024,.885,.477,.014,0x50636c)
+        box(x,1.05,z+.088,.99,.069,.196,oak)
+        box(x+.31,1.104,z+.109,.17,.039,.081,walnut)
+      }
       if(level===b.levels.length-1)tile(r,STOREY-.064,.128,chalk)
       p.finish(g,architecture)
     }
@@ -350,6 +378,14 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
     const box=(x:number,y:number,z:number,w:number,h:number,d:number,c:number)=>p.add('box',x,y,z,w,h,d,c)
     if(b.block!==undefined){
       label(RESIDENCES[b.block].name,0,2.64,r.f+.20,4.85)
+      for(const x of [-10.27,-7.04,-5.65,-1.57,1.57,7.06,10.27]){
+        if(b.style===0){
+          for(let level=0;level<5;level++)for(let row=0;row<9;row++){
+            const y=level*STOREY+.18+row*.312
+            box(x,y,r.f+.119,.69,.028,.014,0xb28269)
+          }
+        }else box(x,top/2,r.f+.112,.072,top,.024,tone.trim)
+      }
       for(let i=1;i<b.levels.length;i++){
         const h=STOREY*i
         box(0,h-.08,r.f+.09,width+.26,.21,.33,tone.trim)

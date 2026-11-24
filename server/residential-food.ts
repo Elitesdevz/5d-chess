@@ -1,10 +1,18 @@
 import {blankOrder,MENU,type MenuItem} from '../src/world/restaurant-model.ts'
 import type {FoodView} from '../src/world/food.ts'
 import {access} from '../src/world/residential.ts'
+import type {Account} from './accounts.ts'
 import type {ChessStore} from './storage.ts'
 import {fail} from './http.ts'
 
 export function residentialFood(store:ChessStore,name:string,keys:readonly string[],unit?:string,command?:Record<string,unknown>):FoodView {
+  if(!command){
+    const payload=store.accountJson(name)??fail(401,'Log in first')
+    const account=JSON.parse(payload) as Account
+    if(!Object.keys(account.fridges??{}).some(id=>!access(id,keys))){
+      return {personal:account.food??blankOrder(),stored:unit?(account.fridges?.[unit]??blankOrder()):undefined}
+    }
+  }
   return store.transaction(tx=>{
     const account=tx.users.get(name)??fail(401,'Log in first')
     const personal=account.food??blankOrder()

@@ -338,11 +338,13 @@ export class CityStage {
         let tag:HTMLElement|undefined
         if(!local){tag=document.createElement('span');tag.className='world-name';tag.textContent=member.name;this.parent.querySelector('.world-names')!.append(tag)}
         current={figure:new Figure(this.art.scene,member,this.shadow!),tag};this.figures.set(member.name,current)
+        current.figure.root.position.y=height
         if(local)current.figure.hideHead()
       }
       const figure=current.figure
       figure.target=member.dining===undefined&&member.barSeat===undefined&&member.boardSeat===undefined&&member.homePose?.kind!=='sit'?member:{...member,lounge:{couch:0,index:0}}
-      figure.root.position.y=local&&!member.lift?walkingHeight(this.predictedHome??member.zone,this.position.x,this.position.z):height
+      figure.root.position.y=local&&!member.lift?walkingHeight(this.predictedHome??member.zone,this.position.x,this.position.z):
+        !local&&!member.lift&&member.zone.startsWith('stairs:')?T.MathUtils.damp(figure.root.position.y,height,18,dt):height
       const cleaning=(member.workingUntil??0)>now&&(member.workKind==='mop'||member.workKind==='wipe')
       if((member.carrying||cleaning||member.kfcRole)&&!current.props)current.props=staffProps(figure.root)
       if(current.props){

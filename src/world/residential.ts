@@ -141,6 +141,11 @@ for(const [block,place] of RESIDENCES.entries()){
       furnish(f,'chair',-2.35,-5.22,.72,.76,-Math.PI/2)
       furnish(f,'plant',-6.5,4.9,.55,.55)
       furnish(f,'plant',6,5.12,.55,.55)
+      furnish(f,'sofa',4.9,-7.19,2.36,.86,Math.PI)
+      furnish(f,'chair',7,-5.74,.70,.76,-Math.PI/2)
+      furnish(f,'coffee',4.88,-5.68,1.19,.65)
+      furnish(f,'plant',1.34,-7.64,.79,.79)
+      furnish(f,'plant',9.74,-7.64,.71,.71)
       continue
     }
     const units=UNITS.filter(u=>u.block===block&&u.floor===level)

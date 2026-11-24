@@ -119,6 +119,18 @@ test('residential walkthrough through both buildings, house styles, furniture an
       offset+=400
       await local(b,0,3.5,-.67)
       await capture(b.id+'-reception')
+      if(b.block===0){
+        const chair=b.levels[0].points.find(p=>p.pose?.kind==='sit'&&p.id.includes('lobby-2'))
+        await path(b,0,{...chair,range:.42})
+        await capture('05-lobby-seating',async page=>{
+          await page.getByRole('button',{name:/Sit down/}).click()
+          await page.getByRole('button',{name:/Stand up/}).waitFor()
+          assert.equal((await action('presence')).you.homePose.kind,'sit')
+          await page.getByRole('button',{name:/Stand up/}).click()
+          await page.getByRole('button',{name:/Stand up/}).waitFor({state:'hidden'})
+        })
+        await path(b,0,{x:5.6,z:1.25})
+      }
       await local(b,6.65,1.25);await local(b,b.lift.x,1.25)
       // Each building is a separate public lobby and cabin.
       await local(b,b.lift.x,b.lift.z)
@@ -171,7 +183,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
           })
         }else await capture(b.id+'-'+index+'-kitchen')
         for(const fixture of floor.fixtures.filter(f=>f.unit===u.id&&f.kind==='toilet')){
-          await path(b,2,{...fixture,range:1.03})
+          await path(b,2,{...fixture,range:1.03,yaw:Math.PI/2})
           if(b.block===0)await capture(b.id+'-'+index+'-bath')
         }
         for(const [j,bed] of floor.points.filter(p=>p.unit===u.id&&p.pose?.kind==='rest').entries()){
