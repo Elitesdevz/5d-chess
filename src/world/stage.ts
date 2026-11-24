@@ -14,32 +14,6 @@ import type {Position} from '../roulette-hall-model.ts'
 
 const TAU=Math.PI*2
 const STANDING_EYE=1.637,SEATED_EYE=1.47
-const routes=[
-  [[-14,7],[-13,-5],[-10.5,-5],[-10.5,6.6],[-14,7]],
-  [[15,8.5],[23,7.25],[30,8.2],[35,12.7],[24,13.35],[15,8.5]],
-  [[-35,8],[-26,7],[-19,8],[-14,14],[-24,13.4],[-35,8]],
-  [[-4,15],[-4.6,9],[-3.85,-4],[-4.9,-4],[-4.9,15],[-4,15]],
-  [[5,16],[9,7],[8,-4],[12,-5],[12,12],[5,16]],
-  [[29.84,25.1],[29.72,14.04],[43.6,14.04],[43.69,29.62],[29.62,29.62],[29.84,25.1]],
-  [[49,7.05],[59,7.05],[63,6.15],[67,7.15],[71,7.1],[68,7.45],[49,7.05]],
-  [[-59,-31],[-59,-44.7],[-48.5,-45.3],[-48.5,-46.5],[-62.6,-46.6],[-62.5,-31],[-59,-31]],
-  [[-40,30],[-30,27],[-26,26],[-21,29],[-30,32],[-40,30]],
-  [[-13.5,43.5],[-13.5,45],[-22,45],[-27,53],[-25.5,53],[-21,46],[-13.5,46],[-13.5,43.5]],
-] as const
-const streets=routes.map(route=>{
-  let length=0
-  const segments=route.slice(1).map((end,i)=>{
-    const start=route[i],from=length
-    length+=Math.hypot(end[0]-start[0],end[1]-start[1])
-    return {start,end,from,to:length}
-  })
-  return {segments,length}
-})
-function pedestrian(index:number,time:number){
-  const {segments,length}=streets[index],distance=(time*(1.3+index*.05)/1000+index*9)%length
-  const {start:a,end:b,from,to}=segments.find(segment=>distance<segment.to)??segments[0],p=(distance-from)/(to-from)
-  return {x:a[0]+(b[0]-a[0])*p,z:a[1]+(b[1]-a[1])*p,yaw:Math.atan2(a[0]-b[0],a[1]-b[1])}
-}
 function shadow(){
   const canvas=document.createElement('canvas');canvas.width=canvas.height=64
   const ctx=canvas.getContext('2d')!,gradient=ctx.createRadialGradient(32,32,0,32,32,32)
@@ -57,7 +31,7 @@ export class CityStage {
   private camera=new T.PerspectiveCamera(58,1,.16,720)
   private shadow?:T.CanvasTexture
   private figures=new Map<string,Avatar>()
-  private npc:Figure[]=[]
+  private npc=new Map<string,Figure>()
   private restaurantNpc=new Map<string,{figure:Figure;props:ReturnType<typeof staffProps>}>()
   private lifts=new Map<string,T.Group>()
   private liftFacing?:{from:number;delta:number;started:number}
@@ -212,10 +186,7 @@ export class CityStage {
   private buildScene(){
     this.art=makeWorldArt(this.caveOpen)
     this.tools=kitchenTools(this.art.scene)
-    this.npc=routes.map((_,i)=>{
-      const target=pedestrian(i,Date.now()+this.clock)
-      return new Figure(this.art!.scene,{...target,name:['Iris','Marlowe','June','Dion','Rafi','Hana','Milo','Lotte','Vera','Otis'][i],avatar:'default',online:true},this.shadow!)
-    })
+
   }
   private clearScene(){
     for(const entry of this.figures.values()){entry.figure.dispose();entry.tag?.remove()}
@@ -234,7 +205,7 @@ export class CityStage {
         }
       })
     }
-    this.npc=[];this.lifts.clear();this.art=undefined
+    this.npc.clear();this.lifts.clear();this.art=undefined
   }
   private fit(){
     const w=Math.max(1,this.canvas.clientWidth),h=Math.max(1,this.canvas.clientHeight)
@@ -305,7 +276,7 @@ export class CityStage {
       const dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=z*Math.cos(this.yaw)-x*Math.sin(this.yaw)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
       const zone=this.predictedHome??(residentialAt(this.zone)?'city':this.zone)
-      const {homeZone,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock)
+      const {homeZone,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock,this.view?.traffic?.vehicles)
       this.position=position;this.predictedHome=homeZone
     }
     this.position.yaw=this.yaw
@@ -379,7 +350,21 @@ export class CityStage {
     for(const [key,cabin] of this.lifts)if(!neededLifts.has(key))cabin.visible=false
     for(const [name,entry] of this.figures)if(!active.has(name)){entry.figure.dispose();entry.tag?.remove();this.figures.delete(name)}
     this.restaurantCast(dt,now)
-    this.npc.forEach((figure,i)=>{if(!this.reduced)figure.target={...figure.target,...pedestrian(i,now)};figure.pose(dt,now)})
+    const residents=this.view.residents??[],activeResidents=new Set(residents.map(n=>n.id))
+    for(const member of residents){
+      let figure=this.npc.get(member.id)
+      const height=riderHeight(member,now)
+      if(!figure){
+        figure=new Figure(this.art.scene,member,this.shadow!)
+        figure.root.position.y=height;this.npc.set(member.id,figure)
+      }
+      const visible=height<21&&this.camera.position.distanceTo(figure.root.position)<49
+      figure.root.visible=visible
+      figure.target=member.homePose?.kind==='sit'?{...member,lounge:{couch:0,index:0}}:member
+      figure.root.position.y=member.lift?height:T.MathUtils.damp(figure.root.position.y,height,18,dt)
+      figure.pose(dt,now,visible?undefined:member,false,false,member.homePose)
+    }
+    for(const [id,figure] of this.npc)if(!activeResidents.has(id)){figure.dispose();this.npc.delete(id)}
   }
   private restaurantCast(dt:number,now:number){
     if(!this.art)return
@@ -443,6 +428,7 @@ export class CityStage {
   private motion(now:number,dt:number){
     if(!this.art)return
     this.art.lightZone(this.zone,dt)
+    this.art.urban(this.view?.traffic,dt,this.reduced)
     this.art.homes.update(this.view?.residential,this.view?.housing?.occupied,now,dt,this.position.x,this.position.z)
     if(!this.reduced){this.art.ambient?.(now);this.art.restaurant.tick(now)}
     if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))

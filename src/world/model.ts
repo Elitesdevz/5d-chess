@@ -1,3 +1,6 @@
+import {PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
+import {vehicleContains,type TrafficView,type Vehicle} from './traffic.ts'
+import type {ResidentView} from './city-residents.ts'
 import {residentialAt,residentialHeight,residentialStep,type HomeZone,type HomePose,type ResidentialView} from './residential.ts'
 import {propertyPoints,officeObstacle,type HousingView} from './housing.ts'
 import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
@@ -97,11 +100,11 @@ export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
 export type WorldChat={id:number;name:string;text:string;at:number}
 export interface WorldView{
-  housing?:HousingView;residential?:ResidentialView;food?:import('./food.ts').FoodView;chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
+  housing?:HousingView;traffic?:TrafficView;residents?:ResidentView[];residential?:ResidentialView;food?:import('./food.ts').FoodView;chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
   id:string;now:number;you:WorldPlayer;players:WorldPlayer[];coins:number;caveOpen:boolean;hall?:HallView;tableMotion?:Pick<HallTable,'spin'|'recent'>[];interaction?:WorldUse;restaurant?:RestaurantView
 }
 function localInteractions(zone:WorldZone):WorldAction[]{
-  if(zone==='city')return propertyPoints().filter(p=>!p.id.startsWith('property:desk-'))
+  if(zone==='city')return [...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
   const home=residentialAt(zone)
   if(home?.building.block!==undefined&&home.level===0&&!home.stairs)return propertyPoints().filter(p=>p.id==='property:desk-'+home.building.block)
   if(zone==='casino')return [
@@ -149,7 +152,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
     const p=localSite(zone,x,z),shaft=Math.abs(p.x)<1.42
     return Math.abs(p.x)<7.72&&p.z<7.29&&p.z>(shaft?-6.21:-5.98)&&!roomObstacles(zone,p.x,p.z)
   }
-  if(officeObstacle(x,z)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z))return false
+  if(urbanObstacle(x,z)||officeObstacle(x,z)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x),opening=room==='bank'?1.13:room==='exchange'?1.02:room==='kfc'?1.28:1.25
     if(side<width+.28&&side>width-.28&&p.z>back-.28&&p.z<front+.28)return false
@@ -166,13 +169,16 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
   }
   return true
 }
-export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true,keys:readonly string[]=[],residential?:ResidentialView,now=Date.now()):Position&{homeZone?:HomeZone}{
+export const outdoorWalkable=(x:number,z:number)=>walkable('city',x,z,true)
+export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true,keys:readonly string[]=[],residential?:ResidentialView,now=Date.now(),vehicles:readonly Vehicle[]=[]):Position&{homeZone?:HomeZone}{
   const d=Math.hypot(x-from.x,z-from.z)
   if(!Number.isFinite(d)||d===0||limit<=0)return {x:from.x,z:from.z,yaw:from.yaw,homeZone:residentialAt(zone)?zone as HomeZone:undefined}
   const scale=Math.min(1,limit/d),steps=Math.max(1,Math.ceil(d*scale/.13))
   const dx=(x-from.x)*scale/steps,dz=(z-from.z)*scale/steps
   let ax=from.x,az=from.z,current=zone
   function step(x:number,z:number){
+    if(current==='city'&&vehicles.some(v=>vehicleContains({x,z},v)&&
+      (!vehicleContains({x:ax,z:az},v)||Math.hypot(x-v.x,z-v.z)<=Math.hypot(ax-v.x,az-v.z))))return false
     if(current==='city'||residentialAt(current)){
       const next=residentialStep(current,x,z,keys,residential,now) as WorldZone|false
       if(!next)return false

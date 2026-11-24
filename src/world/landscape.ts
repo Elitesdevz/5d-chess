@@ -1,3 +1,4 @@
+import {railwayGround,urbanGround} from './city-plan.ts'
 import * as T from 'three'
 import {passages,CAVE_MOUTH,CAVE_X,OASIS_X,TERRAIN_EXTENT,TERRAIN_STEP,VALLEY_TREES,trailDistance,terrainVertex,terrainHeight,ridgeDistance} from './terrain.ts'
 
@@ -76,7 +77,7 @@ export function landscape(scene:T.Scene){
   const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
   for(let i=0;i<4800;i++){
     const x=(random()-.5)*244,z=(random()-.5)*240,h=terrainHeight(x,z)
-    if(Math.abs(x)<79&&Math.abs(z)<52||passages.some(p=>Math.abs(x-p.x)<6&&z>p.z-4&&z<p.z+20)||trailDistance(x,z)<2||ridgeDistance(x,z)>8)continue
+    if(urbanGround(x,z)||railwayGround(x,z)>.18||passages.some(p=>Math.abs(x-p.x)<6&&z>p.z-4&&z<p.z+20)||trailDistance(x,z)<2||ridgeDistance(x,z)>8)continue
       woods.add('pine',x,h+.15,z,.21,.43,.17,0x738753,i,.20)
       if(i%3===0)woods.add('stone',x+.08,h+.28,z,.15,.12,.14,i%2?0xf2d495:0xb39abb)
       if(i%23===0)woods.add('stone',x,h+.3,z,1.7,1.1,1.2,0x89897c,i)

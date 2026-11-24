@@ -22,27 +22,4 @@ export function district(scene:T.Scene){
     for(const dz of [-.62,.62])box(x+w/2+.18,1.14,z+dz,.07,2.05,1.12,glass)
   }
   props.finish(scene)
-  const cars=Array.from({length:6},(_,i)=>{
-    const car=new T.Group(),p=new Scenery(),paint=[0x4e7477,0xb48159,0x54647c,0xaa5350,0xc4baa0,0x455854][i]
-    p.add('box',0,.51,0,1.39,.52,2.97,paint)
-    p.add('box',0,.97,-.12,1.20,.55,1.56,0x354c57)
-    p.add('box',0,1.27,-.12,1.25,.09,1.58,paint)
-    for(const side of [-1,1]){
-      for(const dz of [-.91,.91])p.add('box',side*.65,.25,dz,.22,.49,.5,0x272c2f)
-      p.add('box',side*.48,.58,1.49,.27,.14,.04,0xffe5b2)
-      p.add('box',side*.51,.61,-1.49,.22,.13,.04,0xab4140)
-    }
-    p.finish(car);scene.add(car);return car
-  })
-  const route=new T.CurvePath<T.Vector3>(),corners=[[-61.75,12],[73.25,12],[73.25,30],[-61.75,30]]
-  const point=(x:number,z:number)=>new T.Vector3(x,0,z)
-  corners.forEach(([x,z],i)=>{
-    const next=corners[(i+1)%4],after=corners[(i+2)%4],start=point(x,z),end=point(...next as [number,number])
-    const dir=end.clone().sub(start).normalize(),out=point(...after as [number,number]).sub(end).normalize()
-    route.add(new T.LineCurve3(start.addScaledVector(dir,1.7),end.clone().addScaledVector(dir,-1.7)))
-    route.add(new T.QuadraticBezierCurve3(end.clone().addScaledVector(dir,-1.7),end,end.clone().addScaledVector(out,1.7)))
-  })
-  return {tick(time:number){
-    cars.forEach((car,i)=>{const t=(time/63000+i/cars.length)%1,pos=route.getPoint(t),dir=route.getTangent(t);car.position.copy(pos);car.rotation.y=Math.atan2(dir.x,dir.z)})
-  }}
 }

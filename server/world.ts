@@ -1,4 +1,6 @@
-import {aboard,access,DOOR_TRAVEL,homeZone,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
+import {CityLife} from './city-life.ts'
+import {callResidentialLift,occupy,operateDoor,residentialRide,settleResidentialLifts,stand} from './residential-actions.ts'
+import {aboard,access,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
 import {residentialFood} from './residential-food.ts'
 import {UNITS,type Deeds,type HousingView} from '../src/world/housing.ts'
 import {BAR,BAR_STOOLS,DRINKS,type BarService} from '../src/world/bar-menu.ts'
@@ -17,7 +19,7 @@ import {fail} from './http.ts'
 
 const TIMEOUT=27_000
 type Member=WorldPlayer&{seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position}
-type World={id:string;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView}
+type World={id:string;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView;life:CityLife}
 export interface CaveVisit {day:string;active:boolean}
 const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose})
 
@@ -41,7 +43,7 @@ export class CityWorlds {
   }
   private enter(name:string,avatar:string,zone:WorldZone,now:number){
     let world=[...this.worlds.values()].find(w=>w.members.size<WORLD_CAPACITY)
-    if(!world){world={id:'W-'+randomUUID().slice(0,8),members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}}};this.worlds.set(world.id,world)}
+    if(!world){world={id:'W-'+randomUUID().slice(0,8),members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}},life:new CityLife(now,this.store.metadataValue('cityDeeds') as Deeds|undefined)};this.worlds.set(world.id,world)}
     const member:Member={name,avatar,zone,...FLOOR_ARRIVAL,seen:now,moved:now,online:true}
     this.arrive(world,member,zone,now)
     world.members.set(name,member);this.occupants.set(name,world)
@@ -126,31 +128,17 @@ export class CityWorlds {
   private homeUse(world:World,me:Member,target:HomePoint,keys:string[],now:number){
     const b=residentialAt(me.zone),state=world.residential
     if(me.homePose)fail(409,'Stand up first')
+    const people=world.life.people(world.members.values())
     if(target.door){
-      const d=target.door
-      if(!access(d.unit,keys))fail(403,'Locked — private residence')
-      const stamp=state.doors[d.id]??0
-      if(stamp&&now-Math.abs(stamp)<DOOR_TRAVEL)fail(409,'Wait for the door to finish moving')
-      if(stamp>0){
-        if([...world.members.values()].some(p=>Math.abs(riderHeight(p,now)-riderHeight(me,now))<1&&near(p,target.x,target.z,.57)))
-          fail(409,'Clear the doorway before closing it')
-        state.doors[d.id]=-now
-      }else state.doors[d.id]=now
+      const error=operateDoor(me,target,keys,state,people,now)
+      if(error)fail(error.startsWith('Locked')?403:409,error)
       me.interaction=undefined
     }else if(target.pose&&target.exit){
-      if([...world.members.values()].some(p=>p.homePose?.id===target.pose!.id&&p.zone===me.zone))fail(409,'That place is occupied')
-      me.homePose=target.pose
-      me.homeExit={...target.exit,yaw:target.pose.yaw}
-      Object.assign(me,{x:target.pose.x,z:target.pose.z,yaw:target.pose.yaw})
+      if(!occupy(me,target,people))fail(409,'That place is occupied')
       me.interaction=undefined
     }else if(target.id.startsWith('call:')&&b){
-      const lift=state.lifts[b.building.id]??={level:0,opened:0}
-      if(lift.to!==undefined)fail(409,'Elevator is on its way')
-      if(lift.level!==b.level){
-        const source=homeZone(b.building.id,lift.level)
-        if([...world.members.values()].some(p=>p.zone===source&&aboard(source,p.x,p.z)))fail(409,'Elevator is occupied')
-        Object.assign(lift,{to:b.level,started:now+380,ends:now+1150+Math.abs(lift.level-b.level)*280})
-      }
+      const error=callResidentialLift(me,state,people,now)
+      if(error)fail(409,error)
     }else if(target.id.startsWith('lift:')&&b){
       if(!aboard(me.zone,me.x,me.z)||!openLift(state.lifts[b.building.id]??{level:0,opened:0},b.level,now))fail(409,'Step inside the elevator first')
       me.interaction=target.id as WorldUse
@@ -175,10 +163,8 @@ export class CityWorlds {
     const shared=data.scene===true
     world.restaurant.tick(now)
     me.seen=now;me.avatar=avatar
-    for(const lift of Object.values(world.residential.lifts))if(lift.to!==undefined&&now>=lift.ends!+220){
-      lift.level=lift.to;lift.opened=lift.ends!+220
-      delete lift.to;delete lift.started;delete lift.ends
-    }
+    world.life.tick(now,world.residential,world.members.values())
+    settleResidentialLifts(world.residential,[...world.members.values()],now)
     if(me.lift&&now>=me.lift.ends){me.zone=me.lift.to;me.lift=undefined;me.liftArrived=true;me.moved=now}
     const expired=unauthorizedHome(me.zone,me.x,me.z,housing.keys)
     if(expired){
@@ -194,7 +180,7 @@ export class CityWorlds {
       const {x,z,yaw}=data
       if(data.world===world.id&&(shared||data.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&!me.homePose&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
         const limit=WORLD_SPEED*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
-        const {homeZone:home,...pos}=worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys,world.residential,now)
+        const {homeZone:home,...pos}=worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys,world.residential,now,world.life.traffic.vehicles)
         if(home!==me.zone&&(home||residentialAt(me.zone))){me.zone=home??'city';me.interaction=undefined}
         Object.assign(me,pos,{yaw:Math.atan2(Math.sin(yaw as number),Math.cos(yaw as number)),moved:now})
         this.walkthrough(world,me,open,now)
@@ -223,17 +209,9 @@ export class CityWorlds {
       const a=residentialAt(me.zone),to=data.level
       if(typeof to!=='number'||!Number.isInteger(to)||to<0||to>4)fail(400,'Choose a residential floor')
       if(!a||!a.building.lift||me.interaction!=='lift:'+a.building.id||!aboard(me.zone,me.x,me.z))fail(409,'Step inside the elevator first')
-      const lift=world.residential.lifts[a.building.id]??={level:0,opened:0}
-      if(!openLift(lift,a.level,now)||lift.to!==undefined)fail(409,'Wait for the elevator to arrive')
-      if(to!==a.level){
-        const started=now+420,ends=started+780+Math.abs(to-a.level)*310
-        Object.assign(lift,{to,started,ends})
-        const arrival=homeZone(a.building.id,to)
-        for(const p of world.members.values())if(p.zone===me.zone&&aboard(p.zone,p.x,p.z)){
-          const exit=residentialSite(a.building,a.building.lift.x,1.73)
-          p.lift={to:arrival,started,ends};p.interaction=undefined;p.yaw=Math.atan2(p.x-exit.x,p.z-exit.z)
-        }
-      }else me.interaction=undefined
+      const error=residentialRide(me,to,world.residential,world.life.people(world.members.values()),now)
+      if(error)fail(409,error)
+      me.interaction=undefined
     }else if(action==='food'||action==='close-fridge'){
       const id=me.interaction
       const target=id?.startsWith('fridge:')?this.homePoints(world,me,now).find(p=>p.id===id&&near(me,p.x,p.z,p.range)):undefined
@@ -315,8 +293,8 @@ export class CityWorlds {
         if(world.barReceipts.size>100)world.barReceipts.delete(world.barReceipts.keys().next().value!)
       }else if(world.barReceipts.get(key)!==drink.id)fail(409,'That receipt belongs to a different drink')
     }else if(action==='stand-scenery'){
-      if(me.homePose&&me.homeExit){
-        Object.assign(me,me.homeExit);delete me.homePose;delete me.homeExit
+      if(stand(me)){
+        me.interaction=undefined
       }else if(me.barSeat!==undefined){delete me.barSeat;me.z-=.37}
       else if(me.boardSeat!==undefined){
         const seat=BOARD_SEATS[me.boardSeat]
@@ -361,6 +339,6 @@ export class CityWorlds {
     }
     const residential={...world.residential,fridge:me.interaction?.startsWith('fridge:')?me.interaction:undefined,
       fridges:[...world.members.values()].flatMap(p=>p.interaction?.startsWith('fridge:')?[p.interaction]:[])}
-    return {id:world.id,now,housing,food,residential,boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
+    return {id:world.id,now,housing,food,residential,...(shared&&level<22&&me.zone!=='private'?world.life.snapshot(me,now):{}),boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
   }
 }

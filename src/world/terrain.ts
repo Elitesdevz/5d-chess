@@ -1,3 +1,4 @@
+import {railwayGround,urbanGround} from './city-plan.ts'
 // Shared by the terrain mesh and the authoritative movement simulation.
 export const TERRAIN_STEP=2
 export const TERRAIN_EXTENT=170
@@ -18,13 +19,15 @@ export function ridgeDistance(x:number,z:number){
   return Math.hypot(x,z*.97)-(89+6*Math.sin(theta*3+.8)+4*Math.cos(theta*5))
 }
 export function terrainVertex(x:number,z:number){
-  const radius=Math.abs(x)<79&&Math.abs(z)<51?0:Math.hypot(x,z),d=ridgeDistance(x,z)
+  if(urbanGround(x,z))return 0
+  const radius=Math.hypot(x,z),d=ridgeDistance(x,z)
   const plain=Math.min(1,Math.max(0,(radius-63)/16))*(.85+.48*Math.sin(x*.11)+.35*Math.cos(z*.15))
   const t=Math.max(0,d)
   const ridge=(1-Math.exp(-t*t/1750))*(42+5*Math.sin(x*.055)+5*Math.cos(z*.048))
   // Keep both tunnel approaches level through the foot of the ridge.
   const channel=Math.min(...passages.map(p=>Math.max(Math.abs(x-p.x)-6,p.z-4-z,z-p.z-19,0)))
-  return (plain+ridge)*Math.min(1,channel/7)
+  const transition=Math.max(Math.abs(x)-77,-z-82,z-49,0)
+  return (plain+ridge)*Math.min(1,channel/7,transition/8)*(1-railwayGround(x,z))
 }
 export function terrainHeight(x:number,z:number){
   if(Math.abs(x)+Math.abs(z)<63)return 0
@@ -34,7 +37,7 @@ export function terrainHeight(x:number,z:number){
   return h*(1-v)+terrainVertex(a,b+step)*(v-u)+end*u
 }
 export function passableLand(x:number,z:number){
-  if(ridgeDistance(x,z)<1)return true
+  if(urbanGround(x,z)||ridgeDistance(x,z)<1)return true
   const height=terrainHeight(x,z)
   return ridgeDistance(x,z)<30&&height<22&&Math.hypot(terrainHeight(x+.5,z)-terrainHeight(x-.5,z),terrainHeight(x,z+.5)-terrainHeight(x,z-.5))<.91
 }
@@ -62,7 +65,7 @@ let woodlandSeed=6821
 function woodlandRandom(){woodlandSeed=(Math.imul(woodlandSeed,1664525)+1013904223)>>>0;return woodlandSeed/4294967296}
 for(let i=0;i<730;i++){
   const x=(woodlandRandom()-.5)*220,z=(woodlandRandom()-.5)*220,size=2.2+woodlandRandom()*3.1
-  if(Math.abs(x)<79&&Math.abs(z)<52||Math.abs(x)<24&&z<64&&z>46||passages.some(p=>Math.abs(x-p.x)<7&&z>p.z-4&&z<p.z+21)||trailDistance(x,z)<2||ridgeDistance(x,z)>8)continue
+  if(urbanGround(x,z)||railwayGround(x,z)>.18||Math.abs(x)<24&&z<64&&z>46||passages.some(p=>Math.abs(x-p.x)<7&&z>p.z-4&&z<p.z+21)||trailDistance(x,z)<2||ridgeDistance(x,z)>8)continue
   VALLEY_TREES.push({x,z,size})
   for(let a=Math.floor((x-.32)/6);a<=Math.floor((x+.32)/6);a++)for(let b=Math.floor((z-.32)/6);b<=Math.floor((z+.32)/6);b++){
     const key=a+','+b

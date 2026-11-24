@@ -1,38 +1,25 @@
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
-import {homeFacing,HOMES,MARKET,BOULEVARD_TREES} from './terrain.ts'
+import {MARKET,BOULEVARD_TREES} from './terrain.ts'
+import {CROSSINGS,STREETS,circle} from './city-plan.ts'
+import {PATHS} from './urban-layout.ts'
 const cream=0xe1d0a8,bronze=0xa77b45,wood=0x684c3e,green=0x486552
 
 export function avenues(parent:T.Object3D){
   const p=new Scenery()
   const slab=(x:number,z:number,w:number,d:number,color:number,y:number)=>p.add('box',x,y,z,w,.012,d,color)
-  // Partition the road network at all curb edges. At a junction every patch
-  // has exactly one visible surface and the intersecting street cuts the curb.
-  const roads:{x:number;z:number;length:number;width:number;vertical:boolean;major:boolean}[]=[]
-  const road=(x:number,z:number,length:number,width:number,vertical=false,major=false)=>roads.push({x,z,length,width,vertical,major})
-  road(0,11,154,5.4,false,true)
-  road(0,31,149,3.5)
-  road(-62.5,-9,80,3.25,true)
-  road(74,-9,80,3.25,true)
-  road(0,29,32,4.3,true,true)
-  road(5.75,-49,138.5,3.5)
-  for(const side of [-1,1]){
-    road(side<0?-37.75:43.5,-11.9,side<0?49.5:61,2.9)
-    road(side<0?-37.25:43,-30,side<0?50.5:62,3.1)
-    road(side*10.4,22,18.5,2.4,true)
-    slab(side*24,6.78,3.9,3.6,0xc3b9a2,-.001)
-    for(let j=0;j<8;j++)slab(side*11.8,8.76+j*.63,1.82,.27,0xe2d7bc,.005)
-  }
+  const roads=STREETS.map(s=>({x:(s.a.x+s.b.x)/2,z:(s.a.z+s.b.z)/2,length:Math.hypot(s.b.x-s.a.x,s.b.z-s.a.z),width:s.width,vertical:s.a.x===s.b.x,major:s.traffic&&s.limit>6.7,walk:s.walk,traffic:s.traffic}))
   const xs=new Set<number>(),zs=new Set<number>()
   for(const r of roads){
     const lateral=r.vertical?xs:zs,along=r.vertical?zs:xs
     const mid=r.vertical?r.x:r.z,end=r.vertical?r.z:r.x
     for(const side of [-1,1]){
-      for(const edge of [0,.18,1.4])lateral.add(mid+side*(r.width/2+edge))
+      for(const edge of [0,.18,Math.max(.18,r.walk)])lateral.add(mid+side*(r.width/2+edge))
       along.add(end+side*r.length/2)
     }
     if(r.major)for(let a=2-r.length/2;a<r.length/2-1;a+=4.4){
       if(roads.some(other=>other.vertical!==r.vertical&&Math.abs((r.vertical?other.z:other.x)-end-a)<other.width/2+1&&Math.abs((r.vertical?other.x:other.z)-mid)<other.length/2))continue
+      if(Math.hypot(r.x+(r.vertical?0:a)-circle.x,r.z+(r.vertical?a:0)-circle.z)<circle.radius+3.45)continue
       slab(r.x+(r.vertical?0:a),r.z+(r.vertical?a:0),r.vertical?.085:1.48,r.vertical?1.48:.085,0xcfbf9a,-.012)
     }
   }
@@ -43,8 +30,8 @@ export function avenues(parent:T.Object3D){
     let layer=0
     for(const street of roads){
       const dx=Math.abs(x-street.x),dz=Math.abs(z-street.z),offset=(street.vertical?dx:dz)-street.width/2
-      if((street.vertical?dz:dx)>=street.length/2||offset>=1.4)continue
-      layer=Math.max(layer,offset<0?(street.major?4:3):offset<.18?2:1)
+      if((street.vertical?dz:dx)>=street.length/2||offset>=Math.max(.18,street.walk))continue
+      layer=Math.max(layer,offset<0&&street.traffic?(street.major?4:3):offset<.18&&street.traffic?2:1)
     }
     if(!layer)continue
     color.setHex([0,0xb4aaa0,0xd1c5af,0x726d64,0x535a5b][layer])
@@ -55,11 +42,29 @@ export function avenues(parent:T.Object3D){
   const network=new T.BufferGeometry()
   network.setAttribute('position',new T.Float32BufferAttribute(positions,3));network.setAttribute('color',new T.Float32BufferAttribute(colors,3));network.computeVertexNormals()
   parent.add(new T.Mesh(network,new T.MeshStandardMaterial({vertexColors:true,roughness:.92})))
-  slab(0,45,46,1.75,0xb9a88a,-.038)
-  for(const [x,z] of HOMES){
-    const facing=homeFacing(z),lane=facing<0?11:z<-32?-30:z<-11?-11.9:z<4?11:45
-    const start=z+3*facing,end=lane
-    slab(x,(start+end)/2,1.45,Math.abs(end-start),0xc3b69c,-.053)
+  const ring=new T.Mesh(new T.RingGeometry(circle.radius-circle.width/2,circle.radius+circle.width/2,96),new T.MeshStandardMaterial({color:0x535a5b,roughness:.92}))
+  ring.rotation.x=-Math.PI/2;ring.position.set(circle.x,-.021,circle.z);parent.add(ring)
+  for(const r of [circle.radius-circle.width/2,circle.radius+circle.width/2]){
+    const outer=r>circle.radius
+    for(let arc=0;arc<(outer?4:1);arc++){
+      const curb=new T.Mesh(new T.RingGeometry(r-.12,r+.13,outer?21:96,outer?arc*Math.PI/2+.32:0,outer?Math.PI/2-.64:Math.PI*2),
+        new T.MeshStandardMaterial({color:0xc7baa2}))
+      curb.rotation.x=-Math.PI/2;curb.position.set(circle.x,-.016,circle.z);parent.add(curb)
+    }
+  }
+  for(const approach of [0,Math.PI/2,Math.PI,Math.PI*1.5]){
+    for(let j=-2;j<=2;j++){
+      const x=Math.cos(approach)*10.65-Math.sin(approach)*j*.39,z=Math.sin(approach)*10.65+Math.cos(approach)*j*.39
+      p.add('box',circle.x+x,-.007,circle.z+z,.22,.008,.23,0xe2d8bc)
+    }
+  }
+  for(const c of CROSSINGS)for(let across=-c.width/2+.27;across<c.width/2-.16;across+=.62){
+    slab(c.x+(c.axis==='x'?across:0),c.z+(c.axis==='z'?across:0),c.axis==='x'?.255:1.62,c.axis==='z'?.255:1.62,0xd9d4bf,-.009)
+  }
+  for(const path of PATHS)for(let i=1;i<path.points.length;i++){
+    const a=path.points[i-1],b=path.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)
+    if(len>.07)p.add('box',(a.x+b.x)/2,path.purpose==='drive'?-.034:-.038,(a.z+b.z)/2,path.width,.016,len+.1,
+      path.purpose==='park'?0xbda784:path.purpose==='drive'?0x827b70:0xbfb29b,Math.atan2(dx,dz))
   }
   for(const side of [-1,1]){
     // Boulevard trees, root grates, and low rectangular parterres.

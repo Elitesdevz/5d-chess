@@ -1,3 +1,4 @@
+import {urbanArt} from './urban-art.ts'
 import {basinBed,tunnelBed,poolLevel} from './terrain.ts'
 import {district} from './district.ts'
 import {ownershipSegments} from './company-desk.ts'
@@ -221,13 +222,6 @@ function street(){
   avenues(group)
   plane(group,23.6,14.8,0,-.016,.52,paving())
   landmarks(group)
-  for(const [x,z] of [[-10,2],[10,2],[-11,13],[11,13],[-15,-8],[15,-8],[-17,12],[17,12],[-33,12],[33,12],[-44,-5],[44,-5],[-9,26],[9,26],[-25,26],[25,26]]){
-    lamp(group,x,z)
-  }
-  for(const [x,z] of [[-10.8,-2],[10.8,-2],[-15,15],[15,15],[-32,-6],[32,-6],[-35,22],[31.2,29.25],[-27,-13],[27,-13],[-15,-21],[15,-21]]){
-    potted(group,x,z,1.4)
-  }
-  for(const [x,z] of [[-8,2],[8,2],[-14,14],[14,14],[-18,7],[18,7]])bench(group,x,z,x>0?Math.PI/2:-Math.PI/2)
   const guide=new T.Group();guide.position.set(-4.65,0,1.72);guide.rotation.y=.24;group.add(guide)
   box(guide,[2.53,1.31,.17],[0,1.43,0],ink,.06)
   banner(guide,'CITY SQUARE',[2.24,.28],[0,1.81,.093])
@@ -637,8 +631,9 @@ export function makeWorldArt(open:boolean){
   scene.add(skylight)
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());contactShade(scene);const water=fountain(scene),{wind,seal}=landscape(scene)
-  const quarter=district(scene),homes=residentialArt(scene,banner)
-  const ambient=(time:number)=>{water(time);wind(time);quarter.tick(time);poolRipples(time)}
+  district(scene)
+  const homes=residentialArt(scene,banner),urban=urbanArt(scene,banner)
+  const ambient=(time:number)=>{water(time);wind(time);poolRipples(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>
   for(const zone of Object.keys(PLAN) as (keyof typeof PLAN)[]){
     const group=new T.Group(),{x,z}=PLAN[zone];group.position.set(x,0,z);scene.add(group);rooms[zone]=group
@@ -687,7 +682,7 @@ export function makeWorldArt(open:boolean){
     const target=zone==='cave'?.38:zone==='oasis'?.84:zone==='casino'?1.24:zone==='city'?1.95:1.62
     skylight.intensity=T.MathUtils.damp(skylight.intensity,target,3,dt)
   }
-  return {scene,lightZone,homes,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
+  return {scene,lightZone,homes,urban,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
 }
 function rouletteWagers(table:T.Group){
   const tones=[0xe9c186,0x72bcbc,0xcf8799,0xc2a8e5]
