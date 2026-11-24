@@ -6,7 +6,7 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world[data-flat=true] #world-canvas{cursor:default}
 .world-dark{pointer-events:none;background:#020504;opacity:0;transition:opacity .25s;z-index:1}
 .world-names{pointer-events:none;z-index:2}
-.world-name{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;padding:2px 7px;border-radius:4px;background:#122420dc;border:1px solid #d4bd845c;color:#f3e6c9;font-size:11px}
+.world-name{position:absolute;top:0;left:0;white-space:nowrap;padding:2px 7px;border-radius:4px;background:#122420dc;border:1px solid #d4bd845c;color:#f3e6c9;font-size:11px}
 .world :is(button,input,select){font:inherit;color:inherit}
 .world button{cursor:pointer}
 .world button:disabled{cursor:default;opacity:.51}

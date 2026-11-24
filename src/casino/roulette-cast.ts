@@ -5,6 +5,7 @@ import {materials,type Materials} from './scene/materials.ts'
 import {box,mesh,limb,v} from './scene/geometry.ts'
 /** Jointed, clothed club guests. Shared articulated hands with the first-person player. */
 export class ClubGuest{
+ static readonly idleCurl=.18
  readonly root=new T.Group();readonly left:Arm;readonly right:Arm;readonly head=new T.Group();private blink:T.Mesh[]=[];private restY=1.64;private baseZ:number
  constructor(scene:T.Object3D,x:number,z:number,skin:number,suit:number,private dealer=false,style=0){
   this.baseZ=z;scene.add(this.root);this.root.position.set(x,0,z);this.root.rotation.y=dealer?0:-Math.atan2(x,3.5)
@@ -37,8 +38,8 @@ export class ClubGuest{
   this.left=new Arm(this.root,m,true);this.right=new Arm(this.root,m,false)
   if(!dealer){box(this.root,[.54,.12,.50],[0,.65,-.04],m.leather,.05);box(this.root,[.54,.62,.1],[0,.99,-.26],m.leather,.06);for(const side of[-1,1])limb(this.root,v(side*.23,.6,-.2),v(side*.26,.04,-.22),.022,m.brass)}
  }
- pose(now:number,lean=0,left=v(-.25,1.04,.27),right=v(.25,1.04,.27),curl=.18,world=false){
-  this.root.position.z=this.baseZ+(this.dealer?lean*.43:0);this.root.updateMatrixWorld(true)
+ pose(now:number,lean=0,left=v(-.25,1.04,.27),right=v(.25,1.04,.27),curl=ClubGuest.idleCurl,world=false){
+  this.root.position.z=this.baseZ+(this.dealer?lean*.43:0)
   if(world){left=this.root.worldToLocal(left.clone());right=this.root.worldToLocal(right.clone())}
   this.head.position.y=this.restY+Math.sin(now*.0013)*.003;this.head.rotation.y=Math.sin(now*.0004)*.045;this.head.rotation.x=.025+lean*.09
   const blink=Math.sin(now*.00025)> .994?.08:1;this.blink.forEach((eye,i)=>eye.scale.y=(i%2?1:.014)*blink)

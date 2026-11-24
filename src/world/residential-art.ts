@@ -1,8 +1,9 @@
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
+import {batchOpaque} from '../casino/scene/static-batch.ts'
 import {RESIDENCES,UNITS} from './housing.ts'
 import {BUILDINGS,STOREY,doorSwing,liftHeight,liftOpening,stairHeight,type Building,type Fixture,type Rect,type ResidentialView} from './residential.ts'
-import {ClubGuest} from '../casino/roulette-cast.ts'
+import {CityGuest} from './guest.ts'
 
 export type Letter=(g:T.Object3D,title:string,size:[number,number],position:number[],color?:string,backdrop?:string)=>T.Object3D
 const chalk=0xe1d7c4,oak=0x825d43,walnut=0x4f3830,brass=0xc5a66b,iron=0x334345,porcelain=0xe8e6da
@@ -151,7 +152,7 @@ function slabs(rect:Rect,hole?:Rect){
 export function residentialArt(parent:T.Object3D,letter:Letter){
   const shadows=furnitureShadow(),stamp=new T.Object3D()
   const doors=new Map<string,{hinge:T.Group;angle:number}>(),fridges=new Map<string,T.Group>()
-  const signs=new Map<string,T.Object3D>(),clerks:ClubGuest[]=[]
+  const signs=new Map<string,T.Object3D>(),clerks:CityGuest[]=[]
   const lifts:{id:string;x:number;group:T.Group;leaves:T.Mesh[];landings:T.Mesh[][];indicator:HTMLCanvasElement;texture:T.CanvasTexture;shown:number}[]=[]
   const floors:{group:T.Group;x:number;z:number}[]=[]
   for(const b of BUILDINGS){
@@ -179,6 +180,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
     }
     for(const [level,f] of b.levels.entries()){
       const g=new T.Group(),p=new Scenery(),inside=new T.Group(),furniture=new Scenery();root.add(g,inside);g.position.y=inside.position.y=level*STOREY
+      const moving=new Set<T.Object3D>()
       floors.push({group:inside,x:b.x,z:b.z})
       const box=(x:number,y:number,z:number,w:number,h:number,d:number,c:number)=>p.add('box',x,y,z,w,h,d,c)
       const tile=(a:Rect,y:number,h:number,c:number)=>box((a.l+a.r)/2,y,(a.b+a.f)/2,a.r-a.l,h,a.f-a.b,c)
@@ -262,9 +264,11 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
         const outer=f.walls.some(w=>w.outer&&w.openings.some(o=>o.id===d.id))
         ;(outer?g:inside).add(a)
         const hinge=new T.Group();hinge.position.x=-d.width/2;a.add(hinge)
+        moving.add(hinge)
         smallBox(hinge,d.width/2,1.095,0,d.width-.03,2.177,.069,d.id.endsWith('street')?glassDoor:leaf)
         smallBox(hinge,d.width*.57,1.41,.043,d.width*.71,.76,.027,d.id.endsWith('street')?liftWall:metal)
         for(const side of [-1,1])smallBox(hinge,d.width-.14,.99,side*.066,.135,.034,.102,metal)
+        batchOpaque(hinge)
         const direction=(d.reverse?-1:1)*(d.axis==='x'?1:-1)
         doors.set(d.id,{hinge,angle:direction})
       }
@@ -279,6 +283,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
         modelFurniture(item,furniture,0,tone.fabric)
         if(item.kind==='fridge'){
           const fridge=new T.Group();fridge.position.set(item.x,0,item.z);fridge.rotation.y=item.yaw;inside.add(fridge)
+          moving.add(fridge)
           const door=new T.Group();door.position.set(-item.w/2,0,-item.d/2+.035);fridge.add(door)
           smallBox(door,item.w/2,.906,0,item.w*.98,1.61,.074,fridgeLeaf)
           smallBox(door,item.w*.82,1.08,-.063,.039,.31,.078,metal)
@@ -332,7 +337,9 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       }
       if(b.lift){
         const lift=lifts.at(-1)!
-        lift.landings.push([-1,1].map(side=>smallBox(g,b.lift!.x+side*.384,1.223,2.025,.767,2.444,.082,liftWall)))
+        const leaves=[-1,1].map(side=>smallBox(g,b.lift!.x+side*.384,1.223,2.025,.767,2.444,.082,liftWall))
+        lift.landings.push(leaves)
+        for(const leaf of leaves)moving.add(leaf)
         smallBox(g,b.lift.x-1.02,1.22,1.93,.15,.21,.05,metal)
         label(level?'FLOOR '+level:'GROUND FLOOR',b.lift.x-2.17,level*STOREY+1.85,1.53,1.43).rotation.y=Math.PI
       }
@@ -340,7 +347,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
         if(level===0){
           label('RECEPTION',4.63,1.21,.33,2.2)
           for(let i=1;i<5;i++)label('FLOOR '+i+'   '+i+'01 – '+i+'03',-.38,2.68-i*.31,r.b+.14,2.56)
-          clerks.push(new ClubGuest(root,4.65,-.82,0xb58366,b.style===0?0x42625c:0x3a4b65,true))
+          clerks.push(new CityGuest(root,4.65,-.82,0xb58366,b.style===0?0x42625c:0x3a4b65,true))
         }else for(const [,u] of f.units.entries()){
           const d=f.doors.find(d=>d.id===u.id)!
           const info=UNITS.find(entry=>entry.id===u.id)!
@@ -376,6 +383,8 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       if(level===b.levels.length-1)tile(r,STOREY-.064,.128,chalk)
       p.finish(g,architecture)
       furniture.finish(inside,architecture)
+      batchOpaque(g,moving)
+      batchOpaque(inside,moving)
     }
     const top=b.levels.length*STOREY,p=new Scenery()
     const box=(x:number,y:number,z:number,w:number,h:number,d:number,c:number)=>p.add('box',x,y,z,w,h,d,c)

@@ -12,19 +12,21 @@ const shapes={
 type Shape=keyof typeof shapes
 /** Bake repeated props into one instanced draw per shape, retaining individual paint colors. */
 export class Scenery{
-  private parts=new Map<Shape,{matrix:T.Matrix4;color:number}[]>()
+  private parts=new Map<string,{shape:Shape;items:{matrix:T.Matrix4;color:number}[]}>()
   private transform=new T.Object3D()
+  constructor(private cellSize=0){}
   add(shape:Shape,x:number,y:number,z:number,w:number,h:number,d:number,color:number,yaw=0,roll=0){
     const t=this.transform;t.position.set(x,y,z);t.scale.set(w,h,d);t.rotation.set(0,yaw,roll,'YXZ');t.updateMatrix()
-    let parts=this.parts.get(shape)
-    if(!parts){parts=[];this.parts.set(shape,parts)}
-    parts.push({matrix:t.matrix.clone(),color})
+    const key=this.cellSize?shape+':'+Math.floor(x/this.cellSize)+':'+Math.floor(z/this.cellSize):shape
+    let batch=this.parts.get(key)
+    if(!batch){batch={shape,items:[]};this.parts.set(key,batch)}
+    batch.items.push({matrix:t.matrix.clone(),color})
   }
   finish(parent:T.Object3D,material=new T.MeshStandardMaterial({roughness:.81,flatShading:true,map:grain()})){
     const color=new T.Color()
-    for(const [shape,parts] of this.parts){
-      const mesh=new T.InstancedMesh(shapes[shape],material,parts.length)
-      parts.forEach((v,i)=>{mesh.setMatrixAt(i,v.matrix);mesh.setColorAt(i,color.setHex(v.color))})
+    for(const {shape,items} of this.parts.values()){
+      const mesh=new T.InstancedMesh(shapes[shape],material,items.length)
+      items.forEach((v,i)=>{mesh.setMatrixAt(i,v.matrix);mesh.setColorAt(i,color.setHex(v.color))})
       mesh.computeBoundingSphere();parent.add(mesh)
     }
   }
@@ -46,7 +48,9 @@ function grain(){
 }
 function meadow(scene:T.Scene){
   const pos=[],col=[],idx:number[]=[],covered:number[]=[],uv=[],color=new T.Color(),snow=new T.Color(0xa5a394),grass=new T.Color(0xa5ad75)
+  const tiles=new Map<number,number[]>(),cellsPerTile=16
   const extent=TERRAIN_EXTENT,step=TERRAIN_STEP,side=2*extent/step+1
+  const tileRow=Math.ceil(side/cellsPerTile)
   for(let j=0;j<side;j++)for(let i=0;i<side;i++){
     const x=i*step-extent,z=j*step-extent,h=terrainVertex(x,z),ridge=ridgeDistance(x,z)
     const grain=.5+.5*Math.sin(x*.33+z*.22)*Math.cos(z*.21)
@@ -58,21 +62,41 @@ function meadow(scene:T.Scene){
     if(i<side-1&&j<side-1){
       const cut=passages.find(p=>Math.abs(x+1-p.x)<4&&z>=p.z&&z<p.z+(Math.abs(x+1-p.x)>2?6:8))
       const dest=cut?cut.x===CAVE_X?covered:undefined:idx,a=j*side+i
-      dest?.push(a,a+side+1,a+1,a,a+side,a+side+1)
+      if(!dest)continue
+      const indices=[a,a+side+1,a+1,a,a+side,a+side+1]
+      dest.push(...indices)
+      if(!cut){
+        const tile=Math.floor(j/cellsPerTile)*tileRow+Math.floor(i/cellsPerTile)
+        let faces=tiles.get(tile)
+        if(!faces){faces=[];tiles.set(tile,faces)}
+        faces.push(...indices)
+      }
     }
   }
   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('color',new T.Float32BufferAttribute(col,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setIndex(idx);geo.computeVertexNormals()
   const material=new T.MeshStandardMaterial({vertexColors:true,roughness:1,map:grain()})
-  scene.add(new T.Mesh(geo,material))
-  const patch=new T.BufferGeometry()
-  for(const attr of ['position','color','uv'])patch.setAttribute(attr,geo.getAttribute(attr))
-  patch.setIndex(covered);patch.computeVertexNormals()
+  // Calculate light normals on the original continuous mesh, then share those
+  // buffers across tiles. Only their local triangle indices and bounds differ.
+  const land=new T.Group();land.name='Terrain';scene.add(land)
+  const vertex=new T.Vector3(),positions=geo.getAttribute('position')
+  const groundPatch=(faces:number[],attributes:string[])=>{
+    const part=new T.BufferGeometry()
+    for(const attr of attributes)part.setAttribute(attr,geo.getAttribute(attr))
+    part.setIndex(faces)
+    const bounds=new T.Box3()
+    for(const index of faces)bounds.expandByPoint(vertex.fromBufferAttribute(positions,index))
+    part.boundingBox=bounds
+    part.boundingSphere=bounds.getBoundingSphere(new T.Sphere())
+    return part
+  }
+  for(const faces of tiles.values())land.add(new T.Mesh(groundPatch(faces,['position','color','uv','normal']),material))
+  const patch=groundPatch(covered,['position','color','uv']);patch.computeVertexNormals()
   const seal=new T.Mesh(patch,material);scene.add(seal)
   return seal
 }
 export function landscape(scene:T.Scene){
   const seal=meadow(scene)
-  const woods=new Scenery()
+  const woods=new Scenery(32)
   let seed=41471
   const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
   for(let i=0;i<4800;i++){
@@ -138,7 +162,8 @@ export function landscape(scene:T.Scene){
       woods.add('crown',x,.78,z,.19,.42,.16,0xd5b45e,0,.12)
     }
   }
-  woods.finish(scene)
+  const foliage=new T.Group();foliage.name='Valley vegetation';scene.add(foliage)
+  woods.finish(foliage)
   const flock=new T.Group();scene.add(flock)
   const birds=new Scenery()
   for(let i=0;i<9;i++)for(const wing of [-1,1])birds.add('box',(i-4)*1.1+wing*.23,i%3*.23,Math.abs(i-4)*.7,.52,.055,.16,0x45494d,0,wing*.28)

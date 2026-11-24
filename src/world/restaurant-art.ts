@@ -1,6 +1,6 @@
 import * as T from 'three'
+import {batchOpaque} from '../casino/scene/static-batch.ts'
 import {box,mesh,cylinder} from '../casino/scene/geometry.ts'
-import {batchStatic} from '../casino/scene/static-batch.ts'
 import {COUNTERS,GRILLS,RESTAURANT,RESTAURANT_NAME,MENU,SEATS,TABLES,SUPPLIES,restaurantPoints,type KfcMess,type KitchenHand,type Patty,type OrderItems,type RestaurantView} from './restaurant-model.ts'
 
 const red=metal(0x992e35),redTrim=metal(0xc9383f),cream=metal(0xffe9c8)
@@ -286,7 +286,7 @@ export function buildRestaurant(g:T.Group){
   sign(g,MENU.slice(0,3).map(item=>item.name+'  '+item.price),-5.91,2.16,-1.33,1.93,1.29,{bg:'#283437',rotation:Math.PI/2,font:55})
   sign(g,MENU.map(item=>item.name+'  '+item.price),5.90,2.16,-1.33,1.93,1.29,{bg:'#283437',rotation:-Math.PI/2,font:55})
   for(const x of [-2.3,2.3]){const light=new T.PointLight(0xffd3a6,32,9);light.position.set(x,3.13,2.6);g.add(light)}
-  batchStatic(g)
+  batchOpaque(g,new Set([papers]))
   const meals=new Map<string,{key:string;mesh:T.Group}>()
   const stages=new Map<number,{bun:T.Group;raw:T.Group;surface:T.Mesh;phase:Patty;flippedAt:number}>()
   GRILLS.forEach((x,slot)=>{

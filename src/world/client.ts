@@ -6,6 +6,7 @@ import {BNK,CAS,isEquity,type StockView,type PricePoint} from '../stock-model.ts
 import {DICE_TABLE_INDEX,DESTINATIONS,WORLD_TABLES,type Destination,type WorldAction,type WorldView} from './model.ts'
 import {CityServices,coins,safeText} from './services.ts'
 import type {CityStage} from './stage.ts'
+import type {Position} from '../roulette-hall-model.ts'
 
 const cast=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as E
 const host=cast('city-world'),connection=cast('world-connection'),panel=cast('world-table'),dialog=cast<HTMLDialogElement>('world-service')
@@ -154,26 +155,30 @@ async function floorScreens(zone:string){
     }
   }catch{}
 }
-function accepted(next:WorldView,start:number,reposition=false){
-  offset=next.now-(start+Date.now())/2
+function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
+  const observedOffset=next.now-(start+Date.now())/2
+  offset=view?.id===next.id&&Math.abs(observedOffset-offset)<650?offset+.2*(observedOffset-offset):observedOffset
   const scope=next.id+':'+next.you.zone,changed=viewKey!==scope
   view=next
   if(next.you.zone==='private'){
     closed=true;location.replace('/chess/dice.html?cave=1');return
   }
   connection.hidden=true
-  host.dataset.zone=next.you.zone
-  host.dataset.seated=String(Boolean(next.you.chair||next.you.lounge||next.you.dining!==undefined||next.you.barSeat!==undefined||next.you.boardSeat!==undefined))
+  if(host.dataset.zone!==next.you.zone)host.dataset.zone=next.you.zone
+  const seatedState=String(Boolean(next.you.chair||next.you.lounge||next.you.dining!==undefined||next.you.barSeat!==undefined||next.you.boardSeat!==undefined))
+  if(host.dataset.seated!==seatedState)host.dataset.seated=seatedState
   if(changed){
     viewKey=scope;shownService='';services?.close()
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
   }
-  stage?.set(next,offset,reposition);syncControls();renderChat(next)
+  stage?.set(next,offset,reposition,sent);syncControls();renderChat(next)
   setCoins(next.coins);restaurant?.update(next)
-  const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
-  for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
-    if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
-    else a.removeAttribute('aria-current')
+  if(changed){
+    const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
+    for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
+      if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
+      else a.removeAttribute('aria-current')
+    }
   }
   renderTable()
   const service=next.interaction
@@ -212,13 +217,13 @@ function accepted(next:WorldView,start:number,reposition=false){
   }else if(!service)shownService=''
 }
 async function presence(){
-  const t=Date.now()
-  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,...stage?.position}),signal:AbortSignal.timeout(5500)})
+  const t=Date.now(),sent=stage&&{...stage.position}
+  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,...sent}),signal:AbortSignal.timeout(5500)})
   if(!response.ok){
     if(response.status===401){closed=true;location.replace('/chess/login.html')}
     throw new Error('City connection lost')
   }
-  accepted(await response.json() as WorldView,t)
+  accepted(await response.json() as WorldView,t,false,sent)
 }
 async function action(name:string,data:object){
   if(performing||closed)return
@@ -275,20 +280,36 @@ async function start(){
   },setCoins,()=>void floorScreens(view?.you.zone??''))
   restaurant=new RestaurantUI(dialog,cast('world-kfc-hud'),(command,data)=>action('restaurant',{command,...data}))
   const {CityStage}=await import('./stage.ts')
-  stage=new CityStage(cast('world-canvas'),host,use,showPause)
+  let pollTimer:number|undefined,urgent=false,lastPresence=0
+  function wakePresence(){
+    if(closed||document.hidden)return
+    urgent=true
+    if(pollTimer!==undefined&&!refreshing&&!performing){
+      clearTimeout(pollTimer)
+      pollTimer=window.setTimeout(beat,Math.max(35,lastPresence+95-performance.now()))
+    }
+  }
+  stage=new CityStage(cast('world-canvas'),host,use,showPause,wakePresence)
   const url=new URL(location.href),go=url.searchParams.get('go')??''
   if(url.searchParams.get('exit')==='cave')await action('exit-cave',{})
   else if(like(go))await action('teleport',{to:go})
   else await presence()
   history.replaceState(null,'',url.pathname)
-  const beat=async()=>{
+  async function beat(){
+    pollTimer=undefined
     if(closed)return
     if(!performing){
+      urgent=false
+      lastPresence=performance.now()
       refreshing=presence().catch(()=>{connection.textContent='Reconnecting…';connection.hidden=false})
       await refreshing;refreshing=undefined
     }
-    window.setTimeout(beat,document.hidden?3000:stage?.moving?220:view?.you.chair?480:780)
+    const you=view?.you
+    const nearby=you&&view?.players.some(other=>Math.hypot(other.x-you.x,other.z-you.z)<30)
+    const delay=document.hidden?3000:urgent?70:stage?.moving?180:nearby?315:view?.players.length?430:you?.chair?480:780
+    pollTimer=window.setTimeout(beat,delay)
   }
+  document.addEventListener('visibilitychange',wakePresence)
   void beat();window.setInterval(tableStatus,160)
   window.setInterval(()=>{if(!document.hidden&&view&&/^floor:(CAS|BNK)$/.test(view.you.zone))void floorScreens(view.you.zone)},12_000)
 }

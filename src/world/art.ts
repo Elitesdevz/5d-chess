@@ -12,13 +12,13 @@ import {avenues,venueDetail} from './civic.ts'
 import * as T from 'three'
 import {box,cylinder,mesh,v,dice,resultRotation} from '../casino/scene/geometry.ts'
 import {materials} from '../casino/scene/materials.ts'
-import {batchStatic} from '../casino/scene/static-batch.ts'
+import {batchOpaque,batchStatic} from '../casino/scene/static-batch.ts'
 import {buildBankArchitecture,buildBankVault} from '../bank-stage.ts'
 import {buildHall,buildHallTables,WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts'
-import {ClubGuest} from '../casino/roulette-cast.ts'
+import {CityGuest} from './guest.ts'
 import {ROULETTE_ORDER} from '../casino-model.ts'
 import {SEAT_OFFSETS,type HallTable} from '../roulette-hall-model.ts'
-import {FLOOR_HEIGHT,FLOOR_LIST,CREDIT_ADVISOR,FINANCIAL_ADVISOR,BOARD_TABLE,BOARD_SEATS,PLAN,PUBLIC_DICE,floorHeight,type WorldZone} from './model.ts'
+import {FLOOR_HEIGHT,FLOOR_LIST,CREDIT_ADVISOR,FINANCIAL_ADVISOR,BOARD_TABLE,BOARD_SEATS,PLAN,PUBLIC_DICE,floorHeight,stockFloor,type WorldZone} from './model.ts'
 
 const std=(color:number,metalness=0,roughness=.74)=>new T.MeshStandardMaterial({color,metalness,roughness})
 const brass=std(0xb78b57,.65,.35),oak=std(0x372725,.15,.48),ink=std(0x182930,.28,.57)
@@ -552,9 +552,14 @@ function elevator(scene:T.Object3D){
 }
 function tower(shaft:T.Object3D){
   const tile=paving(),standardWall=std(0x234653),casinoWall=std(0x51333c),bankWall=std(0x375560),trim=std(0x90adb2,.28,.48)
-  const rooms=new Map<string,T.Group>()
-  for(const {symbol} of FLOOR_LIST){
-    const room=new T.Group();room.position.y=floorHeight(`floor:${symbol}`);shaft.add(room);rooms.set(symbol,room)
+  const sections:T.Group[]=[]
+  for(const [i,{symbol}] of FLOOR_LIST.entries()){
+    const height=floorHeight(`floor:${symbol}`)
+    if(i%8===0){
+      const section=new T.Group();section.name='Exchange exterior';section.position.y=height;shaft.add(section);sections.push(section)
+    }
+    const section=sections.at(-1)!
+    const room=new T.Group();room.position.y=height-section.position.y;section.add(room)
     const wall=symbol==='CAS'?casinoWall:symbol==='BNK'?bankWall:standardWall
     liftDeck(room,tile);liftDoorway(room,wall)
     for(const side of [-1,1]){
@@ -580,18 +585,18 @@ function tower(shaft:T.Object3D){
       block(room,2.45,.06,.74,x,1.015,-1.77,symbol==='CAS'?brass:ivory)
     }
     for(const x of [-3.8,3.8])block(room,2.6,.055,.37,x,5.77,1.07,gold)
-    batchStatic(room)
   }
-  const decor=new Map<string,{actors:ClubGuest[];screens:ReturnType<typeof makeScreen>[];doors:ReturnType<typeof slidingDoors>;ownership?:ReturnType<typeof boardroom>}>()
+  for(const section of sections)batchOpaque(section)
+  const decor=new Map<string,{actors:CityGuest[];screens:ReturnType<typeof makeScreen>[];doors:ReturnType<typeof slidingDoors>;ownership?:ReturnType<typeof boardroom>}>()
   return (symbol:string)=>{
-    const room=rooms.get(symbol)
-    if(!room)return
     let entry=decor.get(symbol)
     if(!entry){
+      if(!stockFloor(symbol))return
+      const room=new T.Group();room.position.y=floorHeight(`floor:${symbol}`);shaft.add(room)
       venueDetail(room,'floor',symbol)
       const name=FLOOR_LIST.find(stock=>stock.symbol===symbol)!.name
       banner(room,name,[6,.39],[0,4.17,-4.08],symbol==='CAS'?'#ffdca1':'#ccecee')
-      const actors=[new ClubGuest(room,-2.7,-2.38,0xaa7c61,0x365263,true),new ClubGuest(room,2.7,-2.38,0xd2a17d,symbol==='CAS'?0x674451:0x374d5d,true,1)]
+      const actors=[new CityGuest(room,-2.7,-2.38,0xaa7c61,0x365263,true),new CityGuest(room,2.7,-2.38,0xd2a17d,symbol==='CAS'?0x674451:0x374d5d,true,1)]
       const screens=[makeScreen(room,symbol,-4.53),makeScreen(room,symbol,4.53)]
       const ownership=symbol==='CAS'||symbol==='BNK'?boardroom(room,symbol):undefined
       entry={actors,screens,doors:slidingDoors(room),ownership};decor.set(symbol,entry)
@@ -639,17 +644,17 @@ export function makeWorldArt(open:boolean){
     const group=new T.Group(),{x,z}=PLAN[zone];group.position.set(x,0,z);scene.add(group);rooms[zone]=group
   }
   const {hotel,casino,bank,exchange}=rooms
-  gallery(hotel,'hotel');venueDetail(hotel,'hotel')
+  gallery(hotel,'hotel');venueDetail(hotel,'hotel');batchOpaque(hotel)
   buildHall(casino,true);const bar=salonBar(casino);venueDetail(casino,'casino')
-  const wheels=buildHallTables(casino),wagerTokens=wheels.map(wheel=>rouletteWagers(wheel.group)),actors:ClubGuest[]=[]
-  for(const [x,z] of [[-5,-4.9],[5,-4.9],[0,.61]])actors.push(new ClubGuest(casino,x-.35,z,0xb78968,0x29323d,true))
+  const wheels=buildHallTables(casino),wagerTokens=wheels.map(wheel=>rouletteWagers(wheel.group)),actors:CityGuest[]=[]
+  for(const [x,z] of [[-5,-4.9],[5,-4.9],[0,.61]])actors.push(new CityGuest(casino,x-.35,z,0xb78968,0x29323d,true))
   const table=new T.Group();casino.add(table);table.position.set(PUBLIC_DICE.x,0,PUBLIC_DICE.z)
   box(table,[4.05,.24,2.03],[0,.88,0],oak,.13);box(table,[4.14,.042,2.13],[0,1.008,0],brass,.045)
   box(table,[3.95,.039,1.94],[0,1.045,0],std(0x653f57),.033)
   for(const offset of SEAT_OFFSETS)chairSeat(table,offset)
   banner(table,'IVORY DICE',[2.45,.40],[0,1.68,-.87])
   const publicDie=dice(materials());table.add(publicDie);publicDie.position.set(0,1.165,.08);publicDie.quaternion.copy(resultRotation(1))
-  actors.push(new ClubGuest(casino,PUBLIC_DICE.x,PUBLIC_DICE.z-1.5,0x9a6e53,0x57363e,true,1))
+  actors.push(new CityGuest(casino,PUBLIC_DICE.x,PUBLIC_DICE.z-1.5,0x9a6e53,0x57363e,true,1))
   for(const x of [-1,1]){
     const wall=new T.Group();casino.add(wall);wall.position.set(x*11.25,0,1.1);wall.rotation.y=x*Math.PI/2
     frontWindow(wall,15.59,0,ink,false)
@@ -669,9 +674,10 @@ export function makeWorldArt(open:boolean){
   cylinder(bank,.04,.31,[advisor.x+.63,.99,deskZ],brass,10)
   cylinder(bank,.16,.045,[advisor.x+.63,1.15,deskZ],gold,18)
   banner(bank,'CREDIT ADVISOR',[1.67,.25],[advisor.x,.56,deskZ+.367])
-  const staff=[new ClubGuest(bank,-2.9,-2.72,0xb38469,0x284557,true,1),new ClubGuest(bank,2.9,-2.71,0xd5ad86,0x313c59,true,2),new ClubGuest(bank,7.4,-1.32,0x946344,0x213344,true),new ClubGuest(bank,advisor.x,deskZ-.63,0xbc8b68,0x49676c,true,2)]
-  gallery(exchange,'exchange');venueDetail(exchange,'exchange');staff.push(new ClubGuest(exchange,.65,-3.11,0xc89b79,0x4b3d58,true,1))
-  staff.push(new ClubGuest(exchange,FINANCIAL_ADVISOR.x,FINANCIAL_ADVISOR.z-1.82,0xa57556,0x304550,true,2))
+  batchOpaque(bank)
+  const staff=[new CityGuest(bank,-2.9,-2.72,0xb38469,0x284557,true,1),new CityGuest(bank,2.9,-2.71,0xd5ad86,0x313c59,true,2),new CityGuest(bank,7.4,-1.32,0x946344,0x213344,true),new CityGuest(bank,advisor.x,deskZ-.63,0xbc8b68,0x49676c,true,2)]
+  gallery(exchange,'exchange');venueDetail(exchange,'exchange');batchOpaque(exchange);staff.push(new CityGuest(exchange,.65,-3.11,0xc89b79,0x4b3d58,true,1))
+  staff.push(new CityGuest(exchange,FINANCIAL_ADVISOR.x,FINANCIAL_ADVISOR.z-1.82,0xa57556,0x304550,true,2))
   const lobbyDoors=slidingDoors(exchange),floor=tower(elevator(scene))
   rooms.cave.rotation.y=rooms.oasis.rotation.y=Math.PI
   cave(rooms.cave,false)

@@ -235,7 +235,8 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
   p.finish(g)
 }
 function railway(parent:T.Object3D,label:Letter){
-  const p=new Props(),c=0xa09884
+  const trackside=new T.Group();trackside.name='Railway';parent.add(trackside)
+  const p=new Props(new Scenery(34)),c=0xa09884
   for(let i=-TERRAIN_EXTENT;i<TERRAIN_EXTENT;i+=2){
     const j=i+2,a=railZ(i),b=railZ(j)
     p.bar(i,a,j,b,-.034,5.35,.08,c)
@@ -280,7 +281,7 @@ function railway(parent:T.Object3D,label:Letter){
     p.box(x,2.46,z,.21,.57,.24,coal)
     p.orb(x+.128,2.49,z,.093,.098,.097,0xb75949)
   }
-  p.finish(parent)
+  p.finish(trackside)
 }
 function parks(parent:T.Object3D,label:Letter){
   const p=new Props()

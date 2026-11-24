@@ -71,9 +71,29 @@ test('two browser sessions can walk into the civic quarter and observe the same 
     assert.ok(guest.residents.every(n=>typeof n.activity==='string'&&n.home.length>0))
     const mobile=await phone.newPage()
     mobile.on('pageerror',e=>errors.push(e.message))
+    const visit=await desktop.request.post(base+'/api/world/teleport',{data:{scene:true,to:'city'}})
+    assert.ok(visit.ok())
+    for(let i=0;i<3;i++){
+      now+=400
+      await presence(desktop,{world:guest.id,x:0,z:4.8,yaw:0})
+    }
     await mobile.goto(base+'/chess/world.html')
     await mobile.locator('#world-canvas[data-zone="city"]').waitFor({timeout:48_000})
     assert.equal(await mobile.evaluate(()=>document.querySelector('#city-world').dataset.flat),undefined)
+    const peer=mobile.locator('.world-name').filter({hasText:/^CityWalker$/})
+    await peer.waitFor({timeout:15_000})
+    const initialPosition=await peer.evaluate(node=>node.style.transform)
+    const movingClock=setInterval(()=>now+=80,80)
+    try{
+      for(let i=0;i<3;i++){
+        await presence(desktop,{world:guest.id,x:(i+1)*.24,z:4.8,yaw:.38})
+        await mobile.waitForTimeout(185)
+      }
+      await mobile.waitForFunction(initial=>{
+        const name=[...document.querySelectorAll('.world-name')].find(node=>node.textContent==='CityWalker')
+        return name&&!name.hidden&&name.style.transform!==initial
+      },initialPosition)
+    }finally{clearInterval(movingClock)}
     assert.deepEqual(errors,[])
   }finally{
     Date.now=clock
