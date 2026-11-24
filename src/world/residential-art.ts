@@ -178,7 +178,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       lifts.push({id:b.id,x,group:car,leaves,landings:[],indicator,texture,shown:-1})
     }
     for(const [level,f] of b.levels.entries()){
-      const g=new T.Group(),p=new Scenery(),inside=new T.Group();root.add(g,inside);g.position.y=inside.position.y=level*STOREY
+      const g=new T.Group(),p=new Scenery(),inside=new T.Group(),furniture=new Scenery();root.add(g,inside);g.position.y=inside.position.y=level*STOREY
       floors.push({group:inside,x:b.x,z:b.z})
       const box=(x:number,y:number,z:number,w:number,h:number,d:number,c:number)=>p.add('box',x,y,z,w,h,d,c)
       const tile=(a:Rect,y:number,h:number,c:number)=>box((a.l+a.r)/2,y,(a.b+a.f)/2,a.r-a.l,h,a.f-a.b,c)
@@ -258,7 +258,9 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
         segment(start,center+w.length/2,.026,.133,w.outer?tone.trim:oak,w.outer?.26:.20)
       }
       for(const d of f.doors){
-        const a=new T.Group();a.position.set(d.x,0,d.z);a.rotation.y=d.axis==='x'?0:-Math.PI/2;g.add(a)
+        const a=new T.Group();a.position.set(d.x,0,d.z);a.rotation.y=d.axis==='x'?0:-Math.PI/2
+        const outer=f.walls.some(w=>w.outer&&w.openings.some(o=>o.id===d.id))
+        ;(outer?g:inside).add(a)
         const hinge=new T.Group();hinge.position.x=-d.width/2;a.add(hinge)
         smallBox(hinge,d.width/2,1.095,0,d.width-.03,2.177,.069,d.id.endsWith('street')?glassDoor:leaf)
         smallBox(hinge,d.width*.57,1.41,.043,d.width*.71,.76,.027,d.id.endsWith('street')?liftWall:metal)
@@ -274,7 +276,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
         stamp.scale.set(item.w+.72,item.d+.67,1)
         stamp.updateMatrix()
         contacts.setMatrixAt(i,stamp.matrix)
-        modelFurniture(item,p,0,tone.fabric)
+        modelFurniture(item,furniture,0,tone.fabric)
         if(item.kind==='fridge'){
           const fridge=new T.Group();fridge.position.set(item.x,0,item.z);fridge.rotation.y=item.yaw;inside.add(fridge)
           const door=new T.Group();door.position.set(-item.w/2,0,-item.d/2+.035);fridge.add(door)
@@ -373,6 +375,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       }
       if(level===b.levels.length-1)tile(r,STOREY-.064,.128,chalk)
       p.finish(g,architecture)
+      furniture.finish(inside,architecture)
     }
     const top=b.levels.length*STOREY,p=new Scenery()
     const box=(x:number,y:number,z:number,w:number,h:number,d:number,c:number)=>p.add('box',x,y,z,w,h,d,c)
@@ -454,7 +457,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       for(const [id,d] of doors)d.hinge.rotation.y=d.angle*doorSwing(state?.doors[id],now)
       for(const [id,d] of fridges)d.rotation.y=T.MathUtils.damp(d.rotation.y,state?.fridges?.includes(id)?-1.18:0,11,dt)
       for(const [id,sign] of signs)sign.visible=!occupied?.includes(id)
-      for(const f of floors)f.group.visible=Math.abs(x-f.x)<33&&Math.abs(z-f.z)<35
+      for(const f of floors)f.group.visible=(x-f.x)**2+(z-f.z)**2<24**2
       for(const lift of lifts){
         const stateLift=state?.lifts[lift.id]??{level:0,opened:0},x=lift.x
         lift.group.position.y=liftHeight(stateLift,now)

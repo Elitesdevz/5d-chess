@@ -25,8 +25,7 @@ export const STREETS=[
   street('market','Market Avenue',8,-65,74,-65,5.65,6.9,1.7),
   street('station','Station Approach',0,-73,0,-77.8,4.9,4.4,1.65),
   street('meridian','Meridian Road',0,-57,0,-49,4.9,5.5),
-  street('square','Clock Walk',0,8,0,16.1,2.9,0,0,false),
-  street('hall-south','Clock Walk',0,26,0,45,2.9,0,0,false),
+  street('square','Clock Walk',0,8,0,45,2.9,0,0,false),
   street('mill','Mill Lane',-24,45,24,45,1.9,0,0,false),
   street('green-west','West Garden Walk',-10.4,13,-10.4,31,1.8,0,0,false),
   street('green-east','East Garden Walk',10.4,13,10.4,31,1.8,0,0,false),
@@ -36,7 +35,7 @@ export type LandmarkKind='hall'|'police'|'fire'|'hospital'|'market'|'petrol'|'sc
 type District='centre'|'finance'|'entertainment'|'civic'|'outskirts'
 export type Landmark={id:LandmarkKind;name:string;district:District;x:number;z:number;w:number;d:number;h:number;facing:1|-1;street:string}
 export const LANDMARKS:Landmark[]=[
-  {id:'hall',name:'Meridian Town Hall',district:'centre',x:0,z:21,w:14.6,d:8.8,h:5.6,facing:-1,street:'boulevard'},
+  {id:'hall',name:'Meridian Town Hall',district:'centre',x:-7.7,z:21,w:10.4,d:8.8,h:5.6,facing:-1,street:'boulevard'},
   {id:'police',name:'Meridian Police',district:'civic',x:-52,z:-55.5,w:13,d:6.8,h:4.8,facing:-1,street:'civic'},
   {id:'fire',name:'Civic Fire Station',district:'civic',x:-32,z:-55,w:14,d:7.8,h:4.35,facing:-1,street:'civic'},
   {id:'hospital',name:'Northbank Hospital',district:'civic',x:15.7,z:-55.1,w:20,d:8,h:7.7,facing:-1,street:'market'},
@@ -44,13 +43,13 @@ export const LANDMARKS:Landmark[]=[
   {id:'petrol',name:'Meridian Petrol',district:'outskirts',x:63,z:-53.9,w:10,d:4,h:3.25,facing:-1,street:'market'},
   {id:'school',name:'Eastbank School',district:'civic',x:60.5,z:-76,w:20,d:9.4,h:6.1,facing:1,street:'market'},
   {id:'station',name:'Meridian Central',district:'outskirts',x:0,z:-81.8,w:16,d:4,h:5.1,facing:1,street:'station'},
-  {id:'bakery',name:'Linden Bread & Butter',district:'centre',x:-15.4,z:1.6,w:4.5,d:5.15,h:3.85,facing:1,street:'boulevard'},
-  {id:'cafe',name:'Clockwork Café',district:'centre',x:15.2,z:1.0,w:4.6,d:5.2,h:3.4,facing:1,street:'boulevard'},
+  {id:'bakery',name:'Linden Bread & Butter',district:'centre',x:-27,z:-16.75,w:3.6,d:4.2,h:3.85,facing:1,street:'linden'},
+  {id:'cafe',name:'Clockwork Café',district:'centre',x:27,z:-16.7,w:3.5,d:4.1,h:3.4,facing:1,street:'glass'},
   {id:'books',name:'Fable Books',district:'entertainment',x:-14.8,z:-17.3,w:4.55,d:6.3,h:4.35,facing:1,street:'linden'},
   {id:'florist',name:'The Foxglove',district:'entertainment',x:15,z:-17.3,w:4.4,d:4.2,h:3.25,facing:1,street:'glass'},
   {id:'pharmacy',name:'Northbank Pharmacy',district:'civic',x:28.65,z:-54.8,w:4.7,d:5.8,h:4.1,facing:-1,street:'market'},
   {id:'barber',name:'Linden Barber',district:'entertainment',x:-13.5,z:-35.9,w:4,d:5.3,h:3.65,facing:1,street:'westbank'},
-  {id:'office',name:'Meridian Assurance',district:'finance',x:37.9,z:-5.45,w:6,d:7.25,h:8.9,facing:1,street:'boulevard'},
+  {id:'office',name:'Meridian Assurance',district:'finance',x:37.25,z:-6.0,w:6,d:7.25,h:8.9,facing:1,street:'boulevard'},
   {id:'restaurant',name:'The Blue Lantern',district:'entertainment',x:13.95,z:-35.4,w:4.4,d:5.7,h:4.05,facing:1,street:'eastbank'},
 ]
 export const facade=(b:Landmark):Point=>point(b.x,b.z+b.facing*b.d/2)

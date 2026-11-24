@@ -22,8 +22,9 @@ export const ENTRANCES=[
 ]
 const route=(id:string,points:Point[],width:number,purpose:Footpath['purpose']='walk'):Footpath=>({id,points,width,purpose})
 export const PATHS:Footpath[]=[
-  ...ENTRANCES.map(e=>access(e.id,e.front,e.id==='hall'?point(0,15.4):nearestSidewalk(e.front,e.road),e.id.startsWith('block-')?2.1:1.45)),
+  ...ENTRANCES.map(e=>access(e.id,e.front,nearestSidewalk(e.front,e.road),e.id.startsWith('block-')?2.1:1.45)),
   route('square', [point(0,4),point(0,11),point(0,15.4)],3.3),
+  route('hall-court',[point(-7.7,15.3),point(0,15.3)],2.04),
   route('park-high',[point(25,-68.5),point(23,-71.5),point(18,-73.5),point(17,-77.8),point(23,-80.1),point(30,-79.8),point(36,-78.2),point(42.5,-73.4),point(43,-68.5)],1.7,'park'),
   route('park-bridge',[point(24,-70.9),point(24,-73.6),point(24,-78),point(24,-80.1)],1.6,'park'),
   route('park-sport',[point(38,-67.9),point(38,-71),point(42.5,-73.4)],1.72,'park'),

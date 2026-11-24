@@ -38,7 +38,7 @@ function cellNear(p:Point,step:number,valid:(p:Point)=>boolean){
   }
   return result
 }
-export function findPath(from:Point,to:Point,step:number,valid:(p:Point)=>boolean,weight:(p:Point)=>number=()=>1,limit=3500){
+export function findPath(from:Point,to:Point,step:number,valid:(p:Point)=>boolean,weight:(p:Point)=>number=()=>1,limit=3500,edge?:(a:Point,b:Point)=>boolean){
   const a=cellNear(from,step,valid),b=cellNear(to,step,valid)
   if(!a||!b)return []
   const queue=new SearchQueue(),scores=new Map<string,number>()
@@ -48,15 +48,18 @@ export function findPath(from:Point,to:Point,step:number,valid:(p:Point)=>boolea
     const v=queue.pop()!,hash=v.x+','+v.z
     if(v.g!==scores.get(hash))continue
     if(v.x===b.x&&v.z===b.z){
-      const path:Point[]=[]
-      for(let node:Cell|undefined=v;node;node=node.prior)path.unshift(point(node.x*step,node.z*step))
-      const simplified=path.filter((p,i)=>i===0||i===path.length-1||(p.x-path[i-1].x)!==(path[i+1].x-p.x)||(p.z-path[i-1].z)!==(path[i+1].z-p.z))
+      const cells:Point[]=[]
+      for(let node:Cell|undefined=v;node;node=node.prior)cells.push(node)
+      cells.reverse()
+      const simplified=cells.filter((p,i)=>i===0||i===cells.length-1||p.x-cells[i-1].x!==cells[i+1].x-p.x||
+        p.z-cells[i-1].z!==cells[i+1].z-p.z).map(p=>point(p.x*step,p.z*step))
       if(distance(simplified.at(-1)!,to)>.05)simplified.push(to)
       return simplified
     }
     for(const [dx,dz] of directions){
       const x=v.x+dx,z=v.z+dz,p=point(x*step,z*step)
       if(!valid(p)||dx&&dz&&(!valid(point(x*step,v.z*step))||!valid(point(v.x*step,z*step))))continue
+      if(edge&&!edge(point(v.x*step,v.z*step),p))continue
       const g=v.g+Math.hypot(dx,dz)*weight(p),key=x+','+z
       if(g>=(scores.get(key)??Infinity))continue
       scores.set(key,g)

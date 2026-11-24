@@ -42,10 +42,10 @@ export function passableLand(x:number,z:number){
   return ridgeDistance(x,z)<30&&height<22&&Math.hypot(terrainHeight(x+.5,z)-terrainHeight(x-.5,z),terrainHeight(x,z+.5)-terrainHeight(x,z-.5))<.91
 }
 export const homeFacing=(z:number)=>z===19||z===25||z===26||z===23||z===18?-1:1
-export const MARKET=[[-14,18],[14,18]] as const
+export const MARKET=[[-15.5,16.75],[14,18]] as const
 export const BOULEVARD_TREES=[19,30,39,54] as const
 export function townFixture(x:number,z:number){
-  if(Math.abs(z-18)<.87&&Math.abs(Math.abs(x)-14)<1.52)return true
+  if(MARKET.some(([a,b])=>Math.abs(z-b)<.87&&Math.abs(x-a)<1.52))return true
   if(Math.abs(z-14.85)<.34&&BOULEVARD_TREES.some(dx=>Math.abs(Math.abs(x)-dx)<.34))return true
   if(Math.abs(Math.abs(x)-6.25)<.64&&(Math.abs(z+3)<2||Math.abs(z-4)<2))return true
   if(Math.abs(x+28)<2.72&&Math.abs(z-55)<3.7||Math.abs(x+5)<8.2&&Math.abs(x)>.93&&Math.abs(z-51)<.23)return true

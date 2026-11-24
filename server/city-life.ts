@@ -13,20 +13,28 @@ type Citizen=Occupant&{
   resident:Resident;keys:string[];activity:string;destination:string;goal?:Goal;route:Point[];retry:number;blocked:number;rest?:boolean
   routeAt:number;closed?:HomePoint;stair?:{building:string;floor:number;up:boolean;way:number};lastLift?:number;liftWait?:number
 }
-const navCells=new Map<string,boolean>(),cachedPaths=new Map<string,Point[]>()
+const navCells=new Map<string,boolean>(),navEdges=new Map<string,boolean>(),cachedPaths=new Map<string,Point[]>()
 function outside(p:Point){
   if(!cityGridBounds(p))return false
-  const k=p.x+','+p.z,old=navCells.get(k)
+  const k=p.x.toFixed(3)+','+p.z.toFixed(3),old=navCells.get(k)
   if(old!==undefined)return old
   const okay=groundZone(p.x,p.z)==='city'&&!streetBuilding(p.x,p.z,.32)&&outdoorWalkable(p.x,p.z)&&!parkedCars.some(v=>vehicleContains(p,v,.35))
   navCells.set(k,okay)
   return okay
 }
+function outdoorEdge(a:Point,b:Point){
+  const key=a.x<b.x||a.x===b.x&&a.z<b.z?JSON.stringify([a,b]):JSON.stringify([b,a])
+  const saved=navEdges.get(key)
+  if(saved!==undefined)return saved
+  const clear=[.23,.5,.77].every(t=>outside(point(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t)))
+  navEdges.set(key,clear)
+  return clear
+}
 export function cityRoute(a:Point,b:Point){
   const key=[a.x,a.z,b.x,b.z].map(n=>n.toFixed(1)).join(',')
   const saved=cachedPaths.get(key)
   if(saved)return [...saved]
-  const path=findPath(a,b,.93,outside,pedestrianCost,21000)
+  const path=findPath(a,b,.93,outside,pedestrianCost,21000,outdoorEdge)
   if(cachedPaths.size>360)cachedPaths.delete(cachedPaths.keys().next().value!)
   if(path.length)cachedPaths.set(key,path)
   return [...path]
@@ -213,7 +221,7 @@ export class CityLife {
       else if(goal.outside){
         if(actor.blocked>10){
           const blockers=vehicles.filter(v=>distance(v,actor)<12)
-          actor.route=findPath(actor,goal,.93,p=>outside(p)&&!blockers.some(v=>vehicleContains(p,v,.62)),pedestrianCost,7600)
+          actor.route=findPath(actor,goal,.93,p=>outside(p)&&!blockers.some(v=>vehicleContains(p,v,.62)),pedestrianCost,7600,outdoorEdge)
         }
         if(!actor.route.length)actor.route=cityRoute(actor,goal)
       }
