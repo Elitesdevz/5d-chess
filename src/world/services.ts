@@ -110,7 +110,7 @@ export class CityServices {
     const renderItems=(storage:boolean)=>MENU.map(item=>{
       const quantity=(storage?food.stored!:food.personal)[item.id]
       const transfer=storage?'take':'store',label=storage?'Take':'Store'
-      const submit=(op:string,title:string,all=false)=>`<button type="submit" value="${op}" data-all="${all}" ${quantity?'':'disabled'}>${title}</button>`
+      const submit=(op:string,title:string,all=false)=>`<button type="submit" value="${op}" data-all="${all}" ${all||op==='eat'?'formnovalidate':''} ${quantity?'':'disabled'}>${title}</button>`
       return `<form class="world-ballot residential-food" data-food-item="${item.id}"><h3>${item.name} <small>×${quantity}</small></h3><div class="world-button-row">${food.stored?`<input type="number" aria-label="Quantity" name="quantity" min="1" max="${Math.max(1,quantity)}" value="1">${submit(transfer,label)}${submit(transfer,label+' all',true)}`:''}${storage?'':submit('eat',item.id==='cola'?'Drink one':'Eat one')}</div></form>`
     }).join('')
     this.render('FOOD',food.stored?'Refrigerator':'Food inventory',`<div class="residential-food-columns"><section><h3>Your food inventory</h3>${renderItems(false)}</section>${food.stored?`<section><h3>Stored here</h3>${renderItems(true)}</section>`:''}</div>`)

@@ -6,6 +6,7 @@ import type {ChessStore} from './storage.ts'
 import {fail} from './http.ts'
 
 export function residentialFood(store:ChessStore,name:string,keys:readonly string[],unit?:string,command?:Record<string,unknown>):FoodView {
+  if(unit&&!access(unit,keys))fail(409,'Open an accessible refrigerator first')
   if(!command){
     const payload=store.accountJson(name)??fail(401,'Log in first')
     const account=JSON.parse(payload) as Account
