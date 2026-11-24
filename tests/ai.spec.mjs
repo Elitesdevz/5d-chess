@@ -43,7 +43,7 @@ test('five AI characters, playable Classic/Live duels, private plans and visible
  store.transaction(unit=>{const room=unit.rooms.get(code),s=initialState(2,'classic',['red','yellow']),cells=Array(196).fill(null);for(const[x,y,player,kind]of[[3,10,'red','K'],[7,5,'red','R'],[7,3,'yellow','K']])cells[index({x,y})]={player,kind,moved:true};room.state={...s,round:100,universes:[{...s.universes[0],boards:[{...s.universes[0].boards[0],cells}]}]};room.results=[];room.journal=[];room.locked={}})
  await page.reload();await page.getByRole('button',{name:'Focus player',exact:true}).click();await page.waitForTimeout(150);await square(7,5);await square(7,3);await page.getByRole('button',{name:'Submit turn',exact:true}).click()
  await page.getByText('Victory · +60 coins. Next win today: 30 coins.',{exact:true}).waitFor()
- const me=await(await context.request.get(base+'/api/me')).json();assert.equal(me.profile.coins,540);assert.equal(me.profile.rating.value,1200)
+ const me=await(await context.request.get(base+'/api/me')).json();assert.equal(me.profile.coins,544);assert.equal(me.profile.rating.value,1200)
  await page.getByRole('link',{name:'Choose your next challenge'}).click();await page.locator('[data-ai=pip]').waitFor();assert.match(await page.locator('[data-ai=pip] .ai-prize').innerText(),/\+30/)
  // Verify that a real Live match is ready, has a committed hidden AI plan and is resumable.
  await page.locator('#ai-movement').selectOption('live');await page.getByRole('button',{name:'Challenge Orion',exact:true}).click();await page.waitForURL(/online.html\?code=/)

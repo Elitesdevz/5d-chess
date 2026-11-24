@@ -287,7 +287,7 @@ export class Restaurant {
       purse.coins=fromStockUnits(balance)
       a.restaurant={id:data.id as string,items,lane,status:'paid',bites:0,takeaway}
       a.restaurantOrders=[{id:a.restaurant.id,items,lane,takeaway},...(a.restaurantOrders??[])]
-      u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_ordered',reference:a.restaurant.id,coins:price},now)
+      u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:takeaway?'takeaway_ordered':'meal_ordered',reference:a.restaurant.id,coins:price},now)
     })
     this.restore(member.name,now)
   }

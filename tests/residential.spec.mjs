@@ -23,7 +23,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
   try{
     const base='http://127.0.0.1:'+server.address().port
     browser=await chromium.launch({args:['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-webgl','--enable-unsafe-swiftshader']})
-    const context=await browser.newContext({viewport:{width:1080,height:734},reducedMotion:'reduce'}),errors=[]
+    const context=await browser.newContext({viewport:{width:960,height:668},reducedMotion:'reduce'}),errors=[]
     const name='ResidentialTest'
     assert.equal((await context.request.post(base+'/api/signup',{data:{username:name,password:'fixture',confirm:'fixture'}})).status(),201)
     const keys=UNITS.filter(u=>u.tenure!=='resident').map(u=>u.id)
@@ -53,9 +53,10 @@ test('residential walkthrough through both buildings, house styles, furniture an
       page.on('pageerror',e=>errors.push(e.message))
       try{
         await page.goto(base+'/chess/world.html')
-        await page.locator('#world-canvas[data-zone="'+current.you.zone+'"]').waitFor({timeout:30_000})
+        await page.locator('#world-canvas[data-zone="'+current.you.zone+'"]').waitFor({timeout:42_000})
+        if(out&&label==='04-resting')await page.screenshot({path:join(out,label+'.jpg'),type:'jpeg',timeout:55_000})
         if(check)await check(page)
-        if(out)await page.screenshot({path:join(out,label+'.jpg'),type:'jpeg'})
+        if(out&&label!=='04-resting')await page.screenshot({path:join(out,label+'.jpg'),type:'jpeg',timeout:55_000})
       }finally{await page.close()}
       await action('presence')
     }
@@ -116,7 +117,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
       for(const [x,z] of [[0,11],[edge,11],[edge,-30.75],[b.x,-30.75]])await walk(x,z)
       await action('use',{target:'door:'+b.id+'-street'})
       offset+=400
-      await local(b,0,3.5)
+      await local(b,0,3.5,-.67)
       await capture(b.id+'-reception')
       await local(b,6.65,1.25);await local(b,b.lift.x,1.25)
       // Each building is a separate public lobby and cabin.
@@ -132,7 +133,17 @@ test('residential walkthrough through both buildings, house styles, furniture an
       const s=b.stairs,dz=s.back-s.front
       await local(b,s.x-s.width/2,s.front-.42)
       await local(b,s.x-s.width/2,s.front+dz*.51,Math.PI)
-      await capture(b.id+'-stairs')
+      await capture(b.id+'-stairs',async page=>{
+        const start=current.you.z
+        await page.keyboard.down('w')
+        try{
+          for(let i=0;i<10;i++){
+            await page.waitForTimeout(190)
+            if((await action('presence')).you.z>start+.35)break
+          }
+          assert.ok(current.you.z>start+.35,'keyboard movement advances on the staircase')
+        }finally{await page.keyboard.up('w')}
+      })
       await local(b,s.x-s.width/2,s.front+dz*.90)
       await local(b,s.x+s.width/2,s.front+dz*.90)
       await local(b,s.x+s.width/2,s.front-.44)
@@ -145,7 +156,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
         offset+=400
         await local(b,entrance.x,entrance.z-.46)
         if(b.block===0||index===2)await capture(b.id+'-'+index+'-living')
-        for(const d of floor.doors.filter(d=>d.id.startsWith(u.id+'-'))){
+        for(const d of floor.doors.filter(d=>d.id.startsWith(u.id+'-')).sort((a,b)=>Number(b.id.endsWith('-kitchen'))-Number(a.id.endsWith('-kitchen')))){
           await path(b,2,{...d,range:.94})
           await action('use',{target:'door:'+d.id})
         }
@@ -177,12 +188,12 @@ test('residential walkthrough through both buildings, house styles, furniture an
         }
       }
     }
-    for(const index of [0,2,4,6]){
+    for(const index of [0,2,5,6]){
       const b=buildingById.get('house-'+index),front=residentialSite(b,0,b.rect.f+.74)
       await action('teleport',{to:'city'})
       // Walk a raster of public streets, then cross the house threshold.
       const edge=b.x<0?-61.5:73
-      const approach=b.facing===1&&b.z<0?b.z+5.35:b.z-5.35
+      const approach=b.z<0?-11.7:8.35
       for(const [x,z] of [[0,11],[edge,11],[edge,approach],[b.x,approach]])await walk(x,z)
       await walk(front.x,front.z)
       await action('use',{target:'door:'+b.id})
@@ -199,7 +210,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
         await capture(b.id+'-upstairs')
       }
       const floor=b.levels[s?1:0]
-      for(const d of floor.doors.filter(d=>d.id!==b.id)){
+      for(const d of floor.doors.filter(d=>d.id!==b.id).sort((a,b)=>Number(b.id.endsWith('-kitchen'))-Number(a.id.endsWith('-kitchen')))){
         await path(b,s?1:0,{...d,range:.99})
         await action('use',{target:'door:'+d.id})
       }

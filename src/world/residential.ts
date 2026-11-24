@@ -162,7 +162,7 @@ for(const [i,[x,z]] of HOMES.entries()){
   const rect=style===3?bounds(-3.14,3.14,-4.1,3.35):bounds(-2.94,2.94,-3.85,3.35),id=u.id
   const stair=levels.length>1?{x:1.55,front:1.43,back:-3.51,width:1.25}:undefined
   for(const [level,f] of levels.entries()){
-    shell(f,rect,level?[win(-1.45),win(1.52)]:[door(0,id,u.tenure==='resident'?undefined:id),win(-1.89,1.05),win(1.89,1.05)],
+    shell(f,rect,level?[win(-1.45),win(1.52)]:[door(0,id,i%3===0?undefined:id),win(-1.89,1.05),win(1.89,1.05)],
       [win(-1.57,1.38),win(1.52,1.39)],true)
     f.units.push({id,rect,exit:{x:0,z:4.05}})
     if(stair){
@@ -232,7 +232,7 @@ function hitsWall(w:Wall,x:number,z:number){
   return !w.openings.some(o=>o.kind!=='window'&&Math.abs(side-o.at)<o.width/2-radius)
 }
 export function access(unit:string|undefined,keys:readonly string[]){
-  return !unit||keys.includes(unit)||UNITS.some(u=>u.id===unit&&u.block===undefined&&u.tenure==='resident')
+  return !unit||keys.includes(unit)||UNITS.some(u=>u.id===unit&&u.block===undefined&&Number(u.id.slice(6))%3===0)
 }
 export const DOOR_TRAVEL=290
 const fraction=(t:number)=>Math.max(0,Math.min(1,t))

@@ -50,7 +50,9 @@ function modelFurniture(f:Fixture,p:Scenery,y:number,tone:number){
     add('post',-w*.625,.72,-d*.37,.078,.22,.078,brass)
     add('post',-w*.625,.88,-d*.37,.24,.19,.24,0xeed6ad)
   }else if(f.kind==='fridge'){
-    box(0,.87,.044,w,1.74,d-.088,0xb6c4c3)
+    for(const side of [-1,1])box(side*w*.455,.89,.043,w*.09,1.72,d-.086,0xb6c4c3)
+    box(0,.88,d*.44,w,1.73,d*.12,0x95a8a5)
+    for(const h of [.13,.54,.91,1.23,1.72])box(0,h,.065,w*.89,.057,d*.73,0xc0d2cf)
     box(0,.046,0,w*.9,.092,d*.92,iron)
   }else if(f.kind==='counter'){
     const sections=Math.round(w/.53)
@@ -139,7 +141,7 @@ function slabs(rect:Rect,hole?:Rect){
 export function residentialArt(parent:T.Object3D,letter:Letter){
   const doors=new Map<string,{hinge:T.Group;angle:number}>(),fridges=new Map<string,T.Group>()
   const signs=new Map<string,T.Object3D>(),clerks:ClubGuest[]=[]
-  const lifts:{id:string;group:T.Group;leaves:T.Mesh[];landings:T.Mesh[][];indicator:HTMLCanvasElement;texture:T.CanvasTexture;shown:number}[]=[]
+  const lifts:{id:string;x:number;group:T.Group;leaves:T.Mesh[];landings:T.Mesh[][];indicator:HTMLCanvasElement;texture:T.CanvasTexture;shown:number}[]=[]
   const floors:{group:T.Group;x:number;z:number}[]=[]
   for(const b of BUILDINGS){
     const root=new T.Group();root.position.set(b.x,0,b.z);root.rotation.y=b.facing<0?Math.PI:0;parent.add(root)
@@ -162,7 +164,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       const texture=new T.CanvasTexture(indicator);texture.colorSpace=T.SRGBColorSpace
       const display=new T.Mesh(windowQuad,new T.MeshBasicMaterial({map:texture}))
       display.position.set(x,2.21,z+1.17);display.rotation.y=Math.PI;display.scale.set(.52,.35,1);car.add(display)
-      lifts.push({id:b.id,group:car,leaves,landings:[],indicator,texture,shown:-1})
+      lifts.push({id:b.id,x,group:car,leaves,landings:[],indicator,texture,shown:-1})
     }
     for(const [level,f] of b.levels.entries()){
       const g=new T.Group(),p=new Scenery(),inside=new T.Group();root.add(g,inside);g.position.y=inside.position.y=level*STOREY
@@ -173,7 +175,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       const hole=s&&level>0?{l:s.x-s.width,r:s.x+s.width,b:Math.min(s.back,s.front),f:Math.max(s.back,s.front)}:undefined
       for(const a of slabs(r,hole).flatMap(part=>shaft&&part.l<shaft.l&&part.r>shaft.r?slabs(part,shaft).filter(q=>q.f>q.b):[part])){
         tile(a,-.097,.194,level?tone.floor:0xb9a98d)
-        if(level)tile(a,-.199,.015,0xe0d4bd)
+        if(level)tile(a,-.205,.016,0xf0e3cb)
       }
       if(b.block!==undefined){
         box(0,.013,.315,width-.13,.012,2.62,level?0x9b8165:0xcbbcad)
@@ -379,10 +381,28 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       }
       const u=UNITS.find(unit=>unit.id===b.id)!
       label(u.name.split(' ')[0],.78,1.76,r.f+.143,.36)
-      box(0,-.013,r.f+.34,1.67,.075,.68,tone.trim)
-      if(b.style!==4){
+      for(let i=0;i<3;i++)box(0,-.032,r.f+.30+i*.3,1.52,.09,.264,tone.trim)
+      if(b.style===3){
+        box(-1.23,2.55,r.f+.44,3.31,.15,1.35,tone.trim)
+        box(-2.72,1.26,r.f+.86,.13,2.52,.16,tone.trim)
+        box(2.53,.19,r.f+.3,.69,.38,.46,walnut)
+      }else if(b.style===4){
+        for(const x of [-2.75,2.75])for(let i=0;i<16;i++)box(x,.17+i*.37,r.f+.13,.31,.073,.054,tone.trim)
+        box(0,2.37,r.f+.20,1.62,.16,.44,tone.trim)
+      }else{
         box(-1.85,2.52,r.f+.36,1.9,.11,1.16,tone.trim)
         for(const x of [-2.72,-.98])box(x,1.23,r.f+.81,.091,2.46,.091,oak)
+        if(b.style===5){
+          box(-2.02,.46,r.f+.38,1.04,.12,.37,walnut)
+          box(-2.02,.70,r.f+.56,1.04,.32,.083,oak)
+          for(const x of [-2.45,-1.61])box(x,.216,r.f+.38,.075,.432,.28,walnut)
+        }
+      }
+      const x=b.style===3?2.53:1.98
+      box(x,.19,r.f+.13,.85,.34,.46,b.style===3?iron:0x9c744f)
+      for(let i=0;i<4;i++){
+        p.add('crown',x-.29+i*.19,.43,r.f+.13,.27,.28,.24,0x608164)
+        p.add('crown',x-.29+i*.19,.55+.035*Math.sin(i),r.f+.17,.12,.102,.116,b.style===2?0xce9694:0xe9c191)
       }
     }
     p.finish(root,architecture)
@@ -400,8 +420,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       for(const [id,sign] of signs)sign.visible=!occupied?.includes(id)
       for(const f of floors)f.group.visible=Math.abs(x-f.x)<33&&Math.abs(z-f.z)<35
       for(const lift of lifts){
-        const stateLift=state?.lifts[lift.id]??{level:0,opened:0},x=lift.group.userData.x??lift.leaves[1].position.x-.385
-        lift.group.userData.x=x
+        const stateLift=state?.lifts[lift.id]??{level:0,opened:0},x=lift.x
         lift.group.position.y=liftHeight(stateLift,now)
         const current=Math.round(lift.group.position.y/STOREY)
         if(lift.shown!==current){

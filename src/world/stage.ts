@@ -414,7 +414,7 @@ export class CityStage {
       const p=localSite('oasis',x,z)
       if(inPool(p.x,p.z))this.camera.position.y+=Math.sin(now*.0027)*.055
     }
-    this.camera.rotation.set(this.pitch+(me?.homePose?.kind==='rest'?1.05:0),this.yaw,0,'YXZ')
+    this.camera.rotation.set(T.MathUtils.clamp(this.pitch+(me?.homePose?.kind==='rest'?1.05:0),-1.55,1.55),this.yaw,0,'YXZ')
     const chair=me?.chair,round=chair&&this.view?.hall?.tables[chair.table]
     if(chair&&round){
       const table=WORLD_TABLES[chair.table],dice=chair.table===DICE_TABLE_INDEX

@@ -168,7 +168,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
 }
 export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true,keys:readonly string[]=[],residential?:ResidentialView,now=Date.now()):Position&{homeZone?:HomeZone}{
   const d=Math.hypot(x-from.x,z-from.z)
-  if(!Number.isFinite(d)||d===0||limit<=0)return {...from,homeZone:residentialAt(zone)?zone as HomeZone:undefined}
+  if(!Number.isFinite(d)||d===0||limit<=0)return {x:from.x,z:from.z,yaw:from.yaw,homeZone:residentialAt(zone)?zone as HomeZone:undefined}
   const scale=Math.min(1,limit/d),steps=Math.max(1,Math.ceil(d*scale/.13))
   const dx=(x-from.x)*scale/steps,dz=(z-from.z)*scale/steps
   let ax=from.x,az=from.z,current=zone

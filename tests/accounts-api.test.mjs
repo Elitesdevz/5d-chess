@@ -51,7 +51,7 @@ test('ratings, notifications and settings are private, durable and settled atomi
  assert.deepEqual(responses.map(r=>r.status).sort(),[200,409])
  const winner=(await call('/me',undefined,alice)).data.profile,loser=(await call('/me',undefined,bob)).data.profile
  assert.equal(winner.rating.value,1200);assert.equal(loser.rating.value,1200)
- assert.equal(winner.rating.games,0);assert.equal('ratings' in winner,false);assert.equal(winner.coins,600);assert.equal(loser.coins,540)
+ assert.equal(winner.rating.games,0);assert.equal('ratings' in winner,false);assert.equal(winner.coins,604);assert.equal(loser.coins,540)
  const board=(await call('/leaderboard?pool=classic-duel',undefined,alice)).data
  assert.equal(board.players[0].name,'Alice');assert.equal(board.players[1].name,'Bob')
  const feed=(await call('/notifications',undefined,alice)).data.items

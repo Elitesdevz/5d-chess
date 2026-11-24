@@ -40,7 +40,8 @@ test('AI plans privately in a worker, persists through restart, and resolves Liv
  assert.equal(f.store().activeRooms(),0);assert.equal(f.store().check().accounts,2)
  const before=(await f.call('/me')).data.profile
  if(!result.data.finished)await f.call('/games/'+code+'/resign',{})
- const after=(await f.call('/me')).data.profile;assert.deepEqual(after.rating,before.rating);assert.equal(after.coins,before.coins)
+ const lossReward=f.store().transaction(u=>u.rooms.get(code).ai.lossReward)
+ const after=(await f.call('/me')).data.profile;assert.deepEqual(after.rating,before.rating);assert.equal(lossReward,4);assert.equal(after.coins,before.coins+lossReward)
  assert.equal((await f.call('/ai/claim',{coins:999999})).status,404)
 })
 test('Classic AI responds automatically and a server-verified victory pays exactly once',async t=>{
@@ -55,7 +56,7 @@ test('Classic AI responds automatically and a server-verified victory pays exact
  const result=await f.call('/games/'+code+'/orders',{orders:[{player:'red',from:{x:7,y:5,t:0,u:0},to:{x:7,y:3,t:0,u:0},route:[0]}]})
  assert.equal(result.status,200);assert.equal(result.data.finished,true);assert.equal(result.data.ai.reward.coins,60)
  assert.equal((await f.call('/games/'+code+'/orders',{orders:[]})).status,409)
- await f.restart();const me=(await f.call('/me')).data.profile;assert.equal(me.coins,before+60);assert.equal(me.rating.games,0)
+ await f.restart();const me=(await f.call('/me')).data.profile;assert.equal(me.coins,before+60+4);assert.equal(me.rating.games,0)
  const catalog=(await f.call('/games/ai')).data;assert.equal(catalog.opponents[0].wins,1);assert.equal(catalog.opponents[0].nextReward,30)
  const history=f.store().profileGameRows('Alice',Number.MAX_SAFE_INTEGER,Number.MAX_SAFE_INTEGER,20);assert.equal(JSON.parse(history[0].summary).aiReward,60)
  assert.equal(f.store().check().accounts,1)
