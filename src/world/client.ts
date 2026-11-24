@@ -185,6 +185,11 @@ function accepted(next:WorldView,start:number,reposition=false){
   if(!paused&&service&&shownService!==service){
     shownService=service
     if(station)return
+    if(service.startsWith('property:')){
+      const render=()=>{if(view)services?.property(service,view,async unit=>{await action('housing',{unit});render()})}
+      render()
+      return
+    }
     if(service==='bar'){
       services?.bar(next.bar?.name===next.you.name?next.bar:undefined,(drink,id)=>action('bar',{drink,id}),()=>action('stand-scenery',{}),next.you.barSeat!==undefined)
       return

@@ -13,10 +13,12 @@ export function avenues(parent:T.Object3D){
     for(const side of [-1,1])rect(side*(width/2+.09),0,.18,length,0xd1c5af,-.006+level)
     if(major)for(let a=2-length/2;a<length/2-1;a+=4.4)rect(0,a,.085,1.48,0xcfbf9a,-.010+level)
   }
-  road(0,11,122,5.4,false,true)
+  road(0,11,154,5.4,false,true)
+  road(0,31,149,3.5)
+  road(-60,-9,80,3.25,true)
   road(0,29,32,4.3,true,true)
   for(const side of [-1,1]){
-    road(side*37,31,49,3.5);road(side*37,-10.65,48,2.9)
+    road(side*40,-49,66,3.5);road(side*37,-10.65,48,2.9)
     road(side*31,-30,38,3.1);road(side*48,0,60,3.1,true)
     road(side*10.4,22,18.5,2.4,true)
     slab(side*24,6.78,3.9,3.6,0xc3b9a2,-.001)

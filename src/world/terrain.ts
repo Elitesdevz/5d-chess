@@ -13,7 +13,7 @@ export function ridgeDistance(x:number,z:number){
   return Math.hypot(x,z*.97)-(89+6*Math.sin(theta*3+.8)+4*Math.cos(theta*5))
 }
 export function terrainVertex(x:number,z:number){
-  const radius=Math.hypot(x,z),d=ridgeDistance(x,z)
+  const radius=Math.abs(x)<79&&Math.abs(z)<51?0:Math.hypot(x,z),d=ridgeDistance(x,z)
   const plain=Math.min(1,Math.max(0,(radius-63)/16))*(.85+.48*Math.sin(x*.11)+.35*Math.cos(z*.15))
   const t=Math.max(0,d)
   const ridge=(1-Math.exp(-t*t/1750))*(42+5*Math.sin(x*.055)+5*Math.cos(z*.048))
@@ -33,9 +33,10 @@ export function passableLand(x:number,z:number){
   const height=terrainHeight(x,z)
   return ridgeDistance(x,z)<30&&height<22&&Math.hypot(terrainHeight(x+.5,z)-terrainHeight(x-.5,z),terrainHeight(x,z+.5)-terrainHeight(x,z-.5))<.91
 }
+export const homeFacing=(z:number)=>z===19||z===25||z===26||z===23||z===18?-1:1
 export function houseObstacle(x:number,z:number){
   for(const [cx,cz] of HOMES){
-    const dx=x-cx,dz=z-cz,side=Math.abs(dx)
+    const dx=x-cx,dz=(z-cz)*homeFacing(cz),side=Math.abs(dx)
     if(side>3.28||Math.abs(dz)>3.19)continue
     if(side>2.74||dz< -2.65||dz>2.65&&side>.75)return true
     if(dx< -1.46&&dz>-.9&&dz<1.48||dx>1.32&&dz<-.57||dz< -1.93&&side<1.55)return true

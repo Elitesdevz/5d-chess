@@ -1,3 +1,4 @@
+import {propertyPoints,propertyObstacle,type HousingView} from './housing.ts'
 import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
 import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type OrderItems} from './restaurant-model.ts'
 import {CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
@@ -80,14 +81,15 @@ export function riderHeight(player:WorldPlayer,now:number){
   const progress=Math.max(0,Math.min(1,(now-ride.started)/(ride.ends-ride.started)))
   return from+(floorHeight(ride.to)-from)*progress*progress*(3-2*progress)
 }
-export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`kfc:${string}`
+export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
 export type WorldChat={id:number;name:string;text:string;at:number}
 export interface WorldView{
-  chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
+  housing?:HousingView;chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
   id:string;now:number;you:WorldPlayer;players:WorldPlayer[];coins:number;caveOpen:boolean;hall?:HallView;tableMotion?:Pick<HallTable,'spin'|'recent'>[];interaction?:WorldUse;restaurant?:RestaurantView
 }
 function localInteractions(zone:WorldZone):WorldAction[]{
+  if(zone==='city')return propertyPoints()
   if(zone==='casino')return [
     {id:'bar',label:'Talk to the bartender',...BAR,range:1.62},
     ...BAR_STOOLS.map((seat,i)=>({id:'bar-seat:'+i,label:'Sit at the bar',...seat,range:.75})),
@@ -127,13 +129,13 @@ function roomObstacles(zone:WorldZone,x:number,z:number){
   }
   return false
 }
-function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
+function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean,keys:readonly string[]){
   if(zone==='private')return false
   if(zone.startsWith('floor:')){
     const p=localSite(zone,x,z),shaft=Math.abs(p.x)<1.42
     return Math.abs(p.x)<7.72&&p.z<7.29&&p.z>(shaft?-6.21:-5.98)&&!roomObstacles(zone,p.x,p.z)
   }
-  if(!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z)||houseObstacle(x,z))return false
+  if(propertyObstacle(x,z,keys)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z)||houseObstacle(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x),opening=room==='bank'?1.13:room==='exchange'?1.02:room==='kfc'?1.28:1.25
     if(side<width+.28&&side>width-.28&&p.z>back-.28&&p.z<front+.28)return false
@@ -150,15 +152,15 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
   }
   return true
 }
-export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true):Position{
+export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true,keys:readonly string[]=[]):Position{
   const d=Math.hypot(x-from.x,z-from.z)
   if(!Number.isFinite(d)||d===0||limit<=0)return from
   const scale=Math.min(1,limit/d),steps=Math.max(1,Math.ceil(d*scale/.21))
   const dx=(x-from.x)*scale/steps,dz=(z-from.z)*scale/steps
   let ax=from.x,az=from.z
   for(let i=0;i<steps;i++){
-    if(walkable(zone,ax+dx,az,caveOpen))ax+=dx
-    if(walkable(zone,ax,az+dz,caveOpen))az+=dz
+    if(walkable(zone,ax+dx,az,caveOpen,keys))ax+=dx
+    if(walkable(zone,ax,az+dz,caveOpen,keys))az+=dz
   }
   return {x:ax,z:az,yaw:from.yaw}
 }

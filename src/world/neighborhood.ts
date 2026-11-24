@@ -1,19 +1,20 @@
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
-import {HOMES} from './terrain.ts'
+import {HOMES,homeFacing} from './terrain.ts'
 
 const paint=[0xd6b789,0xc9ceaf,0xc18e79,0xc6beae,0x9bb5ab,0xddc299]
 const roofs=[0x76534b,0x465e63,0x515461,0x935a48]
 const wood=0x76523c,cream=0xebd9b2,iron=0x394b48
 export function neighborhood(parent:T.Object3D){
-  const props=new Scenery(),windows:T.Matrix4[]=[]
+  const windows:T.Matrix4[]=[]
   const placePane=(x:number,y:number,z:number,yaw=0)=>{
     const m=new T.Matrix4().makeRotationY(yaw);m.setPosition(x,y,z);windows.push(m)
   }
   HOMES.forEach(([cx,cz],i)=>{
+    const props=new Scenery(),house=new T.Group();house.position.set(cx,0,cz);house.rotation.y=homeFacing(cz)<0?Math.PI:0;parent.add(house)
     const wall=paint[i%paint.length],roof=roofs[i%roofs.length],accent=[0x477c72,0x7d5662,0x526e80,0x9e734a][i%4]
-    const box=(x:number,y:number,z:number,w:number,h:number,d:number,color:number,roll=0)=>props.add('box',cx+x,y,cz+z,w,h,d,color,0,roll)
-    const orb=(x:number,y:number,z:number,w:number,h:number,d:number,color:number)=>props.add('crown',cx+x,y,cz+z,w,h,d,color)
+    const box=(x:number,y:number,z:number,w:number,h:number,d:number,color:number,roll=0)=>props.add('box',x,y,z,w,h,d,color,0,roll)
+    const orb=(x:number,y:number,z:number,w:number,h:number,d:number,color:number)=>props.add('crown',x,y,z,w,h,d,color)
     // Window wells cut through the walls. The doorway stays open from street to hearth.
     for(const side of [-1,1]){
       const x=side*1.94
@@ -22,7 +23,7 @@ export function neighborhood(parent:T.Object3D){
       box(x,1.61,2.89,.055,1.48,.09,cream);box(x,1.72,2.89,1.5,.05,.09,cream)
       box(x,.85,2.97,1.81,.11,.38,cream)
       for(const edge of [-1,1])box(x+edge*.91,1.62,3,.24,1.49,.08,accent)
-      placePane(cx+x,1.59,cz+2.88)
+      placePane(cx+x*homeFacing(cz),1.59,cz+2.88*homeFacing(cz))
       const sx=side*2.97
       box(sx,.43,0,.17,.86,5.78,wall);box(sx,2.68,0,.17,.72,5.78,wall)
       for(const edge of [-1,1])box(sx,1.59,edge*1.82,.17,1.48,2.14,wall)
@@ -44,7 +45,7 @@ export function neighborhood(parent:T.Object3D){
       for(let k=0;k<5;k++){orb(x+(k-2)*.205,1.13,3.1,.29,.21,.24,0x536f48);orb(x+(k-2)*.205,1.22,3.13,.12,.10,.12,k%2?0xeabc86:0xba6970)}
     }
     for(const z of [-2.88,2.88]){
-      props.add('gable',cx,3.69,cz+z,6,1.40,.17,wall)
+      props.add('gable',0,3.69,z,6,1.40,.17,wall)
       box(0,3.04,z,6.18,.14,.25,cream)
     }
     box(0,1.49,-2.88,5.96,2.99,.18,wall);box(0,2.72,2.89,1.76,.66,.18,wall)
@@ -83,16 +84,23 @@ export function neighborhood(parent:T.Object3D){
     }
     box(0,2.42,-2.746,1.16,.64,.075,wood);box(0,2.42,-2.69,1.04,.52,.04,cream)
     box(0,2.42,-2.655,.93,.42,.031,accent)
-    props.add('gable',cx-.12,2.38,cz-2.627,.54,.23,.018,0xb7c0aa)
-    props.add('gable',cx+.15,2.36,cz-2.615,.59,.19,.018,0x547369)
+    props.add('gable',-.12,2.38,-2.627,.54,.23,.018,0xb7c0aa)
+    props.add('gable',.15,2.36,-2.615,.59,.19,.018,0x547369)
     orb(.26,2.51,-2.62,.087,.087,.015,0xf4d292)
     if(studio){box(2.15,1.52,-1.60,.84,1.05,.09,cream);box(2.15,1.52,-1.53,.66,.79,.04,accent)}
     else if(bakery){for(let n=0;n<3;n++)orb(2.19,1.05,-1.86+n*.36,.56,.24,.27,0xc68c55)}
     else {box(2.1,.98,-1.41,.52,.06,.42,cream);orb(2.46,1.18,-1.85,.26,.46,.26,accent)}
     box(0,2.92,.09,.045,.53,.045,iron);orb(0,2.57,.09,.38,.35,.38,0xffe9bd)
     box(-2.85,1.98,.43,.08,.82,1.04,wood);box(-2.79,1.98,.43,.03,.65,.86,accent)
+    if(i%3===1){
+      box(-1.62,2.58,3.44,2.39,.13,1.25,accent)
+      for(const x of [-2.62,-.64])box(x,1.28,3.94,.1,2.55,.1,cream)
+    }else if(i%3===2){
+      box(-1.61,3.88,.46,1.04,.95,1.23,wall);box(-1.61,4.43,.46,1.37,.16,1.39,roof)
+      box(-1.61,3.98,1.09,.76,.58,.07,accent)
+    }
+    props.finish(house)
   })
-  props.finish(parent)
   const pane=new T.InstancedMesh(new T.PlaneGeometry(1.49,1.46),new T.MeshStandardMaterial({color:0xa8cbd0,transparent:true,opacity:.17,depthWrite:false,side:T.DoubleSide}),windows.length)
   windows.forEach((m,i)=>pane.setMatrixAt(i,m));parent.add(pane)
 }

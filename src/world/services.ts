@@ -1,3 +1,5 @@
+import {UNITS,RESIDENCES} from './housing.ts'
+import type {WorldView} from './model.ts'
 import {DRINKS,type BarService} from './bar-menu.ts'
 import {companyContent} from './company-desk.ts'
 import {api,ApiError} from '../shell.ts'
@@ -75,6 +77,21 @@ export class CityServices {
         if(token===this.token)this.bank(view,data,token)
       }
     }catch(error){if(token===this.token)this.message(error instanceof Error?error.message:'Unavailable')}
+  }
+  property(point:string,view:WorldView,acquire:(id:string)=>Promise<void>){
+    const key=point.slice(9),block=key.startsWith('desk-')?Number(key.slice(5)):undefined
+    const list=UNITS.filter(u=>block===undefined?u.id===key:u.block===block)
+    this.render('CITY HOUSING',block===undefined?'House listing':RESIDENCES[block].name,list.map(u=>{
+      const mine=view.housing?.keys.includes(u.id),occupied=view.housing?.occupied.includes(u.id)||u.tenure==='resident'
+      const expiry=view.housing?.expires[u.id]
+      const status=mine?(expiry?'Your lease ends '+date.format(expiry):'You own this home'):occupied?'Occupied':u.tenure==='rent'?'Seven-day lease':'For sale'
+      return `<section class="world-ballot"><h3>${u.name}</h3><p>${u.layout} · ${status}</p>${mine||occupied?'':`<button class="world-primary" data-home="${u.id}">${u.tenure==='rent'?'Rent':'Buy'} · ${coins(u.price)}</button>`}</section>`
+    }).join(''))
+    if(!this.dialog.open)this.dialog.showModal()
+    this.host.querySelectorAll<HTMLButtonElement>('[data-home]').forEach(b=>b.onclick=async()=>{
+      b.disabled=true
+      try{await acquire(b.dataset.home!)}catch(error){this.message(error instanceof Error?error.message:'Unavailable');b.disabled=false}
+    })
   }
   bar(order:BarService|undefined,buy:(drink:string,id:string)=>Promise<void>,stand:()=>Promise<void>,seated:boolean){
     this.render('ROYAL SALON','The bar',`<div class="world-drinks">${DRINKS.map(drink=>`<article><i style="--drink:#${drink.color.toString(16)}"></i><div><h3>${drink.name}</h3><p>${drink.note}</p></div><button type="button" data-drink="${drink.id}">${coins(drink.price)}</button></article>`).join('')}</div>${seated?'<button type="button" data-bar-stand>Leave stool</button>':''}`)

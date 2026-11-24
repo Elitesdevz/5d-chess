@@ -1,3 +1,4 @@
+import {district} from './district.ts'
 import {ownershipSegments} from './company-desk.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {salonBar} from './salon-bar.ts'
@@ -141,6 +142,14 @@ function landmarks(parent:T.Object3D){
     }else{
       bar(0,3.66,.70,5.82,.18,1.42,0x96b3ae)
       for(const side of [-1,1])for(let k=0;k<3;k++)bar(side*(width-.36*k),7.12,.31,.12,13.8,.24,k%2?gilt:0x899e98)
+    }
+    for(const side of [-1,1]){
+      for(let n=0;n<6;n++){
+        const z=-5.8+n*2.05
+        props.add('box',side*(width+.17),2.65,z,.18,5.3,.24,finish)
+        props.add('box',side*(width+.24),2.65,z,.06,3.76,.07,gilt)
+      }
+      props.add('box',side*(width+.14),4.81,0,.32,.25,14.6,finish)
     }
     props.finish(root)
   }
@@ -500,6 +509,10 @@ function tower(shaft:T.Object3D){
     const wall=symbol==='CAS'?casinoWall:symbol==='BNK'?bankWall:standardWall
     liftDeck(room,tile);liftDoorway(room,wall)
     for(const x of [-7.96,7.96])block(room,.18,5.8,15,x,2.89,0,wall)
+    for(const side of [-1,1]){
+      for(const z of [-4.45,-1.45,1.55,4.55])block(room,.10,3.95,2.3,side*8.10,2.9,z,trim)
+      block(room,.36,.23,15,side*8,5.75,0,ink)
+    }
     block(room,16,.18,11.65,0,5.91,1.655,ink)
     block(room,16,1.16,.16,0,.58,7.48,wall)
     block(room,16,.44,.22,0,5.68,7.48,trim)
@@ -560,7 +573,8 @@ export function makeWorldArt(open:boolean){
   scene.add(new T.HemisphereLight(0xdbe9ff,0xa89072,1.95))
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());contactShade(scene);const water=fountain(scene),wind=landscape(scene)
-  const ambient=(time:number)=>{water(time);wind(time)}
+  const quarter=district(scene,banner)
+  const ambient=(time:number)=>{water(time);wind(time);quarter.tick(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>
   for(const zone of Object.keys(PLAN) as (keyof typeof PLAN)[]){
     const group=new T.Group(),{x,z}=PLAN[zone];group.position.set(x,0,z);scene.add(group);rooms[zone]=group
@@ -603,7 +617,7 @@ export function makeWorldArt(open:boolean){
   for(const zone of ['cave','oasis'] as const){rooms[zone].rotation.y=Math.PI;cave(rooms[zone],zone==='oasis');venueDetail(rooms[zone],zone)}
   const seal=mesh(new T.IcosahedronGeometry(1,2),rock,rooms.cave,[0,1.34,7.01]);seal.scale.set(1.84,1.8,1.1);seal.visible=!open
   const restaurant=buildRestaurant(rooms.kfc)
-  return {scene,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,restaurant,bar,lobbyDoors}
+  return {scene,quarter,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,restaurant,bar,lobbyDoors}
 }
 function rouletteWagers(table:T.Group){
   const tones=[0xe9c186,0x72bcbc,0xcf8799,0xc2a8e5]

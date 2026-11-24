@@ -145,6 +145,7 @@ export class CityStage {
     }
     if(!this.art&&this.renderer)this.buildScene()
     if(this.art){
+      this.art.quarter.update(view.housing)
       this.art.seal.visible=!this.caveOpen
       this.art.restaurant.update(view.restaurant)
       const target=next.lift?.to??next.zone
@@ -295,7 +296,7 @@ export class CityStage {
     if(x||z){
       const dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=z*Math.cos(this.yaw)-x*Math.sin(this.yaw)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
-      this.position=worldMove(this.zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave)
+      this.position=worldMove(this.zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave,this.view?.housing?.keys)
     }
     this.position.yaw=this.yaw
   }
