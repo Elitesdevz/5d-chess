@@ -36,7 +36,13 @@ function outdoorEdge(a:Point,b:Point){
   navEdges.set(key,clear)
   return clear
 }
-export function cityRoute(a:Point,b:Point){
+export function cityRoute(a:Point,b:Point,vehicles:readonly Vehicle[]=[]){
+  const nearby=vehicles.filter(v=>distance(v,a)<12)
+  if(nearby.length){
+    const clear=(p:Point)=>outside(p)&&!nearby.some(v=>vehicleContains(p,v,.59))
+    const detour=findPath(a,b,outdoorGrid,clear,pedestrianCost,10000,outdoorEdge)
+    if(detour.length)return detour
+  }
   const key=[a.x,a.z,b.x,b.z].map(n=>n.toFixed(1)).join(',')
   const saved=cachedPaths.get(key)
   if(saved)return [...saved]
@@ -224,13 +230,7 @@ export class CityLife {
       this.routeBudget--
       const current=residentialAt(actor.zone)
       if(goal.kind&&goal.kind!=='call'||current?.stairs)actor.route=[goal]
-      else if(goal.outside){
-        if(actor.blocked>10){
-          const blockers=vehicles.filter(v=>distance(v,actor)<12)
-          actor.route=findPath(actor,goal,outdoorGrid,p=>outside(p)&&!blockers.some(v=>vehicleContains(p,v,.62)),pedestrianCost,7600,outdoorEdge)
-        }
-        if(!actor.route.length)actor.route=cityRoute(actor,goal)
-      }
+      else if(goal.outside)actor.route=cityRoute(actor,goal,actor.blocked>10?vehicles:[])
       else if(current){
         const {b,level}= {b:current.building,level:current.level}
         const doors=Object.fromEntries(current.f.doors.filter(d=>!d.unit||actor.keys.includes(d.unit)).map(d=>[d.id,now-900]))

@@ -3,6 +3,7 @@ import {Scenery} from './landscape.ts'
 import {MARKET,BOULEVARD_TREES} from './terrain.ts'
 import {CROSSINGS,STREETS,circle} from './city-plan.ts'
 import {PATHS} from './urban-layout.ts'
+import {STOP_LINES} from './traffic.ts'
 const cream=0xe1d0a8,bronze=0xa77b45,wood=0x684c3e,green=0x486552
 
 export function avenues(parent:T.Object3D){
@@ -58,6 +59,7 @@ export function avenues(parent:T.Object3D){
       p.add('box',circle.x+x,-.007,circle.z+z,.22,.008,.23,0xe2d8bc)
     }
   }
+  for(const stop of STOP_LINES)p.add('box',stop.x,-.009,stop.z,stop.width,.011,.162,0xe1d7bc,stop.yaw)
   for(const c of CROSSINGS)for(let across=-c.width/2+.27;across<c.width/2-.16;across+=.62){
     slab(c.x+(c.axis==='x'?across:0),c.z+(c.axis==='z'?across:0),c.axis==='x'?.255:1.62,c.axis==='z'?.255:1.62,0xd9d4bf,-.009)
   }

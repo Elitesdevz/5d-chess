@@ -38,18 +38,27 @@ test('residential walkthrough through both buildings, house styles, furniture an
       current=result
       return result
     }
-    async function walk(x,z,yaw=0){
+    async function walk(x,z,yaw=0,reroute=false){
+      let stalled=0
       for(let i=0;i<85;i++){
         offset+=900
+        const {x:beforeX,z:beforeZ}=current.you
         await action('presence',{x,z,yaw,world:current.id})
-        if(Math.hypot(current.you.x-x,current.you.z-z)<.034)return
+        if(Math.hypot(current.you.x-x,current.you.z-z)<.034)return true
+        stalled=Math.hypot(current.you.x-beforeX,current.you.z-beforeZ)<.02?stalled+1:0
+        if(reroute&&stalled===5)return false
       }
       assert.fail('Blocked walking to '+[x,z]+' from '+JSON.stringify(current.you))
     }
     async function outdoors(destination){
-      const waypoints=cityRoute(current.you,destination)
-      assert.ok(waypoints.length,'property connects to the pedestrian network')
-      for(const p of waypoints)await walk(p.x,p.z)
+      for(let attempt=0;attempt<12;attempt++){
+        const waypoints=cityRoute(current.you,destination,attempt?current.traffic.vehicles:[])
+        assert.ok(waypoints.length,'property connects to the pedestrian network')
+        let arrived=true
+        for(const p of waypoints)if(!await walk(p.x,p.z,0,true)){arrived=false;break}
+        if(arrived)return
+      }
+      assert.fail('No clear walk to '+JSON.stringify(destination)+' from '+JSON.stringify(current.you))
     }
     async function local(b,x,z,yaw=0){
       const p=residentialSite(b,x,z)

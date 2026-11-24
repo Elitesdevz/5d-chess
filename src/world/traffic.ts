@@ -73,6 +73,11 @@ export function alongPath(path:readonly Point[],travel:number){
   }
   return {...path[0],yaw:0}
 }
+const gateDistance=(lane:Lane)=>lane.street==='ring'?1.2:Math.min(3.65,lane.length*.75)
+export const STOP_LINES=[...LANES.values()].filter(lane=>intersections.get(lane.to)?.signal).map(lane=>({
+  ...alongPath(lane.points,Math.min(lane.length,lane.length-gateDistance(lane)+1.72)),
+  width:STREETS.find(s=>s.id===lane.street)!.width/2-.24,
+}))
 function tangent(p:Point,q:Point,span:number){
   const d=distance(p,q)
   return point(p.x+(q.x-p.x)*span/d,p.z+(q.z-p.z)*span/d)
@@ -210,7 +215,7 @@ export class CityTraffic {
       const others=[...stationary,...this.trips.filter(other=>other!==t).map(other=>other.v)]
       if(!t.link&&remain<12){
         const holder=this.junctions.get(j.id)
-        const gate=t.lane.street==='ring'?1.2:Math.min(3.65,t.lane.length*.75)
+        const gate=gateDistance(t.lane)
         const red=j.signal&&signalPhase(now,j.id)!==t.lane.axis
         if(holder!==v.id){
           const queued=this.trips.some(other=>other!==t&&other.lane===t.lane&&!other.link&&!other.v.parking&&other.distance>t.distance)

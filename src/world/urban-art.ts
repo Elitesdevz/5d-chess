@@ -96,7 +96,7 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
   }
   if(b.id!=='fire')door(0,b.id==='hall'?2.57:b.id==='market'?2.8:1.8)
   if(b.id!=='station')p.slab(0,front+.48,w,.98,0xad9f87,-.008)
-  sign(b.name,0,b.id==='fire'?3.83:2.77,front+.18,Math.min(w-.4,b.id==='hall'?7:w*.84),b.id==='hall'?.51:.42)
+  sign(b.name,0,b.id==='fire'?3.83:b.id==='hospital'?3.45:2.77,front+.18,Math.min(w-.4,b.id==='hall'?7:w*.84),b.id==='hall'?.51:.42)
   for(const side of [-1,1]){
     const x=side*(w/2-.27)
     p.box(x,1.67,front+.15,.09,3.31,.09,accent)
