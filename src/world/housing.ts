@@ -26,10 +26,11 @@ export function propertyObstacle(x:number,z:number,keys:readonly string[]){
     if(dx<7.85&&dz>=-5.1&&dz<=5.1&&(dx>7.32||dz< -4.68||dz>4.66&&dx>1.02))return true
   }
   for(const u of UNITS){
-    const dx=Math.abs(x-u.x),dz=(z-u.z)*u.facing
+    const localX=x-u.x,dx=Math.abs(localX),dz=(z-u.z)*u.facing
     if(u.block===undefined){
       if(dx<.93&&Math.abs(dz-2.88)<.24&&!keys.includes(u.id))return true
     }else if(dz>=-4&&dz<=3.02&&dx<=u.width/2+.14){
+      if(dz< -1.28&&localX< -u.width/2+1.68||Math.abs(dz+.67)<1&&localX>u.width/2-1.43||u.width===6&&Math.abs(dz-.75)<.48&&Math.abs(localX-.2)<1.02)return true
       if(dx>u.width/2-.14||Math.abs(dz-2.9)<.2&&(dx>.76||!keys.includes(u.id)))return true
     }
   }

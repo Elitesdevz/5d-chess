@@ -1,5 +1,5 @@
 import * as T from 'three'
-import {BOULEVARD_TREES,HOMES,MARKET} from './terrain.ts'
+import {homeFacing,BOULEVARD_TREES,HOMES,MARKET} from './terrain.ts'
 
 /** Ground contact and eave shade baked once for the mobile renderer. */
 export function contactShade(scene:T.Scene){
@@ -15,7 +15,8 @@ export function contactShade(scene:T.Scene){
   }
   for(const [x,z] of HOMES){
     stamp(x+.41,-.029,z+.40,9.95,9.61)
-    stamp(x,.079,z-2.51,3.4,1.13);stamp(x-2.2,.079,z+.3,1.72,2.97);stamp(x+2.1,.079,z-1.46,1.8,2.2)
+    const f=homeFacing(z)
+    stamp(x,.079,z-f*2.51,3.4,1.13);stamp(x-f*2.2,.079,z+f*.3,1.72,2.97);stamp(x+f*2.1,.079,z-f*1.46,1.8,2.2)
   }
   for(const side of [-1,1])for(const x of BOULEVARD_TREES)stamp(side*x+.42,.012,15.22,3.55,2.75)
   for(const [x,z] of MARKET)stamp(x+.41,-.049,z+.40,4.77,2.82)

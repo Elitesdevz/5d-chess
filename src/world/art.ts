@@ -577,7 +577,7 @@ export function liftPlatform(parent:T.Object3D){
   block(car,2.93,.052,.1,0,.038,-4.22,brass)
   const doors=new T.Group();car.add(doors);doors.name='travel-doors';doors.visible=false
   for(const side of [-1,1]){
-    block(doors,1.46,3.38,.09,side*.734,1.69,-4.29,bronzeFloor)
+    block(doors,1.47,3.38,.09,side*.735,1.69,-4.29,bronzeFloor)
     block(doors,.035,3.29,.04,side*.061,1.67,-4.36,brass)
     block(car,.07,3.42,2.98,side*1.46,1.71,-5.78,ink)
   }
@@ -598,9 +598,10 @@ export function makeWorldArt(open:boolean){
   })
   sky.mapping=T.EquirectangularReflectionMapping;scene.background=sky
   scene.fog=new T.FogExp2(0xc2c9be,.0056)
-  scene.add(new T.HemisphereLight(0xdbe9ff,0xa89072,1.95))
+  const skylight=new T.HemisphereLight(0xdbe9ff,0xa89072,1.95)
+  scene.add(skylight)
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
-  scene.add(street());contactShade(scene);const water=fountain(scene),wind=landscape(scene)
+  scene.add(street());contactShade(scene);const water=fountain(scene),{wind,seal}=landscape(scene)
   const quarter=district(scene,banner)
   const ambient=(time:number)=>{water(time);wind(time);quarter.tick(time);poolRipples(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>
@@ -645,11 +646,13 @@ export function makeWorldArt(open:boolean){
   rooms.cave.rotation.y=rooms.oasis.rotation.y=Math.PI
   cave(rooms.cave,false)
   const poolRipples=cave(rooms.oasis,true)
-  const grotto=rooms.cave,seal=new T.Group();scene.add(seal)
-  seal.position.copy(grotto.position);seal.rotation.y=Math.PI
-  plane(seal,8,16,0,-.085,-.30,std(0x829667));seal.visible=!open;grotto.visible=open
+  const grotto=rooms.cave;seal.visible=!open;grotto.visible=open
   const restaurant=buildRestaurant(rooms.kfc)
-  return {scene,quarter,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
+  function lightZone(zone:string|undefined,dt:number){
+    const target=zone==='cave'?.38:zone==='oasis'?.84:zone==='casino'?1.24:zone==='city'?1.95:1.62
+    skylight.intensity=T.MathUtils.damp(skylight.intensity,target,3,dt)
+  }
+  return {scene,lightZone,quarter,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
 }
 function rouletteWagers(table:T.Group){
   const tones=[0xe9c186,0x72bcbc,0xcf8799,0xc2a8e5]

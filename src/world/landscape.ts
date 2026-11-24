@@ -44,7 +44,7 @@ function grain(){
   return surface
 }
 function meadow(scene:T.Scene){
-  const pos=[],col=[],idx=[],uv=[],color=new T.Color(),snow=new T.Color(0xa5a394),grass=new T.Color(0xa5ad75)
+  const pos=[],col=[],idx:number[]=[],covered:number[]=[],uv=[],color=new T.Color(),snow=new T.Color(0xa5a394),grass=new T.Color(0xa5ad75)
   const extent=TERRAIN_EXTENT,step=TERRAIN_STEP,side=2*extent/step+1
   for(let j=0;j<side;j++)for(let i=0;i<side;i++){
     const x=i*step-extent,z=j*step-extent,h=terrainVertex(x,z),ridge=ridgeDistance(x,z)
@@ -54,13 +54,23 @@ function meadow(scene:T.Scene){
     color.lerp(h>18?snow:grass,grain*.29)
     if(trailDistance(x,z)<1.9)color.setHex(0xbeab87)
     uv.push(x/3.5,z/3.5);pos.push(x,h-.085,z);col.push(color.r,color.g,color.b)
-    if(i<side-1&&j<side-1&&!passages.some(p=>Math.abs(x+1-p.x)<4&&z>=p.z&&z<p.z+16)){const a=j*side+i;idx.push(a,a+side+1,a+1,a,a+side,a+side+1)}
+    if(i<side-1&&j<side-1){
+      const cut=passages.find(p=>Math.abs(x+1-p.x)<4&&z>=p.z&&z<p.z+16)
+      const dest=cut?cut.x===CAVE_X?covered:undefined:idx,a=j*side+i
+      dest?.push(a,a+side+1,a+1,a,a+side,a+side+1)
+    }
   }
   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('color',new T.Float32BufferAttribute(col,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setIndex(idx);geo.computeVertexNormals()
-  scene.add(new T.Mesh(geo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,map:grain()})))
+  const material=new T.MeshStandardMaterial({vertexColors:true,roughness:1,map:grain()})
+  scene.add(new T.Mesh(geo,material))
+  const patch=new T.BufferGeometry()
+  for(const attr of ['position','color','uv'])patch.setAttribute(attr,geo.getAttribute(attr))
+  patch.setIndex(covered);patch.computeVertexNormals()
+  const seal=new T.Mesh(patch,material);scene.add(seal)
+  return seal
 }
 export function landscape(scene:T.Scene){
-  meadow(scene)
+  const seal=meadow(scene)
   const woods=new Scenery()
   let seed=41471
   const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
@@ -116,7 +126,7 @@ export function landscape(scene:T.Scene){
   for(const side of [-1,1])woods.add('box',-28+side*.61,1.09,51.36,.08,2.3,.08,0xdbbc86,0,side*.48)
   for(let n=0;n<=8;n++){
     woods.add('post',-13+n*2,.55,51,.16,1.1,.16,0x866743)
-    if(n<8)for(const y of [.42,.86])woods.add('box',-12+n*2,y,51,2,.11,.12,0xab916b)
+    if(n<8&&n!==6)for(const y of [.42,.86])woods.add('box',-12+n*2,y,51,2,.11,.12,0xab916b)
   }
   for(let row=0;row<12;row++){
     const x=-12.5+row*1.22
@@ -132,9 +142,9 @@ export function landscape(scene:T.Scene){
   const birds=new Scenery()
   for(let i=0;i<9;i++)for(const wing of [-1,1])birds.add('box',(i-4)*1.1+wing*.23,i%3*.23,Math.abs(i-4)*.7,.52,.055,.16,0x45494d,0,wing*.28)
   birds.finish(flock)
-  return (time:number)=>{
+  return {seal,wind(time:number){
     rotor.rotation.z=(time/9600)%(Math.PI*2)
     const angle=(time/37000)%(Math.PI*2)
     flock.position.set(42*Math.cos(angle),17+Math.sin(angle*3)*2,-15+30*Math.sin(angle));flock.rotation.y=-angle
-  }
+  }}
 }

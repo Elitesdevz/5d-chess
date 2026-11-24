@@ -54,6 +54,7 @@ export function townFixture(x:number,z:number){
   if(Math.abs(z-18)<.87&&Math.abs(Math.abs(x)-14)<1.52)return true
   if(Math.abs(z-14.85)<.34&&BOULEVARD_TREES.some(dx=>Math.abs(Math.abs(x)-dx)<.34))return true
   if(Math.abs(Math.abs(x)-6.25)<.64&&(Math.abs(z+3)<2||Math.abs(z-4)<2))return true
+  if(Math.abs(x+28)<2.72&&Math.abs(z-55)<3.7||Math.abs(x+5)<8.2&&Math.abs(x)>.93&&Math.abs(z-51)<.23)return true
   return Math.hypot(x+18,z-55)<1.67
 }
 

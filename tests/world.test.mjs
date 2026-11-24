@@ -4,9 +4,10 @@ import {ChessStore} from '../server/storage.ts'
 import {CityWorlds} from '../server/world.ts'
 import {RouletteHall} from '../server/roulette-hall.ts'
 import {casinoBet} from '../server/casino.ts'
-import {DICE_TABLE_INDEX,LIFT,worldMove,floorHeight,riderHeight,site} from '../src/world/model.ts'
+import {DICE_TABLE_INDEX,LIFT,walkingHeight,worldMove,floorHeight,riderHeight,site} from '../src/world/model.ts'
 
-import {HOMES,passableLand,terrainHeight} from '../src/world/terrain.ts'
+import {RESIDENCES,UNITS,propertyPoints} from '../src/world/housing.ts'
+import {CAVE_MOUTH,OASIS_MOUTH,HOMES,homeFacing,poolLevel,passableLand,terrainHeight} from '../src/world/terrain.ts'
 
 function fixture(t,count=2){
   const store=new ChessStore('.',{memory:true}),roulette=new RouletteHall(store),world=new CityWorlds(store,roulette)
@@ -68,9 +69,9 @@ test('the entrance is once per Dutch day and the private room has no public pres
   const {store,names,action,move,room}=fixture(t),[alice,bob]=names
   action(alice,'presence')
   move(alice,0,58);move(alice,-40,68)
-  const mouth=move(alice,-40,73.25)
+  const mouth=move(alice,-40,CAVE_MOUTH+.75)
   assert.equal(mouth.you.zone,'cave')
-  assert.ok(Math.abs(mouth.you.z-73.25)<.14)
+  assert.ok(Math.abs(mouth.you.z-(CAVE_MOUTH+.75))<.14)
   const hid=room(alice,'cave',0,-7.35)
   assert.equal(hid.you.zone,'private')
   assert.deepEqual(hid.players,[])
@@ -81,15 +82,15 @@ test('the entrance is once per Dutch day and the private room has no public pres
   const exited=action(alice,'teleport',{to:'bank'})
   assert.equal(exited.you.zone,'oasis')
   assert.equal(exited.caveOpen,false)
-  const exit=move(alice,40,72.65)
+  const exit=move(alice,40,OASIS_MOUTH-.35)
   assert.equal(exit.you.zone,'city')
-  assert.ok(Math.abs(exit.you.z-72.65)<.14)
+  assert.ok(Math.abs(exit.you.z-(OASIS_MOUTH-.35))<.14)
   assert.equal(action(alice,'teleport',{to:'bank'}).you.zone,'bank')
   assert.equal(JSON.parse(store.accountJson(alice)).cave.active,false)
   store.transaction(unit=>unit.users.get(bob).wallet.coins=0)
   assert.equal(action(bob,'presence').caveOpen,false)
   move(bob,0,58);move(bob,-40,68)
-  assert.equal(move(bob,-40,74).you.zone,'city')
+  assert.equal(move(bob,-40,CAVE_MOUTH+.75).you.zone,'city')
 })
 
 test('tower floors and bank transactions require the right physical interaction',t=>{
@@ -146,13 +147,56 @@ test('hotel and casino doors preserve position, heading and visibility across th
 
 test('each home opens onto the street and its walls and furniture stop movement',()=>{
   for(const [x,z] of HOMES){
-    const walk=(from,tx,tz)=>worldMove('city',from,tx,tz,14)
-    const inside=walk({x,z:z+4,yaw:0},x,z)
+    const f=homeFacing(z),unit=UNITS.find(u=>u.x===x&&u.z===z),door={x,z:z+4*f,yaw:0}
+    const walk=(from,tx,tz)=>worldMove('city',from,tx,tz,14,true,unit?[unit.id]:[])
+    if(unit)assert.ok(Math.abs(worldMove('city',door,x,z,14).z-z)>2.75)
+    const inside=walk(door,x,z)
     assert.ok(Math.abs(inside.z-z)<.05)
-    assert.ok(walk(inside,x-4,z).x>x-1.7)
-    assert.ok(walk(inside,x+5,z).x<x+3)
-    assert.ok(Math.abs(walk(inside,x,z+4).z-z-4)<.05)
+    assert.ok((walk(inside,x-4*f,z).x-x)*f> -1.7)
+    assert.ok((walk(inside,x+5*f,z).x-x)*f<3)
+    assert.ok(Math.abs(walk(inside,x,z+4*f).z-door.z)<.05)
   }
+})
+test('spring descends continuously, then supports swimmers at the waterline',()=>{
+  for(const z of [7.65,4,0,-2,-5,-7]){
+    const p=site('oasis',0,z),height=walkingHeight('oasis',p.x,p.z)
+    assert.ok(Number.isFinite(height))
+    if(z===7.65)assert.ok(Math.abs(height)<.04)
+    if(z===-7)assert.equal(height,poolLevel-1.28)
+  }
+})
+test('a lease is exclusive, charged once, and becomes available after seven days',t=>{
+  const {names,action,move,store}=fixture(t),[alice,bob]=names
+  const unit=UNITS.find(u=>u.id==='house-10'),sign=propertyPoints().find(p=>p.id==='property:'+unit.id)
+  for(const name of names){
+    action(name,'teleport',{to:'city'})
+    assert.throws(()=>action(name,'housing',{unit:unit.id}),{status:409})
+    move(name,0,11);move(name,sign.x,11);move(name,sign.x,sign.z)
+  }
+  const acquired=action(alice,'housing',{unit:unit.id})
+  assert.ok(acquired.housing.keys.includes(unit.id))
+  assert.equal(acquired.coins,1000-unit.price)
+  assert.equal(action(alice,'housing',{unit:unit.id}).coins,acquired.coins)
+  assert.throws(()=>action(bob,'housing',{unit:unit.id}),{status:409})
+  const stored=store.metadataValue('cityDeeds')[unit.id]
+  assert.equal(stored.until,acquired.now+7*86400000)
+  assert.ok(!action(alice,'presence',{},7*86400000+1).housing.occupied.includes(unit.id))
+})
+test('the apartment clerk sells a fixed unit and its door accepts only the buyer',t=>{
+  const {store,names,action,move}=fixture(t),[buyer]=names,b=RESIDENCES[0]
+  const unit=UNITS.find(u=>u.block===0&&u.tenure==='buy')
+  store.transaction(tx=>{tx.users.get(buyer).wallet.coins=5000})
+  action(buyer,'presence');move(buyer,0,11);move(buyer,-60,11);move(buyer,-60,-30)
+  move(buyer,b.x,-30);move(buyer,b.x,b.z+3.7);move(buyer,b.x+5.1,b.z+3.7)
+  assert.equal(action(buyer,'use',{target:'property:desk-0'}).interaction,'property:desk-0')
+  const bought=action(buyer,'housing',{unit:unit.id})
+  assert.equal(bought.housing.expires[unit.id],0)
+  assert.equal(bought.coins,5000-unit.price)
+  const entry={x:unit.x,z:unit.z+3.75,yaw:0}
+  assert.ok(worldMove('city',entry,unit.x,unit.z+1.7,4).z>unit.z+3)
+  assert.ok(worldMove('city',entry,unit.x,unit.z+1.7,4,true,bought.housing.keys).z<unit.z+2)
+  const resident=UNITS.find(u=>u.block===0&&u.tenure==='resident')
+  assert.throws(()=>action(buyer,'housing',{unit:resident.id}),{status:409})
 })
 test('the valley has walkable meadow and a steep enclosing ridge',()=>{
   for(let i=0;i<72;i++){

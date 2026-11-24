@@ -20,6 +20,8 @@ const routes=[
   [[-4,15],[-4.6,9],[-3.85,-4],[-4.9,-4],[-4.9,15],[-4,15]],
   [[5,16],[9,7],[8,-4],[12,-5],[12,12],[5,16]],
   [[29.84,25.1],[29.72,14.04],[43.6,14.04],[43.69,29.62],[29.62,29.62],[29.84,25.1]],
+  [[49,7.05],[59,7.05],[63,6.15],[67,7.15],[71,7.1],[68,7.45],[49,7.05]],
+  [[-59,-31],[-59,-44.7],[-48.5,-45.3],[-48.5,-46.5],[-62.6,-46.6],[-62.5,-31],[-59,-31]],
   [[-40,30],[-30,27],[-26,26],[-21,29],[-30,32],[-40,30]],
   [[-13.5,43.5],[-13.5,45],[-22,45],[-27,53],[-25.5,53],[-21,46],[-13.5,46],[-13.5,43.5]],
 ] as const
@@ -207,7 +209,7 @@ export class CityStage {
     this.tools=kitchenTools(this.art.scene)
     this.npc=routes.map((_,i)=>{
       const target=pedestrian(i,Date.now()+this.clock)
-      return new Figure(this.art!.scene,{...target,name:['Iris','Marlowe','June','Dion','Rafi','Hana','Vera','Otis'][i],avatar:'default',online:true},this.shadow!)
+      return new Figure(this.art!.scene,{...target,name:['Iris','Marlowe','June','Dion','Rafi','Hana','Milo','Lotte','Vera','Otis'][i],avatar:'default',online:true},this.shadow!)
     })
   }
   private clearScene(){
@@ -430,6 +432,7 @@ export class CityStage {
   }
   private motion(now:number,dt:number){
     if(!this.art)return
+    this.art.lightZone(this.zone,dt)
     if(!this.reduced){this.art.ambient?.(now);this.art.restaurant.tick(now)}
     if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))
     const zones=[this.view?.you.zone,this.view?.you.lift?.to].filter((z):z is WorldZone=>!!z)

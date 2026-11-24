@@ -1,34 +1,64 @@
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
-import {HOMES,MARKET,BOULEVARD_TREES} from './terrain.ts'
+import {homeFacing,HOMES,MARKET,BOULEVARD_TREES} from './terrain.ts'
 const cream=0xe1d0a8,bronze=0xa77b45,wood=0x684c3e,green=0x486552
 
 export function avenues(parent:T.Object3D){
   const p=new Scenery()
   const slab=(x:number,z:number,w:number,d:number,color:number,y:number)=>p.add('box',x,y,z,w,.012,d,color)
-  function road(x:number,z:number,length:number,width:number,vertical=false,major=false){
-    const rect=(offset:number,along:number,w:number,l:number,color:number,y:number)=>slab(x+(vertical?offset:along),z+(vertical?along:offset),vertical?w:l,vertical?l:w,color,y)
-    const level=vertical?.008:0
-    rect(0,0,width+2.8,length,0xb4aaa0,-.045+level);rect(0,0,width,length,major?0x535a5b:0x726d64,-.026+level)
-    for(const side of [-1,1])rect(side*(width/2+.09),0,.18,length,0xd1c5af,-.006+level)
-    if(major)for(let a=2-length/2;a<length/2-1;a+=4.4)rect(0,a,.085,1.48,0xcfbf9a,-.010+level)
-  }
+  // Partition the road network at all curb edges. At a junction every patch
+  // has exactly one visible surface and the intersecting street cuts the curb.
+  const roads:{x:number;z:number;length:number;width:number;vertical:boolean;major:boolean}[]=[]
+  const road=(x:number,z:number,length:number,width:number,vertical=false,major=false)=>roads.push({x,z,length,width,vertical,major})
   road(0,11,154,5.4,false,true)
   road(0,31,149,3.5)
   road(-60,-9,80,3.25,true)
   road(0,29,32,4.3,true,true)
+  road(-5,-49,132,3.5)
   for(const side of [-1,1]){
-    road(side*40,-49,66,3.5);road(side*37,-10.65,48,2.9)
-    road(side*31,-30,38,3.1);road(side*48,0,60,3.1,true)
+    road(side*37,-11.9,48,2.9)
+    road(side*31,-30,38,3.1);road(side*48,-9,80,3.1,true)
     road(side*10.4,22,18.5,2.4,true)
     slab(side*24,6.78,3.9,3.6,0xc3b9a2,-.001)
     for(let j=0;j<8;j++)slab(side*11.8,8.76+j*.63,1.82,.27,0xe2d7bc,.005)
   }
+  const xs=new Set<number>(),zs=new Set<number>()
+  for(const r of roads){
+    const lateral=r.vertical?xs:zs,along=r.vertical?zs:xs
+    const mid=r.vertical?r.x:r.z,end=r.vertical?r.z:r.x
+    for(const side of [-1,1]){
+      for(const edge of [0,.18,1.4])lateral.add(mid+side*(r.width/2+edge))
+      along.add(end+side*r.length/2)
+    }
+    if(r.major)for(let a=2-r.length/2;a<r.length/2-1;a+=4.4){
+      if(roads.some(other=>other.vertical!==r.vertical&&Math.abs((r.vertical?other.z:other.x)-end-a)<other.width/2+1&&Math.abs((r.vertical?other.x:other.z)-mid)<other.length/2))continue
+      slab(r.x+(r.vertical?0:a),r.z+(r.vertical?a:0),r.vertical?.085:1.48,r.vertical?1.48:.085,0xcfbf9a,-.012)
+    }
+  }
+  const xx=[...xs].sort((a,b)=>a-b),zz=[...zs].sort((a,b)=>a-b)
+  const positions:number[]=[],colors:number[]=[],color=new T.Color()
+  for(let i=1;i<xx.length;i++)for(let j=1;j<zz.length;j++){
+    const l=xx[i-1],r=xx[i],t=zz[j-1],b=zz[j],x=(l+r)/2,z=(t+b)/2
+    let layer=0
+    for(const street of roads){
+      const dx=Math.abs(x-street.x),dz=Math.abs(z-street.z),offset=(street.vertical?dx:dz)-street.width/2
+      if((street.vertical?dz:dx)>=street.length/2||offset>=1.4)continue
+      layer=Math.max(layer,offset<0?(street.major?4:3):offset<.18?2:1)
+    }
+    if(!layer)continue
+    color.setHex([0,0xb4aaa0,0xd1c5af,0x726d64,0x535a5b][layer])
+    const y=-.026
+    positions.push(l,y,t,l,y,b,r,y,b,l,y,t,r,y,b,r,y,t)
+    for(let k=0;k<6;k++)colors.push(color.r,color.g,color.b)
+  }
+  const network=new T.BufferGeometry()
+  network.setAttribute('position',new T.Float32BufferAttribute(positions,3));network.setAttribute('color',new T.Float32BufferAttribute(colors,3));network.computeVertexNormals()
+  parent.add(new T.Mesh(network,new T.MeshStandardMaterial({vertexColors:true,roughness:.92})))
   slab(0,45,46,1.75,0xb9a88a,-.038)
   for(const [x,z] of HOMES){
-    const lane=z<-32?-30:z<-11?-10.65:z<4?11:z>35?45:31
-    const start=z+3,end=Math.max(start+.68,lane)
-    slab(x,(start+end)/2,1.45,end-start,0xc3b69c,-.053)
+    const facing=homeFacing(z),lane=facing<0?11:z<-32?-30:z<-11?-11.9:z<4?11:45
+    const start=z+3*facing,end=lane
+    slab(x,(start+end)/2,1.45,Math.abs(end-start),0xc3b69c,-.053)
   }
   for(const side of [-1,1]){
     // Boulevard trees, root grates, and low rectangular parterres.

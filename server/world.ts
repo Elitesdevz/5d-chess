@@ -164,6 +164,7 @@ export class CityWorlds {
         purse.coins-=unit.price
         deeds[unit.id]={holder:name,until:unit.tenure==='rent'?now+7*86400000:0}
         u.putMetadata('cityDeeds',deeds)
+        u.economyUsage(name,'/api/world/housing',{action:unit.tenure==='rent'?'housing_lease':'housing_purchase',reference:unit.id,coins:unit.price},now)
       })
       housing=this.housing(name,now)
     }else if(action==='chat'){
