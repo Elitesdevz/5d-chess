@@ -12,7 +12,7 @@ export const UNITS:Unit[]=[
     layout:['Studio','Corner study','Family suite'][i],tenure:(i===block?'resident':(i+block)%2?'rent':'buy') as Tenure,price:(i+block)%2?60+width*18:800+width*280,
   }))),
 ]
-export const OFFICES=[{x:-68,z:-22,w:8,d:11,h:19},{x:-69,z:0,w:10,d:12,h:29},{x:-68,z:24,w:9,d:8,h:13},{x:66,z:-20,w:9,d:10,h:17}]
+export const OFFICES=[{x:-68,z:-22,w:8,d:11,h:19},{x:-70,z:0,w:10,d:12,h:29},{x:-68,z:24,w:9,d:8,h:13},{x:66,z:-20,w:9,d:10,h:17}]
 export type Deeds=Record<string,{holder:string;until:number}>
 export type HousingView={keys:string[];occupied:string[];expires:Record<string,number>}
 export function propertyPoints(){

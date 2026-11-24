@@ -19,7 +19,9 @@ export function district(scene:T.Scene,letter:Letter){
       }
       box(x,y-1,z,w+.26,.17,d+.25,stone)
     }
-    box(x,2.35,z+d/2+.48,3.75,.19,1.12,steel)
+    box(x+w/2+.47,2.35,z,1.13,.19,3.75,steel)
+    box(x+w/2+.07,1.12,z,.16,2.24,2.84,steel)
+    for(const dz of [-.62,.62])box(x+w/2+.18,1.14,z+dz,.07,2.05,1.12,glass)
   }
   const doors=new Map<string,T.Mesh>(),doorMat=new T.MeshStandardMaterial({color:wood})
   const clerks:ClubGuest[]=[]
@@ -81,7 +83,7 @@ export function district(scene:T.Scene,letter:Letter){
     }
     p.finish(car);scene.add(car);return car
   })
-  const route=new T.CurvePath<T.Vector3>(),corners=[[-47,12],[47,12],[47,30],[-47,30]]
+  const route=new T.CurvePath<T.Vector3>(),corners=[[-61.75,12],[73.25,12],[73.25,30],[-61.75,30]]
   const point=(x:number,z:number)=>new T.Vector3(x,0,z)
   corners.forEach(([x,z],i)=>{
     const next=corners[(i+1)%4],after=corners[(i+2)%4],start=point(x,z),end=point(...next as [number,number])
