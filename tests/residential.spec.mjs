@@ -6,6 +6,8 @@ import {join} from 'node:path'
 import {chromium} from 'playwright'
 import {ChessStore} from '../server/storage.ts'
 import {createApplication} from '../server/application.ts'
+import {cityRoute} from '../server/city-life.ts'
+import {CITY_DAY_MS} from '../src/world/city-residents.ts'
 import {BUILDINGS,buildingById,contains,homeZone,residentialSite,residentialStep} from '../src/world/residential.ts'
 import {UNITS} from '../src/world/housing.ts'
 import {site} from '../src/world/model.ts'
@@ -14,7 +16,7 @@ import {COUNTERS} from '../src/world/restaurant-model.ts'
 test('residential walkthrough through both buildings, house styles, furniture and takeaway storage', {timeout:660_000},async()=>{
   const out=process.env.RESIDENTIAL_SCREENSHOTS
   if(out)await mkdir(out,{recursive:true})
-  const realNow=Date.now,startedAt=realNow()
+  const realNow=Date.now,startedAt=Math.floor(realNow()/CITY_DAY_MS)*CITY_DAY_MS
   let offset=0
   Date.now=()=>startedAt+offset
   const store=new ChessStore('.', {memory:true}), app=createApplication(store),server=createServer(app.handle)
@@ -37,12 +39,17 @@ test('residential walkthrough through both buildings, house styles, furniture an
       return result
     }
     async function walk(x,z,yaw=0){
-      for(let i=0;i<45;i++){
+      for(let i=0;i<85;i++){
         offset+=900
         await action('presence',{x,z,yaw,world:current.id})
         if(Math.hypot(current.you.x-x,current.you.z-z)<.034)return
       }
       assert.fail('Blocked walking to '+[x,z]+' from '+JSON.stringify(current.you))
+    }
+    async function outdoors(destination){
+      const waypoints=cityRoute(current.you,destination)
+      assert.ok(waypoints.length,'property connects to the pedestrian network')
+      for(const p of waypoints)await walk(p.x,p.z)
     }
     async function local(b,x,z,yaw=0){
       const p=residentialSite(b,x,z)
@@ -118,8 +125,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
     })
     for(const b of BUILDINGS.slice(0,2)){
       await action('teleport',{to:'city'})
-      const edge=b.block===0?-61.5:73
-      for(const [x,z] of [[0,11],[edge,11],[edge,-30.75],[b.x,-30.75]])await walk(x,z)
+      await outdoors(residentialSite(b,0,b.rect.f+1.02))
       await action('use',{target:'door:'+b.id+'-street'})
       offset+=400
       await local(b,0,3.5,-.67)
@@ -217,11 +223,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
     for(const index of [0,2,5,6]){
       const b=buildingById.get('house-'+index),front=residentialSite(b,0,b.rect.f+.74)
       await action('teleport',{to:'city'})
-      // Walk a raster of public streets, then cross the house threshold.
-      const edge=b.x<0?-61.5:73
-      const approach=b.z<0?-11.7:8.35
-      for(const [x,z] of [[0,11],[edge,11],[edge,approach],[b.x,approach]])await walk(x,z)
-      await walk(front.x,front.z)
+      await outdoors(front)
       await action('use',{target:'door:'+b.id})
       await local(b,0,2.69)
       await capture(b.id+'-interior')
