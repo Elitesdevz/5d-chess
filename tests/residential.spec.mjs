@@ -14,12 +14,12 @@ import {COUNTERS} from '../src/world/restaurant-model.ts'
 test('residential walkthrough through both buildings, house styles, furniture and takeaway storage', {timeout:660_000},async()=>{
   const out=process.env.RESIDENTIAL_SCREENSHOTS
   if(out)await mkdir(out,{recursive:true})
-  const realNow=Date.now
+  const realNow=Date.now,startedAt=realNow()
   let offset=0
-  Date.now=()=>realNow()+offset
+  Date.now=()=>startedAt+offset
   const store=new ChessStore('.', {memory:true}), app=createApplication(store),server=createServer(app.handle)
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
-  let browser,current,keepalive
+  let browser,current
   try{
     const base='http://127.0.0.1:'+server.address().port
     browser=await chromium.launch({args:['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-webgl','--enable-unsafe-swiftshader']})
@@ -29,13 +29,13 @@ test('residential walkthrough through both buildings, house styles, furniture an
     const keys=UNITS.filter(u=>u.tenure!=='resident').map(u=>u.id)
     store.transaction(tx=>tx.putMetadata('cityDeeds',Object.fromEntries(keys.map(id=>[id,{holder:name,until:0}]))))
     async function action(path,data={}){
+      offset+=35
       const response=await context.request.post(base+'/api/world/'+path,{data:{scene:true,...data}})
       const result=await response.json()
       assert.ok(response.ok(),path+' '+JSON.stringify(data)+' '+result.error)
       current=result
       return result
     }
-    keepalive=setInterval(()=>{void context.request.post(base+'/api/world/presence',{data:{scene:true}}).catch(()=>{})},6000)
     async function walk(x,z,yaw=0){
       for(let i=0;i<45;i++){
         offset+=900
@@ -137,7 +137,10 @@ test('residential walkthrough through both buildings, house styles, furniture an
       await local(b,b.lift.x,b.lift.z)
       await action('use',{target:'lift:'+b.id})
       await capture(b.id+'-elevator',async page=>{
+        const depart=page.waitForResponse(r=>r.url().endsWith('/api/world/home-floor')&&r.ok())
         await page.getByRole('button',{name:'1',exact:true}).click()
+        await depart
+        offset+=3100
         await page.locator('#world-canvas[data-zone="'+homeZone(b.id,1)+'"]').waitFor()
       })
       assert.equal(current.you.zone,homeZone(b.id,1))
@@ -148,16 +151,19 @@ test('residential walkthrough through both buildings, house styles, furniture an
       await local(b,s.x-s.width/2,s.front+dz*.51,Math.PI)
       await capture(b.id+'-stairs',async page=>{
         const start=current.you.z
-        await page.evaluate(()=>new Promise(resolve=>{
-          const move=type=>window.dispatchEvent(new KeyboardEvent(type,{key:'w'}))
-          move('keydown')
-          setTimeout(()=>{move('keyup');resolve()},360)
-        }))
-        for(let i=0;i<12;i++){
-          if((await action('presence')).you.z>start+.25)break
-          await page.waitForTimeout(180)
-        }
-        assert.ok(current.you.z>start+.25,'keyboard movement advances on the staircase')
+        const clock=setInterval(()=>{offset+=120},110)
+        try{
+          await page.evaluate(()=>new Promise(resolve=>{
+            const move=type=>window.dispatchEvent(new KeyboardEvent(type,{key:'w'}))
+            move('keydown')
+            setTimeout(()=>{move('keyup');resolve()},400)
+          }))
+          for(let i=0;i<12;i++){
+            if((await action('presence')).you.z>start+.25)break
+            await page.waitForTimeout(180)
+          }
+          assert.ok(current.you.z>start+.25,'keyboard movement advances on the staircase')
+        }finally{clearInterval(clock)}
         assert.match(current.you.zone,/^stairs:/)
       })
       await local(b,s.x-s.width/2,s.front+dz*.90)
@@ -238,7 +244,6 @@ test('residential walkthrough through both buildings, house styles, furniture an
     }
     assert.deepEqual(errors,[])
   }finally{
-    clearInterval(keepalive)
     Date.now=realNow
     app.drain()
     await browser?.close()
