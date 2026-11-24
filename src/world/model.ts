@@ -29,7 +29,7 @@ export const ZONE_ARRIVAL:Record<Exclude<WorldZone,`floor:${string}`>,Position>=
   city:CITY,hotel:{x:0,z:5.7,yaw:0},casino:{x:0,z:7.1,yaw:0},
   bank:{x:0,z:6.6,yaw:0},exchange:{x:0,z:6.6,yaw:0},
   kfc:{x:0,z:5.6,yaw:0},
-  cave:{x:0,z:6.7,yaw:0},oasis:{x:0,z:-6.6,yaw:0},private:{x:0,z:0,yaw:0},
+  cave:{x:0,z:6.7,yaw:0},oasis:{x:.45,z:-6.2,yaw:Math.PI-.09},private:{x:0,z:0,yaw:0},
 }
 export const FLOOR_ARRIVAL={x:0,z:6,yaw:0}
 export const FLOOR_HEIGHT=6

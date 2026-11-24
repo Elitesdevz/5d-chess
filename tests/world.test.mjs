@@ -81,6 +81,7 @@ test('the entrance is once per Dutch day and the private room has no public pres
   assert.equal(settled.round.gross,59.85)
   const exited=action(alice,'teleport',{to:'bank'})
   assert.equal(exited.you.zone,'oasis')
+  assert.ok(Math.cos(exited.you.yaw)>.95,'the swimmer faces the path to daylight')
   assert.equal(exited.caveOpen,false)
   const exit=move(alice,40,OASIS_MOUTH-.35)
   assert.equal(exit.you.zone,'city')
