@@ -39,11 +39,17 @@ function texture(width:number,height:number,paint:(ctx:CanvasRenderingContext2D)
   paint(c.getContext('2d')!)
   const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;return texture
 }
+const bannerTextures=new Map<string,T.CanvasTexture>()
 export function banner(parent:T.Object3D,text:string,size:[number,number],point:number[],color='#f5dba5',backdrop='transparent'){
-  const map=texture(768,160,c=>{
-    if(backdrop!=='transparent'){c.fillStyle=backdrop;c.fillRect(0,0,768,160)}
-    c.fillStyle=color;c.font='600 78px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText(text,384,80,731)
-  })
+  const key=JSON.stringify([text,color,backdrop])
+  let map=bannerTextures.get(key)
+  if(!map){
+    map=texture(768,160,c=>{
+      if(backdrop!=='transparent'){c.fillStyle=backdrop;c.fillRect(0,0,768,160)}
+      c.fillStyle=color;c.font='600 78px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText(text,384,80,731)
+    })
+    bannerTextures.set(key,map)
+  }
   return mesh(new T.PlaneGeometry(...size),new T.MeshBasicMaterial({map,transparent:true,depthWrite:false}),parent,point,false)
 }
 function plane(parent:T.Object3D,w:number,d:number,x:number,y:number,z:number,material:T.Material){

@@ -9,6 +9,7 @@ import type {Position} from '../roulette-hall-model.ts'
 
 const cast=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as E
 const host=cast('city-world'),connection=cast('world-connection'),panel=cast('world-table'),dialog=cast<HTMLDialogElement>('world-service')
+const graphicsMessage='Preparing city graphics…'
 const pause=cast('world-pause'),chatForm=cast<HTMLFormElement>('world-chat-form'),chatInput=chatForm.querySelector('input')!
 let paused=false,chatting=false
 function syncControls(){stage?.lock(paused||chatting||dialog.open)}
@@ -159,7 +160,6 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   if(next.you.zone==='private'){
     closed=true;location.replace('/chess/dice.html?cave=1');return
   }
-  connection.hidden=true
   if(host.dataset.zone!==next.you.zone)host.dataset.zone=next.you.zone
   const seatedState=String(Boolean(next.you.chair||next.you.lounge||next.you.dining!==undefined||next.you.barSeat!==undefined||next.you.boardSeat!==undefined))
   if(host.dataset.seated!==seatedState)host.dataset.seated=seatedState
@@ -168,6 +168,8 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
   }
   stage?.set(next,offset,reposition,sent);syncControls();renderChat(next)
+  connection.hidden=!stage?.preparingGraphics
+  if(stage?.preparingGraphics)connection.textContent=graphicsMessage
   updateWalletBalance(next.coins)
   restaurant?.update(next)
   if(changed){
@@ -285,7 +287,9 @@ async function start(){
       pollTimer=window.setTimeout(beat,Math.max(35,lastPresence+95-performance.now()))
     }
   }
-  stage=new CityStage(cast('world-canvas'),host,use,showPause,wakePresence)
+  stage=new CityStage(cast('world-canvas'),host,use,showPause,wakePresence,()=>{
+    if(connection.textContent===graphicsMessage)connection.hidden=true
+  })
   const url=new URL(location.href),go=url.searchParams.get('go')??''
   if(url.searchParams.get('exit')==='cave')await action('exit-cave',{})
   else if(like(go))await action('teleport',{to:go})

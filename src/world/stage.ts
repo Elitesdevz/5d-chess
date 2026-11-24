@@ -9,6 +9,8 @@ import * as T from 'three'
 import {liftPlatform,makeWorldArt,spinWheel} from './art.ts'
 import {Figure} from '../casino/hall-stage.ts'
 import {PlayerMotion,type PlayerSample} from './player-motion.ts'
+import {CityLighting} from './city-lighting.ts'
+import {CityAssets} from './city-assets.ts'
 import {resultRotation,v} from '../casino/scene/geometry.ts'
 import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
@@ -30,9 +32,9 @@ export class CityStage {
   private art?:ReturnType<typeof makeWorldArt>
   private view?:WorldView
   private camera=new T.PerspectiveCamera(58,1,.16,720)
-  private frustum=new T.Frustum()
-  private projection=new T.Matrix4()
-  private pointLights:{light:T.PointLight;bounds:T.Sphere}[]=[]
+  private lighting?:CityLighting
+  private preparing?:CityAssets
+  private graphicsReady=false
   private shadow?:T.CanvasTexture
   private figures=new Map<string,Avatar>()
   private playerMotion=new Map<string,PlayerMotion>()
@@ -82,7 +84,8 @@ export class CityStage {
   private wasMoving=false
   position:Position={...CITY}
   get moving(){return (this.arrows.size>0||Math.hypot(this.stick.x,this.stick.z)>.09)&&!this.pause}
-  constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void,onPause:()=>void=()=>{},private onMovementChange=()=>{}){
+  get preparingGraphics(){return !!this.art&&!this.graphicsReady}
+  constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void,onPause:()=>void=()=>{},private onMovementChange=()=>{},private onGraphicsReady=()=>{}){
     this.canvas=canvas;this.parent=parent;this.onAction=onAction;this.onPause=onPause
     this.promptButton=parent.querySelector('[data-world-use]')!
     this.promptLabel=this.promptButton.querySelector('span')!
@@ -212,23 +215,27 @@ export class CityStage {
     this.art=makeWorldArt(this.caveOpen)
     this.art.scene.matrixAutoUpdate=false
     this.tools=kitchenTools(this.art.scene)
-    this.art.scene.traverse(object=>{
-      if(object instanceof T.PointLight&&object.distance>0&&!object.castShadow){
-        const center=object.getWorldPosition(new T.Vector3())
-        this.pointLights.push({light:object,bounds:new T.Sphere(center,object.distance+.5)})
-      }
-    })
+    this.lighting=new CityLighting(this.art.scene)
+  }
+  private prepareGraphics(now:number){
+    if(this.graphicsReady||!this.art||!this.renderer)return
+    if(!this.preparing){
+      this.cameraView(now);this.avatars(.016,now);this.motion(now,.016)
+      this.lighting?.update(this.camera)
+      this.preparing=new CityAssets(this.renderer,this.art.scene,this.camera)
+    }
+    if(this.preparing.step()){
+      this.preparing.dispose();this.preparing=undefined
+      this.graphicsReady=true;this.onGraphicsReady()
+    }
   }
   private renderScene(){
     if(!this.art||!this.renderer)return
-    this.projection.multiplyMatrices(this.camera.projectionMatrix,this.camera.matrixWorldInverse)
-    this.frustum.setFromProjectionMatrix(this.projection)
-    // A finite light makes no contribution beyond its range. Keep any light
-    // that can reach the view, including lights just outside the image.
-    for(const {light,bounds} of this.pointLights)light.visible=this.frustum.intersectsSphere(bounds)
+    this.lighting?.update(this.camera)
     this.renderer.render(this.art.scene,this.camera)
   }
   private clearScene(){
+    this.preparing?.dispose();this.preparing=undefined
     for(const entry of this.figures.values()){entry.figure.dispose();entry.tag?.remove()}
     this.figures.clear()
     for(const entry of this.restaurantNpc.values())entry.figure.dispose()
@@ -245,7 +252,7 @@ export class CityStage {
         }
       })
     }
-    this.npc.clear();this.lifts.clear();this.playerMotion.clear();this.pointLights=[];this.art=undefined
+    this.npc.clear();this.lifts.clear();this.playerMotion.clear();this.lighting=undefined;this.art=undefined
   }
   private fit(){
     const w=Math.max(1,this.canvas.clientWidth),h=Math.max(1,this.canvas.clientHeight)
@@ -536,10 +543,14 @@ export class CityStage {
     if(document.hidden){this.lastStep=0;return}
     const stepTime=Math.min(.25,(time-(this.lastStep||time))/1000)
     this.lastStep=time
+    if(this.gl?.isContextLost())return
+    if(this.preparingGraphics){
+      this.prepareGraphics(Date.now()+this.clock)
+      if(this.preparingGraphics)return
+    }
     this.step(stepTime);this.prompt()
     const moving=this.moving
     if(moving!==this.wasMoving){this.wasMoving=moving;this.onMovementChange()}
-    if(this.gl?.isContextLost())return
     if(this.gl&&this.fence){
       if(this.gl.clientWaitSync(this.fence,0,0)===this.gl.TIMEOUT_EXPIRED)return
       this.gl.deleteSync(this.fence);this.fence=null
