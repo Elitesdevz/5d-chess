@@ -20,6 +20,7 @@ export function batchOpaque(section:T.Object3D,keep:ReadonlySet<T.Object3D>=new 
   function visit(object:T.Object3D){
     if(keep.has(object)||!object.visible)return
     if(object instanceof T.Mesh&&!(object instanceof T.InstancedMesh)&&!Array.isArray(object.material)){
+      object.matrixAutoUpdate=false
       const {material,geometry}=object
       const unmirrored=transform.multiplyMatrices(origin,object.matrixWorld).determinant()>0
       if(!material.transparent&&object.frustumCulled&&unmirrored&&object.renderOrder===0&&geometry.drawRange.start===0&&geometry.drawRange.count===Infinity){

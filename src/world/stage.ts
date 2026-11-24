@@ -210,6 +210,7 @@ export class CityStage {
   }
   private buildScene(){
     this.art=makeWorldArt(this.caveOpen)
+    this.art.scene.matrixAutoUpdate=false
     this.tools=kitchenTools(this.art.scene)
     this.art.scene.traverse(object=>{
       if(object instanceof T.PointLight&&object.distance>0&&!object.castShadow){

@@ -26,6 +26,7 @@ export class Scenery{
     const color=new T.Color()
     for(const {shape,items} of this.parts.values()){
       const mesh=new T.InstancedMesh(shapes[shape],material,items.length)
+      mesh.matrixAutoUpdate=false
       items.forEach((v,i)=>{mesh.setMatrixAt(i,v.matrix);mesh.setColorAt(i,color.setHex(v.color))})
       mesh.computeBoundingSphere();parent.add(mesh)
     }
@@ -89,7 +90,11 @@ function meadow(scene:T.Scene){
     part.boundingSphere=bounds.getBoundingSphere(new T.Sphere())
     return part
   }
-  for(const faces of tiles.values())land.add(new T.Mesh(groundPatch(faces,['position','color','uv','normal']),material))
+  for(const faces of tiles.values()){
+    const tile=new T.Mesh(groundPatch(faces,['position','color','uv','normal']),material)
+    tile.matrixAutoUpdate=false
+    land.add(tile)
+  }
   const patch=groundPatch(covered,['position','color','uv']);patch.computeVertexNormals()
   const seal=new T.Mesh(patch,material);scene.add(seal)
   return seal
