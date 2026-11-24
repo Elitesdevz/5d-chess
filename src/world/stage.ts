@@ -3,12 +3,12 @@ import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
 import {staffProps} from './restaurant-art.ts'
 import {WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts'
-import {terrainHeight} from './terrain.ts'
+import {terrainHeight,inPool} from './terrain.ts'
 import * as T from 'three'
 import {liftPlatform,makeWorldArt,spinWheel} from './art.ts'
 import {Figure} from '../casino/hall-stage.ts'
 import {resultRotation,v} from '../casino/scene/geometry.ts'
-import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
+import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
 const TAU=Math.PI*2
@@ -146,7 +146,8 @@ export class CityStage {
     if(!this.art&&this.renderer)this.buildScene()
     if(this.art){
       this.art.quarter.update(view.housing)
-      this.art.seal.visible=!this.caveOpen
+      this.art.seal.visible=!this.caveOpen&&next.zone!=='cave'
+      this.art.grotto.visible=!this.art.seal.visible
       this.art.restaurant.update(view.restaurant)
       const target=next.lift?.to??next.zone
       if(target.startsWith('floor:'))this.art.floor(target.slice(6))
@@ -292,7 +293,7 @@ export class CityStage {
     const keys=this.arrows
     const x=this.stick.x+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'))
     const z=this.stick.z+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'))
-    const length=Math.max(1,Math.hypot(x,z)),speed=WORLD_SPEED*dt/length
+    const length=Math.max(1,Math.hypot(x,z)),speed=WORLD_SPEED*dt/length*(this.zone==='oasis'&&inPool(localSite(this.zone,this.position.x,this.position.z).x,localSite(this.zone,this.position.x,this.position.z).z)?.53:1)
     if(x||z){
       const dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=z*Math.cos(this.yaw)-x*Math.sin(this.yaw)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
@@ -398,7 +399,11 @@ export class CityStage {
       this.yaw=from+delta*progress*progress*(3-2*progress)
       if(progress===1)this.liftFacing=undefined
     }
-    this.camera.position.set(x,(me?.zone==='city'?terrainHeight(x,z):me?riderHeight(me,now):0)+(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE),z)
+    this.camera.position.set(x,(me&&!me.lift?walkingHeight(me.zone,x,z):me?riderHeight(me,now):0)+(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE),z)
+    if(me?.zone==='oasis'){
+      const p=localSite('oasis',x,z)
+      if(inPool(p.x,p.z))this.camera.position.y+=Math.sin(now*.0027)*.055
+    }
     this.camera.rotation.set(this.pitch,this.yaw,0,'YXZ')
     const chair=me?.chair,round=chair&&this.view?.hall?.tables[chair.table]
     if(chair&&round){

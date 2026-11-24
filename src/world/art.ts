@@ -1,3 +1,4 @@
+import {basinBed,tunnelBed,poolLevel} from './terrain.ts'
 import {district} from './district.ts'
 import {ownershipSegments} from './company-desk.ts'
 import type {CompanyView} from '../equity-v2.ts'
@@ -83,7 +84,7 @@ function potted(parent:T.Object3D,x:number,z:number,scale=1){
     const a=i*2.4
     mesh(new T.IcosahedronGeometry(.33+i*.02,1),foliage[i%3],group,[Math.sin(a)*.22,1.22+i*.19,Math.cos(a)*.28]).scale.y=1.35
   }
-  batchStatic(group)
+  batchStatic(group);return group
 }
 function lamp(parent:T.Object3D,x:number,z:number){
   const g=new T.Group();g.position.set(x,0,z);parent.add(g)
@@ -334,24 +335,51 @@ function makeScreen(scene:T.Object3D,symbol:string,x:number){
   }
 }
 function cave(scene:T.Object3D,oasis:boolean){
-  const rockStops=Array.from({length:14},(_,i)=>7.39-i*1.16)
-  plane(scene,5.76,16.9,0,0,0,std(oasis?0x546b58:0x444441))
-  for(const [i,z] of rockStops.entries()){
-    for(const side of [-1,1]){
-      const o=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[side*3.09,1.57,z]);o.scale.set(1.47+.15*Math.sin(i*1.3),2.28+.16*Math.cos(i),1.55);o.rotation.y=z*side*.53
+  // Ribbons share vertices along the sloping bed, banks and grass lip.
+  const ribbon=(left:number,right:number,lh:(z:number)=>number,rh:(z:number)=>number,mat:T.Material)=>{
+    const positions:number[]=[],indices:number[]=[]
+    for(let i=0;i<=32;i++){
+      const z=7.7-i*.5
+      positions.push(left,lh(z),z,right,rh(z),z)
+      if(i){const j=i*2;indices.push(j-2,j-1,j,j,j-1,j+1)}
     }
-    const crown=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[0,3.25,z]);crown.scale.set(3.9,.9,1.47);crown.rotation.y=z*.71
+    const g=new T.BufferGeometry()
+    g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals()
+    scene.add(new T.Mesh(g,mat))
+  }
+  const bed=oasis?basinBed:tunnelBed
+  const lip=()=>-.085
+  ribbon(-4,-2.25,lip,bed,rock);ribbon(-2.25,2.25,bed,bed,std(oasis?0x676f61:0x4f4944));ribbon(2.25,4,bed,lip,rock)
+  // Solid ground above the deep chamber slopes into an uneven stone arch.
+  plane(scene,8,8.3,0,-.085,-4.15,std(0x819464))
+  for(let i=0;i<17;i++){
+    const z=7.35-i*.94,h=bed(z),size=.35+Math.min(1,(7.7-z)/7)
+    for(const side of [-1,1]){
+      const stone=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[side*2.73,h+.55,z])
+      stone.scale.set(.75*size,1.12*size,1.14);stone.rotation.y=i*side
+    }
+    if(z<.4){
+      const crown=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[0,h+3.46,z])
+      crown.scale.set(3.25,.72,1.52)
+    }
   }
   if(oasis){
-    const pool=mesh(new T.CircleGeometry(1.68,44),new T.MeshStandardMaterial({color:0x3b9c94,roughness:.19,metalness:.44}),scene,[.66,.018,-.31])
-    pool.rotation.x=-Math.PI/2;pool.scale.y=1.55
-    for(const [x,z] of [[-1.86,-2.7],[1.84,2.4],[-1.85,1.7],[1.81,-3.5]])potted(scene,x,z,.73)
-    light(scene,0x87dee1,17,8,0,2.6,.48);light(scene,0xf0cb9a,18,8,0,2.9,6.4)
-  }else{
-    light(scene,0xc6c09c,10,5,0,2.51,6.77)
-    block(scene,5.8,3.44,.18,0,1.67,-8,new T.MeshBasicMaterial({color:0x050606}))
-  }
+    plane(scene,4.48,6.81,0,poolLevel,-4.88,new T.MeshStandardMaterial({color:0x389e9c,roughness:.19,metalness:.33,transparent:true,opacity:.82}))
+    for(const [x,z] of [[-1.97,-3.4],[1.99,-5],[-2,.6]])potted(scene,x,z,.56).position.y=bed(z)
+    light(scene,0x72dfdf,32,8,0,-2.9,-4.8)
+    light(scene,0xf4d5a1,12,6,-1.4,-1.5,.9)
+  }else light(scene,0xb3c6bf,8,5,0,-.42,4.4)
+  block(scene,7,8,.28,0,-4.05,-8.22,rock)
   batchStatic(scene)
+  const ripples:T.Mesh[]=[]
+  if(oasis){
+    const film=new T.MeshBasicMaterial({color:0xade9de,transparent:true,opacity:.27,depthWrite:false})
+    for(let i=0;i<7;i++){
+      const ring=mesh(new T.RingGeometry(.43,.44,36),film,scene,[Math.sin(i*3.3)*1.2,poolLevel+.015,-2.6-i*.67])
+      ring.rotation.x=-Math.PI/2;ripples.push(ring)
+    }
+  }
+  return (time:number)=>ripples.forEach((r,i)=>{const s=.78+.35*Math.sin(time*.0017+i);r.scale.set(s,s*.62,1)})
 }
 
 function liftDeck(room:T.Object3D,finish:T.Material){
@@ -574,7 +602,7 @@ export function makeWorldArt(open:boolean){
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());contactShade(scene);const water=fountain(scene),wind=landscape(scene)
   const quarter=district(scene,banner)
-  const ambient=(time:number)=>{water(time);wind(time);quarter.tick(time)}
+  const ambient=(time:number)=>{water(time);wind(time);quarter.tick(time);poolRipples(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>
   for(const zone of Object.keys(PLAN) as (keyof typeof PLAN)[]){
     const group=new T.Group(),{x,z}=PLAN[zone];group.position.set(x,0,z);scene.add(group);rooms[zone]=group
@@ -614,10 +642,14 @@ export function makeWorldArt(open:boolean){
   gallery(exchange,'exchange');venueDetail(exchange,'exchange');staff.push(new ClubGuest(exchange,.65,-3.11,0xc89b79,0x4b3d58,true,1))
   staff.push(new ClubGuest(exchange,FINANCIAL_ADVISOR.x,FINANCIAL_ADVISOR.z-1.82,0xa57556,0x304550,true,2))
   const lobbyDoors=slidingDoors(exchange),floor=tower(elevator(scene))
-  for(const zone of ['cave','oasis'] as const){rooms[zone].rotation.y=Math.PI;cave(rooms[zone],zone==='oasis');venueDetail(rooms[zone],zone)}
-  const seal=mesh(new T.IcosahedronGeometry(1,2),rock,rooms.cave,[0,1.34,7.01]);seal.scale.set(1.84,1.8,1.1);seal.visible=!open
+  rooms.cave.rotation.y=rooms.oasis.rotation.y=Math.PI
+  cave(rooms.cave,false)
+  const poolRipples=cave(rooms.oasis,true)
+  const grotto=rooms.cave,seal=new T.Group();scene.add(seal)
+  seal.position.copy(grotto.position);seal.rotation.y=Math.PI
+  plane(seal,8,16,0,-.085,-.30,std(0x829667));seal.visible=!open;grotto.visible=open
   const restaurant=buildRestaurant(rooms.kfc)
-  return {scene,quarter,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,restaurant,bar,lobbyDoors}
+  return {scene,quarter,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
 }
 function rouletteWagers(table:T.Group){
   const tones=[0xe9c186,0x72bcbc,0xcf8799,0xc2a8e5]

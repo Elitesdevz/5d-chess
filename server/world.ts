@@ -1,3 +1,4 @@
+import {UNITS,type Deeds,type HousingView} from '../src/world/housing.ts'
 import {BAR,BAR_STOOLS,DRINKS,type BarService} from '../src/world/bar-menu.ts'
 import {requireSpending} from './credit.ts'
 import {wallet} from './economy.ts'
@@ -82,6 +83,8 @@ export class CityWorlds {
     }
     if(zone==='cave'&&open&&localSite(zone,member.x,member.z).z<-7.06){this.privateEntry(world,member,now);return}
     const points=this.points(world,member,now)
+    const listing=points.find(p=>p.id.startsWith('property:house-')&&near(member,p.x,p.z,1.05))
+    if(listing)member.interaction=listing.id as WorldUse
     if(member.interaction&&!points.some(p=>p.id===member.interaction&&near(member,p.x,p.z,(p.range??1.65)+.18)))member.interaction=undefined
     const elevator=points.find(p=>p.id==='elevator')
     if(elevator&&!near(member,elevator.x,elevator.z,1.27))member.liftArrived=undefined
@@ -108,6 +111,12 @@ export class CityWorlds {
     const member=this.occupants.get(name)?.members.get(name)
     return Boolean(member&&now-member.seen<TIMEOUT&&member.zone==='bank'&&member.interaction===(kind==='borrow'?'loans':'payments'))
   }
+  private housing(name:string,now:number):HousingView{
+    const deeds=(this.store.metadataValue('cityDeeds')??{}) as Deeds
+    const active=Object.entries(deeds).filter(([,d])=>!d.until||d.until>now)
+    const mine=active.filter(([,d])=>d.holder===name)
+    return {keys:mine.map(([id])=>id),occupied:active.map(([id])=>id),expires:Object.fromEntries(mine.map(([id,d])=>[id,d.until]))}
+  }
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
     this.clean(now)
     const account=this.store.rouletteWallet(name)??fail(401,'Log in first')
@@ -119,9 +128,14 @@ export class CityWorlds {
       world=this.enter(name,avatar,account.caveActive?'private':'city',now)
     }
     const me=world.members.get(name)!
+    let housing=this.housing(name,now)
     const shared=data.scene===true
     world.restaurant.tick(now)
     me.seen=now;me.avatar=avatar
+    if(me.zone==='city'){
+      const expired=UNITS.find(u=>!housing.keys.includes(u.id)&&Math.abs(me.x-u.x)<u.width/2-.15&&(me.z-u.z)*u.facing<2.7&&(me.z-u.z)*u.facing>(u.block===undefined?-2.7:-4))
+      if(expired)Object.assign(me,{x:expired.x,z:expired.z+3.5*expired.facing})
+    }
     if(me.lift&&now>=me.lift.ends){me.zone=me.lift.to;me.lift=undefined;me.liftArrived=true;me.moved=now}
     if(me.zone==='private'&&action!=='presence'&&action!=='exit-cave'&&action!=='teleport')fail(409,'Leave the room first')
     if(me.lift&&action!=='presence'&&action!=='teleport')fail(409,'Wait for the elevator to arrive')
@@ -130,9 +144,28 @@ export class CityWorlds {
       const {x,z,yaw}=data
       if(data.world===world.id&&(shared||data.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
         const limit=WORLD_SPEED*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
-        Object.assign(me,worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave'),{yaw:Math.atan2(Math.sin(yaw as number),Math.cos(yaw as number)),moved:now})
+        Object.assign(me,worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys),{yaw:Math.atan2(Math.sin(yaw as number),Math.cos(yaw as number)),moved:now})
         this.walkthrough(world,me,open,now)
       }
+    }else if(action==='housing'){
+      const unit=UNITS.find(u=>u.id===data.unit)??fail(400,'Unknown address')
+      const counter='property:'+(unit.block===undefined?unit.id:'desk-'+unit.block)
+      if(me.zone!=='city'||!this.points(world,me,now).some(p=>p.id===counter&&near(me,p.x,p.z,p.range)))fail(409,'Visit the listing or clerk first')
+      this.store.transaction(u=>{
+        const deeds=u.metadata<Deeds>('cityDeeds')??{},old=deeds[unit.id]
+        if(old&&(!old.until||old.until>now)){
+          if(old.holder===name)return
+          fail(409,'This home is occupied')
+        }
+        if(unit.tenure==='resident')fail(409,'This home is unavailable')
+        const owner=u.users.get(name)??fail(401,'Log in first'),purse=wallet(owner)
+        requireSpending(owner,now)
+        if(purse.coins<unit.price)fail(409,'Insufficient coins')
+        purse.coins-=unit.price
+        deeds[unit.id]={holder:name,until:unit.tenure==='rent'?now+7*86400000:0}
+        u.putMetadata('cityDeeds',deeds)
+      })
+      housing=this.housing(name,now)
     }else if(action==='chat'){
       const text=typeof data.text==='string'?data.text.replace(/[\p{Cc}\p{Cf}]/gu,' ').trim():''
       if(!text||[...text].length>180)fail(400,'Say something in 180 characters or fewer')
@@ -237,7 +270,7 @@ export class CityWorlds {
     const casino=site('casino',0,3)
     const tableMotion=shared&&!hall&&me.zone!=='private'&&level<5&&near(me,casino.x,casino.z,29)?this.roulette.tableMotion(world.id):undefined
     const restaurant=level<5&&(me.zone==='kfc'||near(me,RESTAURANT.x,RESTAURANT.z,26))?world.restaurant.view(name,now,me.zone==='kfc'):undefined
-    const coins=action==='restaurant'||action==='bar'||action==='use'&&me.zone==='kfc'?this.store.rouletteWallet(name)?.coins:account.coins
-    return {id:world.id,now,boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
+    const coins=action==='housing'||action==='restaurant'||action==='bar'||action==='use'&&me.zone==='kfc'?this.store.rouletteWallet(name)?.coins:account.coins
+    return {id:world.id,now,housing,boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
   }
 }

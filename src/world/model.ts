@@ -1,7 +1,7 @@
 import {propertyPoints,propertyObstacle,type HousingView} from './housing.ts'
 import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
 import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type OrderItems} from './restaurant-model.ts'
-import {CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
+import {basinBed,tunnelBed,inPool,poolLevel,OASIS_MOUTH,CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,houseObstacle,passableLand,terrainHeight} from './terrain.ts'
 import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
 export const WORLD_CAPACITY=50
@@ -20,7 +20,7 @@ export const CITY_PORTALS=[
   {to:'exchange',x:24,z:5,label:'Exchange Tower'},
   {to:'kfc',x:RESTAURANT.x,z:RESTAURANT.z+RESTAURANT.front,label:RESTAURANT_NAME},
   {to:'cave',x:CAVE_X,z:CAVE_MOUTH,label:''},
-  {to:'oasis',x:OASIS_X,z:CAVE_MOUTH,label:''},
+  {to:'oasis',x:OASIS_X,z:OASIS_MOUTH,label:''},
 ] as const
 export const PUBLIC_DICE={name:'Ivory Dice',x:6.1,z:3.0,color:'#e5bd86'} as const
 export const WORLD_TABLES=[...TABLES,PUBLIC_DICE]
@@ -53,7 +53,7 @@ export const PLAN={
   bank:{x:-24,z:-3.05,width:10.2,back:-6.57,front:8.05},
   exchange:{x:24,z:-2.48,width:8,back:-7.45,front:7.48},
   kfc:RESTAURANT,
-  cave:{x:CAVE_X,z:CAVE_MOUTH+7.7},oasis:{x:OASIS_X,z:CAVE_MOUTH+7.7},
+  cave:{x:CAVE_X,z:CAVE_MOUTH+7.7},oasis:{x:OASIS_X,z:OASIS_MOUTH+7.7},
 } as const
 type Building=keyof typeof PLAN
 const building=(zone:WorldZone)=>zone.startsWith('floor:')?'exchange':Object.hasOwn(PLAN,zone)?zone as Building:undefined
@@ -77,9 +77,18 @@ export type LiftRide={to:WorldZone;started:number;ends:number}
 export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems;barSeat?:number;boardSeat?:number}
 export function riderHeight(player:WorldPlayer,now:number){
   const from=floorHeight(player.zone),ride=player.lift
-  if(!ride)return player.zone==='city'?terrainHeight(player.x,player.z):from
+  if(!ride)return walkingHeight(player.zone,player.x,player.z)
+
   const progress=Math.max(0,Math.min(1,(now-ride.started)/(ride.ends-ride.started)))
   return from+(floorHeight(ride.to)-from)*progress*progress*(3-2*progress)
+}
+export function walkingHeight(zone:WorldZone,x:number,z:number){
+  if(zone==='cave'||zone==='oasis'){
+    const local=localSite(zone,x,z)
+    if(zone==='oasis')return inPool(local.x,local.z)?Math.max(basinBed(local.z),poolLevel-1.28):basinBed(local.z)
+    return tunnelBed(local.z)
+  }
+  return zone==='city'?terrainHeight(x,z):floorHeight(zone)
 }
 export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
@@ -111,7 +120,7 @@ export function groundZone(x:number,z:number):PublicZone{
   }
   for(const zone of ['cave','oasis'] as const){
     const p=localSite(zone,x,z)
-    if(Math.abs(p.x)<1.75&&p.z>=-7.8&&p.z<7.7)return zone
+    if(Math.abs(p.x)<(zone==='oasis'?2.12:1.75)&&p.z>=-7.8&&p.z<7.7)return zone
   }
   return 'city'
 }
@@ -148,7 +157,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean,keys:readonl
   }
   for(const cave of ['cave','oasis'] as const){
     const p=localSite(cave,x,z),side=Math.abs(p.x)
-    if(side<4.65&&p.z<7.70&&p.z>-8.55&&(side>=1.75||p.z<-7.7||cave==='cave'&&!caveOpen))return false
+    if(side<4.65&&p.z<7.70&&p.z>-8.55&&(side>=(cave==='oasis'?2.12:1.75)||p.z<-7.7||cave==='cave'&&!caveOpen))return false
   }
   return true
 }

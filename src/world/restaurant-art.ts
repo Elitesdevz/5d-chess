@@ -257,6 +257,14 @@ export function buildRestaurant(g:T.Group){
     block(g,.20,3.83,7.36,x,1.91,-3.32,side===1?red:grey)
     block(g,.20,.63,6.16,x,.31,3.42,red)
     block(g,.28,1.12,6.22,x,3.30,3.42,cream)
+    block(g,.42,.18,13.74,x,3.89,-.25,redTrim)
+    block(g,.31,.16,13.72,x,.15,-.25,darkRed)
+    for(let j=0;j<4;j++)block(g,.27,3.62,.32,x,1.82,-6.6+j*1.85,cream)
+    for(const z of [-5.6,-2.0]){
+      block(g,.29,.87,1.32,side*6.46,2.51,z,silver)
+      for(let k=0;k<6;k++)block(g,.12,.037,1.07,side*6.64,2.21+k*.11,z,grey)
+    }
+    block(g,.85,.14,6.21,side*6.58,2.72,3.42,redTrim)
     pane(g,x,1.67,3.42,6.13,2.15,Math.PI/2)
     for(let i=0;i<7;i++)block(g,.15,2.61,.09,x,1.44,.34+i*1.024,ink)
     for(const z of [1.05,3.15,5.19]){

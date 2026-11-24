@@ -186,6 +186,7 @@ function accepted(next:WorldView,start:number,reposition=false){
     shownService=service
     if(station)return
     if(service.startsWith('property:')){
+      stage?.lock(true)
       const render=()=>{if(view)services?.property(service,view,async unit=>{await action('housing',{unit});render()})}
       render()
       return

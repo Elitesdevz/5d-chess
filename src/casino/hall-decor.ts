@@ -34,7 +34,7 @@ function lettering(parent:T.Object3D,text:string,width:number,height:number,colo
   })
   return mesh(new T.PlaneGeometry(width,height),new T.MeshBasicMaterial({map,transparent:true,depthWrite:false}),parent,undefined,false)
 }
-function floor(parent:T.Object3D){
+function floor(parent:T.Object3D,city:boolean){
   const parquet=canvasTexture(256,256,c=>{
     c.fillStyle='#2a1d1a';c.fillRect(0,0,256,256)
     for(let i=0;i<16;i++){
@@ -49,7 +49,7 @@ function floor(parent:T.Object3D){
     }
   })
   parquet.wrapS=parquet.wrapT=T.RepeatWrapping;parquet.repeat.set(13,10)
-  const woodFloor=mesh(new T.PlaneGeometry(24,18),new T.MeshStandardMaterial({map:parquet,roughness:.46}),parent,[0,-.015,.5])
+  const woodFloor=mesh(new T.PlaneGeometry(city?22.5:24,city?15.6:18),new T.MeshStandardMaterial({map:parquet,roughness:.46}),parent,[0,-.015,city?1.1:.5])
   woodFloor.rotation.x=-Math.PI/2
   const carpet=canvasTexture(512,1024,c=>{
     c.fillStyle='#39222b';c.fillRect(0,0,512,1024)
@@ -147,7 +147,7 @@ function plant(parent:T.Object3D,x:number,z:number){
 }
 export function buildHall(scene:T.Object3D,city=false){
   const architecture=new T.Group();scene.add(architecture)
-  floor(architecture)
+  floor(architecture,city)
   box(architecture,[24,5.5,.3],[0,2.75,-6.7],wall)
   if(!city)box(architecture,[24,5.5,.3],[0,2.75,8.9],wall)
   if(!city)for(const x of [-11.25,11.25])box(architecture,[.3,5.5,15.5],[x,2.75,1.1],wall)

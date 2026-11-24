@@ -1,5 +1,5 @@
 import * as T from 'three'
-import {CAVE_MOUTH,CAVE_X,OASIS_X,TERRAIN_EXTENT,TERRAIN_STEP,VALLEY_TREES,trailDistance,terrainVertex,terrainHeight,ridgeDistance} from './terrain.ts'
+import {passages,CAVE_MOUTH,CAVE_X,OASIS_X,TERRAIN_EXTENT,TERRAIN_STEP,VALLEY_TREES,trailDistance,terrainVertex,terrainHeight,ridgeDistance} from './terrain.ts'
 
 const profile=new T.Shape()
 profile.moveTo(-.5,-.5);profile.lineTo(.5,-.5);profile.lineTo(0,.5);profile.closePath()
@@ -54,7 +54,7 @@ function meadow(scene:T.Scene){
     color.lerp(h>18?snow:grass,grain*.29)
     if(trailDistance(x,z)<1.9)color.setHex(0xbeab87)
     uv.push(x/3.5,z/3.5);pos.push(x,h-.085,z);col.push(color.r,color.g,color.b)
-    if(i<side-1&&j<side-1){const a=j*side+i;idx.push(a,a+side+1,a+1,a,a+side,a+side+1)}
+    if(i<side-1&&j<side-1&&!passages.some(p=>Math.abs(x+1-p.x)<4&&z>=p.z&&z<p.z+16)){const a=j*side+i;idx.push(a,a+side+1,a+1,a,a+side,a+side+1)}
   }
   const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(pos,3));geo.setAttribute('color',new T.Float32BufferAttribute(col,3));geo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));geo.setIndex(idx);geo.computeVertexNormals()
   scene.add(new T.Mesh(geo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,map:grain()})))
@@ -66,7 +66,7 @@ export function landscape(scene:T.Scene){
   const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296}
   for(let i=0;i<4800;i++){
     const x=(random()-.5)*244,z=(random()-.5)*240,h=terrainHeight(x,z)
-    if(Math.abs(x)<63&&Math.abs(z)<48||Math.abs(Math.abs(x)-40)<6&&z>68&&z<94||trailDistance(x,z)<2||ridgeDistance(x,z)>8)continue
+    if(Math.abs(x)<79&&Math.abs(z)<52||passages.some(p=>Math.abs(x-p.x)<6&&z>p.z-4&&z<p.z+20)||trailDistance(x,z)<2||ridgeDistance(x,z)>8)continue
       woods.add('pine',x,h+.15,z,.21,.43,.17,0x738753,i,.20)
       if(i%3===0)woods.add('stone',x+.08,h+.28,z,.15,.12,.14,i%2?0xf2d495:0xb39abb)
       if(i%23===0)woods.add('stone',x,h+.3,z,1.7,1.1,1.2,0x89897c,i)
@@ -75,10 +75,6 @@ export function landscape(scene:T.Scene){
     const h=terrainHeight(x,z)
     woods.add('post',x,h+size*.28,z,.24,size*.56,.24,0x584635)
     for(let n=0;n<3;n++)woods.add('pine',x,h+size*(.45+n*.21),z,size*(.67-.16*n),size*.64,size*(.67-.16*n),[0x385a49,0x497054,0x63815b][n],x)
-  }
-  for(const cx of [CAVE_X,OASIS_X])for(let n=0;n<48;n++){
-    const side=n%2?1:-1,z=CAVE_MOUTH+1+random()*18,x=cx+side*(4.1+random()*3.8)
-    woods.add('crown',x,terrainHeight(x,z)+.6,z,3.6+random()*2,4+random()*3,4.6,0x756f60,random()*6)
   }
   // A mill and hayfields mark the transition from the last street to the basin.
   const mill=new T.Group();mill.position.set(-18,terrainHeight(-18,55),55);scene.add(mill)
@@ -94,6 +90,12 @@ export function landscape(scene:T.Scene){
     millwork.add('box',1.58*x,2.82,1.58*z,.051,.83,.10,0xd1b78a,a)
     millwork.add('box',1.58*x,2.80,1.58*z,.53,.056,.10,0xd1b78a,a)
   }
+  millwork.add('post',0,2.22,0,3.76,.15,3.76,0x765e45)
+  for(let i=0;i<12;i++){
+    const a=i*Math.PI/6,mid=a+Math.PI/12
+    millwork.add('post',1.78*Math.cos(a),2.48,1.78*Math.sin(a),.08,.54,.08,0x8f7454)
+    millwork.add('box',1.73*Math.cos(mid),2.74,1.73*Math.sin(mid),.97,.07,.1,0xa9906a,Math.PI/2-mid)
+  }
   millwork.finish(mill)
   const rotor=new T.Group();rotor.position.set(0,3.8,1.71);mill.add(rotor)
   for(let i=0;i<4;i++){
@@ -107,9 +109,23 @@ export function landscape(scene:T.Scene){
     woods.add('post',x,.47,z,1.08,.92,1.08,0xc6a360)
     woods.add('post',x,.68,z,1.09,.069,1.09,0x96794b)
   }
-  for(let i=0;i<130;i++){
-    const x=-10+(i%13)*1.02,z=52+Math.floor(i/13)*.54
-    woods.add('crown',x,.27,z,1.15,.69,.56,i%5?0xbfaa59:0xd1b968)
+  // Barn, threshing yard, split-rail fence and parallel planted furrows.
+  woods.add('box',-28,1.39,55,5.1,2.77,7,0x985949)
+  woods.add('gable',-28,3.33,55,5.59,1.33,7.45,0x555f62)
+  woods.add('box',-28,1.14,51.45,2.5,2.28,.1,0x564536)
+  for(const side of [-1,1])woods.add('box',-28+side*.61,1.09,51.36,.08,2.3,.08,0xdbbc86,0,side*.48)
+  for(let n=0;n<=8;n++){
+    woods.add('post',-13+n*2,.55,51,.16,1.1,.16,0x866743)
+    if(n<8)for(const y of [.42,.86])woods.add('box',-12+n*2,y,51,2,.11,.12,0xab916b)
+  }
+  for(let row=0;row<12;row++){
+    const x=-12.5+row*1.22
+    woods.add('box',x,.015,55.8,.97,.1,8,0x886a48)
+    for(let j=0;j<18;j++){
+      const z=52+j*.43
+      woods.add('post',x,.37,z,.07,.71,.07,0xa5a25a)
+      woods.add('crown',x,.78,z,.19,.42,.16,0xd5b45e,0,.12)
+    }
   }
   woods.finish(scene)
   const flock=new T.Group();scene.add(flock)
