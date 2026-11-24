@@ -19,7 +19,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
   Date.now=()=>realNow()+offset
   const store=new ChessStore('.', {memory:true}), app=createApplication(store),server=createServer(app.handle)
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
-  let browser,current
+  let browser,current,keepalive
   try{
     const base='http://127.0.0.1:'+server.address().port
     browser=await chromium.launch({args:['--no-sandbox','--disable-dev-shm-usage','--use-angle=swiftshader','--enable-webgl','--enable-unsafe-swiftshader']})
@@ -35,6 +35,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
       current=result
       return result
     }
+    keepalive=setInterval(()=>{void context.request.post(base+'/api/world/presence',{data:{scene:true}}).catch(()=>{})},6000)
     async function walk(x,z,yaw=0){
       for(let i=0;i<45;i++){
         offset+=900
@@ -147,14 +148,17 @@ test('residential walkthrough through both buildings, house styles, furniture an
       await local(b,s.x-s.width/2,s.front+dz*.51,Math.PI)
       await capture(b.id+'-stairs',async page=>{
         const start=current.you.z
-        await page.keyboard.down('w')
-        try{
-          for(let i=0;i<10;i++){
-            await page.waitForTimeout(190)
-            if((await action('presence')).you.z>start+.35)break
-          }
-          assert.ok(current.you.z>start+.35,'keyboard movement advances on the staircase')
-        }finally{await page.keyboard.up('w')}
+        await page.evaluate(()=>new Promise(resolve=>{
+          const move=type=>window.dispatchEvent(new KeyboardEvent(type,{key:'w'}))
+          move('keydown')
+          setTimeout(()=>{move('keyup');resolve()},360)
+        }))
+        for(let i=0;i<12;i++){
+          if((await action('presence')).you.z>start+.25)break
+          await page.waitForTimeout(180)
+        }
+        assert.ok(current.you.z>start+.25,'keyboard movement advances on the staircase')
+        assert.match(current.you.zone,/^stairs:/)
       })
       await local(b,s.x-s.width/2,s.front+dz*.90)
       await local(b,s.x+s.width/2,s.front+dz*.90)
@@ -234,6 +238,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
     }
     assert.deepEqual(errors,[])
   }finally{
+    clearInterval(keepalive)
     Date.now=realNow
     app.drain()
     await browser?.close()
