@@ -60,6 +60,12 @@ export const PARKS=[
   {id:'south',name:'Mill Green',x:23,z:39,w:13,d:8,sport:false},
   {id:'west',name:'Linden Green',x:-20,z:-55.6,w:9,d:7,sport:false}
 ]
+export const PARK_FEATURES={
+  picnic:[point(30.9,-77.9),point(31.4,-72.6)],
+  gardensPlay:point(41,-79.07),
+  schoolPlay:point(48.3,-76),
+  fuel:point(63,-58.8),
+}
 export const pond={x:24,z:-75.7,w:9.4,d:4.3,bridge:24}
 export const RAIL={north:-91,south:-86,stationEdge:10,z:-88.5}
 export function railZ(x:number){
@@ -103,7 +109,9 @@ export const PARKING:Parking[]=[
   {id:'police-1',x:-57.7,z:-60.7,street:'civic',kind:'police',yaw:Math.PI/2,use:'Police'},
   {id:'police-2',x:-52.8,z:-60.7,street:'civic',kind:'police',yaw:Math.PI/2,use:'Police'},
   {id:'fire-1',x:-37,z:-61,street:'civic',kind:'fire',yaw:Math.PI/2,use:'Fire service'},
+  {id:'fire-2',x:-26.9,z:-61,street:'civic',kind:'fire',yaw:Math.PI/2,use:'Fire service'},
   {id:'ambulance',x:22,z:-60.5,street:'market',kind:'ambulance',yaw:Math.PI/2,use:'Emergency'},
+  {id:'ambulance-2',x:26.8,z:-60.5,street:'market',kind:'ambulance',yaw:Math.PI/2,use:'Emergency'},
   {id:'hospital',x:15,z:-70.25,street:'market',yaw:-Math.PI/2,use:'Hospital',accessX:21.7},
   {id:'grocer',x:44,z:-60.7,street:'market',yaw:Math.PI/2,use:'Customer',accessX:50.5},
   {id:'loading',x:49.8,z:-53.6,street:'market',kind:'van',yaw:Math.PI/2,use:'Loading'},

@@ -1,6 +1,6 @@
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
-import {circle,FLEET,LANDMARKS,PARKING,PARKS,pond,railZ,STREETS,type Landmark, type VehicleKind} from './city-plan.ts'
+import {circle,FLEET,LANDMARKS,PARK_FEATURES,PARKING,PARKS,pond,railZ,STREETS,type Landmark, type VehicleKind} from './city-plan.ts'
 import {JUNCTIONS,SIGNAL_HEADS,type TrafficView,type Vehicle} from './traffic.ts'
 import {STREET_PROPS} from './urban-layout.ts'
 import type {Letter} from './residential-art.ts'
@@ -157,12 +157,22 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
     for(const x of [-w*.35,w*.35])p.box(x,h*.53,front+.23,.6,h*1.05,.49,trim)
     p.box(0,2.52,front+.7,4.1,.17,1.4,accent)
     for(const x of [-1.88,1.88])p.post(x,1.27,front+1.15,.11,2.48,.11,trim)
-    const groundX=-12.2
+    const groundX=PARK_FEATURES.schoolPlay.x-b.x
     p.slab(groundX,.0,4.2,6.3,0x78948a)
     for(const z of [-2.5,2.5])p.box(groundX,.001,z,3.87,.017,.07,cream)
     for(const x of [groundX-1.95,groundX+1.95])p.box(x,.001,0,.07,.017,5,cream)
     for(let j=0;j<12;j++)p.post(groundX-2.27,.76,j*.58-3.13,.049,1.48,.049,coal)
     p.bar(groundX-2.27,-3.13,groundX-2.27,3.25,1.24,.05,.05,coal)
+    p.post(groundX,1.13,-2.27,.087,2.26,.087,coal)
+    p.box(groundX,2.17,-2.21,.85,.48,.075,trim)
+    p.box(groundX,1.99,-1.97,.33,.047,.31,0xa96555)
+    p.bar(groundX-1.37,1.4,groundX+1.37,1.4,1.53,.071,.074,accent)
+    for(const dx of [-1.28,1.28])for(const dz of [-.36,.36])
+      p.box(groundX+dx,.77,1.4+dz,.074,1.61,.074,accent,0,-dx*.11)
+    for(const dx of [-.52,.52]){
+      for(const edge of [-.10,.10])p.post(groundX+dx+edge,.91,1.4,.028,1.07,.028,metal)
+      p.box(groundX+dx,.39,1.4,.30,.055,.22,wood)
+    }
   }else if(b.id==='station'){
     p.gable(0,h+.73,0,w+.47,1.43,d+.63,accent)
     p.gable(0,3.85,front+.176,5.85,1.8,.2,trim)
@@ -287,13 +297,19 @@ function parks(parent:T.Object3D,label:Letter){
         p.box(x+sz*2.99,2.21,z,.35,.041,.38,0xb46552)
       }
       p.box(x,-.001,z,.05,.009,4.82,cream)
-      const playX=park.x+12,zPlay=park.z-4.07
+      const {x:playX,z:zPlay}=PARK_FEATURES.gardensPlay
       for(const dx of [-.73,.73])for(const dz of [-.61,.61])p.post(playX+dx,.8,zPlay+dz,.093,1.61,.095,0xb87b4e)
       p.box(playX,1.04,zPlay,1.39,.13,1.11,wood)
       p.gable(playX,1.77,zPlay,1.55,.47,1.39,0x568779)
       p.box(playX+.64,.55,zPlay+.82,.44,.086,1.81,0xd0a66f,-.19,-.26)
     }
     if(park.id==='south')garden(p,park.x-5.3,park.z-2.61,1.61,1.0,0xbb849a)
+  }
+  for(const {x,z} of PARK_FEATURES.picnic){
+    p.box(x,.76,z,1.73,.081,.65,wood)
+    for(const dx of [-.66,.66])for(const dz of [-.27,.27])p.box(x+dx,.382,z+dz,.076,.76,.081,coal,0,dz*.6)
+    p.box(x,.105,z,1.53,.061,.13,wood)
+    for(const dz of [-.52,.52])p.box(x,.44,z+dz,1.73,.08,.26,0xa57c55)
   }
   const water=new T.Mesh(new T.CircleGeometry(1,48),new T.MeshStandardMaterial({color:0x568e90,metalness:.43,roughness:.33}))
   water.rotation.x=-Math.PI/2;water.scale.set(pond.w/2,pond.d/2,1);water.position.set(pond.x,-.017,pond.z);parent.add(water)

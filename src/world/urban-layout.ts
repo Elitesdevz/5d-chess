@@ -1,4 +1,4 @@
-import {circle,distance,facade,LANDMARKS,nearestSidewalk,onRoad,PARKING,PARKS,PLACES,point,pond,railZ,STREETS,type Point} from './city-plan.ts'
+import {circle,distance,facade,LANDMARKS,nearestSidewalk,onRoad,PARK_FEATURES,PARKING,PARKS,PLACES,point,pond,railZ,STREETS,type Point} from './city-plan.ts'
 import {BUILDINGS,contains,residentialSite,type HomePoint} from './residential.ts'
 import {SIGNAL_HEADS} from './traffic.ts'
 import {OFFICES} from './housing.ts'
@@ -111,10 +111,17 @@ export const PUBLIC_SEATS:HomePoint[]=STREET_PROPS.filter(p=>p.kind==='bench').f
   const exit={x:x-s*.75,z:z-c*.75}
   return {...exit,id:'furniture:'+id,label:'Sit on bench',range:.86,exit,pose:{x,z,yaw:p.yaw,id,kind:'sit',height:.47}}
 }))
+const hardscape=[
+  ...PARK_FEATURES.picnic.map(p=>({...p,w:.98,d:.62})),
+  {...PARK_FEATURES.gardensPlay,w:.83,d:.70},
+  {x:46.03,z:PARK_FEATURES.schoolPlay.z,w:.105,d:3.30},
+  ...[-3.75,-2.5,0,2.5,3.75].map(dx=>({x:PARK_FEATURES.fuel.x+dx,z:PARK_FEATURES.fuel.z,w:.32,d:.41})),
+]
 export function urbanObstacle(x:number,z:number){
   if(LANDMARKS.some(b=>Math.abs(x-b.x)<b.w/2+.20&&Math.abs(z-b.z)<b.d/2+.20))return true
   if(Math.hypot(x-circle.x,z-circle.z)<circle.radius-circle.width/2-.25)return true
   const p=point(x,z)
+  if(hardscape.some(b=>Math.abs(x-b.x)<b.w+.16&&Math.abs(z-b.z)<b.d+.16))return true
   if(SIGNAL_HEADS.some(s=>distance(s,p)<.28))return true
   if(Math.abs(x-pond.x)<pond.w/2+.15&&Math.abs(z-pond.z)<pond.d/2+.15&&Math.abs(x-pond.bridge)>.57)return true
   // Continuous fencing keeps the two static rail lines separate from the platform and town.
