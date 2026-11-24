@@ -337,35 +337,62 @@ function makeScreen(scene:T.Object3D,symbol:string,x:number){
 function cave(scene:T.Object3D,oasis:boolean){
   // Ribbons share vertices along the sloping bed, banks and grass lip.
   const ribbon=(left:number,right:number,lh:(z:number)=>number,rh:(z:number)=>number,mat:T.Material)=>{
-    const positions:number[]=[],indices:number[]=[]
+    const positions:number[]=[],indices:number[]=[],uv:number[]=[]
     for(let i=0;i<=32;i++){
       const z=7.7-i*.5
-      positions.push(left,lh(z),z,right,rh(z),z)
+      positions.push(left,lh(z),z,right,rh(z),z);uv.push(0,i/4,1,i/4)
       if(i){const j=i*2;indices.push(j-2,j-1,j,j,j-1,j+1)}
     }
     const g=new T.BufferGeometry()
-    g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setIndex(indices);g.computeVertexNormals()
+    g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals()
     scene.add(new T.Mesh(g,mat))
   }
   const bed=oasis?basinBed:tunnelBed
   const lip=()=>-.085
   ribbon(-4,-2.25,lip,bed,rock);ribbon(-2.25,2.25,bed,bed,std(oasis?0x676f61:0x4f4944));ribbon(2.25,4,bed,lip,rock)
-  // Solid ground above the deep chamber slopes into an uneven stone arch.
-  plane(scene,8,8.3,0,-.085,-4.15,std(0x819464))
-  for(let i=0;i<17;i++){
-    const z=7.35-i*.94,h=bed(z),size=.35+Math.min(1,(7.7-z)/7)
-    for(const side of [-1,1]){
-      const stone=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[side*2.73,h+.55,z])
-      stone.scale.set(.75*size,1.12*size,1.14);stone.rotation.y=i*side
-    }
-    if(z<.4){
-      const crown=mesh(new T.IcosahedronGeometry(1,1),rock,scene,[0,h+3.46,z])
-      crown.scale.set(3.25,.72,1.52)
-    }
+  // A continuous stone vault meets the meadow roof above the underground span.
+  const vertices:number[]=[],faces:number[]=[],tints:number[]=[],tone=new T.Color()
+  const ribs=12,bays=18
+  for(let i=0;i<=bays;i++)for(let j=0;j<=ribs;j++){
+    const a=j*Math.PI/ribs,offset=.19*Math.sin(j*2.5+i*.81)+.11*Math.sin(i*1.9+j*.83)
+    const z=.92-i*9.2/bays+.33*Math.cos(a*2.7)
+    const radius=2.92+offset+.22*Math.cos(i*.42),h=bed(z)
+    vertices.push(Math.cos(a)*radius,h+.37+Math.sin(a)*(3.75+offset),z)
+    tone.setHex(oasis?0x697b71:0x65594c).multiplyScalar(.78+.24*(1+Math.sin(j*1.8+i*.73))/2)
+    tints.push(tone.r,tone.g,tone.b)
+    if(i&&j){const k=i*(ribs+1)+j;faces.push(k-ribs-2,k-1,k,k-ribs-2,k,k-ribs-1)}
   }
+  const vault=new T.BufferGeometry()
+  vault.setAttribute('position',new T.Float32BufferAttribute(vertices,3));vault.setAttribute('color',new T.Float32BufferAttribute(tints,3));vault.setIndex(faces);vault.computeVertexNormals()
+  scene.add(new T.Mesh(vault,new T.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:.87,side:T.DoubleSide})))
+  const details=new Scenery()
+  for(let i=0;i<21;i++)for(const side of [-1,1]){
+    const z=7.25-i*.74+.23*Math.sin(i*2.7+side),h=bed(z)
+    const x=side*(2.42+.16*Math.sin(i*1.8))
+    details.add('stone',x,h+.31,z,.8,.72+Math.sin(i)*.19,1.16,oasis?0x617568:0x5b534b,i)
+    if(z>-.2){
+      const edge=side*(3.65+.16*Math.cos(i))
+      details.add('stone',edge,-.14,z,.74,.52,.98,0x899079,i)
+      for(let k=0;k<3;k++)details.add('pine',edge+k*.12,.12,z+.11*k,.13,.34,.13,0x899358,i,k*.12)
+    }else if(oasis){
+      for(let k=0;k<4;k++){
+        const reach=.18+.52*k/4
+        details.add('pine',side*(2.27-reach*.19),poolLevel+.13+reach*.37,z+.08*k,.14,reach,.13,k%2?0x709973:0x487a60,i,side*(.21+.12*k))
+      }
+    }else if(i%3===0)details.add('pine',x*.68,h+3.05,z,.3,.88,.3,0x70675d,i,Math.PI)
+  }
+  details.finish(scene)
   if(oasis){
-    plane(scene,4.48,6.81,0,poolLevel,-4.88,new T.MeshStandardMaterial({color:0x389e9c,roughness:.19,metalness:.33,transparent:true,opacity:.82}))
-    for(const [x,z] of [[-1.97,-3.4],[1.99,-5],[-2,.6]])potted(scene,x,z,.56).position.y=bed(z)
+    const normal=texture(128,128,c=>{
+      const img=c.createImageData(128,128)
+      for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+        const k=4*(128*y+x),u=x*Math.PI/64,v=y*Math.PI/64
+        img.data[k]=128+23*Math.cos(5*u+2*Math.sin(2*v));img.data[k+1]=128+32*Math.cos(7*v+1.8*Math.sin(u));img.data[k+2]=249;img.data[k+3]=255
+      }
+      c.putImageData(img,0,0)
+    })
+    normal.colorSpace=T.NoColorSpace;normal.wrapS=normal.wrapT=T.RepeatWrapping;normal.repeat.set(2,3)
+    plane(scene,4.48,6.81,0,poolLevel,-4.88,new T.MeshStandardMaterial({color:0x307b79,normalMap:normal,normalScale:new T.Vector2(.64,.64),roughness:.28,metalness:.16,transparent:true,opacity:.73}))
     light(scene,0x72dfdf,32,8,0,-2.9,-4.8)
     light(scene,0xf4d5a1,12,6,-1.4,-1.5,.9)
   }else light(scene,0xb3c6bf,8,5,0,-.42,4.4)
@@ -536,10 +563,18 @@ function tower(shaft:T.Object3D){
     const room=new T.Group();room.position.y=floorHeight(`floor:${symbol}`);shaft.add(room);rooms.set(symbol,room)
     const wall=symbol==='CAS'?casinoWall:symbol==='BNK'?bankWall:standardWall
     liftDeck(room,tile);liftDoorway(room,wall)
-    for(const x of [-7.96,7.96])block(room,.18,5.8,15,x,2.89,0,wall)
     for(const side of [-1,1]){
-      for(const z of [-4.45,-1.45,1.55,4.55])block(room,.10,3.95,2.3,side*8.10,2.9,z,trim)
-      block(room,.36,.23,15,side*8,5.75,0,ink)
+      const x=side*7.96
+      block(room,.22,1.09,15,x,.545,0,wall)
+      block(room,.27,.63,15,x,5.57,0,wall)
+      const pane=mesh(new T.PlaneGeometry(14.83,4.22),glass,room,[x,3.17,0],false)
+      pane.rotation.y=side*Math.PI/2
+      for(const z of [-7.42,-4.47,-1.49,1.49,4.47,7.42])block(room,.34,5.81,.15,x,2.9,z,trim)
+      block(room,.32,.11,15,x,3.49,0,ink)
+      block(room,.47,.22,15,x,5.76,0,trim)
+      // A service spine encloses the landings and reads vertically at street level.
+      block(room,6.35,5.87,.17,side*4.75,2.92,-7.46,wall)
+      for(const k of [2.32,4.62,6.91])block(room,.18,6,.39,side*k,3,-7.51,trim)
     }
     block(room,16,.18,11.65,0,5.91,1.655,ink)
     block(room,16,1.16,.16,0,.58,7.48,wall)

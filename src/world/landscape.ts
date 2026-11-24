@@ -35,7 +35,7 @@ function grain(){
   const ctx=canvas.getContext('2d')!,pixels=ctx.createImageData(128,128)
   for(let i=0;i<128*128;i++){
     const x=i%128,y=Math.floor(i/128),j=i*4
-    const value=239+7*Math.cos(x*.28+2*Math.sin(y*.19))+6*Math.cos(y*.79+x*.65)+3*Math.sin(i*142.73)
+    const value=242+2.4*Math.cos(x*.28+2*Math.sin(y*.19))+2*Math.cos(y*.79+x*.65)+7*Math.sin(i*142.73+Math.cos(x*5.6))
     pixels.data[j]=pixels.data[j+1]=pixels.data[j+2]=value;pixels.data[j+3]=255
   }
   ctx.putImageData(pixels,0,0)
@@ -55,7 +55,7 @@ function meadow(scene:T.Scene){
     if(trailDistance(x,z)<1.9)color.setHex(0xbeab87)
     uv.push(x/3.5,z/3.5);pos.push(x,h-.085,z);col.push(color.r,color.g,color.b)
     if(i<side-1&&j<side-1){
-      const cut=passages.find(p=>Math.abs(x+1-p.x)<4&&z>=p.z&&z<p.z+16)
+      const cut=passages.find(p=>Math.abs(x+1-p.x)<4&&z>=p.z&&z<p.z+(Math.abs(x+1-p.x)>2?6:8))
       const dest=cut?cut.x===CAVE_X?covered:undefined:idx,a=j*side+i
       dest?.push(a,a+side+1,a+1,a,a+side,a+side+1)
     }
