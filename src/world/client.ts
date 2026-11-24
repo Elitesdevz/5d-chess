@@ -1,6 +1,5 @@
 import {RestaurantUI} from './restaurant-ui.ts'
-import {api,ApiError,getSession,initShell,renderAccount} from '../shell.ts'
-import type {Profile} from '../account-model.ts'
+import {api,ApiError,getSession,initShell,updateWalletBalance} from '../shell.ts'
 import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type CasinoView,type RouletteChoice} from '../casino-model.ts'
 import {BNK,CAS,isEquity,type StockView,type PricePoint} from '../stock-model.ts'
 import {DICE_TABLE_INDEX,DESTINATIONS,WORLD_TABLES,type Destination,type WorldAction,type WorldView} from './model.ts'
@@ -44,7 +43,7 @@ chatForm.onsubmit=async e=>{
   try{await action('chat',{text});if(chatInput.value.trim()===text)chatInput.value=''}catch{}
 }
 let restaurant:RestaurantUI|undefined
-let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined,profile:Profile|undefined
+let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
 let viewKey='',shownService='',lastFloor='';let closeAfterFloor=false
 let stake=25,choice:RouletteChoice='white',activeTable=-1,tableKey=''
@@ -55,11 +54,6 @@ const like=(to:string):to is Destination=>Object.hasOwn(DESTINATIONS,to)
 function showError(text:string){
   const p=cast('world-error');p.textContent=text;p.hidden=false
   clearTimeout(errorTimer);errorTimer=window.setTimeout(()=>p.hidden=true,4800)
-}
-function setCoins(coins:number){
-  if(!profile||profile.coins===coins)return false
-  profile={...profile,coins};renderAccount(profile)
-  return true
 }
 const seated=()=>view?.you.chair
 function tableStatus(){
@@ -174,9 +168,9 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
     if(next.you.zone!==lastFloor){lastFloor=next.you.zone;void floorScreens(lastFloor)}
   }
   stage?.set(next,offset,reposition,sent);syncControls();renderChat(next)
-  const rebuiltHeader=setCoins(next.coins)
+  updateWalletBalance(next.coins)
   restaurant?.update(next)
-  if(changed||rebuiltHeader){
+  if(changed){
     const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
     for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
       if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
@@ -275,12 +269,11 @@ window.addEventListener('pagehide',e=>{if(!e.persisted)closed=true})
 async function start(){
   await initShell();const auth=await getSession()
   if(!auth.user){location.replace('/chess/login.html');return}
-  profile=auth.profile??undefined
   services=new CityServices(dialog,auth.user,symbol=>{
     if(closeAfterFloor)return
     closeAfterFloor=true
     void action('floor',{symbol}).then(()=>services?.close()).catch(()=>undefined).finally(()=>closeAfterFloor=false)
-  },setCoins,()=>void floorScreens(view?.you.zone??''))
+  },updateWalletBalance,()=>void floorScreens(view?.you.zone??''))
   restaurant=new RestaurantUI(dialog,cast('world-kfc-hud'),(command,data)=>action('restaurant',{command,...data}))
   const {CityStage}=await import('./stage.ts')
   let pollTimer:number|undefined,urgent=false,lastPresence=0

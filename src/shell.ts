@@ -28,6 +28,12 @@ function applyRating(){
   if(el){el.textContent=`${Math.round(current.rating.value)} ELO`;el.title=`${current.rating.games} rated games`}
   document.querySelectorAll<HTMLElement>('[data-coins]').forEach(el=>{el.textContent=current!.coins>=100000?new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(current!.coins):current!.coins.toLocaleString(undefined,{maximumFractionDigits:4});el.parentElement!.title=`${current!.coins.toLocaleString(undefined,{maximumFractionDigits:4})} earned coins`})
 }
+export function updateWalletBalance(coins:number){
+  if(!current||current.coins===coins)return
+  current={...current,coins}
+  recordBalance(current)
+  applyRating()
+}
 export function renderAccount(profile:Profile){
   current=profile;void startUsage(profile);recordBalance(profile)
   const host=document.getElementById('account-area')
