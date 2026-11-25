@@ -1,3 +1,4 @@
+import {civicRoom,civicHeight,levelOf,levelZone,galleryZone,stair,front,rise} from '../src/world/civic-venues.ts'
 import {resortService} from './resort.ts'
 import {HOTEL_LIFT,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
 import {randomUUID} from 'node:crypto'
@@ -89,7 +90,7 @@ export class CityWorlds {
     this.arrive(world,member,'oasis',now)
   }
   private walkthrough(world:World,member:Member,open:boolean,now:number){
-    const before=member.zone,zone=guestFloor(before)||venue(before)||before.startsWith('floor:')||residentialAt(before)?before:groundZone(member.x,member.z)
+    const before=member.zone,zone=guestFloor(before)||civicRoom(before)||before.startsWith('floor:')||residentialAt(before)?before:groundZone(member.x,member.z)
     if(before!==zone){
       if(before==='kfc'){
         world.restaurant.leave(member.name)
@@ -186,7 +187,7 @@ export class CityWorlds {
     }
     const me=world.members.get(name)!
     if(booking){
-      if(me.cell!==booking.cell){this.arrive(world,me,'station',now);me.cell=booking.cell}
+      if(me.cell!==booking.cell){this.arrive(world,me,galleryZone(booking.cell),now);me.cell=booking.cell}
       else if(data.world===world.id&&data.scene===true)this.store.transaction(tx=>cellMove(tx,booking,data.x,data.z,data.yaw))
       Object.assign(me,{x:booking.x,z:booking.z,yaw:booking.yaw,seen:now})
       return {id:world.id,now,you:{...publicMember(me,data.scene===true),name:booking.name},players:[],coins:account.coins??0,caveOpen:false,
@@ -217,7 +218,8 @@ export class CityWorlds {
     let hall:HallView|undefined,food:ReturnType<typeof residentialFood>|undefined
     if(action==='presence'){
       const {x,z,yaw}=data
-      if(data.world===world.id&&(shared||data.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&!me.homePose&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
+      const currentFloor=data.zone===undefined||data.zone===me.zone||!(civicRoom(me.zone)||typeof data.zone==='string'&&civicRoom(data.zone))
+      if(data.world===world.id&&currentFloor&&(shared||data.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&!me.homePose&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
         const limit=WORLD_SPEED*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
         const {homeZone:home,...pos}=worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys,world.residential,now,world.life.traffic.vehicles)
         if(home!==me.zone&&(home||residentialAt(me.zone))){me.zone=home??'city';me.interaction=undefined}
@@ -306,8 +308,12 @@ export class CityWorlds {
         }else me.interaction=target.id as WorldUse
       }else if(target.id.startsWith('enter-')){
         this.arrive(world,me,target.id.slice(6) as Venue,now)
+      }else if((target.id==='gallery-up'||target.id==='gallery-down')&&civicRoom(me.zone)){
+        const n=levelOf(me.zone),up=target.id==='gallery-up'
+        if(up&&civicHeight(me.zone,me.x,me.z)<(n+1)*rise-.47)fail(409,'Follow the stairs to the landing')
+        this.arrive(world,me,levelZone(n+(up?1:-1)),now,{x:stair.down,z:stair.start+(up?-.53:.12),yaw:up?0:Math.PI})
       }else if(target.id==='exit-venue'&&venue(me.zone)){
-        this.arrive(world,me,'city',now,{...entrances[me.zone],yaw:Math.PI})
+        this.arrive(world,me,'city',now,{...entrances[me.zone],yaw:front[me.zone].sign===1?Math.PI:0})
       }else if(/^(door|furniture|call|lift|fridge|drawer):/.test(target.id)){
         this.homeUse(world,me,target as HomePoint,housing.keys,now)
       }else if(target.id.startsWith('seat:')||target.id.startsWith('couch:')){
@@ -403,8 +409,11 @@ export class CityWorlds {
     if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;this.arrive(world,victim,'city',now)}
     if(simulation.view.custody)return this.update(name,'presence',{},now)
     const players=me.zone==='private'?[]:[...world.members.values()].filter(p=>p.name!==name&&!bookings.some(b=>b.user===p.name)&&p.zone!=='private'&&near(me,p.x,p.z,48)&&(shared?Math.abs(riderHeight(p,now)-level)<23:p.zone===me.zone)).map(p=>publicMember(p,shared))
-    if(me.zone==='station')for(const b of bookings){
-      players.push({name:b.name,avatar:b.avatar,zone:'station',...(shared?{x:b.x,z:b.z}:localSite('station',b.x,b.z)),yaw:b.yaw,
+    if(me.interaction==='booking')simulation.view.register=bookings.map(b=>b.name)
+    for(const b of bookings){
+      const zone=galleryZone(b.cell)
+      if(me.zone!==zone)continue
+      players.push({name:b.name,avatar:b.avatar,zone,...(shared?{x:b.x,z:b.z}:localSite(zone,b.x,b.z)),yaw:b.yaw,
         online:!!this.occupants.get(b.user)?.members.get(b.user)})
     }
     const casino=site('casino',0,3)

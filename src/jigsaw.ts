@@ -85,7 +85,7 @@ export async function jigsaw(host:HTMLElement){
         busy=true
         try{
           const result=await request({piece:selected,target})
-          if(result.released){location.replace('/chess/world.html?go=station');return}
+          if(result.released){location.replace('/chess/world.html');return}
           puzzle=result.puzzle;selected=-1;status.textContent=puzzle.placed.every(Boolean)?'Puzzle complete. Awaiting moderation release.':'Piece fitted.';render()
         }catch(e){status.textContent=e instanceof Error?e.message:'Please try again.'}finally{busy=false}
       }

@@ -1,3 +1,4 @@
+import {entrances,threshold,footprint,origins,type Venue} from './civic-venues.ts'
 import {circle,distance,facade,LANDMARKS,nearestSidewalk,onRoad,PARK_FEATURES,PARKING,PARKS,PLACES,point,pond,railZ,STREETS,type Point} from './city-plan.ts'
 import {BUILDINGS,contains,residentialSite,type HomePoint} from './residential.ts'
 import {SIGNAL_HEADS} from './traffic.ts'
@@ -17,7 +18,8 @@ export const ENTRANCES=[
     const at=residentialSite(b,0,b.rect.f),road=b.block===undefined?homeStreet(b.x,b.z,b.facing):STREETS.find(s=>s.id===(b.block===2?'civic':b.x<0?'westbank':'eastbank'))!
     return {...at,id:b.id,front:residentialSite(b,0,b.rect.f+.87),road}
   }),
-  ...LANDMARKS.map(b=>({...facade(b),id:b.id,front:point(b.x,facade(b).z+.83*b.facing),road:STREETS.find(s=>s.id===b.street)!})),
+  ...Object.entries(entrances).map(([key,front])=>({...threshold(key as Venue,0),id:key==='station'?'police':key,front,road:STREETS.find(s=>s.id==='civic')!})),
+  ...LANDMARKS.filter(b=>b.id!=='police').map(b=>({...facade(b),id:b.id,front:point(b.x,facade(b).z+.83*b.facing),road:STREETS.find(s=>s.id===b.street)!})),
   ...[[-24,5.02,'bank'],[24,5,'exchange'],[0,-7,'hotel'],[63,5.85,'kfc']].map(([x,z,id])=>({x:Number(x),z:Number(z),id:String(id),front:point(Number(x),Number(z)+.8),road:STREETS[0]})),
 ]
 const route=(id:string,points:Point[],width:number,purpose:Footpath['purpose']='walk'):Footpath=>({id,points,width,purpose})
@@ -70,6 +72,7 @@ function add(kind:StreetProp['kind'],x:number,z:number,yaw:number,radius:number,
   return true
 }
 function solidStructure(x:number,z:number,pad:number){
+  if(Object.entries(footprint).some(([id,f])=>{const o=origins[id as Venue];return Math.abs(x-o.x)<f.w/2+pad&&Math.abs(z-o.z)<f.d/2+pad}))return true
   if(LANDMARKS.some(b=>Math.abs(x-b.x)<b.w/2+pad&&Math.abs(z-b.z)<b.d/2+pad))return true
   if(OFFICES.some(b=>Math.abs(x-b.x)<b.w/2+pad&&Math.abs(z-b.z)<b.d/2+pad))return true
   if(BUILDINGS.some(b=>contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad)))return true

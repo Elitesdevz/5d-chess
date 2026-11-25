@@ -13,7 +13,6 @@ export class ArcadeControls {
       const b=(e.target as Element).closest<HTMLButtonElement>('button')
       if(!b||!this.view?.arcade)return
       if(b.dataset.slot!==undefined){this.selected=Number(b.dataset.slot);this.key='';this.update(this.view);return}
-      if(b.dataset.travel){void send('teleport',{to:b.dataset.travel}).catch(()=>{});return}
       const stack=this.view.arcade.slots[this.selected]
       if(b.dataset.op==='eat'&&stack){void send('food',{id:crypto.randomUUID(),operation:'eat',item:stack.item,amount:1}).catch(()=>{});return}
       const target=b.dataset.op==='fire'?host.querySelector<HTMLSelectElement>('select')?.value:b.dataset.target
@@ -39,8 +38,7 @@ export class ArcadeControls {
     const priorTarget=this.host.querySelector<HTMLSelectElement>('select')?.value
     const s=a.slots[this.selected],actions=this.host.querySelector('.arcade-actions')!
     actions.innerHTML=(s?.item==='blaster'?`<select aria-label="Blaster target"><option value="">Open air</option>${targets.map(t=>`<option value="${safeText(t.id)}">${safeText(t.label)} · ${t.hp} HP</option>`).join('')}</select><button data-op="fire">Fire</button>`:s&&s.item!=='cash'?'<button data-op="eat">Eat one</button>':'')+
-      drops.map(d=>`<button data-op="pickup" data-target="${safeText(d.id)}">Pick up items</button>`).join('')+
-      '<details><summary>City destinations</summary><button data-travel="gunshop">Arcade gun shop</button> <button data-travel="station">Meridian Police</button></details>'
+      drops.map(d=>`<button data-op="pickup" data-target="${safeText(d.id)}">Pick up items</button>`).join('')
     const select=actions.querySelector('select')
     if(select&&priorTarget&&targets.some(t=>t.id===priorTarget))select.value=priorTarget
   }
@@ -61,8 +59,8 @@ export function counterUI(dialog:HTMLDialogElement,view:WorldView,send:(data:obj
     title='Storage drawer';content=amount+'<h3>Carried</h3>'+transfer(carried.filter(s=>s.item==='cash'||s.item==='blaster'),'store','Put away')+'<h3>In drawer</h3>'+(transfer(a.drawer??[],'take','Take')||'Empty')
   }else{
     title=service==='desk'?'Meridian Police front desk':'Booking register'
-    content=service==='desk'?'<p>The booking desk is across the lobby. The visitor corridor runs between cells 01–50.</p>':
-      '<p>'+view.players.filter(p=>/^Inmate \d{2}$/.test(p.name)).map(p=>safeText(p.name)).join(' · ')+'</p>'
+    content=service==='desk'?'<p>The booking desk is across the lobby. Take the central stairs to levels 1–5. West Wing holds cells 01–25, East Wing 26–50.</p>':
+      '<p>'+((a.register??[]).map(safeText).join(' · ')||'All cells are available.')+'</p>'
   }
   body.innerHTML=`<header class="world-service-head"><h2 id="world-dialog-title">${title}</h2><form method="dialog"><button aria-label="Close">×</button></form></header><section class="arcade-counter">${content}</section><p class="counter-feedback" role="status"></p>`
   if(!dialog.open)dialog.showModal()
