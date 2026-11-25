@@ -1,3 +1,5 @@
+import {venue,cellPosition,CELL_COUNT} from './arcade.ts'
+import {supportModel} from './arcade-art.ts'
 import {residentialAt,residentialPoints,type HomeZone} from './residential.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {kitchenTools} from './kitchen-tools.ts'
@@ -39,6 +41,7 @@ export class CityStage {
   private figures=new Map<string,Avatar>()
   private playerMotion=new Map<string,PlayerMotion>()
   private labelPoint=new T.Vector3()
+  private support=new Map<string,T.Group>()
   private npc=new Map<string,Figure>()
   private restaurantNpc=new Map<string,{figure:Figure;props:ReturnType<typeof staffProps>}>()
   private lifts=new Map<string,T.Group>()
@@ -114,7 +117,7 @@ export class CityStage {
     const seatChanged=seat(prior)!==seat(next)
     const housingChanged=this.view?.housing?.keys.some(key=>!view.housing?.keys.includes(key))
     const reported=sent??this.position
-    if(changedWorld||reposition||seatChanged||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>1.35){
+    if(changedWorld||reposition||seatChanged||next.zone==='station'&&view.arcade?.custody&&document.querySelector('.cell-screen[open]')||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>1.35){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
       this.predictedHome=residentialAt(next.zone)?next.zone as HomeZone:undefined
     }
@@ -321,7 +324,12 @@ export class CityStage {
     const x=this.stick.x+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'))
     const z=this.stick.z+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'))
     const length=Math.max(1,Math.hypot(x,z)),speed=WORLD_SPEED*dt/length*(this.zone==='oasis'&&inPool(localSite(this.zone,this.position.x,this.position.z).x,localSite(this.zone,this.position.x,this.position.z).z)?.53:1)
-    if(x||z){
+    if(this.view?.arcade?.custody){
+      if(document.querySelector('.cell-screen[open]'))return
+      const c=cellPosition(this.view.arcade.custody.cell)
+      this.position.x=T.MathUtils.clamp(this.position.x+(x*Math.cos(this.yaw)+z*Math.sin(this.yaw))*speed,c.x-1.55,c.x+1.55)
+      this.position.z=T.MathUtils.clamp(this.position.z+(z*Math.cos(this.yaw)-x*Math.sin(this.yaw))*speed,c.z-1.2,c.z+1.2)
+    }else if(x||z){
       const dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=z*Math.cos(this.yaw)-x*Math.sin(this.yaw)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
       const zone=this.predictedHome??(residentialAt(this.zone)?'city':this.zone)
@@ -334,11 +342,15 @@ export class CityStage {
     const {x,z}=this.position
     if(this.view===this.promptedView&&x===this.promptedX&&z===this.promptedZ)return
     this.promptedView=this.view;this.promptedX=x;this.promptedZ=z
-    const zone=this.predictedHome??(this.zone?.startsWith('floor:')?this.zone:groundZone(this.position.x,this.position.z))
+    const zone=this.predictedHome??(this.zone&&(venue(this.zone)||this.zone.startsWith('floor:'))?this.zone:groundZone(this.position.x,this.position.z))
     const seated=this.view?.you.boardSeat!==undefined||this.view?.you.barSeat!==undefined
     const pose=this.view?.you.homePose
     let candidate:WorldAction|undefined
-    if(seated||pose)candidate={id:'stand-scenery',label:pose?.kind==='rest'?'Get up':'Stand up',x,z}
+    if(this.view?.arcade?.custody){
+      const b=this.view.arcade.custody,c=cellPosition(b.cell),tx=c.x+(b.cell%2?.68:-.68),tz=c.z+.99
+      if(b.ends===null&&Math.hypot(x-tx,z-tz)<1.7)candidate={id:'cell-table',label:'Sit at the jigsaw table',x:tx,z:tz}
+    }
+    else if(seated||pose)candidate={id:'stand-scenery',label:pose?.kind==='rest'?'Get up':'Stand up',x,z}
     else if(this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift){
       const points=zone==='kfc'?restaurantPoints(this.view?.restaurant,this.view?.you.dining).map(p=>({...p,...site(zone,p.x,p.z)})):
         [...interactions(zone),...boardPoints(zone,this.view?.boardTaken),...residentialPoints(zone,this.position,this.view?.housing?.keys??[],this.view?.residential)]
@@ -392,7 +404,7 @@ export class CityStage {
         current.props.mop.visible=cleaning&&member.workKind==='mop'
         current.props.mop.rotation.z=.19+Math.sin(now*.008)*.13
       }
-      figure.pose(dt,now,local?this.position:sample,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now,member.homePose)
+      figure.pose(member.online?dt:0,member.online?now:0,local?this.position:sample,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now,member.homePose)
       const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
       if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
       if(interior){
@@ -420,12 +432,25 @@ export class CityStage {
     for(const [key,cabin] of this.lifts)if(!neededLifts.has(key))cabin.visible=false
     for(const [name,entry] of this.figures)if(!active.has(name)){entry.figure.dispose();entry.tag?.remove();this.figures.delete(name)}
     this.restaurantCast(dt,now)
-    const residents=this.view.residents??[],activeResidents=new Set(residents.map(n=>n.id))
+    const contacts=this.view.arcade?.contacts??[]
+    const props=[...contacts.filter(c=>c.kind==='dog'||c.kind==='helicopter'),...(this.view.arcade?.drops??[]).map(d=>({...d,kind:'drop' as const}))]
+    for(const [id,g] of this.support)if(!props.some(p=>p.id===id)){
+      this.art.scene.remove(g);this.support.delete(id)
+      g.traverse(obj=>{if(obj instanceof T.InstancedMesh){obj.dispose();obj.material.dispose()}})
+    }
+    for(const c of props){
+      let g=this.support.get(c.id)
+      if(!g){g=supportModel(c.kind);this.support.set(c.id,g);this.art.scene.add(g)}
+      g.visible=true;g.position.set(c.x,c.kind==='helicopter'?6:0,c.z)
+      if(c.kind==='helicopter')g.rotation.y=now*.0006
+    }
+    const officers=contacts.filter(c=>c.kind==='officer').map(c=>({...c,zone:c.zone as WorldZone,name:c.label,avatar:'default',online:true,yaw:0,homePose:undefined,lift:undefined}))
+    const residents=[...this.view.residents??[],...officers],activeResidents=new Set(residents.map(n=>n.id))
     for(const member of residents){
       let figure=this.npc.get(member.id)
       const height=riderHeight(member,now)
       if(!figure){
-        figure=new Figure(this.art.scene,member,this.shadow!)
+        figure=new Figure(this.art.scene,member,this.shadow!,'kind' in member?'officer':false)
         figure.root.position.y=height;this.npc.set(member.id,figure)
       }
       const visible=height<21&&this.camera.position.distanceTo(figure.root.position)<49
@@ -581,8 +606,20 @@ export class CityStage {
       ...['casino','bank','exchange'].flatMap(zone=>interactions(zone as WorldZone)),
       {...site('hotel',0,-7.9),label:'Gaming floor'},
     ]
+    if(this.zone){
+      landmarks.push(...interactions(this.zone),...residentialPoints(this.zone,o,this.view?.housing?.keys??[],this.view?.residential))
+      for(const c of this.view?.arcade?.contacts??[])landmarks.push({...c,label:c.label})
+      for(const d of this.view?.arcade?.drops??[])landmarks.push({...d,label:'Dropped items'})
+      if(this.zone==='station')for(let i=1;i<=CELL_COUNT;i++){
+        const p=cellPosition(i),[x,y]=project(p.x,p.z)
+        ctx.strokeStyle='#b0bdba';ctx.strokeRect(x-size*2.1,y-size*1.57,size*4.2,size*3.14)
+        ctx.fillStyle='#7c9cae';ctx.fillRect(x-size*.9,y-size*.6,size*.75,size*1.65)
+        ctx.fillStyle='#eee6ce';ctx.fillRect(x+size,y-size*.9,size*.4,size*.48)
+        ctx.fillText('Cell '+i,x,y)
+      }
+    }
     for(const p of landmarks){const [x,y]=project(p.x,p.z);ctx.fillStyle='#8fe2b5';ctx.fillRect(x-8,y-8,16,16);ctx.fillStyle='#dfedda';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText(p.label,x,y-12)}
-    for(const other of this.view?.players??[]){const [x,z]=project(other.x,other.z);ctx.fillStyle='#f1c78b';ctx.beginPath();ctx.arc(x,z,5,0,TAU);ctx.fill()}
+    for(const other of this.view?.players??[]){const [x,z]=project(other.x,other.z);ctx.fillStyle='#f1c78b';ctx.beginPath();ctx.arc(x,z,5,0,TAU);ctx.fill();ctx.fillText(other.name,x,z+17)}
     ctx.fillStyle='#b0eada';ctx.beginPath();ctx.arc(w/2,h/2,7,0,TAU);ctx.fill()
   }
 }

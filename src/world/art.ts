@@ -1,3 +1,4 @@
+import {arcadeBuildings} from './arcade-art.ts'
 import {urbanArt} from './urban-art.ts'
 import {basinBed,tunnelBed,poolLevel} from './terrain.ts'
 import {district} from './district.ts'
@@ -643,6 +644,7 @@ export function makeWorldArt(open:boolean){
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());contactShade(scene);const water=fountain(scene),{wind,seal}=landscape(scene)
   district(scene)
+  arcadeBuildings(scene,banner)
   const homes=residentialArt(scene,banner),urban=urbanArt(scene,banner)
   const ambient=(time:number)=>{water(time);wind(time);poolRipples(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>

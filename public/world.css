@@ -237,3 +237,18 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .residential-food h3{margin:0 0 .55rem}
 .residential-food h3 small{color:#b1c2b4}
 .residential-bank button{min-width:3rem;font-size:1.16rem}
+
+#city-world:has(#city-pack:not([hidden])) .world-use{bottom:102px}
+#city-pack{position:absolute;z-index:4;left:50%;bottom:12px;transform:translateX(-50%);max-width:min(600px,94%);border:1px solid #b5c3ac55;border-radius:9px;background:#172a30ed;color:#f4eed9;padding:6px 10px;font:600 12px/1.4 system-ui}
+.arcade-meter{color:#b3e8d6;margin-bottom:4px}
+.arcade-slots{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px}
+.arcade-slots button{background:#254044;color:#fff2d8;min-width:32px;border:1px solid #627774;border-radius:4px;padding:2px;font-size:11px}
+.arcade-slots small{display:block;color:#b6c9b8}
+.arcade-slots [aria-pressed=true]{outline:2px solid #edc17c}
+.arcade-actions{display:flex;align-items:center;gap:6px;margin-top:4px}
+.arcade-actions details{margin-left:auto}
+.arcade-actions button,.arcade-actions summary,.arcade-counter button{cursor:pointer}
+.arcade-counter{display:flex;flex-wrap:wrap;gap:10px;padding:10px}
+.arcade-counter h3,.arcade-counter p{width:100%}
+.arcade-counter input{width:6em}
+@media(max-width:700px){#city-pack{bottom:5px;font-size:10px}.arcade-slots button{min-width:26px;font-size:9px}.world-chat{bottom:106px}}

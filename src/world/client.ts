@@ -1,3 +1,5 @@
+import {ArcadeControls,counterUI} from './arcade-ui.ts'
+import {showCustody,openCellTable} from '../custody-ui.ts'
 import {RestaurantUI} from './restaurant-ui.ts'
 import {api,ApiError,getSession,initShell,updateWalletBalance} from '../shell.ts'
 import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type CasinoView,type RouletteChoice} from '../casino-model.ts'
@@ -14,6 +16,7 @@ const pause=cast('world-pause'),chatForm=cast<HTMLFormElement>('world-chat-form'
 let paused=false,chatting=false
 function syncControls(){stage?.lock(paused||chatting||dialog.open)}
 function showPause(){
+  if(view?.arcade?.custody){document.querySelector<HTMLDialogElement>('.cell-screen:not([open])')?.showModal();return}
   if(closed||paused)return
   paused=true;pause.hidden=false
   if(chatting)chatInput.blur()
@@ -43,6 +46,7 @@ chatForm.onsubmit=async e=>{
   chatInput.blur();stage?.resumeMouse()
   try{await action('chat',{text});if(chatInput.value.trim()===text)chatInput.value=''}catch{}
 }
+const packUI=new ArcadeControls(cast('city-pack'),action)
 let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
@@ -156,7 +160,8 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   const observedOffset=next.now-(start+Date.now())/2
   offset=view?.id===next.id&&Math.abs(observedOffset-offset)<650?offset+.2*(observedOffset-offset):observedOffset
   const scope=next.id+':'+next.you.zone,changed=viewKey!==scope
-  view=next
+  view=next;packUI.update(next)
+  if(next.arcade?.custody){if(dialog.open)dialog.close();paused=false;pause.hidden=true;showCustody(next.arcade.custody)}
   if(next.you.zone==='private'){
     closed=true;location.replace('/chess/dice.html?cave=1');return
   }
@@ -189,6 +194,11 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   if(!paused&&service&&shownService!==service){
     shownService=service
     if(station)return
+    if(['cash','counter','desk','booking'].includes(service)||service.startsWith('drawer:')){
+      stage?.lock(true)
+      const render=()=>{if(view&&view.interaction===service)counterUI(dialog,view,async data=>{await action('arcade',data);render()})}
+      render();return
+    }
     if(service.startsWith('lift:')){
       stage?.lock(true)
       services?.residentialLift(next.you.zone,async level=>{await action('home-floor',{level});services?.close()})
@@ -217,7 +227,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
 }
 async function presence(){
   const t=Date.now(),sent=stage&&{...stage.position}
-  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,...sent}),signal:AbortSignal.timeout(5500)})
+  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,...(view?.arcade?.custody&&document.querySelector('.cell-screen[open]')?{}:sent)}),signal:AbortSignal.timeout(5500)})
   if(!response.ok){
     if(response.status===401){closed=true;location.replace('/chess/login.html')}
     throw new Error('City connection lost')
@@ -239,6 +249,7 @@ async function action(name:string,data:object){
   finally{performing=false;updateSelection()}
 }
 function use(point?:WorldAction){
+  if(point?.id==='cell-table'){openCellTable();return}
   if(view?.interaction?.startsWith('kfc:kitchen:')){
     void action('restaurant',{command:'leave-station'}).catch(()=>{});return
   }
@@ -292,7 +303,7 @@ async function start(){
   })
   const url=new URL(location.href),go=url.searchParams.get('go')??''
   if(url.searchParams.get('exit')==='cave')await action('exit-cave',{})
-  else if(like(go))await action('teleport',{to:go})
+  else if(!auth.custody&&like(go))await action('teleport',{to:go})
   else await presence()
   history.replaceState(null,'',url.pathname)
   async function beat(){

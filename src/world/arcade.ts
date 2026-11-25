@@ -10,7 +10,7 @@ export const JAIL_MINUTES=[0,2,10,60,360,1440]
 export const CELL_COUNT=50
 export const PUZZLE_SIZE=1000
 export const alias=(cell:number)=>'Inmate '+String(cell).padStart(2,'0')
-export const entrances={station:{x:-50,z:-60},gunshop:{x:66,z:-60}}
+export const entrances={station:{x:-50,z:-60},gunshop:{x:-55,z:-71}}
 export type Venue=keyof typeof entrances
 export const venue=(zone:string):zone is Venue=>zone==='station'||zone==='gunshop'
 // Interiors use shared city coordinates on their own plots.
