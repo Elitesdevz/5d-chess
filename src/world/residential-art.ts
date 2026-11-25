@@ -65,6 +65,7 @@ function modelFurniture(f:Fixture,p:Scenery,y:number,tone:number){
       const x=(i+.5)*w/sections-w/2
       box(x,.47,-d*.5,w/sections-.024,.715,.038,i===sections-1?iron:tone)
       box(x,.68,-d*.545,.17,.026,.043,brass)
+      box(x,.56,-d*.535,w/sections-.036,.018,.022,walnut)
     }
     const x=-w*.26
     box(x,.945,0,.42,.022,.43,0x758b8e)

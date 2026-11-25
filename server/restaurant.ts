@@ -1,3 +1,4 @@
+import {pack,carry,mirrorFood,heal} from './city-inventory.ts'
 import {randomUUID} from 'node:crypto'
 import {income} from './credit.ts'
 import {wallet} from './economy.ts'
@@ -411,8 +412,9 @@ export class Restaurant {
         const meal=account.restaurant
         if(!meal||meal.id!==data.id||!meal.takeaway||meal.status!=='served')fail(409,'Your takeaway is not ready')
         this.requirePoint(member,'kfc:collect',now)
-        const food=account.food??=blankOrder(),items=orderItems(meal)
-        for(const item of MENU)food[item.id]+=items[item.id]
+        const p=pack(account),items=orderItems(meal)
+        for(const item of MENU)if(items[item.id])carry(p,item.id,items[item.id])
+        mirrorFood(account)
         ;(account.foodReceipts??={})['takeaway:'+meal.id]='collected'
         delete account.restaurant
         u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'takeaway_collected',reference:meal.id},now)
@@ -442,6 +444,7 @@ export class Restaurant {
         const meal=a.restaurant
         if(meal?.status!=='served'||meal.takeaway)fail(409,'Your meal is still being prepared')
         meal.bites++
+        heal(a,10)
         if(meal.bites>=Math.max(3,orderSize(orderItems(meal)))){
           delete a.restaurant
           u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'meal_finished',reference:meal.id},now)

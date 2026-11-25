@@ -1,3 +1,4 @@
+import {pack,carry,remove,recover,heal,mirrorFood} from './city-inventory.ts'
 import {blankOrder,MENU,type MenuItem} from '../src/world/restaurant-model.ts'
 import type {FoodView} from '../src/world/food.ts'
 import {access} from '../src/world/residential.ts'
@@ -10,19 +11,19 @@ export function residentialFood(store:ChessStore,name:string,keys:readonly strin
   if(!command){
     const payload=store.accountJson(name)??fail(401,'Log in first')
     const account=JSON.parse(payload) as Account
-    if(!Object.keys(account.fridges??{}).some(id=>!access(id,keys))){
+    if(account.cityPack&&!Object.keys(account.fridges??{}).some(id=>!access(id,keys))){
       return {personal:account.food??blankOrder(),stored:unit?(account.fridges?.[unit]??blankOrder()):undefined}
     }
   }
   return store.transaction(tx=>{
     const account=tx.users.get(name)??fail(401,'Log in first')
-    const personal=account.food??blankOrder()
+    const p=pack(account)
     for(const [id,contents] of Object.entries(account.fridges??{})){
       if(access(id,keys))continue
-      for(const {id:item} of MENU)personal[item]+=contents[item]
+      for(const {id:item} of MENU)if(contents[item])recover(p,item,contents[item])
       delete account.fridges![id]
-      account.food=personal
     }
+    const personal=mirrorFood(account)
     const stored=unit?(account.fridges?.[unit]??blankOrder()):undefined
     if(command){
       const {id,item,operation,amount}=command
@@ -38,15 +39,16 @@ export function residentialFood(store:ChessStore,name:string,keys:readonly strin
         if(receipts[id]!==receipt)fail(409,'This request has already been used')
       }else{
         if(typeof quantity!=='number'||!Number.isSafeInteger(quantity)||quantity<1||quantity>source[type])fail(409,'Choose an available quantity')
-        source[type]-=quantity
-        if(operation==='take')personal[type]+=quantity
+        if(operation==='take'){carry(p,type,quantity);stored![type]-=quantity}
+        else remove(p,type,quantity)
+        if(operation==='eat')heal(account,quantity*20)
         if(operation==='store')stored![type]+=quantity
         if(stored&&unit)(account.fridges??={})[unit]=stored
-        account.food=personal
+        mirrorFood(account)
         receipts[id]=receipt
         tx.economyUsage(name,'/api/world/food',{action:'restaurant_action',service:'food_'+operation,reference:type,value:quantity},Date.now())
       }
     }
-    return {personal,stored}
+    return {personal:account.food!,stored}
   })
 }
