@@ -89,6 +89,7 @@ export function transfer(a:Account,operation:unknown,item:Item,amount:number,atB
     }
   }else if(operation==='buy'){
     if(!atShop)fail(409,'Visit the arcade gun shop')
+    requireSpending(a,now)
     remove(p,'cash',PRICE);carry(p,'blaster',1)
   }else if(operation==='recover'||operation==='take'||operation==='store'){
     if(operation==='recover'?!atBank:!drawer)fail(403,'Open the appropriate storage first')
@@ -104,4 +105,3 @@ export function transfer(a:Account,operation:unknown,item:Item,amount:number,atB
   }else fail(400,'Unknown inventory action')
   mirrorFood(a)
 }
-

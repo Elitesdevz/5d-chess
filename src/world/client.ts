@@ -30,7 +30,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)showPause()
 window.addEventListener('blur',showPause)
 let chatKey=''
 function renderChat(next:WorldView){
-  const key=next.id+':'+(next.chat?.at(-1)?.id??0)
+  const key=next.id+JSON.stringify(next.chat?.slice(-8).map(m=>[m.id,m.name,m.text]))
   if(key===chatKey)return
   chatKey=key
   const list=cast('world-messages')
@@ -302,7 +302,7 @@ async function start(){
     if(connection.textContent===graphicsMessage)connection.hidden=true
   })
   const url=new URL(location.href),go=url.searchParams.get('go')??''
-  if(url.searchParams.get('exit')==='cave')await action('exit-cave',{})
+  if(!auth.custody&&url.searchParams.get('exit')==='cave')await action('exit-cave',{})
   else if(!auth.custody&&like(go))await action('teleport',{to:go})
   else await presence()
   history.replaceState(null,'',url.pathname)

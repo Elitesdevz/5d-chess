@@ -36,10 +36,13 @@ export class ArcadeControls {
     if(key===this.key)return
     this.key=key
     this.host.querySelector('.arcade-slots')!.innerHTML=a.slots.map((s,i)=>`<button data-slot="${i}" aria-pressed="${this.selected===i}" title="Slot ${i+1}"><small>${i+1}</small>${s?names[s.item]+' ×'+s.count:'—'}</button>`).join('')
+    const priorTarget=this.host.querySelector<HTMLSelectElement>('select')?.value
     const s=a.slots[this.selected],actions=this.host.querySelector('.arcade-actions')!
     actions.innerHTML=(s?.item==='blaster'?`<select aria-label="Blaster target"><option value="">Open air</option>${targets.map(t=>`<option value="${safeText(t.id)}">${safeText(t.label)} · ${t.hp} HP</option>`).join('')}</select><button data-op="fire">Fire</button>`:s&&s.item!=='cash'?'<button data-op="eat">Eat one</button>':'')+
       drops.map(d=>`<button data-op="pickup" data-target="${safeText(d.id)}">Pick up items</button>`).join('')+
       '<details><summary>City destinations</summary><button data-travel="gunshop">Arcade gun shop</button> <button data-travel="station">Meridian Police</button></details>'
+    const select=actions.querySelector('select')
+    if(select&&priorTarget&&targets.some(t=>t.id===priorTarget))select.value=priorTarget
   }
 }
 
@@ -69,4 +72,3 @@ export function counterUI(dialog:HTMLDialogElement,view:WorldView,send:(data:obj
     catch(e){body.querySelector('.counter-feedback')!.textContent=e instanceof Error?e.message:'Transfer failed';b.disabled=false}
   }
 }
-

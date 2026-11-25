@@ -75,7 +75,7 @@ export function publicView(value:unknown,bookings:Booking[]):unknown{
   if(!bookings.length)return value
   const names=new Map(bookings.map(b=>[b.user,b.name]))
   const escaped=[...names.keys()].sort((a,b)=>b.length-a.length).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')
-  const pattern=new RegExp('(?<![\\\\p{L}\\\\p{N}_])(?:'+escaped+')(?![\\\\p{L}\\\\p{N}_])','gu')
+  const pattern=new RegExp(String.raw`(?<![\p{L}\p{N}_])(?:${escaped})(?![\p{L}\p{N}_])`,'gu')
   function visit(v:unknown,key:string):unknown{
     if(typeof v==='string'){
       if(identities.has(key)||key==='seats')return names.get(v)??v
@@ -88,4 +88,3 @@ export function publicView(value:unknown,bookings:Booking[]):unknown{
   }
   return visit(value,'')
 }
-

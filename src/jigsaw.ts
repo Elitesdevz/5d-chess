@@ -103,4 +103,3 @@ export async function jigsaw(host:HTMLElement){
   host.querySelector<HTMLButtonElement>('[data-next]')!.onclick=()=>{if(page<39){page++;selected=-1;render()}}
   render()
 }
-

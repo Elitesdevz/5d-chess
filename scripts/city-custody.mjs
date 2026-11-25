@@ -20,4 +20,3 @@ try{
   })
   console.log(result)
 }finally{store.close()}
-

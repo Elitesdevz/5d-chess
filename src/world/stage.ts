@@ -1,3 +1,4 @@
+import {staffId,bankStaff} from './service-staff.ts'
 import {venue,cellPosition,CELL_COUNT} from './arcade.ts'
 import {supportModel} from './arcade-art.ts'
 import {residentialAt,residentialPoints,type HomeZone} from './residential.ts'
@@ -161,6 +162,12 @@ export class CityStage {
       this.art.seal.visible=!this.caveOpen&&next.zone!=='cave'
       this.art.grotto.visible=!this.art.seal.visible
       this.art.restaurant.update(view.restaurant)
+      const hidden=view.arcade?.recoveringStaff??[]
+      this.art.staff.forEach((a,i)=>a.root.visible=!hidden.includes(i<bankStaff.length?staffId('bank',i):staffId('exchange',i-bankStaff.length)))
+      this.art.actors.forEach((a,i)=>a.root.visible=!hidden.includes(staffId('casino',i)))
+      this.art.bar.bartender.root.visible=!hidden.includes(staffId('casino',4))
+      this.art.homes.clerks.forEach((a,i)=>a.root.visible=!hidden.includes(staffId('home:block-'+i+':0',0)))
+      if(next.zone.startsWith('floor:'))this.art.floor(next.zone.slice(6))?.actors.forEach((a,i)=>a.root.visible=!hidden.includes(staffId(next.zone,i)))
       const target=next.lift?.to??next.zone
       if(target.startsWith('floor:'))this.art.floor(target.slice(6))
     }

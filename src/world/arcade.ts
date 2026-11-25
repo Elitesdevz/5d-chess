@@ -27,6 +27,5 @@ export interface CustodyView {cell:number;name:string;ends:number|null;noRelease
 export interface Contact {id:string;label:string;x:number;z:number;zone:string;hp?:number;kind:'officer'|'dog'|'helicopter'|'resident'|'player'}
 export interface ArcadeView {
   sequence:number;slots:(Stack|null)[];hp:number;stars:number;remaining:number;contacts:Contact[]
-  drawer?:Stack[];recovery?:Stack[];drops:{id:string;x:number;z:number}[];warning?:string;searches?:string[];custody?:CustodyView
+  recoveringStaff?:string[];drawer?:Stack[];recovery?:Stack[];drops:{id:string;x:number;z:number}[];warning?:string;searches?:string[];custody?:CustodyView
 }
-

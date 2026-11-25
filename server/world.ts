@@ -1,7 +1,8 @@
 import {randomUUID} from 'node:crypto'
 import {CityArcade} from './city-arcade.ts'
 import {roster,cellMove,custodyView} from './custody.ts'
-import {entrances,venue,type Venue} from '../src/world/arcade.ts'
+import {entrances,venue,SLOT_COUNT,MAX_HP,type Venue} from '../src/world/arcade.ts'
+import {serviceStaff} from '../src/world/service-staff.ts'
 import {CityLife} from './city-life.ts'
 import {callResidentialLift,occupy,operateDoor,residentialRide,settleResidentialLifts,stand} from './residential-actions.ts'
 import {aboard,access,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
@@ -181,7 +182,7 @@ export class CityWorlds {
       else if(data.world===world.id&&data.scene===true)this.store.transaction(tx=>cellMove(tx,booking,data.x,data.z,data.yaw))
       Object.assign(me,{x:booking.x,z:booking.z,yaw:booking.yaw,seen:now})
       return {id:world.id,now,you:{...publicMember(me,data.scene===true),name:booking.name},players:[],coins:account.coins??0,caveOpen:false,
-        arcade:{hp:100,slots:[],sequence:0,remaining:0,stars:0,contacts:[],drops:[],custody:custodyView(booking)}}
+        arcade:{hp:this.store.cityStats(name)?.hp??MAX_HP,slots:Array(SLOT_COUNT).fill(null),sequence:0,remaining:0,stars:0,contacts:[],drops:[],custody:custodyView(booking)}}
     }
     if(me.cell){delete me.cell;this.arrive(world,me,'station',now)}
     let housing=this.housing(name,now)
@@ -356,11 +357,15 @@ export class CityWorlds {
     }
     const at=(id:string)=>me.interaction===id&&this.points(world,me,now).some(p=>p.id===id&&near(me,p.x,p.z,p.range))
     const drawer=me.interaction?.startsWith('drawer:')?this.homePoints(world,me,now).find(p=>p.id===me.interaction&&near(me,p.x,p.z,p.range)&&housing.keys.includes(p.unit!))?.unit:undefined
-    const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents:world.life.population.map(n=>({id:n.resident.id,name:n.name,x:n.x,z:n.z,zone:n.zone})),
+    const level=riderHeight(me,now)
+    const restaurant=level<5&&(me.zone==='kfc'||near(me,RESTAURANT.x,RESTAURANT.z,26))?world.restaurant.view(name,now,me.zone==='kfc'):undefined
+    const residents=world.life.population.map(n=>({id:n.resident.id,name:n.name,x:n.x,z:n.z,zone:n.zone}))
+    residents.push(...serviceStaff(me.zone))
+    for(const a of restaurant?.actors??[])residents.push({id:'kfc:'+a.id,name:a.name,zone:'kfc',...site('kfc',a.x,a.z)})
+    const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents,
       keys:housing.keys,drawer,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
     if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;this.arrive(world,victim,'city',now)}
     if(simulation.view.custody)return this.update(name,'presence',{},now)
-    const level=riderHeight(me,now)
     const players=me.zone==='private'?[]:[...world.members.values()].filter(p=>p.name!==name&&!bookings.some(b=>b.user===p.name)&&p.zone!=='private'&&near(me,p.x,p.z,48)&&(shared?Math.abs(riderHeight(p,now)-level)<23:p.zone===me.zone)).map(p=>publicMember(p,shared))
     if(me.zone==='station')for(const b of bookings){
       players.push({name:b.name,avatar:b.avatar,zone:'station',...(shared?{x:b.x,z:b.z}:localSite('station',b.x,b.z)),yaw:b.yaw,
@@ -368,7 +373,7 @@ export class CityWorlds {
     }
     const casino=site('casino',0,3)
     const tableMotion=shared&&!hall&&me.zone!=='private'&&level<5&&near(me,casino.x,casino.z,29)?this.roulette.tableMotion(world.id):undefined
-    const restaurant=level<5&&(me.zone==='kfc'||near(me,RESTAURANT.x,RESTAURANT.z,26))?world.restaurant.view(name,now,me.zone==='kfc'):undefined
+    if(restaurant)restaurant.actors=restaurant.actors.filter(a=>!(simulation.health['kfc:'+a.id]?.returns>now))
     const coins=action==='arcade'||action==='housing'||action==='restaurant'||action==='bar'||action==='use'&&me.zone==='kfc'?this.store.rouletteWallet(name)?.coins:account.coins
     if(me.interaction==='food')food??=residentialFood(this.store,name,housing.keys)
     if(me.interaction?.startsWith('fridge:')){

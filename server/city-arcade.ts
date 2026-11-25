@@ -12,9 +12,13 @@ type Located={x:number;z:number;zone:string}
 type Drop=Located&{id:string;items:Stack[]}
 type NpcHealth={hp:number;returns:number}
 type Scene={world:string;shard:number;me:WorldPlayer;players:WorldPlayer[];residents:(Located&{id:string;name:string})[];keys:string[];drawer?:string;bank:boolean;shop:boolean}
-type Search={id:string;world:string;units:Contact[];cursor:number;last:number;arrived:number;raidAt:number;dogAt:number;dogWarningUntil?:number;searched:string[];warning:string}
-export const RULES={range:8,damage:35,shotDelay:900,notice:4500,officers:[0,1,2,3,4,5],speed:[0,1.6,1.9,2.2,2.5,2.7],dogRange:7,dogCooldown:18000,dogNotice:2400,raidDelay:12000}
-function advance(p:Pack,by:number){p.stars=Math.min(5,p.stars+by);p.remaining=CLEAR_MINUTES[p.stars]*60000}
+type Search={id:string;world:string;units:Contact[];cursor:number;lastKnown:Located;last:number;arrived:number;raidAt:number;dogAt:number;dogWarningUntil?:number;searched:string[];warning:string}
+export const RULES={range:8,damage:35,shotDelay:900,notice:4500,sight:[0,12,15,18,22,30],officers:[0,1,2,3,4,5],speed:[0,1.6,1.9,2.2,2.5,2.7],dogRange:7,dogCooldown:18000,dogNotice:2400,raidDelay:12000}
+function advance(p:Pack,by:number){
+  if(p.stars===5)return
+  p.stars=Math.min(5,p.stars+by)
+  p.remaining=CLEAR_MINUTES[p.stars]*60000
+}
 export class CityArcade {
   private store:ChessStore
   private seen=new Map<string,number>()
@@ -76,7 +80,7 @@ export class CityArcade {
     if(!p.stars){this.searches.delete(me.name);return}
     let search=this.searches.get(me.name)
     if(!search){
-      search={id:randomUUID(),world:s.world,units:[],cursor:0,last:now,arrived:now,raidAt:now,dogAt:now-RULES.dogCooldown,searched:[],warning:'Meridian patrol is searching'}
+      search={id:randomUUID(),world:s.world,units:[],cursor:0,lastKnown:{x:me.x,z:me.z,zone:me.zone},last:now,arrived:now,raidAt:now,dogAt:now-RULES.dogCooldown,searched:[],warning:'Meridian patrol is searching'}
       this.searches.set(me.name,search)
     }
     search.world=s.world
@@ -92,7 +96,7 @@ export class CityArcade {
       this.store.transaction(tx=>this.sweep(tx,s,p.stars,search!,now))
       search.raidAt=now
     }
-    let caught=false
+    let caught=false,tracking=false
     const health=this.store.metadataValue('npc:'+s.shard) as Record<string,NpcHealth>|undefined
     for(const [i,o] of search.units.entries()){
       if(!canEnter||(health?.[o.id]?.returns??0)>now)continue
@@ -101,13 +105,17 @@ export class CityArcade {
         if(now-search.arrived<5000)continue
         Object.assign(o,{x:me.x+12,z:me.z+2,zone:me.zone})
       }
-      const d=Math.hypot(o.x-me.x,o.z-me.z)
-      const speed=RULES.speed[p.stars]
       if(now-search.arrived<RULES.notice)continue
-      const step=Math.min(d,speed*dt)
-      if(d){o.x+=(me.x-o.x)*step/d;o.z+=(me.z-o.z)*step/d}
-      if(d<1.15)caught=true
+      const distance=Math.hypot(o.x-me.x,o.z-me.z)
+      const spotted=distance<=RULES.sight[p.stars]||p.stars===5&&me.zone==='city'
+      if(spotted){search.lastKnown={x:me.x,z:me.z,zone:me.zone};tracking=true}
+      const phase=(now-search.arrived)/4500+i
+      const goal=spotted?me:{x:search.lastKnown.x+4*Math.cos(phase),z:search.lastKnown.z+4*Math.sin(phase)}
+      const d=Math.hypot(goal.x-o.x,goal.z-o.z),step=Math.min(d,RULES.speed[p.stars]*dt)
+      if(d){o.x+=(goal.x-o.x)*step/d;o.z+=(goal.z-o.z)*step/d}
+      if(distance<1.15)caught=true
     }
+    if(!search.searched.length||now-search.raidAt>5000)search.warning=tracking?'Meridian patrol in pursuit':'Meridian patrol is searching'
     if(p.stars===5){
       const lead=search.units[0],d=Math.hypot(lead.x-me.x,lead.z-me.z)
       if(d<=RULES.dogRange&&lead.zone===me.zone&&now-search.dogAt>=RULES.dogCooldown){
@@ -196,8 +204,8 @@ export class CityArcade {
     if(p.stars===5&&search){const lead=search.units[0];contacts.push({...lead,id:'heli',label:'Police helicopter',kind:'helicopter',hp:100},{...lead,x:lead.x+.8,id:'dog',label:'Dog team',kind:'dog',hp:100})}
     const view:ArcadeView={sequence:p.sequence,slots:p.slots,hp:p.hp,stars:p.stars,remaining:p.remaining,contacts,
       drops:drops.filter(d=>d.zone===me.zone&&near(me,d.x,d.z,28)).map(({id,x,z})=>({id,x,z})),
+      recoveringStaff:Object.keys(health).filter(id=>id.startsWith('staff:')&&health[id].returns>now),
       drawer:s.drawer?p.drawers[s.drawer]??[]:undefined,recovery:s.bank?p.recovery:undefined,warning:search?.warning,searches:search?.searched.slice(-4),custody:booked&&custodyView(booked)}
     return {view,respawn,health}
   }
 }
-

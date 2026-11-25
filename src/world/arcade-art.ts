@@ -67,4 +67,3 @@ export function supportModel(kind:Contact['kind']|'drop'){
   }
   p.finish(g);return g
 }
-

@@ -63,4 +63,3 @@ export function custodyHeartbeat(){
   window.setInterval(tick,12000)
   window.addEventListener('pageshow',e=>{if(e.persisted)void tick()})
 }
-
