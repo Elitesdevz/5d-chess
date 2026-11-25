@@ -1,3 +1,4 @@
+import {randomUUID} from 'node:crypto'
 import {CityArcade} from './city-arcade.ts'
 import {roster,cellMove,custodyView} from './custody.ts'
 import {entrances,venue,type Venue} from '../src/world/arcade.ts'
@@ -12,7 +13,6 @@ import {wallet} from './economy.ts'
 import {operating,companies,saveCompanies,cashUnits} from './corporate.ts'
 import {Restaurant} from './restaurant.ts'
 import {RESTAURANT,restaurantPoints} from '../src/world/restaurant-model.ts'
-import {randomUUID} from 'node:crypto'
 import {dayKey} from '../src/collection.ts'
 import {BOARD_SEATS,BOARD_TABLE,boardPoints,DESTINATIONS,FLOOR_ARRIVAL,LIFT,WORLD_CAPACITY,WORLD_SPEED,floorHeight,groundZone,interactions,localSite,near,riderHeight,site,spawn,stockFloor,worldMove,type Destination,type WorldPlayer,type WorldUse,type WorldView,type WorldZone,type WorldChat} from '../src/world/model.ts'
 import type {Position,HallView} from '../src/roulette-hall-model.ts'
@@ -22,7 +22,7 @@ import {fail} from './http.ts'
 
 const TIMEOUT=27_000
 type Member=WorldPlayer&{seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position;cell?:number}
-type World={id:string;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView;life:CityLife}
+type World={id:string;shard:number;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView;life:CityLife}
 export interface CaveVisit {day:string;active:boolean}
 const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose})
 
@@ -49,12 +49,12 @@ export class CityWorlds {
         room.lastChat.delete(name)
         room.members.delete(name);this.occupants.delete(name)
       }
-      if(!room.members.size)this.worlds.delete(room.id)
+      if(!room.members.size){this.arcade.retire(room.shard);this.worlds.delete(room.id)}
     }
   }
   private enter(name:string,avatar:string,zone:WorldZone,now:number){
     let world=[...this.worlds.values()].find(w=>w.members.size<WORLD_CAPACITY)
-    if(!world){let n=1;while(this.worlds.has('W-'+n))n++;world={id:'W-'+n,members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}},life:new CityLife(now,this.store.metadataValue('cityDeeds') as Deeds|undefined)};this.worlds.set(world.id,world)}
+    if(!world){let shard=1;while([...this.worlds.values()].some(w=>w.shard===shard))shard++;world={id:'W-'+randomUUID().slice(0,8),shard,members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}},life:new CityLife(now,this.store.metadataValue('cityDeeds') as Deeds|undefined)};this.worlds.set(world.id,world)}
     const member:Member={name,avatar,zone,...FLOOR_ARRIVAL,seen:now,moved:now,online:true}
     this.arrive(world,member,zone,now)
     world.members.set(name,member);this.occupants.set(name,world)
@@ -356,7 +356,7 @@ export class CityWorlds {
     }
     const at=(id:string)=>me.interaction===id&&this.points(world,me,now).some(p=>p.id===id&&near(me,p.x,p.z,p.range))
     const drawer=me.interaction?.startsWith('drawer:')?this.homePoints(world,me,now).find(p=>p.id===me.interaction&&near(me,p.x,p.z,p.range)&&housing.keys.includes(p.unit!))?.unit:undefined
-    const simulation=this.arcade.run({world:world.id,me,players:[...world.members.values()],residents:world.life.population.map(n=>({id:n.resident.id,name:n.name,x:n.x,z:n.z,zone:n.zone})),
+    const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents:world.life.population.map(n=>({id:n.resident.id,name:n.name,x:n.x,z:n.z,zone:n.zone})),
       keys:housing.keys,drawer,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
     if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;this.arrive(world,victim,'city',now)}
     if(simulation.view.custody)return this.update(name,'presence',{},now)

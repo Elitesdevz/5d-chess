@@ -200,12 +200,21 @@ export class ChessStore {
       this.db.exec('ROLLBACK'); this.statements.clear(); throw error
     } finally {this.inTransaction = false}
   }
+  private writeCheck?:()=>void
+  // World and hall services each own several short synchronous transactions.
+  // Check custody under their writer locks, including operator changes from another process.
+  withWriteCheck<T>(check:()=>void,work:()=>T):T {
+    const before=this.writeCheck
+    this.writeCheck=check
+    try{return work()}finally{this.writeCheck=before}
+  }
   transaction<T>(work: (unit: UnitOfWork) => T): T {
     if (work.constructor.name === 'AsyncFunction') throw new Error('Chess transactions must be synchronous')
     if (this.inTransaction) throw new Error('Nested chess transaction')
     this.db.exec('BEGIN IMMEDIATE')
     this.inTransaction = true
     try {
+      this.writeCheck?.()
       const unit = new UnitOfWork(this)
       const result = work(unit)
       if (result && typeof result === 'object' && 'then' in result) {
@@ -230,6 +239,13 @@ export class ChessStore {
     this.statement('DELETE FROM economy_usage_outbox WHERE id<=?').run(through)
   }
   accountJson(name: string): string | undefined {return (this.statement('SELECT payload FROM accounts WHERE name=?').get(name) as Row | undefined)?.payload}
+  cityPack(name:string){
+    const row=this.statement("SELECT json_extract(payload,'$.cityPack') AS pack FROM accounts WHERE name=?").get(name) as {pack:string|null}|undefined
+    return row?.pack?JSON.parse(row.pack) as import('./city-inventory.ts').Pack:undefined
+  }
+  cityStats(name:string){
+    return this.statement("SELECT json_extract(payload,'$.cityPack.hp') AS hp,json_extract(payload,'$.cityPack.stars') AS stars FROM accounts WHERE name=?").get(name) as {hp:number|null;stars:number|null}|undefined
+  }
   restaurantMeal(name:string){
     const row=this.statement("SELECT json_extract(payload,'$.restaurant') AS meal FROM accounts WHERE name=?").get(name) as {meal:string|null}|undefined
     return row?.meal?JSON.parse(row.meal) as import('../src/world/restaurant-model.ts').KfcMeal:undefined

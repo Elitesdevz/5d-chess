@@ -414,7 +414,7 @@ export class Restaurant {
         this.requirePoint(member,'kfc:collect',now)
         const p=pack(account),items=orderItems(meal)
         for(const item of MENU)if(items[item.id])carry(p,item.id,items[item.id])
-        mirrorFood(account)
+        p.sequence++;mirrorFood(account)
         ;(account.foodReceipts??={})['takeaway:'+meal.id]='collected'
         delete account.restaurant
         u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'takeaway_collected',reference:meal.id},now)

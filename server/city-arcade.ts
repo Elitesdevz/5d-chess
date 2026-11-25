@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto'
 import type {ChessStore,UnitOfWork} from './storage.ts'
-import {alias,cellPosition,CLEAR_MINUTES,MAX_HP,origins,type ArcadeView,type Contact,type Stack,type Item} from '../src/world/arcade.ts'
+import {CLEAR_MINUTES,MAX_HP,type ArcadeView,type Contact,type Stack,type Item} from '../src/world/arcade.ts'
 import {near,type WorldPlayer} from '../src/world/model.ts'
 import {UNITS,type Deeds} from '../src/world/housing.ts'
 import {buildingById,homeZone,residentialSite,residentialAt,contains} from '../src/world/residential.ts'
@@ -11,22 +11,35 @@ import {fail} from './http.ts'
 type Located={x:number;z:number;zone:string}
 type Drop=Located&{id:string;items:Stack[]}
 type NpcHealth={hp:number;returns:number}
-type Scene={world:string;me:WorldPlayer;players:WorldPlayer[];residents:(Located&{id:string;name:string})[];keys:string[];drawer?:string;bank:boolean;shop:boolean}
-type Search={units:Contact[];last:number;arrived:number;raidAt:number;dogAt:number;searched:string[];warning:string}
+type Scene={world:string;shard:number;me:WorldPlayer;players:WorldPlayer[];residents:(Located&{id:string;name:string})[];keys:string[];drawer?:string;bank:boolean;shop:boolean}
+type Search={id:string;world:string;units:Contact[];cursor:number;last:number;arrived:number;raidAt:number;dogAt:number;dogWarningUntil?:number;searched:string[];warning:string}
 export const RULES={range:8,damage:35,shotDelay:900,notice:4500,officers:[0,1,2,3,4,5],speed:[0,1.6,1.9,2.2,2.5,2.7],dogRange:7,dogCooldown:18000,dogNotice:2400,raidDelay:12000}
 function advance(p:Pack,by:number){p.stars=Math.min(5,p.stars+by);p.remaining=CLEAR_MINUTES[p.stars]*60000}
 export class CityArcade {
   private store:ChessStore
   private seen=new Map<string,number>()
   private searches=new Map<string,Search>()
-  constructor(store:ChessStore){this.store=store}
+  constructor(store:ChessStore){
+    this.store=store
+    for(const shard of (store.metadataValue('dropDistricts')??[]) as number[])this.retire(shard)
+  }
+  retire(shard:number){
+    if(shard===1)return
+    const key='cityDrops:'+shard
+    if(!this.store.metadataValue(key))return
+    this.store.transaction(tx=>{
+      const items=tx.metadata<Drop[]>(key)??[]
+      if(items.length)tx.putMetadata('cityDrops:1',[...tx.metadata<Drop[]>('cityDrops:1')??[],...items])
+      tx.putMetadata(key,[])
+      tx.putMetadata('dropDistricts',(tx.metadata<number[]>('dropDistricts')??[]).filter(n=>n!==shard))
+    })
+  }
   offline(name:string){this.seen.delete(name)}
   active(name:string,now:number){
     const last=this.seen.get(name)
     this.seen.set(name,now)
     if(last===undefined||now<=last||now-last>30000)return
-    const a=JSON.parse(this.store.accountJson(name)??'{}')
-    if(!a.cityPack?.stars)return
+    if(!this.store.cityStats(name)?.stars)return
     this.store.transaction(tx=>{
       const p=pack(tx.users.get(name)!)
       p.remaining=Math.max(0,p.remaining-(now-last))
@@ -42,19 +55,20 @@ export class CityArcade {
     const deeds=tx.metadata<Deeds>('cityDeeds')??{}
     const owned=UNITS.filter(u=>deeds[u.id]?.holder===s.me.name&&(!deeds[u.id].until||deeds[u.id].until>now))
     const candidates=stars<4?owned:UNITS.filter(u=>owned.includes(u)||Math.hypot(u.x-s.me.x,u.z-s.me.z)<18||owned.some(h=>Math.hypot(u.x-h.x,u.z-h.z)<12))
-    const unit=candidates[search.searched.length%candidates.length]
+    const unit=candidates.find(u=>!search.searched.includes(u.id))??candidates[search.cursor%candidates.length]
     if(!unit)return
-    search.searched.push(unit.id);search.warning='Searching '+unit.name
+    search.cursor++;search.searched=[...search.searched.slice(-3),unit.id];search.warning='Searching '+unit.name
     const officer=search.units.at(-1)!
     const building=buildingById.get(unit.block===undefined?unit.id:'block-'+unit.block)!
     const home=building.levels[unit.floor].units.find(u=>u.id===unit.id)!
     Object.assign(officer,residentialSite(building,(home.rect.l+home.rect.r)/2,(home.rect.b+home.rect.f)/2),{zone:homeZone(building.id,unit.floor)})
     if(!owned.includes(unit))return
     const a=tx.users.get(s.me.name)!,p=pack(a)
-    if(p.drawers[unit.id])p.drawers[unit.id]=p.drawers[unit.id].filter(i=>i.item!=='blaster')
+    const drawer=p.drawers[unit.id]
+    if(drawer?.some(i=>i.item==='blaster')){p.drawers[unit.id]=drawer.filter(i=>i.item!=='blaster');p.sequence++}
     const here=residentialAt(s.me.zone)
     if(here?.building.id===building.id&&here.level===unit.floor&&contains(home.rect,(s.me.x-building.x)*building.facing,(s.me.z-building.z)*building.facing)){
-      p.slots=p.slots.map(i=>i?.item==='blaster'?null:i)
+      if(p.slots.some(i=>i?.item==='blaster')){p.slots=p.slots.map(i=>i?.item==='blaster'?null:i);p.sequence++}
     }
   }
   private pursue(s:Scene,p:Pack,now:number){
@@ -62,22 +76,26 @@ export class CityArcade {
     if(!p.stars){this.searches.delete(me.name);return}
     let search=this.searches.get(me.name)
     if(!search){
-      search={units:[],last:now,arrived:now,raidAt:now,dogAt:now,searched:[],warning:'Meridian patrol is searching'}
+      search={id:randomUUID(),world:s.world,units:[],cursor:0,last:now,arrived:now,raidAt:now,dogAt:now-RULES.dogCooldown,searched:[],warning:'Meridian patrol is searching'}
       this.searches.set(me.name,search)
     }
+    search.world=s.world
     const dt=Math.max(0,Math.min(1.25,(now-search.last)/1000));search.last=now
+    const residence=residentialAt(me.zone)
+    const room=residence?.f.units.find(u=>contains(u.rect,(me.x-residence.building.x)*residence.building.facing,(me.z-residence.building.z)*residence.building.facing))
+    const canEnter=!residence||p.stars>=3&&(!room||s.keys.includes(room.id)||p.stars>=4)
     while(search.units.length<RULES.officers[p.stars]){
       const i=search.units.length
-      search.units.push({id:'patrol-'+i,label:'Patrol '+(i+1),kind:'officer',x:me.x+10+i*1.5,z:me.z+4-i,zone:me.zone})
+      search.units.push({id:'patrol-'+search.id+'-'+i,label:'Patrol '+(i+1),kind:'officer',x:me.x+10+i*1.5,z:me.z+4-i,zone:canEnter?me.zone:'city'})
     }
     if(p.stars>=3&&now-search.raidAt>=RULES.raidDelay){
       this.store.transaction(tx=>this.sweep(tx,s,p.stars,search!,now))
       search.raidAt=now
     }
     let caught=false
-    const health=this.store.metadataValue('npc:'+s.world) as Record<string,NpcHealth>|undefined
+    const health=this.store.metadataValue('npc:'+s.shard) as Record<string,NpcHealth>|undefined
     for(const [i,o] of search.units.entries()){
-      if((health?.[o.id]?.returns??0)>now)continue
+      if(!canEnter||(health?.[o.id]?.returns??0)>now)continue
       if(p.stars>=3&&i===search.units.length-1&&search.searched.length&&now-search.raidAt<5000)continue
       if(o.zone!==me.zone){
         if(now-search.arrived<5000)continue
@@ -93,12 +111,15 @@ export class CityArcade {
     if(p.stars===5){
       const lead=search.units[0],d=Math.hypot(lead.x-me.x,lead.z-me.z)
       if(d<=RULES.dogRange&&lead.zone===me.zone&&now-search.dogAt>=RULES.dogCooldown){
-        search.dogAt=now;search.warning='Dog team approaching — move away!'
+        search.dogAt=now;search.dogWarningUntil=now+RULES.dogNotice
       }
-      const elapsed=now-search.dogAt
-      if(search.warning.startsWith('Dog team')&&elapsed>=RULES.dogNotice){
-        if(elapsed<RULES.dogNotice+1500&&d<2.8&&lead.zone===me.zone)caught=true
-        search.warning='Helicopter tracking the area'
+      if(search.dogWarningUntil!==undefined){
+        if(now<search.dogWarningUntil){
+          search.warning='Dog team approaching — move away!';caught=false
+        }else{
+          if(now-search.dogWarningUntil<1500&&d<2.8&&lead.zone===me.zone)caught=true
+          search.warning='Helicopter tracking the area';delete search.dogWarningUntil
+        }
       }
     }
     if(caught){
@@ -109,18 +130,22 @@ export class CityArcade {
   }
   run(s:Scene,now:number,data?:Record<string,unknown>){
     const {me,world}=s
-    const dropKey='cityDrops:'+world,npcKey='npc:'+world
-    const previous=this.searches.get(me.name)
-    const staff=[...this.staff(now),...(previous?.units??[])]
+    const dropKey='cityDrops:'+s.shard,npcKey='npc:'+s.shard
+    const patrols=()=>[...this.searches.values()].filter(search=>search.world===world&&now-search.last<30000).flatMap(search=>search.units)
+    const staff=[...this.staff(now),...patrols()]
     const bookings=roster(this.store,now)
-    const people:Contact[]=s.players.filter(o=>o.name!==me.name&&!bookings.some(b=>b.user===o.name)).map(o=>({...o,id:'player:'+o.name,label:o.name,kind:'player'}))
-    const targets:Contact[]=[...staff,...people,...s.residents.map(o=>({...o,id:o.id,label:o.name,kind:'resident' as const}))]
+    const people:Contact[]=s.players.filter(o=>o.name!==me.name&&!bookings.some(b=>b.user===o.name)).map(o=>({x:o.x,z:o.z,zone:o.zone,id:'player:'+o.name,label:o.name,kind:'player'}))
+    const civilians:Contact[]=[...people,...s.residents.map(o=>({...o,id:o.id,label:o.name,kind:'resident' as const}))]
+    const targets=[...staff,...civilians]
     let respawn:string|undefined
-    const {p,drops,health}=this.store.transaction(tx=>{
+    const saved=data?undefined:this.store.cityPack(me.name)
+    const {p,drops,health}=saved&&Object.keys(saved.drawers).every(id=>s.keys.includes(id))?{
+      p:saved,drops:(this.store.metadataValue(dropKey)??[]) as Drop[],health:(this.store.metadataValue(npcKey)??{}) as Record<string,NpcHealth>
+    }:this.store.transaction(tx=>{
       const a=tx.users.get(me.name)!,p=pack(a)
       for(const [id,contents] of Object.entries(p.drawers))if(!s.keys.includes(id)){
         for(const stack of contents)stash(p.recovery,stack.item,stack.count)
-        delete p.drawers[id]
+        delete p.drawers[id];p.sequence++
       }
       const drops=tx.metadata<Drop[]>(dropKey)??[],health=tx.metadata<Record<string,NpcHealth>>(npcKey)??{}
       if(data){
@@ -137,7 +162,10 @@ export class CityArcade {
             vp.hp=Math.max(0,vp.hp-RULES.damage)
             if(!vp.hp){
               const items=vp.slots.filter((i):i is Stack=>!!i)
-              if(items.length)drops.push({id:randomUUID(),items,x:t.x,z:t.z,zone:t.zone})
+              if(items.length){
+                drops.push({id:randomUUID(),items,x:t.x,z:t.z,zone:t.zone})
+                if(s.shard>1)tx.putMetadata('dropDistricts',[...new Set([...tx.metadata<number[]>('dropDistricts')??[],s.shard])])
+              }
               vp.slots=vp.slots.map(()=>null);vp.hp=MAX_HP;vp.sequence++;mirrorFood(victim)
               if(victim.cave)victim.cave.active=false
               respawn=t.label;advance(p,1);tx.putMetadata(dropKey,drops)
@@ -162,7 +190,9 @@ export class CityArcade {
     })
     const booked=this.pursue(s,p,now)
     const search=this.searches.get(me.name)
-    const contacts=targets.filter(t=>t.zone===me.zone&&near(me,t.x,t.z,36)&&!(health[t.id]?.returns>now)).map(t=>({...t,hp:t.kind==='player'?JSON.parse(this.store.accountJson(t.label)!).cityPack?.hp??MAX_HP:health[t.id]?.hp||MAX_HP}))
+    // A raid has its own write transaction after the encounter.
+    if(search?.raidAt===now&&search.cursor)Object.assign(p,this.store.cityPack(me.name))
+    const contacts=[...this.staff(now),...patrols(),...civilians].filter(t=>t.zone===me.zone&&near(me,t.x,t.z,36)&&!(health[t.id]?.returns>now)).map(t=>({...t,hp:t.kind==='player'?this.store.cityStats(t.label)?.hp??MAX_HP:health[t.id]?.hp||MAX_HP}))
     if(p.stars===5&&search){const lead=search.units[0];contacts.push({...lead,id:'heli',label:'Police helicopter',kind:'helicopter',hp:100},{...lead,x:lead.x+.8,id:'dog',label:'Dog team',kind:'dog',hp:100})}
     const view:ArcadeView={sequence:p.sequence,slots:p.slots,hp:p.hp,stars:p.stars,remaining:p.remaining,contacts,
       drops:drops.filter(d=>d.zone===me.zone&&near(me,d.x,d.z,28)).map(({id,x,z})=>({id,x,z})),

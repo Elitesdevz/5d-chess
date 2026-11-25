@@ -45,6 +45,7 @@ export function residentialFood(store:ChessStore,name:string,keys:readonly strin
         if(operation==='store')stored![type]+=quantity
         if(stored&&unit)(account.fridges??={})[unit]=stored
         mirrorFood(account)
+        p.sequence++
         receipts[id]=receipt
         tx.economyUsage(name,'/api/world/food',{action:'restaurant_action',service:'food_'+operation,reference:type,value:quantity},Date.now())
       }

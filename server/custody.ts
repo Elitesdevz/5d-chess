@@ -49,29 +49,33 @@ export function cellMove(tx:UnitOfWork,b:Booking,x:unknown,z:unknown,yaw:unknown
   const center=cellPosition(b.cell)
   const list=tx.metadata<Booking[]>(KEY)??[],entry=list.find(e=>e.user===b.user&&e.cell===b.cell)
   if(!entry)return
-  Object.assign(entry,{x:Math.max(center.x-1.55,Math.min(center.x+1.55,x)),z:Math.max(center.z-1.2,Math.min(center.z+1.2,z)),yaw})
+  const point={x:Math.max(center.x-1.55,Math.min(center.x+1.55,x)),z:Math.max(center.z-1.2,Math.min(center.z+1.2,z)),yaw}
+  if(entry.x===point.x&&entry.z===point.z&&entry.yaw===yaw)return
+  Object.assign(entry,point)
   Object.assign(b,entry)
   tx.putMetadata(KEY,list)
 }
 export function puzzleAction(tx:UnitOfWork,b:Booking,data?:Record<string,unknown>){
+  const current=tx.metadata<Booking[]>(KEY)?.find(entry=>entry.user===b.user&&entry.cell===b.cell)
   const puzzle=tx.users.get(b.user)?.cellPuzzle
-  if(b.ends!==null||!puzzle)fail(403,'The puzzle table is reserved for permanent custody')
+  if(!current||current.ends!==null||!puzzle)fail(403,'The puzzle table is reserved for permanent custody')
   if(data){
     const {piece,target}=data
     if(typeof piece!=='number'||!Number.isInteger(piece)||piece<0||piece>=PUZZLE_SIZE||puzzle.tiles[piece]!==target)fail(409,'That piece does not fit there')
     puzzle.placed[piece]=true
-    if(!b.noRelease&&puzzle.placed.every(Boolean)){release(tx,b.user);return {released:true}}
+    if(!current.noRelease&&puzzle.placed.every(Boolean)){release(tx,b.user);return {released:true}}
   }
   return {puzzle}
 }
 // Project only identity-bearing fields. Board coordinates, move colors, item IDs,
 // and game codes must still work when a player happens to share their spelling.
-const identities=new Set(['user','name','owner','holder','seller','buyer','account','opponents','customer','worker','carrier','playerName','voter','byName','leader'])
+const identities=new Set(['user','name','owner','holder','seller','buyer','buy','sell','account','opponents','customer','worker','carrier','playerName','voter','byName','leader'])
 const prose=new Set(['title','detail','endReason','bio','text','label','activity','description'])
 export function publicView(value:unknown,bookings:Booking[]):unknown{
   if(!bookings.length)return value
   const names=new Map(bookings.map(b=>[b.user,b.name]))
-  const pattern=new RegExp([...names.keys()].sort((a,b)=>b.length-a.length).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'gu')
+  const escaped=[...names.keys()].sort((a,b)=>b.length-a.length).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')
+  const pattern=new RegExp('(?<![\\\\p{L}\\\\p{N}_])(?:'+escaped+')(?![\\\\p{L}\\\\p{N}_])','gu')
   function visit(v:unknown,key:string):unknown{
     if(typeof v==='string'){
       if(identities.has(key)||key==='seats')return names.get(v)??v
