@@ -11,7 +11,8 @@ import {book,roster} from '../server/custody.ts'
 import {pack,carry} from '../server/city-inventory.ts'
 import {RULES} from '../server/city-arcade.ts'
 import {CLEAR_MINUTES,JAIL_MINUTES} from '../src/world/arcade.ts'
-import {cityRoute} from '../server/city-life.ts'
+import {visitorRoute} from './civic-route.mjs'
+import {cells,cellPosition,insideDoor,at} from '../src/world/civic-venues.ts'
 import {entrances} from '../src/world/arcade.ts'
 import {site} from '../src/world/model.ts'
 
@@ -36,13 +37,14 @@ async function fixture(t){
   async function ok(name,path,data){const r=await request(name,path,data);assert.ok(r.status<300,path+' '+JSON.stringify(r.value));return r.value}
   const signup=name=>ok(name,'signup',{username:name,password:'local-test',confirm:'local-test'})
   const world=(name,path,data={})=>ok(name,'world/'+path,{scene:true,...data})
+  const route=name=>visitorRoute((path,data)=>world(name,path,data),ms=>now+=ms)
   async function counter(name,to,target,x,z){
-    const v=await world(name,'teleport',{to})
+    const v=to==='gunshop'?await route(name).enter(to):await world(name,'teleport',{to})
     now+=1250
     await world(name,'presence',{world:v.id,...site(v.you.zone,x,z),yaw:0})
     return world(name,'use',{target})
   }
-  return {dir,request,ok,world,signup,counter,get store(){return store},tick:ms=>now+=ms,
+  return {dir,request,ok,world,signup,counter,route,get store(){return store},tick:ms=>now+=ms,
     restart:async()=>{await stop();await open()},operator:(...args)=>execFileSync(process.execPath,['scripts/city-custody.mjs',...args],{env:{...process.env,DATA_DIR:dir}})}
 }
 const slots=v=>v.arcade.slots
@@ -138,7 +140,7 @@ test('local combat, eating, death, competing pickups, pursuit, offline sentence 
   const frozen=(await f.ok(a,'custody/position',{x:jail.x+.7,z:jail.z+.4,yaw:1})).custody
   await f.ok(a,'logout',{})
   await f.restart()
-  v=await f.world(b,'teleport',{to:'station'})
+  const visitor=f.route(b);await visitor.enter('station');v=await visitor.climb()
   const avatar=v.players.find(p=>p.name===jail.name)
   assert.deepEqual([avatar.x,avatar.z,avatar.online],[frozen.x,frozen.z,false])
   const login=await f.ok(a,'login',{username:a,password:'local-test'});assert.equal(login.user,'Inmate 01')
@@ -152,32 +154,26 @@ test('local combat, eating, death, competing pickups, pursuit, offline sentence 
 test('walk through both street entrances, visit the jail wing, and return to the city',async t=>{
   const f=await fixture(t),name='Visitor'
   await f.signup(name)
-  let v=await f.world(name,'presence')
-  async function walk(p){
-    for(let i=0;i<60&&Math.hypot(v.you.x-p.x,v.you.z-p.z)>.1;i++){
-      const before=v.you;f.tick(850)
-      v=await f.world(name,'presence',{world:v.id,...p,yaw:0})
-      if(Math.hypot(v.you.x-before.x,v.you.z-before.z)<.025)return false
-    }
-    return Math.hypot(v.you.x-p.x,v.you.z-p.z)<.12
-  }
-  for(const [zone,entry] of Object.entries(entrances)){
-    for(let attempt=0;attempt<12;attempt++){
-      let arrived=true
-      const route=cityRoute(v.you,entry,attempt?v.traffic.vehicles:[])
-      assert.ok(route.length)
-      for(const p of route)if(!await walk(p)){arrived=false;break}
-      if(arrived)break
-    }
-    v=await f.world(name,'use',{target:'enter-'+zone});assert.equal(v.you.zone,zone)
+  const visitor=f.route(name)
+  await visitor.read()
+  for(const target of ['enter-station','enter-gunshop','gallery-up'])assert.equal((await f.request(name,'world/use',{target,scene:true})).status,409)
+  for(const zone of ['station','gunshop']){
+    assert.equal((await f.request(name,'world/teleport',{to:zone})).status,400)
+    await visitor.enter(zone)
     if(zone==='station'){
-      await walk(site(zone,0,-82.8))
-      assert.ok(v.you.z<-81)
-      assert.equal(await walk(site(zone,-4.2,-82.8)),false)
-      assert.ok(v.you.x>208)
-      await walk(site(zone,0,3.8))
+      for(let floor=1;floor<=5;floor++)assert.equal((await visitor.climb()).you.zone,'precinct:'+floor)
+      const c=cells[49]
+      await visitor.step(c.x,0)
+      assert.equal(await visitor.walk(cellPosition(50)),false)
+      assert.ok(visitor.view.you.z<at('station',0,.75).z)
+      await visitor.step(c.x,0)
+      for(let floor=5;floor>0;floor--)await visitor.descend()
     }
-    v=await f.world(name,'use',{target:'exit-venue'});assert.equal(v.you.zone,'city')
+    const p=insideDoor(zone)
+    assert.ok(await visitor.walk(at(zone,p.x,p.z)))
+    const v=await visitor.use('exit-venue')
+    assert.equal(v.you.zone,'city')
+    assert.ok(Math.hypot(v.you.x-entrances[zone].x,v.you.z-entrances[zone].z)<.01)
   }
 })
 
@@ -288,7 +284,7 @@ test('NPC HP, suspect-only seizures, neighboring searches and a warned range-lim
     a.drawers['house-1']=[{item:'blaster',count:1},{item:'cash',count:42}]
     pack(tx.users.get(other)).drawers['house-0']=[{item:'blaster',count:1}]
   })
-  let v=await f.world(name,'teleport',{to:'station'})
+  let v=await f.route(name).enter('station')
   async function shot(target=''){
     f.tick(950);v=await f.world(name,'arcade',{operation:'fire',slot:0,target,sequence:v.arcade.sequence})
   }
@@ -319,4 +315,32 @@ test('NPC HP, suspect-only seizures, neighboring searches and a warned range-lim
     }
   }
   assert.ok(warned,'dog warning precedes the tag')
+})
+
+test('a signed-in legacy inmate and an unclaimed venue bag migrate once across restarts',async t=>{
+  const f=await fixture(t),name='Old precinct resident'
+  await f.signup(name)
+  f.operator('jail',name,'--no-release')
+  const {puzzle}=await f.ok(name,'custody/puzzle')
+  await f.ok(name,'custody/puzzle',{piece:71,target:puzzle.tiles[71]})
+  const contents=[{item:'cash',count:17}],gear=[{item:'blaster',count:1}]
+  f.store.transaction(tx=>{
+    const a=tx.users.get(name);a.wallet.coins=391.125;pack(a).drawers={'house-1':gear}
+    const list=tx.metadata('meridianBookings')
+    Object.assign(list[0],{x:205.8+.62,z:-6-.39,yaw:1.23})
+    tx.putMetadata('meridianBookings',list)
+    tx.putMetadata('cityDrops:1',[{id:'legacy-bag',x:240,z:1,zone:'gunshop',items:contents}])
+  })
+  const center=cellPosition(1),door=insideDoor('gunshop')
+  for(let i=0;i<2;i++){
+    await f.restart()
+    const view=await f.world(name,'presence'),b=view.arcade.custody
+    assert.equal(view.you.zone,'precinct:1');assert.equal(view.coins,391.125)
+    assert.equal(b.cell,1);assert.equal(b.name,'Inmate 01');assert.equal(b.noRelease,true)
+    assert.ok(Math.abs(b.x-center.x-.62)<1e-8&&Math.abs(b.z-center.z+.39)<1e-8)
+    assert.equal(b.yaw,1.23);assert.deepEqual(f.store.cityPack(name).drawers['house-1'],gear)
+    const saved=(await f.ok(name,'custody/puzzle')).puzzle
+    assert.deepEqual(saved.tiles,puzzle.tiles);assert.equal(saved.placed.filter(Boolean).length,1);assert.ok(saved.placed[71])
+    assert.deepEqual(f.store.metadataValue('cityDrops:1'),[{id:'legacy-bag',zone:'gunshop',items:contents,...at('gunshop',door.x,door.z)}])
+  }
 })

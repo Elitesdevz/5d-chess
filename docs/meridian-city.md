@@ -16,11 +16,11 @@ Existing SQLite accounts acquire the hotbar on first use. Older food quantities 
 
 The kitchen counter has a storage drawer in each house and apartment. An active deed or lease allows its resident to put away and retrieve cash and blasters. Walk up to the drawer to use it. Food goes in the existing fridge.
 
-The arcade gun shop is at the northwest edge of town. Use its street entrance or the hotbar's City destinations menu. A pulse blaster costs 25 carried cash. Choose the blaster and a nearby target or open air, then press Fire. A shot deals 35 HP with a 900 ms recharge. Players respawn at the city entrance. The carried slots become one collectible bag at the death location. Pickup requires room for the entire bag. Banked coins, cosmetics and home contents stay with their owner. When a secondary city instance empties, its unclaimed bags move to the same coordinates in the first instance.
+Pulse & Pixel, the arcade gun shop, stands on the north sidewalk at the northwest end of Civic Avenue. Use the lit storefront door, walk to the display counter and leave through the same doorway. A pulse blaster costs 25 carried cash. Choose the blaster and a nearby target or open air, then press Fire. A shot deals 35 HP with a 900 ms recharge. Players respawn at the city entrance. The carried slots become one collectible bag at the death location. Pickup requires room for the entire bag. Banked coins, cosmetics and home contents stay with their owner. When a secondary city instance empties, its unclaimed bags move to the same coordinates in the first instance.
 
 ## Meridian Police
 
-Enter Meridian Police on Civic Avenue or use City destinations. The front desk and booking register open from the lobby. The visitor corridor between the cells runs to cells 49 and 50. Bars separate visitors from the cell interiors. Occupied cells show their inmate even after logout or a server restart.
+Enter Meridian Police from the south sidewalk on Civic Avenue, between the signed front columns near the patrol cars. Public enquiries and booking face the lobby. The central staircase leads to five visitor galleries. Walk both flights to the landing and press E or the touch interaction button to continue. Take the staircase back down to leave through the lobby. West Wing holds cells 01–25 and East Wing holds 26–50, five on each side of each gallery. Cell 50 faces the public corridor on level five. Bars separate visitors from the cell interiors. Occupied cells show their inmate even after logout or a server restart.
 
 | Stars | Patrol | Active time to clear | Sentence |
 | --- | --- | --- | --- |
@@ -36,7 +36,7 @@ The shared inventory and sentence constants are in `src/world/arcade.ts`. Pursui
 
 ## Custody and moderation
 
-Sentences use a persistent UTC deadline. Expiry applies offline, including when the next visitor opens the station. Cell assignments, transfers and pickup use the store's SQLite writer transactions. The account retains its login name. Public views use the current numbered inmate alias. Chess deadline maintenance and settlement continue while the inmate's requests to play are locked.
+Sentences use a persistent UTC deadline. Expiry applies offline, including when the next visitor opens the station. At startup the precinct translates saved cell positions from the previous layout into their assigned cells. It preserves the offset inside the cell where space permits, the viewing direction, sentence and jigsaw. Unclaimed bags in the old interiors move inside their respective front doors. Cell assignments, transfers and pickup use the store's SQLite writer transactions. The account retains its login name. Public views use the current numbered inmate alias. Chess deadline maintenance and settlement continue while the inmate's requests to play are locked.
 
 The custody screen shows the sentence and cell, allows movement within the cell and provides logout. Look around cell opens the city view. Permanent inmates can sit at the jigsaw table from the cell screen or from inside their 3D cell. Choose a loose piece and its location within the panorama. The board has 40 sections of 25 pieces. Correct placements save immediately, and SQLite verifies all 1,000 before puzzle release.
 
@@ -54,7 +54,13 @@ The flag keeps the sentence active after puzzle completion. Only an operator can
 
 - `npm test` builds the clients and server and runs the Node suite. `tests/city-expansion.test.mjs` uses loopback HTTP, signed-in test accounts, temporary SQLite directories, a controlled clock and the operator CLI. It exercises migration, overflow recovery, cash conservation, full slots, HP, knockout, competing pickup, wanted timers and raids, both street entrances, cell capacity, access restrictions, aliases, offline avatars, restart and both puzzle-release modes.
 - A SQLite database created by clean `main` at `8f6e310` was also reopened by the feature build. The fixture kept its 413.125 banked coins and all 95 food portions. Its nine slots held 81 portions and the recovery counter held 14.
-- `tests/city-expansion.spec.mjs` uses the signup form, signed-in Bank link, keyboard movement, hotbar, shop, custody screen and jigsaw in Chromium with WebGL disabled. A second player opens the inmate’s profile through both the leaderboard and a match.
+- `tests/city-expansion.spec.mjs` uses the signup form, signed-in City link, a walk from Clock Square to the bank and arcade shop, keyboard movement, hotbar, shop, custody screen and jigsaw in Chromium with WebGL disabled. A second player opens the inmate’s profile through both the leaderboard and a match.
 - `tests/residential.spec.mjs` walks through houses and apartment floors and uses their furnishings in Chromium. The drawer checks put away and retrieve a carried item in both property types. `tests/city-render.spec.mjs` checks WebGL scene preparation and camera turns.
 
 Run browser tests after the build with Playwright Chromium installed, for example `node --test --test-concurrency=1 tests/city-expansion.spec.mjs tests/city-render.spec.mjs tests/residential.spec.mjs`. The tests use fixture accounts. Puzzle completion and the longest sentences are exercised through the API and test clock. The browser walkthrough fits an individual piece and reloads its progress. Two checks also fail on clean `main` at `8f6e310`. The rankings notification test times out waiting for its casino win message, and the profile editor measures 777 px at a 768 px viewport.
+
+The venue walkthrough lives in `tests/civic-venues.spec.mjs`. It uses the City link and ordinary movement from Clock Square, opens the police front desk, climbs to cell 50, returns down the stairs, visits the arcade counter and checks both exit locations. It runs once with WebGL disabled and desktop keyboard controls, and again with WebGL and a mobile touch joystick. The Royal Resort regression is `tests/royal-resort.spec.mjs`.
+
+A second disposable SQLite fixture created with main at `6b42ee8` retained its existing login session, Inmate 01 alias, cell-relative position and facing, permanent moderation-only sentence, fitted jigsaw piece and 482.125 banked coins after migration and a second restart.
+
+The [Civic Avenue screenshot review](review/civic-avenue/README.md) compares the running bank, police station, jail and arcade shop, including the previous and new overhead clients.

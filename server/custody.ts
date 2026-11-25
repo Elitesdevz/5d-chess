@@ -1,3 +1,4 @@
+import {confined} from '../src/world/civic-venues.ts'
 import {randomInt} from 'node:crypto'
 import {alias,CELL_COUNT,cellPosition,JAIL_MINUTES,PUZZLE_SIZE,type CustodyView} from '../src/world/arcade.ts'
 import type {ChessStore,UnitOfWork} from './storage.ts'
@@ -7,6 +8,19 @@ import {fail} from './http.ts'
 type Booking=CustodyView&{user:string;avatar:string}
 export type Puzzle={tiles:number[];placed:boolean[]}
 const KEY='meridianBookings'
+// Translate offsets from the original off-map cell centres under one SQLite writer lock.
+export function migratePrecinct(tx:UnitOfWork){
+  const entries=tx.metadata<Booking[]>(KEY)??[]
+  let changed=false
+  for(const b of entries){
+    if(!(b.x>190))continue
+    const oldX=210+(b.cell%2?-4.2:4.2),oldZ=-6-Math.floor((b.cell-1)/2)*3.2
+    const center=cellPosition(b.cell)
+    Object.assign(b,confined(b.cell,center.x+b.x-oldX,center.z+b.z-oldZ))
+    changed=true
+  }
+  if(changed)tx.putMetadata(KEY,entries)
+}
 export function roster(store:ChessStore,now:number):Booking[]{
   const list=(store.metadataValue(KEY)??[]) as Booking[]
   return list.filter(b=>b.ends===null||b.ends>now)
@@ -46,10 +60,9 @@ export function release(tx:UnitOfWork,user:string){
 }
 export function cellMove(tx:UnitOfWork,b:Booking,x:unknown,z:unknown,yaw:unknown){
   if(typeof x!=='number'||typeof z!=='number'||typeof yaw!=='number'||![x,z,yaw].every(Number.isFinite))return
-  const center=cellPosition(b.cell)
   const list=tx.metadata<Booking[]>(KEY)??[],entry=list.find(e=>e.user===b.user&&e.cell===b.cell)
   if(!entry)return
-  const point={x:Math.max(center.x-1.55,Math.min(center.x+1.55,x)),z:Math.max(center.z-1.2,Math.min(center.z+1.2,z)),yaw}
+  const point={...confined(b.cell,x,z),yaw}
   if(entry.x===point.x&&entry.z===point.z&&entry.yaw===yaw)return
   Object.assign(entry,point)
   Object.assign(b,entry)

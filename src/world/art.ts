@@ -43,13 +43,17 @@ function texture(width:number,height:number,paint:(ctx:CanvasRenderingContext2D)
   const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;return texture
 }
 const bannerTextures=new Map<string,T.CanvasTexture>()
-export function banner(parent:T.Object3D,text:string,size:[number,number],point:number[],color='#f5dba5',backdrop='transparent'){
-  const key=JSON.stringify([text,color,backdrop])
+export function banner(parent:T.Object3D,text:string,size:[number,number],point:number[],color='#f5dba5',backdrop='transparent',fit=false){
+  const width=fit?Math.min(1024,Math.round(104*size[0]/size[1])):768
+  const height=fit?Math.round(width*size[1]/size[0]):160
+  const key=JSON.stringify([text,color,backdrop,width,height])
   let map=bannerTextures.get(key)
   if(!map){
-    map=texture(768,160,c=>{
-      if(backdrop!=='transparent'){c.fillStyle=backdrop;c.fillRect(0,0,768,160)}
-      c.fillStyle=color;c.font='600 78px Georgia';c.textAlign='center';c.textBaseline='middle';c.fillText(text,384,80,731)
+    map=texture(width,height,c=>{
+      if(backdrop!=='transparent'){c.fillStyle=backdrop;c.fillRect(0,0,width,height)}
+      c.fillStyle=color;c.font='600 '+(fit?height*.78:78)+'px Georgia'
+      if(fit&&c.measureText(text).width>width*.94)c.font='600 '+height*.78*width*.94/c.measureText(text).width+'px Georgia'
+      c.textAlign='center';c.textBaseline='middle';c.fillText(text,width/2,height/2,width*.952)
     })
     bannerTextures.set(key,map)
   }
@@ -646,7 +650,7 @@ export function makeWorldArt(open:boolean){
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());contactShade(scene);const water=fountain(scene),{wind,seal}=landscape(scene)
   district(scene)
-  arcadeBuildings(scene,banner)
+  const civic=arcadeBuildings(scene,(parent,text,size,point,fg,bg)=>banner(parent,text,size,point,fg,bg,true))
   const homes=residentialArt(scene,banner),urban=urbanArt(scene,banner)
   const ambient=(time:number)=>{water(time);wind(time);poolRipples(time)}
   const rooms={} as Record<keyof typeof PLAN,T.Group>
@@ -705,7 +709,7 @@ export function makeWorldArt(open:boolean){
     const target=zone==='cave'?.38:zone==='oasis'?.84:zone==='casino'?1.24:zone==='city'?1.95:1.62
     skylight.intensity=T.MathUtils.damp(skylight.intensity,target,3,dt)
   }
-  return {scene,resort,lightZone,homes,urban,actors,staff,hotelClerks,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
+  return {scene,civic,resort,lightZone,homes,urban,actors,staff,hotelClerks,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
 }
 function rouletteWagers(table:T.Group){
   const tones=[0xe9c186,0x72bcbc,0xcf8799,0xc2a8e5]

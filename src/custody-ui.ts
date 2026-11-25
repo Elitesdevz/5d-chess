@@ -57,7 +57,7 @@ export function custodyHeartbeat(){
       if(!r.ok)return
       const {custody}=await r.json()
       if(custody)showCustody(custody)
-      else if(cell)location.replace('/chess/world.html?go=station')
+      else if(cell)location.replace('/chess/world.html')
     }catch{/* Reconnect on the next heartbeat. */}
   }
   window.setInterval(tick,12000)

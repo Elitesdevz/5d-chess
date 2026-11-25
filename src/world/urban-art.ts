@@ -443,7 +443,7 @@ function car(v:Vehicle,parent:T.Object3D){
   return {g,wheels,brakes}
 }
 export function urbanArt(scene:T.Scene,label:Letter){
-  LANDMARKS.forEach(b=>building(scene,b,label))
+  LANDMARKS.filter(b=>b.id!=='police').forEach(b=>building(scene,b,label))
   railway(scene,label);parks(scene,label);streetFurniture(scene,label)
   const lamps=new Map<string,Record<'x'|'z',T.Mesh[]>>()
   for(const p of JUNCTIONS.filter(j=>j.signal)){

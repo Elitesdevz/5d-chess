@@ -1,3 +1,4 @@
+import {deskFurniture,at,insideDoor,venue} from '../src/world/civic-venues.ts'
 import {randomUUID} from 'node:crypto'
 import type {ChessStore,UnitOfWork} from './storage.ts'
 import {CLEAR_MINUTES,MAX_HP,type ArcadeView,type Contact,type Stack,type Item} from '../src/world/arcade.ts'
@@ -5,7 +6,7 @@ import {near,localSite,site,type WorldPlayer} from '../src/world/model.ts'
 import {UNITS,type Deeds} from '../src/world/housing.ts'
 import {buildingById,homeZone,residentialSite,residentialAt,contains} from '../src/world/residential.ts'
 import {ROOMS,center,guestFloor,roomAt} from '../src/world/resort.ts'
-import {book,roster,custodyView} from './custody.ts'
+import {migratePrecinct,book,roster,custodyView} from './custody.ts'
 import {carry,mirrorFood,pack,quantity,releaseDrawer,transfer,type Pack} from './city-inventory.ts'
 import {fail} from './http.ts'
 
@@ -39,6 +40,18 @@ export class CityArcade {
   private searches=new Map<string,Search>()
   constructor(store:ChessStore){
     this.store=store
+    store.transaction(tx=>{
+      migratePrecinct(tx)
+      for(const shard of [1,...tx.metadata<number[]>('dropDistricts')??[]]){
+        const key='cityDrops:'+shard,bags=tx.metadata<Drop[]>(key)??[]
+        let moved=false
+        for(const bag of bags)if(venue(bag.zone)&&bag.x>190){
+          const door=insideDoor(bag.zone)
+          Object.assign(bag,at(bag.zone,door.x,door.z));moved=true
+        }
+        if(moved)tx.putMetadata(key,bags)
+      }
+    })
     for(const shard of (store.metadataValue('dropDistricts')??[]) as number[])this.retire(shard)
   }
   retire(shard:number){
@@ -65,8 +78,7 @@ export class CityArcade {
     })
   }
   private staff(now:number):Contact[]{
-    return [{id:'desk',label:'Desk officer',kind:'officer',zone:'station',x:207,z:-2.9},
-      {id:'booking',label:'Booking officer',kind:'officer',zone:'station',x:214,z:-2.8},
+    return [...deskFurniture.map(d=>({id:d.id,label:d.id==='desk'?'Desk officer':'Booking officer',kind:'officer' as const,zone:'station',...at('station',d.x,d.z+.72)})),
       {id:'patrol',label:'Meridian patrol',kind:'officer',zone:'city',x:-50+4*Math.sin(now/9000),z:-61}]
   }
   private sweep(tx:UnitOfWork,s:Scene,stars:number,search:Search,now:number){
