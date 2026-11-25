@@ -1,5 +1,6 @@
+import {civicMap} from './civic-map.ts'
 import {staffId,bankStaff} from './service-staff.ts'
-import {venue,cellPosition,CELL_COUNT} from './arcade.ts'
+import {civicRoom,confined,tablePosition,levelOf,civicHeight,rise} from './civic-venues.ts'
 import {supportModel} from './arcade-art.ts'
 import {residentialAt,residentialPoints,type HomeZone} from './residential.ts'
 import type {CompanyView} from '../equity-v2.ts'
@@ -119,11 +120,16 @@ export class CityStage {
     const seatChanged=seat(prior)!==seat(next)
     const housingChanged=this.view?.housing?.keys.some(key=>!view.housing?.keys.includes(key))
     const reported=sent??this.position
-    if(changedWorld||reposition||seatChanged||next.zone==='station'&&view.arcade?.custody&&document.querySelector('.cell-screen[open]')||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>1.35){
+    const changedVenue=prior?.zone!==next.zone&&(civicRoom(next.zone)||!!prior&&civicRoom(prior.zone))
+    const inCellDialog=view.arcade?.custody&&document.querySelector('.cell-screen[open]')
+    // The two flights are less than a metre apart. A wall or stair landing can
+    // stop a server step sooner than prediction when the player turns a corner.
+    const correctionLimit=civicRoom(next.zone)?.27:1.35
+    if(changedWorld||reposition||seatChanged||changedVenue||inCellDialog||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
       this.predictedHome=residentialAt(next.zone)?next.zone as HomeZone:undefined
     }
-    if(changedWorld||reposition||seatChanged){
+    if(changedWorld||reposition||seatChanged||changedVenue){
       this.liftFacing=undefined
       this.yaw=next.yaw;this.pitch=0
       if(next.chair){
@@ -164,6 +170,7 @@ export class CityStage {
       this.art.grotto.visible=!this.art.seal.visible
       this.art.restaurant.update(view.restaurant)
       this.art.resort(view,this.graphicsReady)
+      this.art.civic(next.zone,next.x,next.z)
       const hidden=view.arcade?.recoveringStaff??[]
       this.art.staff.forEach((a,i)=>a.root.visible=!hidden.includes(i<bankStaff.length?staffId('bank',i):staffId('exchange',i-bankStaff.length)))
       this.art.hotelClerks.forEach((a,i)=>a.root.visible=!hidden.includes(staffId('hotel',i)))
@@ -330,19 +337,26 @@ export class CityStage {
     stick.addEventListener('lostpointercapture',()=>{pointer=undefined;this.stick={x:0,z:0};thumb.style.transform=''},{signal})
     window.addEventListener('pagehide',e=>{if(!e.persisted){this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame);this.clearScene();this.renderer?.dispose()}},{signal})
   }
+  private lastCivicDirection=0
   private step(dt:number){
     if(!this.zone||this.pause||this.station||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||this.view?.you.lift||this.view?.you.homePose)return
     const keys=this.arrows
     const x=this.stick.x+Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'))
     const z=this.stick.z+Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'))
+    if(civicRoom(this.zone)){
+      const direction=x||z?1+((Math.round(Math.atan2(z,x)*4/Math.PI)+8)%8):0
+      if(direction!==this.lastCivicDirection){this.lastCivicDirection=direction;this.onMovementChange()}
+    }
     const length=Math.max(1,Math.hypot(x,z)),speed=WORLD_SPEED*dt/length*(this.zone==='oasis'&&inPool(localSite(this.zone,this.position.x,this.position.z).x,localSite(this.zone,this.position.x,this.position.z).z)?.53:1)
+    const heading=this.renderer?this.yaw:0
+    if(!this.renderer&&(x||z))this.yaw=Math.atan2(-x,-z)
     if(this.view?.arcade?.custody){
       if(document.querySelector('.cell-screen[open]'))return
-      const c=cellPosition(this.view.arcade.custody.cell)
-      this.position.x=T.MathUtils.clamp(this.position.x+(x*Math.cos(this.yaw)+z*Math.sin(this.yaw))*speed,c.x-1.55,c.x+1.55)
-      this.position.z=T.MathUtils.clamp(this.position.z+(z*Math.cos(this.yaw)-x*Math.sin(this.yaw))*speed,c.z-1.2,c.z+1.2)
+      Object.assign(this.position,confined(this.view.arcade.custody.cell,
+        this.position.x+(x*Math.cos(heading)+z*Math.sin(heading))*speed,
+        this.position.z+(z*Math.cos(heading)-x*Math.sin(heading))*speed))
     }else if(x||z){
-      const dx=x*Math.cos(this.yaw)+z*Math.sin(this.yaw),dz=z*Math.cos(this.yaw)-x*Math.sin(this.yaw)
+      const dx=x*Math.cos(heading)+z*Math.sin(heading),dz=z*Math.cos(heading)-x*Math.sin(heading)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
       const zone=this.predictedHome??(residentialAt(this.zone)?'city':this.zone)
       const {homeZone,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock,this.view?.traffic?.vehicles)
@@ -354,12 +368,12 @@ export class CityStage {
     const {x,z}=this.position
     if(this.view===this.promptedView&&x===this.promptedX&&z===this.promptedZ)return
     this.promptedView=this.view;this.promptedX=x;this.promptedZ=z
-    const zone=this.predictedHome??(this.zone&&(guestFloor(this.zone)||venue(this.zone)||this.zone.startsWith('floor:'))?this.zone:groundZone(this.position.x,this.position.z))
+    const zone=this.predictedHome??(this.zone&&(guestFloor(this.zone)||civicRoom(this.zone)||this.zone.startsWith('floor:'))?this.zone:groundZone(this.position.x,this.position.z))
     const seated=this.view?.you.boardSeat!==undefined||this.view?.you.barSeat!==undefined
     const pose=this.view?.you.homePose
     let candidate:WorldAction|undefined
     if(this.view?.arcade?.custody){
-      const b=this.view.arcade.custody,c=cellPosition(b.cell),tx=c.x+(b.cell%2?.68:-.68),tz=c.z+.99
+      const b=this.view.arcade.custody,{x:tx,z:tz}=tablePosition(b.cell)
       if(b.ends===null&&Math.hypot(x-tx,z-tz)<1.7)candidate={id:'cell-table',label:'Sit at the jigsaw table',x:tx,z:tz}
     }
     else if(seated||pose)candidate={id:'stand-scenery',label:pose?.kind==='rest'?'Get up':'Stand up',x,z}
@@ -368,6 +382,7 @@ export class CityStage {
         [...interactions(zone,this.view?.housing?.keys),...boardPoints(zone,this.view?.boardTaken),...residentialPoints(zone,this.position,this.view?.housing?.keys??[],this.view?.residential)]
       let best=Infinity
       for(const point of points){
+        if(point.id==='gallery-up'&&civicRoom(zone)&&civicHeight(zone,x,z)<(levelOf(zone)+1)*rise-.47)continue
         const squared=(x-point.x)**2+(z-point.z)**2
         if(squared<best&&squared<=(point.range??1.65)**2){candidate=point;best=squared}
       }
@@ -609,6 +624,7 @@ export class CityStage {
   private drawFlat(){
     const c=this.canvas,ctx=c.getContext('2d')
     if(!ctx)return
+    if(this.view&&civicMap(ctx,c.width,c.height,this.view,this.position))return
     const w=c.width,h=c.height,size=this.zone==='city'?Math.min(12,w/38):Math.min(42,w/14),o=this.position
     const project=(x:number,z:number)=>[w/2+(x-o.x)*size,h/2+(z-o.z)*size] as const
     ctx.fillStyle='#14272d';ctx.fillRect(0,0,w,h)
@@ -623,13 +639,7 @@ export class CityStage {
       landmarks.push(...interactions(this.zone),...residentialPoints(this.zone,o,this.view?.housing?.keys??[],this.view?.residential))
       for(const c of this.view?.arcade?.contacts??[])landmarks.push({...c,label:c.label})
       for(const d of this.view?.arcade?.drops??[])landmarks.push({...d,label:'Dropped items'})
-      if(this.zone==='station')for(let i=1;i<=CELL_COUNT;i++){
-        const p=cellPosition(i),[x,y]=project(p.x,p.z)
-        ctx.strokeStyle='#b0bdba';ctx.strokeRect(x-size*2.1,y-size*1.57,size*4.2,size*3.14)
-        ctx.fillStyle='#7c9cae';ctx.fillRect(x-size*.9,y-size*.6,size*.75,size*1.65)
-        ctx.fillStyle='#eee6ce';ctx.fillRect(x+size,y-size*.9,size*.4,size*.48)
-        ctx.fillText('Cell '+i,x,y)
-      }
+
     }
     for(const p of landmarks){const [x,y]=project(p.x,p.z);ctx.fillStyle='#8fe2b5';ctx.fillRect(x-8,y-8,16,16);ctx.fillStyle='#dfedda';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText(p.label,x,y-12)}
     for(const other of this.view?.players??[]){const [x,z]=project(other.x,other.z);ctx.fillStyle='#f1c78b';ctx.beginPath();ctx.arc(x,z,5,0,TAU);ctx.fill();ctx.fillText(other.name,x,z+17)}

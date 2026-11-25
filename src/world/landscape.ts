@@ -22,7 +22,7 @@ export class Scenery{
     if(!batch){batch={shape,items:[]};this.parts.set(key,batch)}
     batch.items.push({matrix:t.matrix.clone(),color})
   }
-  finish(parent:T.Object3D,material=new T.MeshStandardMaterial({roughness:.81,flatShading:true,map:grain()})){
+  finish(parent:T.Object3D,material:T.Material=new T.MeshStandardMaterial({roughness:.81,flatShading:true,map:grain()})){
     const color=new T.Color()
     for(const {shape,items} of this.parts.values()){
       const mesh=new T.InstancedMesh(shapes[shape],material,items.length)
