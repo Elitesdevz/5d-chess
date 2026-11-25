@@ -1,6 +1,6 @@
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
-import {ROOMS,TIERS,venues,center,bedAt,fridgeAt,bathAt,HOTEL_LIFT,gameStations,guestFloor,type HotelRoom,type GuestFloor} from './resort.ts'
+import {ROOMS,TIERS,venues,center,bedAt,fridgeAt,dresserAt,bathAt,HOTEL_LIFT,gameStations,guestFloor,type HotelRoom,type GuestFloor} from './resort.ts'
 import {floorHeight,type WorldView} from './model.ts'
 
 type Sign=(parent:T.Object3D,text:string,size:[number,number],point:number[],color?:string,backdrop?:string)=>T.Mesh
@@ -125,6 +125,29 @@ export function royalResort(hotel:T.Group,sign:Sign){
         for(let j=-3;j<=3;j++)box(bed.x+s*1.035,1.01,bed.z+j*wide/7,.092,.91,wide/8,velvet[tier])
         for(const dz of [-.28,.28])box(bed.x+s*.63,.82,bed.z+dz,.40,.15,wide*.39,linen[tier])
         box(bed.x-s*.53,.745,bed.z,.28,.03,wide+.04,tier===4?gold:jade)
+      }
+      const dresser=dresserAt(room),finish=tier>2?jade:walnut
+      box(dresser.x,.43,dresser.z,1.42,.81,.68,finish)
+      box(dresser.x,.88,dresser.z,1.48,.09,.73,tier===4?ivory:trim)
+      for(const y of [.27,.62]){
+        box(dresser.x,y,dresser.z-.35,1.31,.30,.055,finish)
+        box(dresser.x,y+.025,dresser.z-.397,.28,.047,.052,tier>1?gold:ivory)
+      }
+      if(tier>=1){
+        // The suites have a wider, stepped gilt frame above the dresser.
+        const width=tier>=3?1.48:.92,wallZ=room.front-.12
+        box(dresser.x,1.89,wallZ,width,1.13,.06,trim)
+        box(dresser.x,1.89,wallZ-.04,width-.10,1.03,.035,0x9bbbc0)
+        if(tier>=3){
+          for(const side of [-1,1]){
+            box(dresser.x+side*(width/2+.08),1.89,wallZ,.12,.87,.07,gold)
+            box(dresser.x+side*(width/2+.17),1.89,wallZ,.05,.62,.06,gold)
+          }
+          const lampX=dresser.x+s*.44
+          parts.add('post',lampX,.95,dresser.z,.26,.055,.26,gold)
+          parts.add('post',lampX,1.12,dresser.z,.046,.30,.046,gold)
+          parts.add('post',lampX,1.33,dresser.z,.29,.27,.29,ivory)
+        }
       }
       box(fridge.x,.55,fridge.z,.83,1.10,.78,tier<2?0xa29d8c:night)
       box(fridge.x,.56,fridge.z-.40,.77,1.02,.035,tier<2?0xb8b7a9:jade)

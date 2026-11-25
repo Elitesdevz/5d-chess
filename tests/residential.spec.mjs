@@ -6,6 +6,7 @@ import {join} from 'node:path'
 import {chromium} from 'playwright'
 import {ChessStore} from '../server/storage.ts'
 import {createApplication} from '../server/application.ts'
+import {pack,carry} from '../server/city-inventory.ts'
 import {cityRoute} from '../server/city-life.ts'
 import {CITY_DAY_MS} from '../src/world/city-residents.ts'
 import {BUILDINGS,buildingById,contains,homeZone,residentialSite,residentialStep} from '../src/world/residential.ts'
@@ -30,6 +31,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
     assert.equal((await context.request.post(base+'/api/signup',{data:{username:name,password:'fixture',confirm:'fixture'}})).status(),201)
     const keys=UNITS.filter(u=>u.tenure!=='resident').map(u=>u.id)
     store.transaction(tx=>tx.putMetadata('cityDeeds',Object.fromEntries(keys.map(id=>[id,{holder:name,until:0}]))))
+    store.transaction(tx=>carry(pack(tx.users.get(name)),'cash',12))
     async function action(path,data={}){
       offset+=35
       const response=await context.request.post(base+'/api/world/'+path,{data:{scene:true,...data}})
@@ -132,6 +134,16 @@ test('residential walkthrough through both buildings, house styles, furniture an
       await page.getByRole('button',{name:'Collect order'}).click()
       await page.locator('#world-service').waitFor({state:'hidden'})
     })
+    async function checkDrawer(b,level,id){
+      const drawer=b.levels[level].points.find(p=>p.unit===id&&p.id.startsWith('drawer:'))
+      await path(b,level,{...drawer,range:.65})
+      await action('use',{target:drawer.id})
+      await capture(id+'-drawer',async page=>{
+        await page.getByRole('button',{name:/Put away Cash/}).click()
+        await page.getByRole('button',{name:/Take Cash/}).click()
+        await page.getByRole('button',{name:/Take Cash/}).waitFor({state:'detached'})
+      })
+    }
     for(const b of BUILDINGS.slice(0,2)){
       await action('teleport',{to:'city'})
       await outdoors(residentialSite(b,0,b.rect.f+1.02))
@@ -201,6 +213,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
           await path(b,2,{...d,range:.94})
           await action('use',{target:'door:'+d.id})
         }
+        if(b.block===0&&index===0)await checkDrawer(b,2,u.id)
         const fridge=floor.points.find(p=>p.unit===u.id&&p.id.startsWith('fridge:'))
         await path(b,2,{...fridge,range:.69,yaw:Math.PI/2})
         if(b.block===0&&index===0){
@@ -251,6 +264,7 @@ test('residential walkthrough through both buildings, house styles, furniture an
         await path(b,s?1:0,{...d,range:.99})
         await action('use',{target:'door:'+d.id})
       }
+      if(index===2)await checkDrawer(b,0,b.id)
       for(const bed of floor.points.filter(p=>p.pose?.kind==='rest')){
         await path(b,s?1:0,{...bed,range:.49,yaw:Math.PI/2})
         await action('use',{target:bed.id})

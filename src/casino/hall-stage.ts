@@ -33,14 +33,14 @@ export class Figure {
   private motion=0
   private shadow:T.Mesh<T.PlaneGeometry,T.MeshBasicMaterial>
   private ownedMaterials:T.Material[]
-  constructor(scene:T.Scene,player:HallPlayer,shadow:T.Texture,staff:boolean|'cashier'|'cook'|'janitor'|'manager'=false){
+  constructor(scene:T.Scene,player:HallPlayer,shadow:T.Texture,staff:boolean|'cashier'|'cook'|'janitor'|'manager'|'officer'=false){
     this.target=player
     this.root.position.set(player.x,0,player.z)
     this.root.rotation.y=player.yaw
     scene.add(this.root)
     this.root.add(this.body)
     const code=[...player.name].reduce((acc,c)=>(acc*31+c.charCodeAt(0))>>>0,0)
-    const suit=material(staff==='cook'?0xdbc8ae:staff==='cashier'?0x962d39:staff==='janitor'?0x487274:staff?0x202830:suits[code%suits.length]),skin=material(skins[(code>>>4)%skins.length])
+    const suit=material(staff==='officer'?0x324f74:staff==='cook'?0xdbc8ae:staff==='cashier'?0x962d39:staff==='janitor'?0x487274:staff?0x202830:suits[code%suits.length]),skin=material(skins[(code>>>4)%skins.length])
     this.ownedMaterials=[suit,skin]
     box(this.body,[.43,.50,.25],[0,1.18,0],suit,.074)
     box(this.body,[.30,.18,.23],[0,.885,0],suit,.041)
@@ -72,7 +72,7 @@ export class Figure {
     if(staff==='cook'){
       box(this.head,[.28,.077,.245],[0,1.752,.014],shirt,.03)
       for(const x of [-.074,0,.074])mesh(new T.SphereGeometry(.091,12,8),shirt,this.head,[x,1.82,.018])
-    }else if(staff==='cashier'||staff==='janitor'){
+    }else if(staff==='cashier'||staff==='janitor'||staff==='officer'){
       box(this.head,[.26,.077,.23],[0,1.76,.016],suit,.037)
       box(this.head,[.21,.018,.15],[0,1.729,-.12],suit,.006)
     }

@@ -8,6 +8,7 @@ import {debit,quantity,resortAccount} from './resort-ledger.ts'
 import {reserveWager,settleWager} from './casino-finance.ts'
 import {cashUnits,companies,operating,saveCompanies} from './corporate.ts'
 import {income} from './credit.ts'
+import {pack,releaseDrawer,releaseFridge} from './city-inventory.ts'
 import {fail} from './http.ts'
 
 export function resortService(u:UnitOfWork,name:string,station:string,now:number,data?:Record<string,unknown>):ResortView{
@@ -30,6 +31,11 @@ export function resortService(u:UnitOfWork,name:string,station:string,now:number
     if(deeds[room.id]?.until>now)fail(409,'This room is occupied')
     const rate=TIERS[room.tier].price
     debit(account,rate,now)
+    const previous=deeds[room.id]&&u.users.get(deeds[room.id].holder)
+    if(previous){
+      releaseDrawer(pack(previous),room.id)
+      releaseFridge(previous,room.id)
+    }
     deeds[room.id]={holder:name,until:now+STAY_MS};u.putMetadata('cityDeeds',deeds)
     const e=companies(u,now)
     e.CAS.cash+=cashUnits(rate);operating(e.CAS,'Guest room sales',cashUnits(rate),now);saveCompanies(u,e)

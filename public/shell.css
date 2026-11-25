@@ -127,3 +127,19 @@ body[data-page=collection] .equipment-slots button,body[data-page=collection] .o
 .has-economy .economy-nav .kfc-nav-button{border:1px solid #e0918670;background:#71343c68;color:#ffe1bc;justify-content:center}
 .has-economy .economy-nav .kfc-nav-button:hover,.has-economy .economy-nav .kfc-nav-button[aria-current=page]{border-color:#e5938a;background:#8c3743;color:#fff2d9}
 .kfc-nav-button b{font-size:1.05em;letter-spacing:.1em}
+
+.in-custody .masthead,.in-custody main:not(.world){filter:grayscale(1);opacity:.42;pointer-events:none}
+.in-custody .world-chat,.in-custody .world-food-toggle,.in-custody .world-pause-toggle{display:none}
+.cell-screen{background:#1c3038;color:#faf0db;border:1px solid #9dada5;border-radius:12px;width:min(680px,92vw);max-height:90vh;overflow:auto;padding:20px;font:15px/1.4 system-ui;z-index:100}
+.cell-screen::backdrop{background:#132129b0;backdrop-filter:grayscale(1)}
+.cell-screen header small{color:#b8cdbd;letter-spacing:.12em}
+.cell-screen h2,.cell-screen h3,.cell-screen h4{margin:.35em 0}
+.cell-screen button,.cell-reopen{padding:5px 9px;border:1px solid #79908c;border-radius:4px;background:#2a474c;color:#fff1dc;cursor:pointer}
+.cell-screen button:focus-visible,.tile-grid button[aria-pressed=true]{outline:3px solid #f0c773;z-index:1}
+.cell-controls,.cell-screen footer,.puzzle-nav{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0}
+.cell-plan{height:95px;position:relative;background:#718381;border:4px double #c3ccbf;max-width:360px;margin:auto;color:#112a2c}
+.cell-plan span,.cell-table{position:absolute;padding:3px 8px;background:#c5c5b5}.cell-plan span:first-child{top:8px;left:4px}.cell-plan span:nth-child(2){top:8px;right:4px}.cell-plan .cell-table{bottom:4px;right:5px}.cell-plan i{position:absolute;color:#ffcf64;transform:translate(-50%,-50%)}
+.puzzle-preview{width:min(200px,45%);height:auto;display:block;margin:0 auto;cursor:pointer}
+.puzzle-halves{display:grid;grid-template-columns:1fr 1fr;gap:10px}.tile-grid{display:grid;grid-template-columns:repeat(5,1fr);background:#293d44}
+.tile-grid button{position:relative;min-width:0;aspect-ratio:1;padding:0;border:0;border-radius:0;background:transparent}.tile-grid canvas{width:100%;display:block}
+.tile-grid button:disabled{opacity:1}.cell-reopen{position:fixed;right:2%;bottom:12%;z-index:20}

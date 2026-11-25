@@ -2,6 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {ChessStore} from '../server/storage.ts'
 import {CityWorlds} from '../server/world.ts'
+import {RULES} from '../server/city-arcade.ts'
+import {carry,pack,mirrorFood} from '../server/city-inventory.ts'
+import {publicView} from '../server/custody.ts'
 import {RouletteHall} from '../server/roulette-hall.ts'
 import {resortService} from '../server/resort.ts'
 import {advanceTable,cardAction,pokerScore} from '../server/card-salon.ts'
@@ -28,10 +31,14 @@ function fixture(t,start=Date.now()){
   return {db,use,make,order,play,balance,tick:n=>now+=n,now:()=>now}
 }
 
-test('book, ride, rest, store and recover food when a room expires',t=>{
+test('a suite key grants access to the bed, shower, private drawer and minibar until checkout',t=>{
   const f=fixture(t),roulette=new RouletteHall(f.db),world=new CityWorlds(f.db,roulette)
   roulette.stop()
   const act=(action,data={},dt=20)=>world.update('Ada',action,{scene:true,...data},f.tick(dt))
+  f.db.transaction(u=>{
+    const a=u.users.get('Ada'),p=pack(a)
+    carry(p,'cash',17);carry(p,'cola',2);mirrorFood(a)
+  })
   let v=act('teleport',{to:'casino'})
   function walk(x,z){
     const goal=site(v.you.zone,x,z)
@@ -48,10 +55,19 @@ test('book, ride, rest, store and recover food when a room expires',t=>{
   v=act('resort-floor',{floor:'hotel:3'});assert.equal(v.you.zone,'hotel:3')
   walk(0,5.85);walk(0,-16.5);walk(-2.45,-16.5);walk(-2.45,-14.7);walk(-6.18,-14.7);walk(-6.18,-11.53)
   assert.equal(act('use',{target:'resort:bed:305'}).you.homePose.kind,'rest')
-  v=act('stand-scenery');walk(-3.1,-11.58)
+  v=act('stand-scenery')
+  assert.throws(()=>act('use',{target:'drawer:hotel-305'}),/closer/)
+  walk(-4.75,-11.43);v=act('use',{target:'drawer:hotel-305'})
+  const deposit={operation:'store',item:'cash',amount:12,sequence:v.arcade.sequence}
+  v=act('arcade',deposit);assert.deepEqual(v.arcade.drawer,[{item:'cash',count:12}])
+  assert.throws(()=>act('arcade',deposit),/Inventory changed/)
+  assert.throws(()=>act('arcade',{...deposit,item:'cola',amount:1,sequence:v.arcade.sequence}),/refrigerator/)
+  v=act('arcade',{operation:'take',item:'cash',amount:3,sequence:v.arcade.sequence})
+  assert.deepEqual(v.arcade.drawer,[{item:'cash',count:9}])
+  walk(-3.1,-11.58)
+  assert.throws(()=>act('arcade',{...deposit,sequence:v.arcade.sequence}),/storage first/)
   v=act('use',{target:'fridge:hotel-305'})
   assert.ok(v.food.stored)
-  f.db.transaction(u=>{u.users.get('Ada').food={...v.food.personal,cola:2}})
   assert.equal(act('food',{operation:'store',amount:'all',item:'cola',id:crypto.randomUUID()}).food.stored.cola,2)
   act('close-fridge')
   walk(-2.5,-11.58);walk(-2.5,-22.15);walk(-6.65,-22.15)
@@ -60,10 +76,57 @@ test('book, ride, rest, store and recover food when a room expires',t=>{
   f.db.transaction(u=>{const d=u.metadata('cityDeeds');d['hotel-305'].until=f.now();u.putMetadata('cityDeeds',d)})
   v=act('presence');assert.equal(v.you.x,0);assert.ok(!v.housing.keys.includes('hotel-305'))
   assert.equal(act('food').food.personal.cola,2)
+  assert.deepEqual(f.db.cityPack('Ada').recovery,[{item:'cash',count:9}])
+  assert.throws(()=>act('use',{target:'drawer:hotel-305'}),/closer/)
   assert.ok(!resortWalkable('hotel:3',-3,-16.5,[]))
   assert.equal(ROOMS.length,11);assert.equal(new Set(ROOMS.map(r=>r.tier)).size,5)
   assert.ok(walkingHeight('hotel:3',...Object.values(site('hotel:3',6,-17)))<floorHeight('hotel:3')-1)
   assert.equal(STAY_MS,3600_000)
+})
+
+test('rebooking an expired room releases the former keyholder’s storage exactly once',t=>{
+  const f=fixture(t)
+  for(const nextGuest of ['Ada','Bea']){
+    f.order('Ada','desk',{room:201})
+    f.db.transaction(u=>{
+      const a=u.users.get('Ada'),p=pack(a)
+      p.drawers['hotel-201']=[{item:'cash',count:8}]
+      a.fridges={'hotel-201':{burger:0,fries:0,cola:2}}
+    })
+    f.tick(STAY_MS)
+    const command=f.make(nextGuest,{room:201})
+    f.use(nextGuest,'desk',command);f.use(nextGuest,'desk',command)
+    const a=JSON.parse(f.db.accountJson('Ada'))
+    assert.equal(a.cityPack.drawers['hotel-201'],undefined)
+    assert.equal(a.fridges['hotel-201'],undefined)
+    const stays=nextGuest==='Ada'?1:2
+    assert.equal(a.food.cola,2*stays)
+    assert.deepEqual(a.cityPack.recovery,[{item:'cash',count:8*stays}])
+    f.tick(STAY_MS)
+  }
+})
+
+test('a city property search respects the motel room key and leaves other guests’ drawers private',t=>{
+  const f=fixture(t),roulette=new RouletteHall(f.db),world=new CityWorlds(f.db,roulette)
+  roulette.stop()
+  f.order('Ada','desk',{room:201});f.order('Bea','desk',{room:202})
+  f.db.transaction(u=>{
+    for(const [guest,room] of [['Ada','hotel-201'],['Bea','hotel-202']])
+      pack(u.users.get(guest)).drawers[room]=[{item:'cash',count:9},{item:'blaster',count:1}]
+    Object.assign(pack(u.users.get('Ada')),{stars:3,remaining:600_000})
+  })
+  world.update('Ada','teleport',{to:'casino',scene:true},f.now())
+  const view=world.update('Ada','presence',{scene:true},f.tick(RULES.raidDelay))
+  assert.deepEqual(view.arcade.searches,['hotel-201'])
+  assert.deepEqual(f.db.cityPack('Ada').drawers['hotel-201'],[{item:'cash',count:9}])
+  assert.equal(f.db.cityPack('Bea').drawers['hotel-202'].length,2)
+})
+
+test('custody aliases apply to card turns, payouts and the lottery winner',()=>{
+  const view={turn:'Ada',resort:{table:{turn:'Ada',result:'Ada wins the pot',seats:[{name:'Ada'}]},lottery:{last:{winner:'Ada'}}}}
+  const masked=publicView(view,[{user:'Ada',name:'Inmate 01'}])
+  assert.equal(masked.turn,'Ada')
+  assert.deepEqual(masked.resort,{table:{turn:'Inmate 01',result:'Inmate 01 wins the pot',seats:[{name:'Inmate 01'}]},lottery:{last:{winner:'Inmate 01'}}})
 })
 
 test('poker needs two funded players, conceals cards, draws, bets and pays a five percent rake once',t=>{

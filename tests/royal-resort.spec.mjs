@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
 import {chromium} from 'playwright'
 import {ChessStore} from '../server/storage.ts'
+import {pack,carry} from '../server/city-inventory.ts'
 import {createApplication} from '../server/application.ts'
 import {site} from '../src/world/model.ts'
 
@@ -20,6 +21,7 @@ test('a guest books at reception, rides the lift and plays the arcade through th
       assert.ok(response.ok(),await response.text())
       return response.json()
     }
+    db.transaction(u=>carry(pack(u.users.get('ResortGuest')),'cash',12))
     let v=await world('teleport',{to:'casino'})
     // Walk using real server movement before opening the page at each counter.
     async function walk(x,z){
@@ -62,6 +64,16 @@ test('a guest books at reception, rides the lift and plays the arcade through th
     page=await visit(/Play three-ball pool/)
     await page.getByRole('button',{name:'Shoot',exact:true}).click()
     await page.getByText(/balls left|Table cleared/).waitFor()
+    await page.close()
+    v=await world('presence')
+    await walk(0,4.78);await walk(0,-16.5);await walk(-2.45,-16.5)
+    await walk(-2.45,-14.7);await walk(-4.75,-14.7);await walk(-4.75,-11.43)
+    page=await visit(/Open dresser drawer/)
+    await page.getByLabel('Quantity').fill('4')
+    await page.getByRole('button',{name:'Put away Cash (×12)'}).click()
+    await page.getByRole('button',{name:'Take Cash (×4)'}).click()
+    await page.getByRole('button',{name:'Take Cash (×3)'}).waitFor()
+    await page.getByRole('button',{name:'Put away Cash (×9)'}).waitFor()
     assert.deepEqual(errors,[])
   }finally{
     await browser?.close();app.drain();server.closeAllConnections()

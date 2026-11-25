@@ -1,5 +1,6 @@
 import * as T from 'three'
 import {box,cylinder,mesh} from '../casino/scene/geometry.ts'
+import {casinoStaff} from './service-staff.ts'
 import {CityGuest} from './guest.ts'
 import {batchStatic} from '../casino/scene/static-batch.ts'
 import {BAR, BAR_COUNTER, BAR_STOOLS,DRINKS,type BarService} from './bar-menu.ts'
@@ -46,7 +47,7 @@ export function salonBar(room:T.Object3D){
     blade.rotation.z=-n*.16
   }
   batchStatic(bar)
-  const bartender=new CityGuest(room,BAR.x,8.07,0xb47d60,0x394951,true,3)
+  const bartender=new CityGuest(room,casinoStaff[4].x,casinoStaff[4].z,0xb47d60,0x394951,true,3)
   bartender.root.rotation.y=Math.PI*2
   const drink=new T.Group();bar.add(drink)
   mesh(new T.CylinderGeometry(.075,.059,.22,18),glass,drink,[0,.11,0])
@@ -65,5 +66,5 @@ export function salonBar(room:T.Object3D){
       drink.position.set(BAR.x,1.03,7.53-.64*p)
     }
   }
-  return {tick}
+  return {tick,bartender}
 }

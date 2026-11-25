@@ -29,6 +29,7 @@ export const center=(bay:Bay)=>(bay.back+bay.front)/2
 export const roomAt=(floor:string,x:number,z:number)=>ROOMS.find(b=>b.floor===floor&&b.side*x>1.7&&z>b.back&&z<b.front)
 export const bedAt=(r:HotelRoom)=>({x:r.side*7.65,z:r.front-1.53})
 export const fridgeAt=(r:HotelRoom)=>({x:r.side*3.1,z:r.front-.67})
+export const dresserAt=(r:HotelRoom)=>({x:r.side*4.75,z:r.front-.56})
 export const bathAt=(r:HotelRoom)=>({x:r.side*7.9,z:r.back+.85})
 export const liftPoint={id:'resort:lift',label:'Hotel lift',...HOTEL_LIFT,range:1.28}
 export const gameStations=[
@@ -41,11 +42,15 @@ export function resortPoints(zone:string,keys:readonly string[]=[]){
     {id:'resort:lottery',label:'Weekly lottery & shares',x:5.8,z:-4.85}]
   if(!guestFloor(zone))return []
   return [liftPoint,...(zone==='hotel:3'?[{id:'resort:billiards',label:'Play three-ball pool',x:-5.6,z:4.76,range:.95}]:[]),...(zone==='hotel:2'?gameStations.map(s=>({...s,id:'resort:'+s.id,range:1.28})):[]),
-    ...ROOMS.filter(r=>r.floor===zone&&keys.includes(r.id)).flatMap(r=>[
-      {id:'fridge:'+r.id,label:'Open minibar fridge',x:r.side*3.1,z:r.front-1.58,range:.91},
-      {id:'resort:bed:'+r.number,label:'Lie down',x:r.side*6.18,z:bedAt(r).z,range:1},
-      {id:'resort:bath:'+r.number,label:'Use the shower',x:r.side*6.65,z:bathAt(r).z,range:1},
-    ])]
+    ...ROOMS.filter(r=>r.floor===zone&&keys.includes(r.id)).flatMap(roomPoints)]
+}
+export function roomPoints(r:HotelRoom){
+  return [
+    {id:'fridge:'+r.id,label:'Open minibar fridge',x:r.side*3.1,z:r.front-1.58,range:.91},
+    {id:'drawer:'+r.id,label:'Open dresser drawer',x:dresserAt(r).x,z:r.front-1.43,range:.84},
+    {id:'resort:bed:'+r.number,label:'Lie down',x:r.side*6.18,z:bedAt(r).z,range:1},
+    {id:'resort:bath:'+r.number,label:'Use the shower',x:r.side*6.65,z:bathAt(r).z,range:1},
+  ]
 }
 export function poolDepth(x:number,z:number){
   if(x<3.5||x>8.45||z< -21.9||z> -12.1)return 0
@@ -64,6 +69,8 @@ export function resortWalkable(zone:GuestFloor,x:number,z:number,keys:readonly s
     if('id' in bay&&!keys.includes(bay.id))return false
     if('tier' in bay){
       const r=bay
+      const dresser=dresserAt(r)
+      if(Math.abs(x-dresser.x)<.89&&Math.abs(z-dresser.z)<.51)return false
       if(side>4.24&&side<8.45&&Math.abs(z-r.back-1.89)<.23)return false
       if(r.tier>=3&&Math.abs(side-4.72)<.68&&Math.abs(z-center(r))<1.19)return false
       if(side>6.44&&Math.abs(z-bedAt(r).z)<1.22||Math.abs(side-3.1)<.57&&Math.abs(z-fridgeAt(r).z)<.55)return false

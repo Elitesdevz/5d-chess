@@ -1,3 +1,4 @@
+import {housingClerk} from './service-staff.ts'
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import {batchOpaque} from '../casino/scene/static-batch.ts'
@@ -65,6 +66,7 @@ function modelFurniture(f:Fixture,p:Scenery,y:number,tone:number){
       const x=(i+.5)*w/sections-w/2
       box(x,.47,-d*.5,w/sections-.024,.715,.038,i===sections-1?iron:tone)
       box(x,.68,-d*.545,.17,.026,.043,brass)
+      box(x,.56,-d*.535,w/sections-.036,.018,.022,walnut)
     }
     const x=-w*.26
     box(x,.945,0,.42,.022,.43,0x758b8e)
@@ -347,7 +349,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
         if(level===0){
           label('RECEPTION',4.63,1.21,.33,2.2)
           for(let i=1;i<5;i++)label('FLOOR '+i+'   '+i+'01 – '+i+'03',-.38,2.68-i*.31,r.b+.14,2.56)
-          clerks.push(new CityGuest(root,4.65,-.82,0xb58366,b.style===0?0x42625c:0x3a4b65,true))
+          clerks.push(new CityGuest(root,housingClerk.x,housingClerk.z,0xb58366,b.style===0?0x42625c:0x3a4b65,true))
         }else for(const [,u] of f.units.entries()){
           const d=f.doors.find(d=>d.id===u.id)!
           const info=UNITS.find(entry=>entry.id===u.id)!
@@ -462,6 +464,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
     sign.rotation.y=u.facing<0?Math.PI:0;signs.set(u.id,sign)
   }
   return {
+    clerks,
     update(state:ResidentialView|undefined,occupied:readonly string[]|undefined,now:number,dt:number,x:number,z:number){
       for(const [id,d] of doors)d.hinge.rotation.y=d.angle*doorSwing(state?.doors[id],now)
       for(const [id,d] of fridges)d.rotation.y=T.MathUtils.damp(d.rotation.y,state?.fridges?.includes(id)?-1.18:0,11,dt)
