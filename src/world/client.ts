@@ -48,7 +48,8 @@ chatForm.onsubmit=async e=>{
   try{await action('chat',{text});if(chatInput.value.trim()===text)chatInput.value=''}catch{}
 }
 let resortUI:ResortUI|undefined
-const packUI=new ArcadeControls(cast('city-pack'),action)
+const packUI=new ArcadeControls(cast('city-pack'),action,syncLoadout)
+function syncLoadout(){stage?.setLoadout(packUI.weapon,(op,target)=>packUI.trigger(op,target))}
 let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
@@ -162,7 +163,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   const observedOffset=next.now-(start+Date.now())/2
   offset=view?.id===next.id&&Math.abs(observedOffset-offset)<650?offset+.2*(observedOffset-offset):observedOffset
   const scope=next.id+':'+next.you.zone,changed=viewKey!==scope
-  view=next;packUI.update(next)
+  view=next;packUI.update(next);syncLoadout()
   if(next.arcade?.custody){if(dialog.open)dialog.close();paused=false;pause.hidden=true;showCustody(next.arcade.custody)}
   if(next.you.zone==='private'){
     closed=true;location.replace('/chess/dice.html?cave=1');return
@@ -235,7 +236,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
 }
 async function presence(){
   const t=Date.now(),sent=stage&&{...stage.position}
-  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,...(view?.arcade?.custody&&document.querySelector('.cell-screen[open]')?{}:sent)}),signal:AbortSignal.timeout(5500)})
+  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,slot:packUI.slot,sprint:stage?.sprinting,...(view?.arcade?.custody&&document.querySelector('.cell-screen[open]')?{}:sent)}),signal:AbortSignal.timeout(5500)})
   if(!response.ok){
     if(response.status===401){closed=true;location.replace('/chess/login.html')}
     throw new Error('City connection lost')
@@ -275,6 +276,7 @@ dialog.addEventListener('close',()=>{
   if(view?.interaction?.startsWith('resort:'))void action('close-resort',{station:view.interaction}).catch(()=>{})
   if(view?.interaction==='food'||view?.interaction?.startsWith('fridge:'))void action('close-fridge',{}).catch(()=>{})
 })
+host.querySelector<HTMLButtonElement>('[data-city-camera]')!.onclick=()=>stage?.toggleCamera()
 host.querySelector<HTMLButtonElement>('[data-world-food]')!.onclick=()=>{shownService='';void action('food',{}).catch(()=>{})}
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){

@@ -13,6 +13,7 @@ import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
 export const WORLD_CAPACITY=50
 export const WORLD_SPEED=4.7
+export const SPRINT_SPEED=WORLD_SPEED*1.45
 export const CITY={x:0,z:8,yaw:0}
 export const FLOOR_LIST:{symbol:string;name:string}[]=[...STOCKS].sort((a,b)=>a.symbol.localeCompare(b.symbol))
 FLOOR_LIST.push({symbol:'CAS',name:'The Casino'},{symbol:'BNK',name:'Fifth Dimension Bank'})
@@ -81,7 +82,7 @@ export function spawn(zone:WorldZone,point=levelOf(zone)?{x:0,z:0,yaw:0}:guestFl
   return {...site(zone,point.x,point.z),yaw:point.yaw+(reverse(zone)<0?Math.PI:0)}
 }
 export type LiftRide={to:WorldZone;started:number;ends:number}
-export type WorldPlayer=HallPlayer&{zone:WorldZone;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems;shower?:{room:number;until:number};barSeat?:number;boardSeat?:number;homePose?:HomePose}
+export type WorldPlayer=HallPlayer&{zone:WorldZone;equipped?:import('./arcade.ts').WeaponId;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems;shower?:{room:number;until:number};barSeat?:number;boardSeat?:number;homePose?:HomePose}
 export function riderHeight(player:WorldPlayer,now:number){
   const from=residentialHeight(player.zone,player.x,player.z)??floorHeight(player.zone),ride=player.lift
   if(!ride)return walkingHeight(player.zone,player.x,player.z)

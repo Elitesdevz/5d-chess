@@ -4,7 +4,7 @@ import {HOTEL_LIFT,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../
 import {randomUUID} from 'node:crypto'
 import {CityArcade} from './city-arcade.ts'
 import {roster,cellMove,custodyView} from './custody.ts'
-import {entrances,venue,SLOT_COUNT,MAX_HP,type Venue} from '../src/world/arcade.ts'
+import {entrances,venue,SLOT_COUNT,isWeapon,MAX_HP,type Venue} from '../src/world/arcade.ts'
 import {serviceStaff} from '../src/world/service-staff.ts'
 import {CityLife} from './city-life.ts'
 import {callResidentialLift,occupy,operateDoor,residentialRide,settleResidentialLifts,stand} from './residential-actions.ts'
@@ -18,17 +18,17 @@ import {operating,companies,saveCompanies,cashUnits} from './corporate.ts'
 import {Restaurant} from './restaurant.ts'
 import {RESTAURANT,restaurantPoints} from '../src/world/restaurant-model.ts'
 import {dayKey} from '../src/collection.ts'
-import {BOARD_SEATS,BOARD_TABLE,boardPoints,DESTINATIONS,FLOOR_ARRIVAL,LIFT,WORLD_CAPACITY,WORLD_SPEED,floorHeight,groundZone,interactions,localSite,near,riderHeight,site,spawn,stockFloor,worldMove,type Destination,type WorldPlayer,type WorldUse,type WorldView,type WorldZone,type WorldChat} from '../src/world/model.ts'
+import {BOARD_SEATS,BOARD_TABLE,boardPoints,DESTINATIONS,FLOOR_ARRIVAL,LIFT,WORLD_CAPACITY,WORLD_SPEED,SPRINT_SPEED,floorHeight,groundZone,interactions,localSite,near,riderHeight,site,spawn,stockFloor,worldMove,type Destination,type WorldPlayer,type WorldUse,type WorldView,type WorldZone,type WorldChat} from '../src/world/model.ts'
 import type {Position,HallView} from '../src/roulette-hall-model.ts'
 import type {ChessStore} from './storage.ts'
 import type {RouletteHall} from './roulette-hall.ts'
 import {fail} from './http.ts'
 
 const TIMEOUT=27_000
-type Member=WorldPlayer&{seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position;cell?:number}
+type Member=WorldPlayer&{slot?:number;seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position;cell?:number}
 type World={id:string;shard:number;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView;life:CityLife}
 export interface CaveVisit {day:string;active:boolean}
-const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose,shower}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose,shower})
+const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose,shower,equipped}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose,shower,equipped})
 
 export class CityWorlds {
   readonly arcade:CityArcade
@@ -220,7 +220,7 @@ export class CityWorlds {
       const {x,z,yaw}=data
       const currentFloor=data.zone===undefined||data.zone===me.zone||!(civicRoom(me.zone)||typeof data.zone==='string'&&civicRoom(data.zone))
       if(data.world===world.id&&currentFloor&&(shared||data.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&!me.homePose&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
-        const limit=WORLD_SPEED*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
+        const limit=(data.sprint===true?SPRINT_SPEED:WORLD_SPEED)*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
         const {homeZone:home,...pos}=worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys,world.residential,now,world.life.traffic.vehicles)
         if(home!==me.zone&&(home||residentialAt(me.zone))){me.zone=home??'city';me.interaction=undefined}
         Object.assign(me,pos,{yaw:Math.atan2(Math.sin(yaw as number),Math.cos(yaw as number)),moved:now})
@@ -406,7 +406,10 @@ export class CityWorlds {
     for(const a of restaurant?.actors??[])residents.push({id:'kfc:'+a.id,name:a.name,zone:'kfc',...site('kfc',a.x,a.z)})
     const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents,
       keys:housing.keys,drawer,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
-    if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;this.arrive(world,victim,'city',now)}
+    if((action==='presence'||action==='arcade')&&typeof data.slot==='number'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<SLOT_COUNT)me.slot=data.slot
+    const item=simulation.view.slots[me.slot??0]?.item
+    me.equipped=isWeapon(item)?item:undefined
+    if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;delete victim.equipped;this.arrive(world,victim,'city',now)}
     if(simulation.view.custody)return this.update(name,'presence',{},now)
     const players=me.zone==='private'?[]:[...world.members.values()].filter(p=>p.name!==name&&!bookings.some(b=>b.user===p.name)&&p.zone!=='private'&&near(me,p.x,p.z,48)&&(shared?Math.abs(riderHeight(p,now)-level)<23:p.zone===me.zone)).map(p=>publicMember(p,shared))
     if(me.interaction==='booking')simulation.view.register=bookings.map(b=>b.name)

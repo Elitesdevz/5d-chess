@@ -279,3 +279,12 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .arcade-counter h3,.arcade-counter p{width:100%}
 .arcade-counter input{width:6em}
 @media(max-width:700px){#city-pack{bottom:5px;font-size:10px}.arcade-slots button{min-width:26px;font-size:9px}.world-chat{bottom:106px}}
+.city-armory{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.6rem}
+.city-armory article{display:grid;gap:.42rem;padding:.75rem;background:#273937;border:1px solid #688077;border-radius:.35rem}
+.city-armory article h3{margin:0;color:#ffefd4}.city-armory small{color:#c3d2c9}
+.city-ammo{font:600 .78rem monospace;white-space:nowrap}.arcade-actions{flex-wrap:wrap}
+.world-camera{position:absolute;right:7.4rem;top:.72rem;z-index:3;padding:.48rem .68rem;border:1px solid #a7b3a54d;border-radius:.55rem;background:#182c29;color:#f5ead4;font-weight:650}
+.city-reticle{display:none;pointer-events:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #333}
+[data-armed] .city-reticle{display:block}
+[data-flat=true] .world-camera{display:none}
+[data-hit] .city-reticle{width:12px;height:12px;border:2px solid #ffdf86;background:transparent;transform:translate(-50%,-50%) rotate(45deg);border-radius:1px}

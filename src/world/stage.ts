@@ -1,6 +1,8 @@
 import {civicMap} from './civic-map.ts'
 import {staffId,bankStaff} from './service-staff.ts'
 import {civicRoom,confined,tablePosition,levelOf,civicHeight,rise} from './civic-venues.ts'
+import {HeldModel} from './overrun-models.ts'
+import {WEAPONS,type WeaponId} from './arcade.ts'
 import {supportModel} from './arcade-art.ts'
 import {residentialAt,residentialPoints,type HomeZone} from './residential.ts'
 import type {CompanyView} from '../equity-v2.ts'
@@ -17,7 +19,7 @@ import {CityLighting} from './city-lighting.ts'
 import {CityAssets} from './city-assets.ts'
 import {resultRotation,v} from '../casino/scene/geometry.ts'
 import {guestFloor} from './resort.ts'
-import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
+import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,SPRINT_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
 const TAU=Math.PI*2
@@ -54,6 +56,40 @@ export class CityStage {
   private voluntaryUnlock=false
   private wasLocked=false
   private onPause:()=>void
+  private held=new HeldModel(true)
+  private chase=false
+  private chaseVisible=false
+  private weapon?:WeaponId
+  private firing?:(operation:'fire'|'reload',target?:string)=>void
+  private holdingFire=false
+  private nextTrigger=0
+  private aiming=false
+  get sprinting(){return !this.pause&&!this.aiming&&!this.view?.arcade?.custody&&this.arrows.has('shift')}
+  setLoadout(id:WeaponId|undefined,fire:(operation:'fire'|'reload',target?:string)=>void){
+    if(this.weapon!==id){this.holdingFire=false;this.aiming=false}
+    this.weapon=id;this.firing=fire
+    if(!id)this.aiming=false
+  }
+  private fireAtReticle(){
+    if(!this.weapon||!this.view||this.view.arcade?.custody)return
+    const current=performance.now(),mag=this.view.arcade?.magazines?.[this.weapon]
+    if(current<this.nextTrigger||mag&&(mag.readyAt>Date.now()+this.clock||mag.rounds<1))return
+    this.nextTrigger=current+WEAPONS[this.weapon].delay
+    const reach=WEAPONS[this.weapon].range,me=this.view.you
+    let nearest=Infinity,target:string|undefined
+    for(const c of this.view.arcade?.contacts??[]){
+      if(c.zone!==me.zone||c.kind==='dog'||c.kind==='helicopter')continue
+      const distance=Math.hypot(c.x-me.x,c.z-me.z)
+      if(distance>reach||distance>=nearest)continue
+      const p=this.labelPoint.set(c.x,walkingHeight(me.zone,c.x,c.z)+1.12,c.z).project(this.camera)
+      // Project the city character's torso into the reticle in screen space.
+      if(p.z>0&&p.z<1&&Math.abs(p.x)*this.camera.aspect<.42/Math.max(1,distance)&&Math.abs(p.y)<1.65/Math.max(1,distance)){
+        nearest=distance;target=c.id
+      }
+    }
+    this.firing?.('fire',target)
+  }
+  toggleCamera(){this.chase=!this.chase;this.parent.dataset.camera=this.chase?'third':'first'}
   private cameraAim=new T.Vector3()
   private tools?:ReturnType<typeof kitchenTools>
   private station?:{point:string;x:number;y:number;phase:number;sent:boolean;fillAt:number}
@@ -89,7 +125,7 @@ export class CityStage {
   private onAction:(point?:WorldAction)=>void
   private wasMoving=false
   position:Position={...CITY}
-  get moving(){return (this.arrows.size>0||Math.hypot(this.stick.x,this.stick.z)>.09)&&!this.pause}
+  get moving(){return (this.arrows.size>Number(this.arrows.has('shift'))||Math.hypot(this.stick.x,this.stick.z)>.09)&&!this.pause}
   get preparingGraphics(){return !!this.art&&!this.graphicsReady}
   constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void,onPause:()=>void=()=>{},private onMovementChange=()=>{},private onGraphicsReady=()=>{}){
     this.canvas=canvas;this.parent=parent;this.onAction=onAction;this.onPause=onPause
@@ -111,7 +147,7 @@ export class CityStage {
   }
   lock(value:boolean){
     this.pause=value
-    if(value){this.arrows.clear();this.stick={x:0,z:0};this.drag=undefined;this.releaseMouse()}
+    if(value){this.holdingFire=false;this.aiming=false;this.arrows.clear();this.stick={x:0,z:0};this.drag=undefined;this.releaseMouse()}
   }
   set(view:WorldView,offset:number,reposition=false,sent?:Position){
     const prior=this.view?.you,next=view.you
@@ -285,13 +321,15 @@ export class CityStage {
     else {this.canvas.width=w;this.canvas.height=h}
   }
   private bind(){
-    const {signal}=this.input,allowed=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright']
+    const {signal}=this.input,allowed=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift']
     window.addEventListener('keydown',e=>{
       if(this.pause||e.ctrlKey||e.altKey||e.metaKey||document.activeElement?.matches('input,select,textarea,[contenteditable]'))return
       const k=e.key.toLowerCase()
       if(this.station&&k.startsWith('arrow')){
         e.preventDefault();this.moveTool(k==='arrowleft'?-24:k==='arrowright'?24:0,k==='arrowup'?-24:k==='arrowdown'?24:0);return
       }
+      if(k==='v'&&!e.repeat){this.toggleCamera();return}
+      if(k==='r'&&this.weapon&&!e.repeat){this.firing?.('reload');return}
       if(k==='e'&&!e.repeat){e.preventDefault();this.act();return}
       if(allowed.includes(k)){this.arrows.add(k);e.preventDefault()}
     },{signal})
@@ -309,12 +347,19 @@ export class CityStage {
       this.turn(e.movementX,e.movementY)
     },{signal})
     this.canvas.addEventListener('pointerdown',e=>{
-      if(this.pause||!this.renderer||e.button!==0)return
+      if(this.pause||!this.renderer)return
+      if(document.pointerLockElement===this.canvas&&this.weapon&&this.parent.hasAttribute('data-armed')){
+        if(e.button===2){this.aiming=true;return}
+        if(e.button===0){this.holdingFire=true;this.fireAtReticle();return}
+      }
+      if(e.button!==0)return
       this.canvas.focus({preventScroll:true})
       if(e.pointerType==='mouse'){this.resumeMouse(true);if(!this.station)return}
       if(this.drag)return
       this.canvas.setPointerCapture(e.pointerId);this.drag={id:e.pointerId,x:e.clientX,y:e.clientY}
     },{signal})
+    this.canvas.addEventListener('contextmenu',e=>{if(this.weapon)e.preventDefault()},{signal})
+    window.addEventListener('pointerup',e=>{if(e.button===2)this.aiming=false;if(e.button===0)this.holdingFire=false},{signal})
     this.canvas.addEventListener('pointermove',e=>{
       if(this.pause||document.pointerLockElement===this.canvas)return
       if(e.pointerType==='mouse'&&!this.station)return
@@ -347,7 +392,7 @@ export class CityStage {
       const direction=x||z?1+((Math.round(Math.atan2(z,x)*4/Math.PI)+8)%8):0
       if(direction!==this.lastCivicDirection){this.lastCivicDirection=direction;this.onMovementChange()}
     }
-    const length=Math.max(1,Math.hypot(x,z)),speed=WORLD_SPEED*dt/length*(this.zone==='oasis'&&inPool(localSite(this.zone,this.position.x,this.position.z).x,localSite(this.zone,this.position.x,this.position.z).z)?.53:1)
+    const length=Math.max(1,Math.hypot(x,z)),speed=(this.sprinting?SPRINT_SPEED:WORLD_SPEED)*dt/length*(this.zone==='oasis'&&inPool(localSite(this.zone,this.position.x,this.position.z).x,localSite(this.zone,this.position.x,this.position.z).z)?.53:1)
     const heading=this.renderer?this.yaw:0
     if(!this.renderer&&(x||z))this.yaw=Math.atan2(-x,-z)
     if(this.view?.arcade?.custody){
@@ -359,7 +404,7 @@ export class CityStage {
       const dx=x*Math.cos(heading)+z*Math.sin(heading),dz=z*Math.cos(heading)-x*Math.sin(heading)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
       const zone=this.predictedHome??(residentialAt(this.zone)?'city':this.zone)
-      const {homeZone,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,WORLD_SPEED*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock,this.view?.traffic?.vehicles)
+      const {homeZone,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,(this.sprinting?SPRINT_SPEED:WORLD_SPEED)*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock,this.view?.traffic?.vehicles)
       this.position=position;this.predictedHome=homeZone
     }
     this.position.yaw=this.yaw
@@ -404,11 +449,12 @@ export class CityStage {
       if(!current){
         let tag:HTMLElement|undefined
         if(!local){tag=document.createElement('span');tag.className='world-name';tag.textContent=member.name;this.parent.querySelector('.world-names')!.append(tag)}
-        current={figure:new Figure(this.art.scene,member,this.shadow!),tag};this.figures.set(member.name,current)
+        current={figure:new Figure(this.art.scene,member,this.shadow!),tag};current.figure.usePlayerModel();this.figures.set(member.name,current)
         current.figure.root.position.y=riderHeight(member,now)
-        if(local)current.figure.hideHead()
       }
       const figure=current.figure
+      figure.equipped=local?this.weapon:member.equipped
+      if(local)figure.setFirstPerson(!this.chaseVisible)
       if(current.target!==member){
         current.target=member
         figure.target=member.dining===undefined&&member.barSeat===undefined&&member.boardSeat===undefined&&member.homePose?.kind!=='sit'?member:{...member,lounge:{couch:0,index:0}}
@@ -545,6 +591,29 @@ export class CityStage {
       if(!this.pause&&s.fillAt&&performance.now()>=s.fillAt)this.completeTool('fill')
     }
     this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt,!!s?.phase)
+    const free=!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
+    this.chaseVisible=false
+    if(this.chase&&free){
+      const behind=worldMove(me.zone,{x,z,yaw:this.yaw},x+2.8*Math.sin(this.yaw),z+2.8*Math.cos(this.yaw),2.8,true,this.view?.housing?.keys,this.view?.residential,now)
+      this.chaseVisible=Math.hypot(behind.x-x,behind.z-z)>.52
+      if(this.chaseVisible){
+        this.camera.position.set(behind.x,this.camera.position.y+.59,behind.z)
+        this.camera.lookAt(x,this.camera.position.y-.84,z)
+      }
+    }
+    const armed=free&&!this.chaseVisible&&!this.pause?this.weapon:undefined
+    if(this.holdingFire&&document.pointerLockElement===this.canvas&&(armed==='ar'||armed==='smg'))this.fireAtReticle()
+    this.held.setWeapon(armed)
+    this.parent.toggleAttribute('data-armed',!!armed)
+    if(this.art&&this.camera.parent!==this.art.scene)this.art.scene.add(this.camera)
+    if(this.held.parent!==this.camera)this.camera.add(this.held)
+    const kick=this.reduced?0:Math.max(0,1-(now-(this.view?.arcade?.lastShot??0))/150)
+    this.parent.toggleAttribute('data-hit',!!armed&&!!this.view?.arcade?.lastHit&&now-(this.view.arcade.lastShot??0)<245)
+    const bob=this.moving&&!this.reduced?Math.sin(now*(this.sprinting?.015:.011))*.009:0
+    this.held.position.set(this.aiming?.012:.22,(this.aiming?-.115:-.235)+bob+kick*.025,-.40+kick*.045)
+    this.held.rotation.set(kick*.10,this.aiming?0:.07,0)
+    const zoom=this.aiming&&armed?(armed==='sniper'?1.85:1.24):1
+    if(this.camera.zoom!==zoom){this.camera.zoom=zoom;this.camera.updateProjectionMatrix()}
     this.camera.updateMatrixWorld()
   }
   private motion(now:number,dt:number){

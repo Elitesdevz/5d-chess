@@ -43,8 +43,10 @@ const types = {'world.html':'text/html; charset=utf-8','world.js':'text/javascri
   'portal.css': 'text/css; charset=utf-8', 'shell.css': 'text/css; charset=utf-8', 'logo.png': 'image/png', 'emblem.svg': 'image/svg+xml'}
 for(const chunk of await readdir('dist/chess/chunks'))types['chunks/'+chunk]='text/javascript; charset=utf-8'
 await cp('node_modules/three/LICENSE','dist/chess/third-party-notices.txt');types['third-party-notices.txt']='text/plain; charset=utf-8'
+for(const name of await readdir('dist/chess/overrun'))types['overrun/'+name]=name.endsWith('.glb')?'model/gltf-binary':'image/webp'
+const binaryAsset=name=>/\.(png|glb|webp)$/.test(name)
 const assets = Object.fromEntries(await Promise.all(Object.entries(types).map(async ([name, type]) =>
-  [name, {type, binary: name.endsWith('.png'), body: name.endsWith('.png') ? (await readFile(`dist/chess/${name}`)).toString('base64') : await readFile(`dist/chess/${name}`, 'utf8')}])))
+  [name, {type, binary: binaryAsset(name), body: binaryAsset(name) ? (await readFile(`dist/chess/${name}`)).toString('base64') : await readFile(`dist/chess/${name}`, 'utf8')}])))
 await mkdir('.cloudflare', {recursive: true})
 await writeFile('.cloudflare/worker.mjs', `const assets = ${JSON.stringify(assets)};
 ${await readFile('scripts/edge.mjs', 'utf8')}`)

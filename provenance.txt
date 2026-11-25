@@ -1,0 +1,23 @@
+Overrun assets in the Royal city update
+
+Source project: Overrun by DH4410 and its contributors
+Repository: https://github.com/DH4410/Overrun
+Source revision: 42f64791386346ba4a0e6e2c9430e9dff720e3fc
+The contributor commissioning this integration reports permission to reuse and
+adapt Overrun for 5d-chess. This records the source and the reported permission.
+Original third-party credits and rights remain with their respective creators.
+
+Overrun's assets/bots/ely.glb and assets/bots/trooper.glb provide the two
+multiplayer player skins. Overrun credits the character rigs and shared idle,
+walk and run clips in assets/bots/anim/ to Mixamo (https://www.mixamo.com/).
+The bundled city versions in public/overrun contain in-place rotation clips
+sampled from those FBXs and same-origin WebP versions of the original textures.
+The shipping glTF meshes and animation tracks were optimized with gltfpack.
+Seating, resting, city jobs and figure placement were adapted for 5d-chess.
+
+The five weapon meshes and first-person gloves in public/overrun were baked
+from the pistol, smg, ar, shotgun and sniper builders in src/gunmodels.js.
+The city groups meshes by material, simplifies their geometry and shares each
+model between the shop rack, first-person view and multiplayer characters.
+Overrun inspired the sprint, aim, firing feedback and magazine/reload controls.
+City movement limits, prices, hit points, timings and custody rules are local.

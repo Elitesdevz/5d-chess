@@ -6,17 +6,19 @@ Open the City from the signed-in header. Walk with WASD or the joystick and pres
 
 The middle counter at Fifth Dimension Bank exchanges whole coins between the existing wallet and carried cash. Loans, repayments, rewards and existing shops continue to use the wallet. A withdrawal leaves fractional bank balances intact.
 
-Click a hotbar slot or press 1–9 to select it. Cash stacks in one slot. Each food stack holds nine of one menu item. Each pulse blaster occupies a separate slot. The existing Food and fridge menus work with these same slots. Takeaway collection waits if an order will not fit. Eating a carried portion restores 20 HP, and a dine-in bite restores 10, up to 100.
+Click a hotbar slot or press 1–9 to select it. Cash stacks in one slot. Each food stack holds nine of one menu item. Each weapon occupies a separate slot. The existing Food and fridge menus work with these same slots. Takeaway collection waits if an order will not fit. Eating a carried portion restores 20 HP, and a dine-in bite restores 10, up to 100.
 
-At the Royal, each motel key opens a private room for one hour. Store carried cash and pulse blasters in its dresser and food in its minibar. At checkout, drawer contents go to the bank recovery counter. Minibar contents return to available inventory slots, with overflow available at the same counter.
+At the Royal, each motel key opens a private room for one hour. Store carried cash and weapons in its dresser and food in its minibar. At checkout, drawer contents go to the bank recovery counter. Minibar contents return to available inventory slots, with overflow available at the same counter.
 
 [Backstage Single](images/royal-single.webp) · [Aureate Penthouse](images/royal-penthouse.webp)
 
 Existing SQLite accounts acquire the hotbar on first use. Older food quantities fill available slots in menu order. The cash counter holds excess for collection after space opens. Contents of an expired drawer also go to the recovery counter. Expired fridge contents fill available slots and excess goes to recovery. The legacy food field remains a projection of carried food.
 
-The kitchen counter has a storage drawer in each house and apartment. An active deed or lease allows its resident to put away and retrieve cash and blasters. Walk up to the drawer to use it. Food goes in the existing fridge.
+The kitchen counter has a storage drawer in each house and apartment. An active deed or lease allows its resident to put away and retrieve cash and weapons. Walk up to the drawer to use it. Food goes in the existing fridge.
 
-Pulse & Pixel, the arcade gun shop, stands on the north sidewalk at the northwest end of Civic Avenue. Use the lit storefront door, walk to the display counter and leave through the same doorway. A pulse blaster costs 25 carried cash. Choose the blaster and a nearby target or open air, then press Fire. A shot deals 35 HP with a 900 ms recharge. Players respawn at the city entrance. The carried slots become one collectible bag at the death location. Pickup requires room for the entire bag. Banked coins, cosmetics and home contents stay with their owner. When a secondary city instance empties, its unclaimed bags move to the same coordinates in the first instance.
+Pulse & Pixel, the arcade gun shop, stands on the north sidewalk at the northwest end of Civic Avenue. Use the lit storefront door, walk to the display counter and leave through the same doorway. The rack sells the Pistol (25 carried cash), SMG (60), Assault Rifle (95), Shotgun (80), and Sniper Rifle (140). Existing pulse blasters appear as Pistols. Each weapon type has its own magazine. Stowing a weapon, switching slots, or logging out preserves that magazine.
+
+In the 3D view, click to capture the mouse, then click to fire at the reticle. Hold the mouse button for automatic fire with the SMG or Assault Rifle. Hold the right button to aim, press R to reload, and hold Shift while moving to sprint. V or the Camera button switches between first and third person. The hotbar also offers target selection, Fire and Reload on touch screens and the overhead map. Firing raises the wanted level. Players respawn at the city entrance. The carried slots become one collectible bag at the death location. Pickup requires room for the entire bag. Banked coins, cosmetics and home contents stay with their owner. When a secondary city instance empties, its unclaimed bags move to the same coordinates in the first instance.
 
 ## Meridian Police
 
@@ -26,7 +28,7 @@ Enter Meridian Police from the south sidewalk on Civic Avenue, between the signe
 | --- | --- | --- | --- |
 | 1 | One officer searches the last reported area | 10 minutes | 2 minutes |
 | 2 | Two officers, wider sight range | 20 minutes | 10 minutes |
-| 3 | Three officers search suspect-owned or leased homes and seize blasters there | 40 minutes | 1 hour |
+| 3 | Three officers search suspect-owned or leased homes and seize stored weapons there | 40 minutes | 1 hour |
 | 4 | Four officers also search nearby properties | 60 minutes | 6 hours |
 | 5 | Five officers, helicopter tracking and a dog team | 90 minutes | 24 hours |
 
