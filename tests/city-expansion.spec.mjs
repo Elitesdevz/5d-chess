@@ -1,3 +1,5 @@
+import {observeCity,browserWalker} from './civic-controls.mjs'
+import {cellPosition,entrances} from '../src/world/civic-venues.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
@@ -6,7 +8,7 @@ import {ChessStore} from '../server/storage.ts'
 import {createApplication} from '../server/application.ts'
 import {book} from '../server/custody.ts'
 
-test('play the expansion from signup, the city hotbar, and a permanent cell without WebGL', {timeout:120000},async()=>{
+test('play the expansion from signup, the city hotbar, and a permanent cell without WebGL', {timeout:240000},async()=>{
   const store=new ChessStore('.',{memory:true}),app=createApplication(store),server=createServer(app.handle)
   await new Promise(r=>server.listen(0,'127.0.0.1',r))
   let browser
@@ -14,15 +16,22 @@ test('play the expansion from signup, the city hotbar, and a permanent cell with
     const base='http://127.0.0.1:'+server.address().port
     browser=await chromium.launch({args:['--disable-webgl','--no-sandbox']})
     const page=await browser.newPage({viewport:{width:1100,height:790}}),errors=[]
+    await observeCity(page)
     page.on('pageerror',e=>errors.push(e.message))
     await page.goto(base+'/chess/login.html')
     await page.getByRole('button',{name:'Create an account'}).click()
     await page.locator('#username').fill('Map Walker');await page.locator('#password').fill('fixture')
     await page.locator('#confirm').fill('fixture');await page.locator('#auth-submit').click()
     await page.waitForURL('**/chess/lobby.html')
-    await page.getByRole('link',{name:'Bank',exact:true}).first().click()
+    await page.getByRole('link',{name:'City',exact:true}).first().click()
     const canvas=page.locator('#world-canvas')
-    await page.locator('#city-world[data-flat=true][data-zone=bank]').waitFor()
+    await page.locator('#city-world[data-flat=true][data-zone=city]').waitFor()
+    const walker=browserWalker(page)
+    const start=await page.evaluate(()=>window.walkObservation.view.you)
+    assert.deepEqual([start.x,start.z],[0,8])
+    await walker.outside({x:-24,z:5.67})
+    await walker.walk({x:-24,z:4.16})
+    await page.locator('#city-world[data-zone=bank]').waitFor()
     async function walkToPrompt(label){
       await canvas.focus();await page.keyboard.down('w')
       try{await page.getByRole('button',{name:new RegExp(label)}).waitFor({timeout:6500})}
@@ -38,8 +47,9 @@ test('play the expansion from signup, the city hotbar, and a permanent cell with
     await page.getByText(/Carried cash 40/).waitFor()
     await page.getByRole('button',{name:'Close',exact:true}).click()
     assert.equal(await page.locator('.arcade-slots button').count(),9)
-    await page.locator('.arcade-actions summary').click()
-    await page.getByRole('button',{name:'Arcade gun shop',exact:true}).click()
+    await walker.walk({x:-24,z:5.66})
+    await walker.outside(entrances.gunshop)
+    await walker.use('enter-gunshop')
     await page.locator('#city-world[data-zone=gunshop]').waitFor()
     await walkToPrompt('Visit the blaster counter')
     await page.getByRole('button',{name:/Buy · 25 cash/}).click()
@@ -56,6 +66,19 @@ test('play the expansion from signup, the city hotbar, and a permanent cell with
     store.transaction(tx=>book(tx,'Map Walker',5,Date.now(),true,true))
     await page.locator('dialog.cell-screen[open]').waitFor()
     assert.equal(await page.locator('#cell-title').innerText(),'Inmate 01')
+    await page.getByRole('button',{name:'Look around cell'}).click()
+    const center=cellPosition(1)
+    await canvas.focus();await page.keyboard.down('d')
+    try{
+      await page.waitForFunction(x=>Math.abs(window.walkObservation.view.you.x-x)<.02,center.x+.96)
+      await page.waitForTimeout(240)
+    }finally{await page.keyboard.up('d')}
+    const frozen=(await (await page.request.get(base+'/api/custody')).json()).custody
+    assert.ok(Math.abs(frozen.x-center.x-.96)<.02)
+    assert.equal((await page.request.post(base+'/api/world/use',{data:{target:'gallery-down',scene:true}})).status(),423)
+    await page.reload()
+    await page.locator('#world-canvas[data-zone="precinct:1"]').waitFor()
+    assert.equal(await page.evaluate(()=>window.walkObservation.view.you.x),frozen.x)
     await page.getByRole('button',{name:'Jigsaw table',exact:true}).click()
     await page.locator('.tray button').first().waitFor()
     assert.equal(await page.locator('.board button').count(),25)
