@@ -1,3 +1,6 @@
+import {advanceLottery} from './weekly-lottery.ts'
+import {advanceTable} from './card-salon.ts'
+import {roster,cellMove,custodyView,puzzleAction,publicView} from './custody.ts'
 import {UsageStore,usagePath,usageApi,serverUsage,drainEconomyUsage,worldEconomyUsage} from './telemetry.ts'
 import {puzzleApi} from './puzzles.ts'
 import {AiScheduler} from './ai-scheduler.ts'
@@ -28,6 +31,14 @@ export function createApplication(store: ChessStore) {
     if(!telemetryWarning){console.error('Economy telemetry delivery deferred');telemetryWarning=true}
   }}
   const economyUsageTimer=setInterval(collectEconomy,2000);economyUsageTimer.unref()
+  const settleResort=()=>store.transaction(unit=>{
+    const now=Date.now()
+    advanceLottery(unit,now)
+    for(const game of ['poker','blackjack'] as const)advanceTable(unit,game,now)
+  })
+  settleResort()
+  const resortTimer=setInterval(()=>{try{settleResort()}catch(error){console.error('Resort settlement deferred',error)}},10_000)
+  resortTimer.unref()
   const ai=new AiScheduler(store)
   const roulette=new RouletteHall(store)
   const city=new CityWorlds(store,roulette)
@@ -39,7 +50,7 @@ export function createApplication(store: ChessStore) {
   const noticeTimer=setInterval(cleanNotices,60*1000);noticeTimer.unref()
   let draining = false
   return {
-    drain: () => {draining = true;ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
+    drain: () => {draining = true;clearInterval(resortTimer);ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       const started=Date.now();let actor:string|undefined,pathForUsage='',methodForUsage=req.method??'GET',beforeUsage:{coins?:number;elo?:number}|undefined
       const logUsage=(status:number)=>{try{serverUsage(usage,store,actor,pathForUsage,methodForUsage,status,started,typeof req.headers['x-client-trace']==='string'?req.headers['x-client-trace']:undefined,typeof req.headers['x-ui-action']==='string'?req.headers['x-ui-action']:undefined,beforeUsage)}catch{/* Diagnostics must not change an API response. */}}
@@ -51,28 +62,56 @@ export function createApplication(store: ChessStore) {
         checkOrigin(req)
         const method = req.method || 'GET'
         if (path === '/api/health' && method === 'GET') {store.ready(); json(res,200,{ok: true, storageSchema: STORAGE_SCHEMA}); return}
+        const authorize=(track=true)=>{
+          const now=Date.now(),name=user(store,req),bookings=roster(store,now)
+          const booking=bookings.find(b=>b.user===name)
+          if(booking&&!['/api/login','/api/logout','/api/me','/api/custody','/api/custody/puzzle','/api/custody/position','/api/world/presence'].includes(path))
+            fail(423,'In custody at Meridian Police')
+          if(track&&name&&!path.startsWith('/api/world/'))city.arcade.active(name,now)
+          return {name,booking,bookings}
+        }
+        if(method==='GET'&&['/api/stocks/trends','/api/stocks/history'].includes(path))authorize()
         if (path === '/api/stocks/trends' && method === 'GET'){
           actor=user(store,req)??fail(401,'Log in first')
           const symbols=[...new Set((url.searchParams.get('symbols')??'').split(','))]
           if(symbols.length>3)fail(400,'Choose up to three stocks')
           const data=await Promise.allSettled(symbols.map(async symbol=>[symbol,(await stockHistory.get(symbol)).slice(-22)] as const))
           const trends=Object.fromEntries(data.flatMap(item=>item.status==='fulfilled'?[item.value]:[]))
-          json(res,200,{trends})
+          authorize(false);json(res,200,{trends})
           return
         }
         if (path === '/api/stocks/history' && method === 'GET'){
           actor=user(store,req)??fail(401,'Log in first')
           const points=await stockHistory.get(url.searchParams.get('symbol')??'')
-          json(res,200,{points});logUsage(200)
+          authorize(false);json(res,200,{points});logUsage(200)
           return
         }
         // Never hold the writer lock while awaiting a network request body.
         const data = method === 'POST' && path !== '/api/logout' ? await body(req) : {}
+        const {name,booking}=authorize()
+        const project=(value:unknown)=>publicView(value,roster(store,Date.now()))
+        if(path==='/api/custody'&&method==='GET'){
+          if(!name)fail(401,'Log in first')
+          json(res,200,{custody:booking?custodyView(booking):null});return
+        }
+        if(path==='/api/custody/position'&&method==='POST'){
+          if(!booking)fail(403,'No active sentence')
+          store.transaction(tx=>cellMove(tx,booking,data.x,data.z,data.yaw))
+          json(res,200,{custody:custodyView(booking)});return
+        }
+        if(path==='/api/custody/puzzle'&&(method==='GET'||method==='POST')){
+          if(!booking)fail(403,'No active sentence')
+          const result=store.transaction(tx=>puzzleAction(tx,booking,method==='POST'?data:undefined))
+          json(res,200,result);return
+        }
         if(path.startsWith('/api/world/')&&method==='POST'){
           actor=user(store,req)??fail(401,'Log in first')
           const action=path.slice('/api/world/'.length)
-          const view=city.update(actor,action,data)
-          json(res,200,view)
+          const view=store.withWriteCheck(()=>{
+            const fresh=authorize(false).booking
+            if(fresh&&!booking)fail(423,'In custody at Meridian Police')
+          },()=>city.update(name!,action,data))
+          json(res,200,project(view))
           if(action==='use'||action==='floor')worldEconomyUsage(usage,store,actor,action,view)
           if(action!=='presence')logUsage(200)
           return
@@ -80,14 +119,17 @@ export function createApplication(store: ChessStore) {
         if(path.startsWith('/api/roulette-hall/')&&method==='POST'){
           actor=user(store,req)??fail(401,'Log in first')
           const action=path.slice('/api/roulette-hall/'.length)
-          const result=roulette.update(actor,action,data)
-          json(res,200,result)
+          const result=store.withWriteCheck(()=>authorize(false),()=>roulette.update(name!,action,data))
+          json(res,200,project(result))
           if(action!=='presence')logUsage(200)
           return
         }
         const reply = store.transaction(unit => {
+          const {booking}=authorize(false)
           unit.usageTrace(req.headers['x-client-trace'],req.headers['x-ui-action'])
           actor=user(unit,req)
+          if(booking&&path==='/api/me'&&method==='GET')return {status:200,value:{user:booking.name,profile:null,custody:custodyView(booking)},headers:undefined}
+          if(name&&path==='/api/logout')city.disconnect(name)
           const auth = authApi(unit,req,path,data,limiter)
           if (auth){const named=(auth.value as {user?:unknown}).user;if(typeof named==='string')actor=named;return auth}
           const me = user(unit,req) ?? fail(401,'Log in first')
@@ -108,7 +150,7 @@ export function createApplication(store: ChessStore) {
             ?? fail(404,'Not found')
         })
         // Send success only after the SQL commit succeeds.
-        json(res,reply.status,reply.value,reply.headers);logUsage(reply.status)
+        json(res,reply.status,project(reply.value),reply.headers);logUsage(reply.status)
         ai.kick()
       } catch (error) {
         const code = (error as {code?: string}).code

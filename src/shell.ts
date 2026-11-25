@@ -1,3 +1,5 @@
+import {showCustody,custodyHeartbeat} from './custody-ui.ts'
+import type {CustodyView} from './world/arcade.ts'
 import {startUsage,recordBalance,usageTrace,recordApi} from './telemetry.ts'
 import {profileHref} from './profile-model.ts'
 import {noticeUrl} from './account-model.ts'
@@ -18,7 +20,7 @@ export async function api<T>(path:string,data?:unknown):Promise<T> {
   return result
   }finally{recordApi(path,data===undefined?'GET':'POST',status,trace)}
 }
-export interface SessionInfo {user:string|null;profile?:Profile|null}
+export interface SessionInfo {custody?:CustodyView;user:string|null;profile?:Profile|null}
 let session:Promise<SessionInfo>|undefined,current:Profile|undefined
 export const getSession=()=>session??=api<SessionInfo>('/me')
 const fallback=(name:string):Profile=>({name,settings:{avatar:'default',movement:'live',players:2,moveNotifications:true},rating:{value:1200,games:0},coins:0,loadout:{icon:'default',pieces:{}}})
@@ -108,6 +110,8 @@ export async function initShell(options:{redirectHome?:boolean}={}){
   try{
     const data=await getSession()
     if(data.user){
+      custodyHeartbeat()
+      if(data.custody){showCustody(data.custody);return data}
       if(options.redirectHome){location.replace('/chess/lobby.html');return data}
       renderAccount(data.profile??fallback(data.user))
       if(document.body.dataset.page!=='lobby'){

@@ -17,7 +17,7 @@ export const coins=(n:number)=>casinoCoins(n)+' coins'
 const escapeMap:Record<string,string>={'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}
 export const safeText=(text:string)=>text.replace(/[&<>"']/g,c=>escapeMap[c])
 const date=new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeZone:'Europe/Amsterdam'})
-const stockName=(ticker:string)=>FLOOR_LIST.find(s=>s.symbol===ticker)?.name??ticker
+const stockName=(ticker:string)=>ticker==='LOT'?'Royal Weekly Lottery':FLOOR_LIST.find(s=>s.symbol===ticker)?.name??ticker
 type BankOrder={id:string;sequence:number;amount:number|null;days?:number;loanId?:string;kind:'borrow'|'repay'}
 
 export class CityServices {
@@ -262,6 +262,7 @@ export class CityServices {
       <article><span>FLOOR DIRECTORY</span><h3>Trade with a broker</h3><p>Enter the elevator, pick a company, and speak to a broker on its floor. Use coins to buy and sell shares.</p></article>
       <article><span>FINANCIAL ADVISOR</span><h3>Follow your investments</h3><p>Visit the desk to your left for your holdings, daily performance and available cash.</p></article>
       <article><span>CAS AND BNK</span><h3>Own a piece of the city</h3><p>Prices follow completed trades. Shareholders can earn dividends and vote on company policy at the board table.</p></article>
+      <article><span>LOT</span><h3>Royal Weekly Lottery</h3><p>Visit the hotel lottery stand to trade shares and collect a share of ticket sales each week.</p></article>
       <article><span>REFERENCE STOCKS</span><h3>Explore real-world companies</h3><p>These virtual shares track external prices. Your holdings stay in the game and are traded with coins.</p></article>
       </div>`)
   }
@@ -279,7 +280,7 @@ export class CityServices {
     const change=(n:number)=>`<span class="${n>=0?'world-gain':'world-loss'}">${n>0?'+':''}${n.toFixed(2)}%</span>`
     const open=Object.values(data.companies).flatMap(c=>c.orders.map(o=>({...o,symbol:c.symbol})))
     this.render('FINANCIAL ADVISOR','Your portfolio',`<div class="world-portfolio-mast"><div><small>Marked holdings</small><b>${coins(worth)}</b><span>Daily move ${previous?change(100*(priced.reduce((n,p)=>n+p.value!,0)/previous-1)):'—'}</span></div><div><small>Cash available</small><b>${coins(data.coins)}</b><span>${positions.length} ${positions.length===1?'holding':'holdings'}</span></div></div><h3>Holdings</h3>
-      <ul class="world-ledger world-portfolio-ledger">${positions.map(p=>`<li><span><strong>${safeText(p.symbol)}</strong> · ${safeText(stockName(p.symbol))}<small>${casinoCoins(p.holding.shares)} shares · Floor ${FLOOR_LIST.findIndex(s=>s.symbol===p.symbol)+1}</small><meter min="0" max="1" value="${worth?(p.value??0)/worth:0}" aria-label="Portfolio weight"></meter></span><b>${p.value===undefined?'—':coins(p.value)}<small>${p.prior!==undefined&&p.value!==undefined?change(100*(p.value/p.prior-1)):'—'}</small></b></li>`).join('')||'<li>No holdings yet</li>'}</ul>
+      <ul class="world-ledger world-portfolio-ledger">${positions.map(p=>`<li><span><strong>${safeText(p.symbol)}</strong> · ${safeText(stockName(p.symbol))}<small>${casinoCoins(p.holding.shares)} shares · ${p.symbol==='LOT'?'Hotel lottery stand':'Floor '+(FLOOR_LIST.findIndex(s=>s.symbol===p.symbol)+1)}</small><meter min="0" max="1" value="${worth?(p.value??0)/worth:0}" aria-label="Portfolio weight"></meter></span><b>${p.value===undefined?'—':coins(p.value)}<small>${p.prior!==undefined&&p.value!==undefined?change(100*(p.value/p.prior-1)):'—'}</small></b></li>`).join('')||'<li>No holdings yet</li>'}</ul>
       ${open.length?`<details><summary>Open orders (${open.length})</summary><ul class="world-ledger">${open.map(o=>`<li><span>${o.symbol} · ${o.side==='buy'?'Buy':'Sell'} ${casinoCoins(o.shares)} at ${casinoCoins(o.price)}</span><button type="button" data-portfolio-cancel="${safeText(o.id)}" data-symbol="${o.symbol}">Cancel</button></li>`).join('')}</ul></details>`:''}`)
     const token=this.token
     this.host.querySelectorAll<HTMLButtonElement>('[data-portfolio-cancel]').forEach(b=>b.onclick=async()=>{

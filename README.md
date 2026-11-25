@@ -22,7 +22,7 @@ Open [http://127.0.0.1:4173/chess/](http://127.0.0.1:4173/chess/). Red starts im
 - With the canvas focused, use arrow keys to move across squares, Shift + arrows to change board nodes, Enter to select, and WASD to pan. F fits the multiverse, Z focuses the selection, and 0 resets to a Present frontier.
 - The round history steps through committed snapshots in the same canvas. Play round reruns the reveal animation.
 
-See [RULES.md](RULES.md) for complete movement and conflict rules.
+See [RULES.md](RULES.md) for complete movement and conflict rules. The [Meridian city guide](docs/meridian-city.md) covers carried cash, homes, patrols, custody and local verification.
 
 ## Checks
 

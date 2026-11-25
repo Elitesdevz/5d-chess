@@ -2,7 +2,7 @@ import {PLACES} from './city-plan.ts'
 import {UNITS,type Deeds} from './housing.ts'
 import type {WorldPlayer} from './model.ts'
 export const CITY_DAY_MS=3600000
-const names=['Amira','Arthur','Aya','Bram','Carmen','Cian','Dalia','Dion','Elio','Eva','Farah','Felix','Greta','Hana','Hugo','Inez','Iris','Isak','Jade','Jules','June','Kai','Lena','Leonie','Lotte','Marlowe','Milo','Nadia','Nico','Noor','Otis','Rafi','Rosa','Saskia','Theo','Vera']
+export const RESIDENT_NAMES=['Amira','Arthur','Aya','Bram','Carmen','Cian','Dalia','Dion','Elio','Eva','Farah','Felix','Greta','Hana','Hugo','Inez','Iris','Isak','Jade','Jules','June','Kai','Lena','Leonie','Lotte','Marlowe','Milo','Nadia','Nico','Noor','Otis','Rafi','Rosa','Saskia','Theo','Vera']
 const occupations=[
   ['Town clerk','hall'],['Financial analyst','bank'],['Broker','exchange'],['Hotel employee','hotel'],['Baker','bakery'],
   ['Bookseller','books'],['Hospital employee','hospital'],['Police clerk','police'],['Fire station mechanic','fire'],
@@ -17,7 +17,7 @@ const available=UNITS.filter(u=>u.tenure==='resident'&&(u.block!==undefined||Num
 export function assignResidents(deeds:Deeds,now:number):Resident[]{
   const homes=available.filter(u=>!deeds[u.id]||!!deeds[u.id].until&&deeds[u.id].until<=now)
   if(!homes.length)return []
-  return names.map((name,i)=>{
+  return RESIDENT_NAMES.map((name,i)=>{
     const home=homes[i%homes.length],job=occupations[i%occupations.length]
     return {id:'resident-'+i,name,home:home.id,address:home.name,occupation:job[0],work:job[1],lunch:lunches[(i*5+1)%lunches.length],
       leisure:leisure[(i*3+2)%leisure.length],speed:1.38+(i%7)*.067,departure:6.65+(i%11)*.27,shift:6.8+(i%5)*.44,style:i,household:Math.floor(i/homes.length)}

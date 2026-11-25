@@ -1,5 +1,6 @@
 import * as T from 'three'
 import {box,cylinder,mesh} from '../casino/scene/geometry.ts'
+import {casinoStaff} from './service-staff.ts'
 import {CityGuest} from './guest.ts'
 import {batchStatic} from '../casino/scene/static-batch.ts'
 import {BAR, BAR_COUNTER, BAR_STOOLS,DRINKS,type BarService} from './bar-menu.ts'
@@ -32,8 +33,21 @@ export function salonBar(room:T.Object3D){
     mesh(new T.CylinderGeometry(.13,.28,.24,16),red,bar,[u,3.20,7.23])
     cylinder(bar,.27,.019,[u,3.07,7.23],lamp,20)
   }
+  // Brass foot rail and a backlit fan of champagne flutes over the central shelf.
+  const rail=cylinder(bar,.045,6.7,[x,.27,z-.63],brass,12)
+  rail.rotation.z=Math.PI/2
+  for(const dx of [-2.85,-1.42,0,1.42,2.85]){
+    box(bar,[.055,.07,.36],[x+dx,.27,z-.49],brass,.014)
+    cylinder(bar,.087,.023,[x+dx,2.49,8.23],brass,12)
+    cylinder(bar,.016,.15,[x+dx,2.42,8.23],brass,12)
+    mesh(new T.ConeGeometry(.083,.13,12),glass,bar,[x+dx,2.3,8.23])
+  }
+  for(let n=-4;n<=4;n++){
+    const blade=box(bar,[.07,1.25,.05],[x+n*.24,3.06-Math.abs(n)*.052,8.51],lamp,.012)
+    blade.rotation.z=-n*.16
+  }
   batchStatic(bar)
-  const bartender=new CityGuest(room,BAR.x,8.07,0xb47d60,0x394951,true,3)
+  const bartender=new CityGuest(room,casinoStaff[4].x,casinoStaff[4].z,0xb47d60,0x394951,true,3)
   bartender.root.rotation.y=Math.PI*2
   const drink=new T.Group();bar.add(drink)
   mesh(new T.CylinderGeometry(.075,.059,.22,18),glass,drink,[0,.11,0])
@@ -52,5 +66,5 @@ export function salonBar(room:T.Object3D){
       drink.position.set(BAR.x,1.03,7.53-.64*p)
     }
   }
-  return {tick}
+  return {tick,bartender}
 }

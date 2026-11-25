@@ -1,3 +1,6 @@
+import {ResortUI} from './resort-ui.ts'
+import {ArcadeControls,counterUI} from './arcade-ui.ts'
+import {showCustody,openCellTable} from '../custody-ui.ts'
 import {RestaurantUI} from './restaurant-ui.ts'
 import {api,ApiError,getSession,initShell,updateWalletBalance} from '../shell.ts'
 import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type CasinoView,type RouletteChoice} from '../casino-model.ts'
@@ -14,6 +17,7 @@ const pause=cast('world-pause'),chatForm=cast<HTMLFormElement>('world-chat-form'
 let paused=false,chatting=false
 function syncControls(){stage?.lock(paused||chatting||dialog.open)}
 function showPause(){
+  if(view?.arcade?.custody){document.querySelector<HTMLDialogElement>('.cell-screen:not([open])')?.showModal();return}
   if(closed||paused)return
   paused=true;pause.hidden=false
   if(chatting)chatInput.blur()
@@ -27,7 +31,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden)showPause()
 window.addEventListener('blur',showPause)
 let chatKey=''
 function renderChat(next:WorldView){
-  const key=next.id+':'+(next.chat?.at(-1)?.id??0)
+  const key=next.id+JSON.stringify(next.chat?.slice(-8).map(m=>[m.id,m.name,m.text]))
   if(key===chatKey)return
   chatKey=key
   const list=cast('world-messages')
@@ -43,6 +47,8 @@ chatForm.onsubmit=async e=>{
   chatInput.blur();stage?.resumeMouse()
   try{await action('chat',{text});if(chatInput.value.trim()===text)chatInput.value=''}catch{}
 }
+let resortUI:ResortUI|undefined
+const packUI=new ArcadeControls(cast('city-pack'),action)
 let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
@@ -156,7 +162,8 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   const observedOffset=next.now-(start+Date.now())/2
   offset=view?.id===next.id&&Math.abs(observedOffset-offset)<650?offset+.2*(observedOffset-offset):observedOffset
   const scope=next.id+':'+next.you.zone,changed=viewKey!==scope
-  view=next
+  view=next;packUI.update(next)
+  if(next.arcade?.custody){if(dialog.open)dialog.close();paused=false;pause.hidden=true;showCustody(next.arcade.custody)}
   if(next.you.zone==='private'){
     closed=true;location.replace('/chess/dice.html?cave=1');return
   }
@@ -173,7 +180,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   updateWalletBalance(next.coins)
   restaurant?.update(next)
   if(changed){
-    const nav=next.you.zone==='hotel'||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
+    const nav=next.you.zone.startsWith('hotel')||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
     for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
       if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
       else a.removeAttribute('aria-current')
@@ -186,9 +193,20 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
     if(!station)return
     void action('restaurant',{command:'kitchen',point:station,gesture}).finally(()=>stage?.resetTool()).catch(()=>{})
   })
+  if(!paused&&service?.startsWith('resort:')){
+    if(shownService!==service||dialog.open){resortUI?.open(next);syncControls()}
+    shownService=service
+    return
+  }
+  if(!service&&shownService.startsWith('resort:')&&dialog.open)services?.close()
   if(!paused&&service&&shownService!==service){
     shownService=service
     if(station)return
+    if(['cash','counter','desk','booking'].includes(service)||service.startsWith('drawer:')){
+      stage?.lock(true)
+      const render=()=>{if(view&&view.interaction===service)counterUI(dialog,view,async data=>{await action('arcade',data);render()})}
+      render();return
+    }
     if(service.startsWith('lift:')){
       stage?.lock(true)
       services?.residentialLift(next.you.zone,async level=>{await action('home-floor',{level});services?.close()})
@@ -217,7 +235,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
 }
 async function presence(){
   const t=Date.now(),sent=stage&&{...stage.position}
-  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,...sent}),signal:AbortSignal.timeout(5500)})
+  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,...(view?.arcade?.custody&&document.querySelector('.cell-screen[open]')?{}:sent)}),signal:AbortSignal.timeout(5500)})
   if(!response.ok){
     if(response.status===401){closed=true;location.replace('/chess/login.html')}
     throw new Error('City connection lost')
@@ -233,12 +251,13 @@ async function action(name:string,data:object){
     if(name==='use')await presence()
     if(closed)return
     const t=Date.now()
-    accepted(await api<WorldView>('/world/'+name,{...data,scene:true}),t,name==='teleport'||name==='exit-cave')
+    accepted(await api<WorldView>('/world/'+name,{...data,scene:true}),t,name==='resort-floor'||name==='teleport'||name==='exit-cave')
     if(name==='stand'||name==='stand-scenery'||name==='teleport')stage?.resumeMouse()
   }catch(error){showError(error instanceof Error?error.message:'City action failed');throw error}
   finally{performing=false;updateSelection()}
 }
 function use(point?:WorldAction){
+  if(point?.id==='cell-table'){openCellTable();return}
   if(view?.interaction?.startsWith('kfc:kitchen:')){
     void action('restaurant',{command:'leave-station'}).catch(()=>{});return
   }
@@ -253,6 +272,7 @@ function use(point?:WorldAction){
 host.querySelector<HTMLButtonElement>('[data-world-use]')!.onclick=()=>stage?.act()
 dialog.addEventListener('close',()=>{
   syncControls();if(!paused)stage?.resumeMouse()
+  if(view?.interaction?.startsWith('resort:'))void action('close-resort',{station:view.interaction}).catch(()=>{})
   if(view?.interaction==='food'||view?.interaction?.startsWith('fridge:'))void action('close-fridge',{}).catch(()=>{})
 })
 host.querySelector<HTMLButtonElement>('[data-world-food]')!.onclick=()=>{shownService='';void action('food',{}).catch(()=>{})}
@@ -276,6 +296,7 @@ async function start(){
     closeAfterFloor=true
     void action('floor',{symbol}).then(()=>services?.close()).catch(()=>undefined).finally(()=>closeAfterFloor=false)
   },updateWalletBalance,()=>void floorScreens(view?.you.zone??''))
+  resortUI=new ResortUI(dialog,action)
   restaurant=new RestaurantUI(dialog,cast('world-kfc-hud'),(command,data)=>action('restaurant',{command,...data}))
   const {CityStage}=await import('./stage.ts')
   let pollTimer:number|undefined,urgent=false,lastPresence=0
@@ -291,8 +312,8 @@ async function start(){
     if(connection.textContent===graphicsMessage)connection.hidden=true
   })
   const url=new URL(location.href),go=url.searchParams.get('go')??''
-  if(url.searchParams.get('exit')==='cave')await action('exit-cave',{})
-  else if(like(go))await action('teleport',{to:go})
+  if(!auth.custody&&url.searchParams.get('exit')==='cave')await action('exit-cave',{})
+  else if(!auth.custody&&like(go))await action('teleport',{to:go})
   else await presence()
   history.replaceState(null,'',url.pathname)
   async function beat(){

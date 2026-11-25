@@ -87,6 +87,7 @@ async function lobby(){
   el('game-movement').addEventListener('change',rewardHint);rewardHint()
   const session=await getSession().catch(()=>null)
   if(!session?.user){location.replace('/chess/login.html');return}
+  if(session.custody)return
   if(!session.profile){error('lobby-error','The home page needs the matching updated game server.');return}
   let profile:Profile=session.profile
   let count=profile.settings.players,movement:Movement=profile.settings.movement,place:'online'|'local'='online',showAll=false

@@ -46,6 +46,7 @@ function furnish(f:Floor,kind:Fixture['kind'],x:number,z:number,w:number,d:numbe
       f.points.push({...exit,id:'furniture:'+pose.id,label:kind==='bed'?'Lie down':'Sit down',range:1.02,pose,exit,unit})
     }
   }
+  if(kind==='counter'&&unit)f.points.push({...along(item,0,-d/2-.4,yaw),id:'drawer:'+id,label:'Open storage drawer',range:1.08,unit})
   if(kind==='fridge')f.points.push({...along(item,0,-d/2-.4,yaw),id:'fridge:'+id,label:'Open fridge',range:1.08,unit})
 }
 function plan(f:Floor,r:Rect,id:string,template:number,upper=false){
@@ -300,6 +301,7 @@ export function residentialPoints(zone:string,position:Point,keys:readonly strin
   if(!b)return []
   const f=b.levels[found?.level??0]
   return f.points.flatMap(p=>{
+    if(p.id.startsWith('drawer:')&&(!p.unit||!keys.includes(p.unit)))return []
     if(!found&&!p.door?.id.endsWith('-street')&&p.door?.id!==b.id)return []
     if(!p.door&&(!access(p.unit,keys)||p.unit&&!f.units.some(u=>u.id===p.unit&&contains(u.rect,(position.x-b.x)*b.facing,(position.z-b.z)*b.facing))))return []
     const d=p.door,canOpen=access(d?.unit,keys)
