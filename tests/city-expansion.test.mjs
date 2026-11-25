@@ -119,6 +119,13 @@ test('local combat, eating, death, competing pickups, pursuit, offline sentence 
   for(let i=0;i<40&&!v.arcade.custody;i++){f.tick(900);v=await f.world(a,'presence')}
   const jail=v.arcade.custody;assert.equal(jail.name,'Inmate 01')
   assert.equal(jail.ends-Date.now(),86400000)
+  for(const [path,field] of [['leaderboard','rating'],['leaderboard/coins/full','coins'],['leaderboard/net-worth/full','netWorth']]){
+    const board=(await f.ok(b,path)).players
+    assert.equal(board.at(-1).name,'Inmate 01')
+    assert.equal(board.at(-1).jailed,true)
+    assert.equal(board.at(-1).rank,board.length)
+    assert.ok(field in board.at(-1))
+  }
   for(const [path,data] of [['games/'+match.code+'/orders',{orders:[]}],['economy/spin',{}],['economy/buy',{}],['stocks/trade',{}],['bank/borrow',{}],['world/teleport',{to:'city'}],['world/arcade',{}],['roulette-hall/presence',{}],['stocks/history?symbol=BNK',undefined],['casino',undefined]]){
     assert.equal((await f.request(a,path,data)).status,423,path)
   }

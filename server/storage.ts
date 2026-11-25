@@ -303,13 +303,19 @@ export class ChessStore {
   activeRooms(): number {return Number((this.statement("SELECT COUNT(*) AS count FROM rooms WHERE finished=0 AND json_type(payload,'$.ai') IS NULL").get() as {count: number}).count)}
   metadataValue(key:string):unknown {const row=this.statement('SELECT value FROM metadata WHERE key=?').get(key) as {value:string}|undefined;return row?JSON.parse(row.value):undefined}
   putMetadata(key:string,value:unknown):void {this.requireWriter();this.statement('INSERT INTO metadata(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE value<>excluded.value').run(key,JSON.stringify(value))}
+  private jailedNames():Set<string>{
+    const bookings=this.metadataValue('meridianBookings') as Array<{user:string;ends:number|null}>|undefined
+    return new Set((bookings??[]).filter(b=>b.ends===null||b.ends>Date.now()).map(b=>b.user))
+  }
   leaderboard() {
     const rows = this.statement(`SELECT name, COALESCE(json_extract(payload,'$.wallet.loadout.icon'),'default') AS avatar,
       json_extract(payload,'$.wallet.loadout.frame') AS frame, COALESCE(json_extract(payload,'$.rating.value'),1200) AS rating,
       COALESCE(json_extract(payload,'$.rating.games'),0) AS games FROM accounts`).all() as Array<{name: string; avatar: string; frame: string | null; rating: number; games: number}>
-    const sorted = rows.map(row => ({...row, frame: row.frame ?? undefined, rating: Math.round(row.rating)})).sort((a,b) => b.rating-a.rating || a.name.localeCompare(b.name))
+    const jailed=this.jailedNames()
+    const sorted = rows.map(row => ({...row, frame: row.frame ?? undefined, rating: Math.round(row.rating), jailed:jailed.has(row.name)}))
+      .sort((a,b) => Number(a.jailed)-Number(b.jailed) || b.rating-a.rating || a.name.localeCompare(b.name))
     let rank = 1
-    return sorted.map((row,i) => {if (i && row.rating !== sorted[i-1].rating) rank=i+1; return {...row, rank}})
+    return sorted.map((row,i) => {if (i && (row.jailed!==sorted[i-1].jailed||row.rating !== sorted[i-1].rating)) rank=i+1; return {...row, rank}})
   }
   coinLeaderboard(prices?:ReadonlyMap<string,number>) {
     const rows=this.statement(`SELECT name,COALESCE(json_extract(payload,'$.wallet.loadout.icon'),'default') AS avatar,
@@ -317,6 +323,7 @@ export class ChessStore {
       COALESCE(json_extract(payload,'$.wallet.coins'),0) AS coins,
       CASE WHEN ? THEN json_extract(payload,'$.stocks.positions') END AS positions FROM accounts`).all(prices?1:0) as
       Array<{name:string;avatar:string;frame:string|null;coins:number;positions:string|null}>
+    const jailed=this.jailedNames()
     const sorted=rows.map(({name,avatar,frame,coins,positions})=>{
       let value=toStockUnits(coins)
       if(prices&&positions){
@@ -324,11 +331,11 @@ export class ChessStore {
           value+=toStockUnits(prices.get(symbol)??0)*holding.shares
         }
       }
-      return {name,avatar,frame:frame??undefined,value}
-    }).sort((a,b)=>b.value-a.value||a.name.localeCompare(b.name))
+      return {name,avatar,frame:frame??undefined,value,jailed:jailed.has(name)}
+    }).sort((a,b)=>Number(a.jailed)-Number(b.jailed)||b.value-a.value||a.name.localeCompare(b.name))
     let rank=1
     return sorted.map((row,i)=>{
-      if(i&&row.value!==sorted[i-1].value)rank=i+1
+      if(i&&(row.jailed!==sorted[i-1].jailed||row.value!==sorted[i-1].value))rank=i+1
       return {...row,value:fromStockUnits(row.value),rank}
     })
   }

@@ -15,11 +15,14 @@ test('authenticated top-100 and full rankings preserve global ranks; seller note
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`
  t.after(async()=>{await new Promise(r=>{server.close(r);server.closeAllConnections()});store.close();await rm(dir,{recursive:true,force:true})})
  const item=ITEMS.find(i=>i.type==='icon'&&!i.monthly),uid='a'.repeat(24),token='market-ranking-fixture'
- store.transaction(u=>{for(let i=0;i<105;i++){const name='Player'+String(i).padStart(3,'0');u.users.add(name,ensureAccount({name,salt:'fixture',hash:'fixture',rating:{value:1400-i,games:i},wallet:{coins:10000,starterGranted:true,inventory:i===104?[{uid,itemId:item.id,acquired:1}]:[],loadout:{icon:'default',pieces:{}}}}))}u.putSession(createHash('sha256').update(token).digest('hex'),{user:'Player104',expires:Date.now()+60000})})
+ store.transaction(u=>{for(let i=0;i<105;i++){const name='Player'+String(i).padStart(3,'0');u.users.add(name,ensureAccount({name,salt:'fixture',hash:'fixture',rating:{value:1400-i,games:i},wallet:{coins:10000,starterGranted:true,inventory:i===104?[{uid,itemId:item.id,acquired:1}]:[],loadout:{icon:'default',pieces:{}}}}))}u.putMetadata('meridianBookings',[{user:'Player000',cell:1,name:'Inmate 01',ends:null}]);u.putSession(createHash('sha256').update(token).digest('hex'),{user:'Player104',expires:Date.now()+60000})})
  const call=async(path,body,authenticated=true)=>{const r=await fetch(base+'/api'+path,{method:body===undefined?'GET':'POST',headers:{...(authenticated?{cookie:'multiverse_session='+token}:{}),...(body===undefined?{}:{'content-type':'application/json'})},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,data:await r.json()}}
  assert.equal((await call('/leaderboard/full',undefined,false)).status,401)
  const top=(await call('/leaderboard')).data,full=(await call('/leaderboard/full')).data
- assert.equal(top.players.length,100);assert.equal(full.players.length,105);assert.deepEqual(top.players,full.players.slice(0,100));assert.equal(top.me.rank,105);assert.equal(full.players[104].name,'Player104')
+ assert.equal(top.players.length,100);assert.equal(full.players.length,105);assert.deepEqual(top.players,full.players.slice(0,100));assert.equal(top.me.rank,104);assert.equal(full.players[104].name,'Inmate 01');assert.equal(full.players[104].jailed,true);assert.equal(full.players[104].rank,105)
+ const coins=(await call('/leaderboard/coins/full')).data.players,worth=(await call('/leaderboard/net-worth/full')).data.players
+ assert.equal(coins.at(-1).name,'Inmate 01');assert.equal(coins.at(-1).jailed,true);assert.equal(coins.at(-1).rank,105)
+ assert.equal(worth.at(-1).name,'Inmate 01');assert.equal(worth.at(-1).jailed,true);assert.equal(worth.at(-1).rank,105)
  const before=store.snapshot();for(const description of ['x'.repeat(MARKET_DESCRIPTION_LIMIT+1),{},42,'bad\u0000note']){assert.equal((await call('/economy/list',{uid,price:100,description})).status,400);assert.deepEqual(store.snapshot(),before)}
  const note='<img src=x onerror=alert(1)>\nA rare find & a fair price.'
  assert.equal((await call('/economy/list',{uid,price:100,description:'  '+note+'  '})).status,200)
