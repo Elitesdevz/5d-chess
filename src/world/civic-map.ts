@@ -8,9 +8,13 @@ export function civicMap(ctx:CanvasRenderingContext2D,w:number,h:number,view:Wor
   const room=view.you.zone,out=room==='city'
   if(!out&&!civicRoom(room))return false
   // The outdoor plan leaves enough street on screen to choose the next turn.
-  const size=out?Math.max(6,Math.min(13,w/61)):Math.min((w-32)/19.4,(h-88)/9.3,52)
-  const center=out?eye:origins[design(room as CivicRoom)]
-  const px=(x:number)=>w/2+(x-center.x)*size,py=(z:number)=>(out?h/2:h*.47)+(z-center.z)*size
+  const plot=out?undefined:footprint[design(room as CivicRoom)]
+  // Keep the complete plan, including a player just inside the door, above
+  // the interaction prompt and nine-slot hotbar on short screens.
+  const planHeight=Math.max(h*.48,h-176)
+  const size=plot?Math.min((w-24)/(plot.w+1),planHeight/(plot.d+1.35),52):Math.max(6,Math.min(13,w/61))
+  const center=out?eye:origins[design(room as CivicRoom)],middle=out?h/2:35+planHeight/2
+  const px=(x:number)=>w/2+(x-center.x)*size,py=(z:number)=>middle+(z-center.z)*size
   const visible=(x:number,z:number,margin=90)=>px(x)>-margin&&px(x)<w+margin&&py(z)>-margin&&py(z)<h+margin
   function rect(x:number,z:number,a:number,b:number,fill:string,line?:string){
     const l=px(x-a/2),t=py(z-b/2)
