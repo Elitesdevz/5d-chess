@@ -1,3 +1,4 @@
+import {roster} from './custody.ts'
 import {BIO_LIMIT,type ShowcaseSkin,type PlayerCard,type ProfileEditor,type HistoryEntry,type HistoryPage} from '../src/profile-model.ts'
 import {KINDS,PLAYERS,type Player} from '../src/model.ts'
 import {itemById,covers,setById,SETS,planSet} from '../src/collection.ts'
@@ -61,8 +62,10 @@ export function profileHistory(store:ChessStore,account:Account,viewer:string,ta
 export function playerProfileApi(store:ChessStore,unit:UnitOfWork,source:Account,url:URL,method:string,data:Record<string,unknown>):Reply|undefined{
  if(!['/api/profile','/api/profile/edit','/api/profile/history'].includes(url.pathname))return
  const name=url.searchParams.get('user')??source.name;if(!name.trim()||name.length>32)fail(400,'Invalid player name')
- const account=unit.findAccount(name)??fail(404,'Player not found')
- if(url.pathname==='/api/profile'&&method==='GET')return {status:200,value:profileCard(store,account,source.name)}
+ const bookings=roster(store,Date.now()),inmate=bookings.find(b=>b.name===name)
+ if(!inmate&&bookings.some(b=>b.user.toLowerCase()===name.toLowerCase()))fail(404,'Player not found')
+ const account=unit.findAccount(inmate?.user??name)??fail(404,'Player not found')
+ if(url.pathname==='/api/profile'&&method==='GET')return {status:200,value:inmate?{...profileCard(store,account,source.name),bio:'',showcase:[]}:profileCard(store,account,source.name)}
  if(url.pathname==='/api/profile/history'&&method==='GET')return {status:200,value:profileHistory(store,account,source.name,url.searchParams.get('tab')??'games',url.searchParams.get('before'))}
  if(account.name!==source.name)fail(403,'You can only edit your own profile')
  if(url.pathname==='/api/profile/edit'&&method==='GET')return {status:200,value:editor(account)}

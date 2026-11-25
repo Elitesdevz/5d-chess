@@ -1,3 +1,6 @@
+import {CityArcade} from './city-arcade.ts'
+import {roster,cellMove,custodyView} from './custody.ts'
+import {entrances,venue,type Venue} from '../src/world/arcade.ts'
 import {CityLife} from './city-life.ts'
 import {callResidentialLift,occupy,operateDoor,residentialRide,settleResidentialLifts,stand} from './residential-actions.ts'
 import {aboard,access,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
@@ -18,17 +21,25 @@ import type {RouletteHall} from './roulette-hall.ts'
 import {fail} from './http.ts'
 
 const TIMEOUT=27_000
-type Member=WorldPlayer&{seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position}
+type Member=WorldPlayer&{seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position;cell?:number}
 type World={id:string;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView;life:CityLife}
 export interface CaveVisit {day:string;active:boolean}
 const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,carriedItems,barSeat,boardSeat,homePose})
 
 export class CityWorlds {
+  readonly arcade:CityArcade
   private worlds=new Map<string,World>()
   private occupants=new Map<string,World>()
   private store:ChessStore
   private roulette:RouletteHall
-  constructor(store:ChessStore,roulette:RouletteHall){this.store=store;this.roulette=roulette}
+  constructor(store:ChessStore,roulette:RouletteHall){this.store=store;this.roulette=roulette;this.arcade=new CityArcade(store)}
+  disconnect(name:string){
+    this.arcade.offline(name)
+    const world=this.occupants.get(name)
+    if(!world)return
+    world.restaurant.leave(name);this.roulette.detach(name,world.id)
+    world.members.delete(name);this.occupants.delete(name)
+  }
   private clean(now:number){
     for(const room of this.worlds.values()){
       for(const [name,member] of room.members){
@@ -43,7 +54,7 @@ export class CityWorlds {
   }
   private enter(name:string,avatar:string,zone:WorldZone,now:number){
     let world=[...this.worlds.values()].find(w=>w.members.size<WORLD_CAPACITY)
-    if(!world){world={id:'W-'+randomUUID().slice(0,8),members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}},life:new CityLife(now,this.store.metadataValue('cityDeeds') as Deeds|undefined)};this.worlds.set(world.id,world)}
+    if(!world){let n=1;while(this.worlds.has('W-'+n))n++;world={id:'W-'+n,members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}},life:new CityLife(now,this.store.metadataValue('cityDeeds') as Deeds|undefined)};this.worlds.set(world.id,world)}
     const member:Member={name,avatar,zone,...FLOOR_ARRIVAL,seen:now,moved:now,online:true}
     this.arrive(world,member,zone,now)
     world.members.set(name,member);this.occupants.set(name,world)
@@ -75,7 +86,7 @@ export class CityWorlds {
     this.arrive(world,member,'oasis',now)
   }
   private walkthrough(world:World,member:Member,open:boolean,now:number){
-    const before=member.zone,zone=before.startsWith('floor:')||residentialAt(before)?before:groundZone(member.x,member.z)
+    const before=member.zone,zone=venue(before)||before.startsWith('floor:')||residentialAt(before)?before:groundZone(member.x,member.z)
     if(before!==zone){
       if(before==='kfc'){
         world.restaurant.leave(member.name)
@@ -142,6 +153,9 @@ export class CityWorlds {
     }else if(target.id.startsWith('lift:')&&b){
       if(!aboard(me.zone,me.x,me.z)||!openLift(state.lifts[b.building.id]??{level:0,opened:0},b.level,now))fail(409,'Step inside the elevator first')
       me.interaction=target.id as WorldUse
+    }else if(target.id.startsWith('drawer:')){
+      if(!target.unit||!keys.includes(target.unit))fail(403,'This drawer is private')
+      me.interaction=target.id as WorldUse
     }else if(target.id.startsWith('fridge:')){
       if(!access(target.unit,keys))fail(403,'This refrigerator is private')
       me.interaction=target.id as WorldUse
@@ -150,6 +164,9 @@ export class CityWorlds {
 
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
     this.clean(now)
+    this.arcade.active(name,now)
+    const bookings=roster(this.store,now),booking=bookings.find(b=>b.user===name)
+    if(booking&&action!=='presence')fail(423,'In custody at Meridian Police')
     const account=this.store.rouletteWallet(name)??fail(401,'Log in first')
     const open=(account.coins??0)>=1&&account.caveDay!==dayKey(now)
     const avatar=account.avatar??'default'
@@ -159,6 +176,14 @@ export class CityWorlds {
       world=this.enter(name,avatar,account.caveActive?'private':'city',now)
     }
     const me=world.members.get(name)!
+    if(booking){
+      if(me.cell!==booking.cell){this.arrive(world,me,'station',now);me.cell=booking.cell}
+      else if(data.world===world.id&&data.scene===true)this.store.transaction(tx=>cellMove(tx,booking,data.x,data.z,data.yaw))
+      Object.assign(me,{x:booking.x,z:booking.z,yaw:booking.yaw,seen:now})
+      return {id:world.id,now,you:{...publicMember(me,data.scene===true),name:booking.name},players:[],coins:account.coins??0,caveOpen:false,
+        arcade:{hp:100,slots:[],sequence:0,remaining:0,stars:0,contacts:[],drops:[],custody:custodyView(booking)}}
+    }
+    if(me.cell){delete me.cell;this.arrive(world,me,'station',now)}
     let housing=this.housing(name,now)
     const shared=data.scene===true
     world.restaurant.tick(now)
@@ -242,7 +267,11 @@ export class CityWorlds {
     }else if(action==='use'){
       const target=this.points(world,me,now).find(p=>p.id===data.target&&near(me,p.x,p.z,p.range))
       if(!target)fail(409,'Move closer to interact')
-      if(/^(door|furniture|call|lift|fridge):/.test(target.id)){
+      if(target.id.startsWith('enter-')){
+        this.arrive(world,me,target.id.slice(6) as Venue,now)
+      }else if(target.id==='exit-venue'&&venue(me.zone)){
+        this.arrive(world,me,'city',now,{...entrances[me.zone],yaw:Math.PI})
+      }else if(/^(door|furniture|call|lift|fridge|drawer):/.test(target.id)){
         this.homeUse(world,me,target as HomePoint,housing.keys,now)
       }else if(target.id.startsWith('seat:')||target.id.startsWith('couch:')){
         const [type,index]=target.id.split(':')
@@ -314,7 +343,7 @@ export class CityWorlds {
     }else if(action==='stand'||action==='bet'){
       if(me.zone!=='casino')fail(409,'Visit the casino to use a table')
       hall=this.roulette.update(name,action,data,now,{id:world.id,position:this.boundPosition(me)})
-    }else fail(404,'Unknown city action')
+    }else if(action!=='arcade')fail(404,'Unknown city action')
     if(me.zone==='casino'){
       hall??=this.roulette.update(name,'presence',{},now,{id:world.id,position:this.boundPosition(me)})
       if(me.barSeat===undefined)Object.assign(me,{...site('casino',hall.you.x,hall.you.z),yaw:hall.you.yaw,chair:hall.you.chair,lounge:hall.you.lounge})
@@ -325,12 +354,22 @@ export class CityWorlds {
       person.kitchenHand=world.restaurant.kitchenHand(person.name)
       person.carriedItems=world.restaurant.carriedItems(person.name)
     }
+    const at=(id:string)=>me.interaction===id&&this.points(world,me,now).some(p=>p.id===id&&near(me,p.x,p.z,p.range))
+    const drawer=me.interaction?.startsWith('drawer:')?this.homePoints(world,me,now).find(p=>p.id===me.interaction&&near(me,p.x,p.z,p.range)&&housing.keys.includes(p.unit!))?.unit:undefined
+    const simulation=this.arcade.run({world:world.id,me,players:[...world.members.values()],residents:world.life.population.map(n=>({id:n.resident.id,name:n.name,x:n.x,z:n.z,zone:n.zone})),
+      keys:housing.keys,drawer,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
+    if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;this.arrive(world,victim,'city',now)}
+    if(simulation.view.custody)return this.update(name,'presence',{},now)
     const level=riderHeight(me,now)
-    const players=me.zone==='private'?[]:[...world.members.values()].filter(p=>p.name!==name&&p.zone!=='private'&&near(me,p.x,p.z,48)&&(shared?Math.abs(riderHeight(p,now)-level)<23:p.zone===me.zone)).map(p=>publicMember(p,shared))
+    const players=me.zone==='private'?[]:[...world.members.values()].filter(p=>p.name!==name&&!bookings.some(b=>b.user===p.name)&&p.zone!=='private'&&near(me,p.x,p.z,48)&&(shared?Math.abs(riderHeight(p,now)-level)<23:p.zone===me.zone)).map(p=>publicMember(p,shared))
+    if(me.zone==='station')for(const b of bookings){
+      players.push({name:b.name,avatar:b.avatar,zone:'station',...(shared?{x:b.x,z:b.z}:localSite('station',b.x,b.z)),yaw:b.yaw,
+        online:!!this.occupants.get(b.user)?.members.get(b.user)})
+    }
     const casino=site('casino',0,3)
     const tableMotion=shared&&!hall&&me.zone!=='private'&&level<5&&near(me,casino.x,casino.z,29)?this.roulette.tableMotion(world.id):undefined
     const restaurant=level<5&&(me.zone==='kfc'||near(me,RESTAURANT.x,RESTAURANT.z,26))?world.restaurant.view(name,now,me.zone==='kfc'):undefined
-    const coins=action==='housing'||action==='restaurant'||action==='bar'||action==='use'&&me.zone==='kfc'?this.store.rouletteWallet(name)?.coins:account.coins
+    const coins=action==='arcade'||action==='housing'||action==='restaurant'||action==='bar'||action==='use'&&me.zone==='kfc'?this.store.rouletteWallet(name)?.coins:account.coins
     if(me.interaction==='food')food??=residentialFood(this.store,name,housing.keys)
     if(me.interaction?.startsWith('fridge:')){
       const target=this.homePoints(world,me,now).find(p=>p.id===me.interaction&&near(me,p.x,p.z,p.range))
@@ -339,6 +378,8 @@ export class CityWorlds {
     }
     const residential={...world.residential,fridge:me.interaction?.startsWith('fridge:')?me.interaction:undefined,
       fridges:[...world.members.values()].flatMap(p=>p.interaction?.startsWith('fridge:')?[p.interaction]:[])}
-    return {id:world.id,now,housing,food,residential,...(shared&&level<22&&me.zone!=='private'?world.life.snapshot(me,now):{}),boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
+    const surroundings=shared&&level<22&&me.zone!=='private'?world.life.snapshot(me,now):undefined
+    if(surroundings)surroundings.residents=surroundings.residents.filter(r=>!(simulation.health[r.id]?.returns>now))
+    return {id:world.id,now,housing,food,residential,arcade:simulation.view,...surroundings,boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
   }
 }

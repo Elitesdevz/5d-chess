@@ -1,3 +1,4 @@
+import {entrances,origins,venue,venueWalk,type ArcadeView,type Venue} from './arcade.ts'
 import {PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
 import {vehicleContains,type TrafficView,type Vehicle} from './traffic.ts'
 import type {ResidentView} from './city-residents.ts'
@@ -14,10 +15,10 @@ export const CITY={x:0,z:8,yaw:0}
 export const FLOOR_LIST:{symbol:string;name:string}[]=[...STOCKS].sort((a,b)=>a.symbol.localeCompare(b.symbol))
 FLOOR_LIST.push({symbol:'CAS',name:'The Casino'},{symbol:'BNK',name:'Fifth Dimension Bank'})
 export const stockFloor=(symbol:string)=>symbol==='CAS'||symbol==='BNK'||STOCK_SYMBOLS.has(symbol)
-export type PublicZone='city'|'hotel'|'casino'|'bank'|'exchange'|'kfc'|'cave'|'oasis'|`floor:${string}`|HomeZone
+export type PublicZone=Venue|'city'|'hotel'|'casino'|'bank'|'exchange'|'kfc'|'cave'|'oasis'|`floor:${string}`|HomeZone
 export type WorldZone=PublicZone|'private'
-export type Destination='city'|'casino'|'bank'|'stocks'|'kfc'
-export const DESTINATIONS={city:'city',casino:'hotel',bank:'bank',stocks:'exchange',kfc:'kfc'} as const
+export type Destination=Venue|'city'|'casino'|'bank'|'stocks'|'kfc'
+export const DESTINATIONS={station:'station',gunshop:'gunshop',city:'city',casino:'hotel',bank:'bank',stocks:'exchange',kfc:'kfc'} as const
 export const CITY_PORTALS=[
   {to:'hotel',x:0,z:-7,label:'Royal Hotel & Casino'},
   {to:'bank',x:-24,z:5,label:'Fifth Dimension Bank'},
@@ -30,7 +31,7 @@ export const PUBLIC_DICE={name:'Ivory Dice',x:6.1,z:3.0,color:'#e5bd86'} as cons
 export const WORLD_TABLES=[...TABLES,PUBLIC_DICE]
 export const DICE_TABLE_INDEX=TABLES.length
 export const ZONE_ARRIVAL:Record<Exclude<WorldZone,HomeZone|`floor:${string}`>,Position>={
-  city:CITY,hotel:{x:0,z:5.7,yaw:0},casino:{x:0,z:7.1,yaw:0},
+  station:{x:0,z:3.4,yaw:0},gunshop:{x:0,z:2.4,yaw:0},city:CITY,hotel:{x:0,z:5.7,yaw:0},casino:{x:0,z:7.1,yaw:0},
   bank:{x:0,z:6.6,yaw:0},exchange:{x:0,z:6.6,yaw:0},
   kfc:{x:0,z:5.6,yaw:0},
   cave:{x:0,z:6.7,yaw:0},oasis:{x:.45,z:-6.2,yaw:Math.PI-.09},private:{x:0,z:0,yaw:0},
@@ -62,7 +63,7 @@ export const PLAN={
 type Building=keyof typeof PLAN
 const building=(zone:WorldZone)=>zone.startsWith('floor:')?'exchange':Object.hasOwn(PLAN,zone)?zone as Building:undefined
 const reverse=(zone:WorldZone)=>zone==='cave'||zone==='oasis'?-1:1
-export function roomOrigin(zone:WorldZone){return PLAN[building(zone)!]??CITY_ORIGIN}
+export function roomOrigin(zone:WorldZone){return venue(zone)?origins[zone]:PLAN[building(zone)!]??CITY_ORIGIN}
 const CITY_ORIGIN={x:0,z:0}
 export const floorNumber=(zone:WorldZone)=>zone.startsWith('floor:')?FLOOR_LIST.findIndex(f=>f.symbol===zone.slice(6))+1:0
 export const floorHeight=(zone:WorldZone)=>floorNumber(zone)*FLOOR_HEIGHT
@@ -96,15 +97,20 @@ export function walkingHeight(zone:WorldZone,x:number,z:number){
   }
   return zone==='city'?terrainHeight(x,z):floorHeight(zone)
 }
-export type WorldUse='loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
+export type WorldUse='cash'|'counter'|'booking'|'desk'|`drawer:${string}`|'loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
 export type WorldChat={id:number;name:string;text:string;at:number}
 export interface WorldView{
-  housing?:HousingView;traffic?:TrafficView;residents?:ResidentView[];residential?:ResidentialView;food?:import('./food.ts').FoodView;chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
+  arcade?:ArcadeView;housing?:HousingView;traffic?:TrafficView;residents?:ResidentView[];residential?:ResidentialView;food?:import('./food.ts').FoodView;chat?:WorldChat[];bar?:BarService;boardTaken?:number[]
   id:string;now:number;you:WorldPlayer;players:WorldPlayer[];coins:number;caveOpen:boolean;hall?:HallView;tableMotion?:Pick<HallTable,'spin'|'recent'>[];interaction?:WorldUse;restaurant?:RestaurantView
 }
 function localInteractions(zone:WorldZone):WorldAction[]{
-  if(zone==='city')return [...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
+  if(venue(zone)){
+    const exit={id:'exit-venue',label:'Return to town',x:0,z:zone==='station'?4.2:3.35,range:1}
+    return zone==='station'?[exit,{id:'desk',label:'Speak to the desk officer',x:-3,z:0},{id:'booking',label:'View booking register',x:3,z:-1}]:
+      [exit,{id:'counter',label:'Visit the blaster counter',x:0,z:-1.45}]
+  }
+  if(zone==='city')return [...Object.entries(entrances).map(([id,p])=>({...p,id:'enter-'+id,label:id==='station'?'Enter Meridian Police':'Enter arcade gun shop'})),...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
   const home=residentialAt(zone)
   if(home?.building.block!==undefined&&home.level===0&&!home.stairs)return propertyPoints().filter(p=>p.id==='property:desk-'+home.building.block)
   if(zone==='casino')return [
@@ -113,7 +119,7 @@ function localInteractions(zone:WorldZone):WorldAction[]{
     ...WORLD_TABLES.map((t,i)=>({id:'seat:'+i,label:t.name,x:t.x,z:t.z+1.68,range:2.15})),
     ...LOUNGES.map((seat,i)=>({id:'couch:'+i,label:'Sit on couch',x:seat.x,z:seat.z,range:1.75})),
   ]
-  if(zone==='bank')return [{id:'credit',label:'Speak to the credit advisor',...CREDIT_ADVISOR},{id:'loans',label:'Speak to the lender',x:-2.9,z:.73},{id:'payments',label:'Speak to the cashier',x:2.9,z:.73},{id:'reserve',label:'Speak to the reserve clerk',x:7.4,z:.6}]
+  if(zone==='bank')return [{id:'cash',label:'Withdraw or deposit cash',x:0,z:.75},{id:'credit',label:'Speak to the credit advisor',...CREDIT_ADVISOR},{id:'loans',label:'Speak to the lender',x:-2.9,z:.73},{id:'payments',label:'Speak to the cashier',x:2.9,z:.73},{id:'reserve',label:'Speak to the reserve clerk',x:7.4,z:.6}]
   if(zone==='exchange'||zone.startsWith('floor:'))return [{id:'elevator',label:'Use elevator',...LIFT,range:1.25},...(zone==='exchange'?[{id:'reception',label:'Talk to reception',x:.63,z:-.77},{id:'advisor',label:'Review your portfolio',...FINANCIAL_ADVISOR}]:[{id:'trader',label:'Speak to the trader',x:-2.7,z:-.4},{id:'trader',label:'Speak to the trader',x:2.7,z:-.4}])]
   return []
 }
@@ -147,6 +153,7 @@ function roomObstacles(zone:WorldZone,x:number,z:number){
   return false
 }
 function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
+  if(venue(zone))return venueWalk(zone,x,z)
   if(zone==='private')return false
   if(zone.startsWith('floor:')){
     const p=localSite(zone,x,z),shaft=Math.abs(p.x)<1.42

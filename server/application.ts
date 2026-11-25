@@ -1,3 +1,4 @@
+import {roster,custodyView,puzzleAction,publicView} from './custody.ts'
 import {UsageStore,usagePath,usageApi,serverUsage,drainEconomyUsage,worldEconomyUsage} from './telemetry.ts'
 import {puzzleApi} from './puzzles.ts'
 import {AiScheduler} from './ai-scheduler.ts'
@@ -51,6 +52,15 @@ export function createApplication(store: ChessStore) {
         checkOrigin(req)
         const method = req.method || 'GET'
         if (path === '/api/health' && method === 'GET') {store.ready(); json(res,200,{ok: true, storageSchema: STORAGE_SCHEMA}); return}
+        const authorize=()=>{
+          const now=Date.now(),name=user(store,req),bookings=roster(store,now)
+          const booking=bookings.find(b=>b.user===name)
+          if(booking&&!['/api/login','/api/logout','/api/me','/api/custody','/api/custody/puzzle','/api/world/presence'].includes(path))
+            fail(423,'In custody at Meridian Police')
+          if(name&&!path.startsWith('/api/world/'))city.arcade.active(name,now)
+          return {name,booking,bookings}
+        }
+        if(path.startsWith('/api/stocks/'))authorize()
         if (path === '/api/stocks/trends' && method === 'GET'){
           actor=user(store,req)??fail(401,'Log in first')
           const symbols=[...new Set((url.searchParams.get('symbols')??'').split(','))]
@@ -68,11 +78,22 @@ export function createApplication(store: ChessStore) {
         }
         // Never hold the writer lock while awaiting a network request body.
         const data = method === 'POST' && path !== '/api/logout' ? await body(req) : {}
+        const {name,booking}=authorize()
+        const project=(value:unknown)=>publicView(value,roster(store,Date.now()))
+        if(path==='/api/custody'&&method==='GET'){
+          if(!name)fail(401,'Log in first')
+          json(res,200,{custody:booking?custodyView(booking):null});return
+        }
+        if(path==='/api/custody/puzzle'&&(method==='GET'||method==='POST')){
+          if(!booking)fail(403,'No active sentence')
+          const result=store.transaction(tx=>puzzleAction(tx,booking,method==='POST'?data:undefined))
+          json(res,200,result);return
+        }
         if(path.startsWith('/api/world/')&&method==='POST'){
           actor=user(store,req)??fail(401,'Log in first')
           const action=path.slice('/api/world/'.length)
           const view=city.update(actor,action,data)
-          json(res,200,view)
+          json(res,200,project(view))
           if(action==='use'||action==='floor')worldEconomyUsage(usage,store,actor,action,view)
           if(action!=='presence')logUsage(200)
           return
@@ -81,13 +102,15 @@ export function createApplication(store: ChessStore) {
           actor=user(store,req)??fail(401,'Log in first')
           const action=path.slice('/api/roulette-hall/'.length)
           const result=roulette.update(actor,action,data)
-          json(res,200,result)
+          json(res,200,project(result))
           if(action!=='presence')logUsage(200)
           return
         }
         const reply = store.transaction(unit => {
           unit.usageTrace(req.headers['x-client-trace'],req.headers['x-ui-action'])
           actor=user(unit,req)
+          if(booking&&path==='/api/me'&&method==='GET')return {status:200,value:{user:booking.name,profile:null,custody:custodyView(booking)},headers:undefined}
+          if(name&&path==='/api/logout')city.disconnect(name)
           const auth = authApi(unit,req,path,data,limiter)
           if (auth){const named=(auth.value as {user?:unknown}).user;if(typeof named==='string')actor=named;return auth}
           const me = user(unit,req) ?? fail(401,'Log in first')
@@ -108,7 +131,7 @@ export function createApplication(store: ChessStore) {
             ?? fail(404,'Not found')
         })
         // Send success only after the SQL commit succeeds.
-        json(res,reply.status,reply.value,reply.headers);logUsage(reply.status)
+        json(res,reply.status,project(reply.value),reply.headers);logUsage(reply.status)
         ai.kick()
       } catch (error) {
         const code = (error as {code?: string}).code
