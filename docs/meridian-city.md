@@ -20,6 +20,8 @@ Pulse & Pixel, the arcade gun shop, stands on the north sidewalk at the northwes
 
 In the 3D view, click to capture the mouse, then click to fire at the reticle. Hold the mouse button for automatic fire with the SMG or Assault Rifle. Hold the right button to aim, press R to reload, and hold Shift while moving to sprint. V or the Camera button switches between first and third person. The hotbar also offers target selection, Fire and Reload on touch screens and the overhead map. Firing raises the wanted level. Players respawn at the city entrance. The carried slots become one collectible bag at the death location. Pickup requires room for the entire bag. Banked coins, cosmetics and home contents stay with their owner. When a secondary city instance empties, its unclaimed bags move to the same coordinates in the first instance.
 
+[Player models at Pulse & Pixel](review/overrun/players.webp) · [First-person showroom view](review/overrun/shop.webp) · [Asset provenance](../provenance.txt)
+
 ## Meridian Police
 
 Enter Meridian Police from the south sidewalk on Civic Avenue, between the signed front columns near the patrol cars. Public enquiries and booking face the lobby. The central staircase leads to five visitor galleries. Walk both flights to the landing and press E or the touch interaction button to continue. Take the staircase back down to leave through the lobby. West Wing holds cells 01–25 and East Wing holds 26–50, five on each side of each gallery. Cell 50 faces the public corridor on level five. Bars separate visitors from the cell interiors. Occupied cells show their inmate even after logout or a server restart.

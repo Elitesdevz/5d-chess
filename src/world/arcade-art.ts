@@ -263,7 +263,9 @@ export function arcadeBuildings(scene:T.Scene,label:Letter){
   }
   const exterior=group('station'),outside=builder(exterior,label);precinctExterior(outside);outside.finish()
   const base=group('station'),reception=builder(base,label);shell(reception,'station',rise);lobby(reception);stairs(reception);reception.finish()
-  const retail=group('gunshop'),rk=builder(retail,label);const showModels=shop(rk,retail);rk.finish()
+  const retail=group('gunshop'),rk=builder(retail,label)
+  const showModels=shop(rk,retail)
+  rk.finish()
   // CityLighting retains each source's original parent for its visibility checks.
   const lobbyLights=new T.Group(),shopLights=new T.Group()
   base.add(lobbyLights);retail.add(shopLights)

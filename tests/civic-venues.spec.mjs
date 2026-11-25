@@ -45,7 +45,7 @@ for(const flat of [true,false])test('walk from Clock Square through both Civic A
       if(id==='gunshop'){
         await outside(entrances.gunshop);await use('enter-gunshop');await zone('gunshop')
         await walk(at(id,0,-1.22));await use('counter')
-        await page.getByRole('button',{name:/Buy · 25 cash/}).waitFor()
+        await page.getByRole('button',{name:/Buy Pistol for 25 cash/}).waitFor()
         await page.getByRole('button',{name:'Close',exact:true}).click()
       }
       const p=insideDoor(id);await walk(at(id,p.x,p.z));await use('exit-venue');await zone('city')
