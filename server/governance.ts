@@ -5,9 +5,10 @@ import type {UnitOfWork} from './storage.ts'
 import {DAY,income,updateCredit} from './credit.ts'
 import {wallet} from './economy.ts'
 import {portfolio} from './cas-shares.ts'
-import {PE,BUYBACK,postCreditCollections,dictionary,holderLabel,cashUnits,assets,liabilities,shortfall,lendable,cashForDistribution,safetyReserve,coverOperatingCosts,eligible,sharesOf,ratio,journal,operating,repayCorporate,debt,companies,saveCompanies,setHolding,type Ballot,type Company,type Companies} from './corporate.ts'
+import {PE,BUYBACK,postCreditCollections,dictionary,holderLabel,cashUnits,assets,liabilities,shortfall,lendable,cashForDistribution,safetyReserve,coverOperatingCosts,eligible,sharesOf,ratio,journal,operating,repayCorporate,debt,companies,saveCompanies,setHolding,amsterdamDay,nextAmsterdamMidnight,type Ballot,type Company,type Companies} from './corporate.ts'
 import {book,cancelOrders,maintainOrders,offerInventory,submit} from './order-book.ts'
 import {fail} from './http.ts'
+import {notify} from './accounts.ts'
 
 const options=(c:Company)=>Object.entries(policies[c.symbol])
 const proposalKeys=(c:Company)=>options(c).flatMap(([p,{options}])=>(options as readonly number[]).map(v=>[p,v] as const))
@@ -187,13 +188,13 @@ function recapitalize(unit:UnitOfWork,e:Companies,c:Company,now:number){
 function distribute(unit:UnitOfWork,e:Companies,c:Company,now:number){
   if(now<c.nextDividend)return
   const at=c.nextDividend,first=at
-  c.nextDividend+=DAY*7*(1+Math.floor((now-at)/(DAY*7)))
+  c.nextDividend=nextAmsterdamMidnight(now)
   const clear=c.profit-c.loss
   c.loss=Math.max(0,-clear);c.profit=0
   const owners=eligible(c)
   const pool=locked(c,first)||!owners?0:Math.min(ratio(Math.max(0,clear),c.policy.dividends),cashForDistribution(c,now))
   let paid=0
-  const day=new Date(at).toISOString().slice(0,10)
+  const day=amsterdamDay(at)
   if(pool)for(const [name,shares] of Object.entries(c.holders)){
     const units=ratio(pool,shares,owners)
     if(!units)continue
@@ -204,6 +205,7 @@ function distribute(unit:UnitOfWork,e:Companies,c:Company,now:number){
       wallet(account);income(account,units,now)
       const p=portfolio(account),field=c.symbol==='CAS'?'dividendsPaid':'bankDividendsPaid',amount=fromStockUnits(units)
       p.dividends.unshift({day,shares,amount,symbol:c.symbol})
+      notify(account,{kind:'casino',title:`${c.symbol} dividend received`,detail:`You got ${amount} coins from ${c.symbol} dividends.`,code:c.symbol})
       unit.economyUsage(account.name,'/api/stocks',{action:'dividend',symbol:c.symbol,shares,coins:amount},at)
       p[field]=fromStockUnits(cashUnits(p[field]??0)+units)
     }

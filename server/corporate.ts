@@ -5,6 +5,18 @@ import type {Account} from './accounts.ts'
 import type {UnitOfWork} from './storage.ts'
 import {CAS_META,portfolio} from './cas-shares.ts'
 import {collections,creditAccount,DAY,loansFor,migrateLoan} from './credit.ts'
+const amsterdamDate=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Amsterdam',year:'numeric',month:'2-digit',day:'2-digit'})
+export function amsterdamDay(at:number):string{
+  const parts=Object.fromEntries(amsterdamDate.formatToParts(at).map(part=>[part.type,part.value]))
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+export function nextAmsterdamMidnight(after:number):number{
+  const day=amsterdamDay(after)
+  let low=after,high=after+36*60*60_000
+  while(amsterdamDay(high)===day)high+=12*60*60_000
+  while(high-low>1){const middle=Math.floor((low+high)/2);if(amsterdamDay(middle)===day)low=middle;else high=middle}
+  return high
+}
 
 export const BANK_META='bankExchange'
 export const COMPANIES='economyV2'
@@ -33,7 +45,7 @@ export interface Company {
   bankruptcy?:Insolvency;recoveryUntil:number
 }
 export interface Companies {
-  CAS:Company;BNK:Company;peCash:number;nextPE:number;peLadder?:true;lastSlot:number;ballot?:Ballot;reversals:Record<string,{buyer:string;at:number}>
+  CAS:Company;BNK:Company;peCash:number;nextPE:number;peLadder?:true;lastSlot:number;ballot?:Ballot;reversals:Record<string,{buyer:string;at:number}>;dividendCadence?:'daily-amsterdam-v1'
 }
 export const cashUnits=toStockUnits
 export function ratio(amount:number,numerator:number,denominator=100){
@@ -88,6 +100,11 @@ export function companies(unit:UnitOfWork,now=Date.now()):Companies{
       }
     }
     if(existing.ballot){existing.ballot.snapshot=dictionary(existing.ballot.snapshot);existing.ballot.votes=dictionary(existing.ballot.votes)}
+    if(existing.dividendCadence!=='daily-amsterdam-v1'){
+      existing.CAS.nextDividend=nextAmsterdamMidnight(now)
+      existing.BNK.nextDividend=nextAmsterdamMidnight(now)
+      existing.dividendCadence='daily-amsterdam-v1'
+    }
     return existing
   }
   const oldCAS=unit.metadata<Legacy>(CAS_META),oldBank=unit.metadata<Legacy>(BANK_META)
@@ -126,7 +143,7 @@ export function companies(unit:UnitOfWork,now=Date.now()):Companies{
       cas.profit+=toStockUnits(bet.stake)
     }
   }
-  const result={CAS:cas,BNK:bank,peCash:cashUnits(50_000),nextPE:now+DAY,lastSlot:Math.floor((now-DAY/2)/DAY)-1,reversals:{}}
+  const result={CAS:cas,BNK:bank,peCash:cashUnits(50_000),nextPE:now+DAY,lastSlot:Math.floor((now-DAY/2)/DAY)-1,reversals:{},dividendCadence:'daily-amsterdam-v1' as const}
   saveCompanies(unit,result)
   return result
 }
