@@ -1,3 +1,5 @@
+import {advanceLottery} from './weekly-lottery.ts'
+import {advanceTable} from './card-salon.ts'
 import {UsageStore,usagePath,usageApi,serverUsage,drainEconomyUsage,worldEconomyUsage} from './telemetry.ts'
 import {puzzleApi} from './puzzles.ts'
 import {AiScheduler} from './ai-scheduler.ts'
@@ -28,6 +30,14 @@ export function createApplication(store: ChessStore) {
     if(!telemetryWarning){console.error('Economy telemetry delivery deferred');telemetryWarning=true}
   }}
   const economyUsageTimer=setInterval(collectEconomy,2000);economyUsageTimer.unref()
+  const settleResort=()=>store.transaction(unit=>{
+    const now=Date.now()
+    advanceLottery(unit,now)
+    for(const game of ['poker','blackjack'] as const)advanceTable(unit,game,now)
+  })
+  settleResort()
+  const resortTimer=setInterval(()=>{try{settleResort()}catch(error){console.error('Resort settlement deferred',error)}},10_000)
+  resortTimer.unref()
   const ai=new AiScheduler(store)
   const roulette=new RouletteHall(store)
   const city=new CityWorlds(store,roulette)
@@ -39,7 +49,7 @@ export function createApplication(store: ChessStore) {
   const noticeTimer=setInterval(cleanNotices,60*1000);noticeTimer.unref()
   let draining = false
   return {
-    drain: () => {draining = true;ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
+    drain: () => {draining = true;clearInterval(resortTimer);ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       const started=Date.now();let actor:string|undefined,pathForUsage='',methodForUsage=req.method??'GET',beforeUsage:{coins?:number;elo?:number}|undefined
       const logUsage=(status:number)=>{try{serverUsage(usage,store,actor,pathForUsage,methodForUsage,status,started,typeof req.headers['x-client-trace']==='string'?req.headers['x-client-trace']:undefined,typeof req.headers['x-ui-action']==='string'?req.headers['x-ui-action']:undefined,beforeUsage)}catch{/* Diagnostics must not change an API response. */}}

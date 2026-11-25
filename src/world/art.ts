@@ -1,3 +1,4 @@
+import {royalResort} from './resort-art.ts'
 import {urbanArt} from './urban-art.ts'
 import {basinBed,tunnelBed,poolLevel} from './terrain.ts'
 import {district} from './district.ts'
@@ -269,7 +270,7 @@ function gallery(scene:T.Object3D,type:'hotel'|'exchange'){
     banner(scene,'GAMING FLOOR',[4.18,.34],[0,3.62,-7.51])
     plane(scene,3.65,15.5,0,.016,0,rug)
     for(const x of [-1.70,1.70])plane(scene,.039,15.38,x,.022,0,brass)
-    for(const x of [-6.58,6.58])for(const z of [-4.7,-.7,3.6]){
+    for(const x of [-6.58,6.58])for(const z of [-.7,3.6]){
       bench(scene,x,z,x>0?Math.PI/2:-Math.PI/2,leather);potted(scene,x*.92,z+.77)
     }
     for(const side of [-1,1]){
@@ -651,6 +652,7 @@ export function makeWorldArt(open:boolean){
   }
   const {hotel,casino,bank,exchange}=rooms
   gallery(hotel,'hotel');venueDetail(hotel,'hotel');batchOpaque(hotel)
+  const resort=royalResort(hotel,banner)
   buildHall(casino,true);const bar=salonBar(casino);venueDetail(casino,'casino')
   const wheels=buildHallTables(casino),wagerTokens=wheels.map(wheel=>rouletteWagers(wheel.group)),actors:CityGuest[]=[]
   for(const [x,z] of [[-5,-4.9],[5,-4.9],[0,.61]])actors.push(new CityGuest(casino,x-.35,z,0xb78968,0x29323d,true))
@@ -658,6 +660,11 @@ export function makeWorldArt(open:boolean){
   box(table,[4.05,.24,2.03],[0,.88,0],oak,.13);box(table,[4.14,.042,2.13],[0,1.008,0],brass,.045)
   box(table,[3.95,.039,1.94],[0,1.045,0],std(0x653f57),.033)
   for(const offset of SEAT_OFFSETS)chairSeat(table,offset)
+  for(const dx of [-1.42,1.42])for(const dz of [-.59,.59]){
+    cylinder(table,.19,.018,[dx,1.079,dz],brass,30)
+    cylinder(table,.165,.019,[dx,1.084,dz],leather,30)
+  }
+  banner(casino,'THE AMBER BAR',[3.3,.41],[-6.25,3.67,8.47]).rotation.y=Math.PI
   banner(table,'IVORY DICE',[2.45,.40],[0,1.68,-.87])
   const publicDie=dice(materials());table.add(publicDie);publicDie.position.set(0,1.165,.08);publicDie.quaternion.copy(resultRotation(1))
   actors.push(new CityGuest(casino,PUBLIC_DICE.x,PUBLIC_DICE.z-1.5,0x9a6e53,0x57363e,true,1))
@@ -683,6 +690,7 @@ export function makeWorldArt(open:boolean){
   batchOpaque(bank)
   const staff=[new CityGuest(bank,-2.9,-2.72,0xb38469,0x284557,true,1),new CityGuest(bank,2.9,-2.71,0xd5ad86,0x313c59,true,2),new CityGuest(bank,7.4,-1.32,0x946344,0x213344,true),new CityGuest(bank,advisor.x,deskZ-.63,0xbc8b68,0x49676c,true,2)]
   gallery(exchange,'exchange');venueDetail(exchange,'exchange');batchOpaque(exchange);staff.push(new CityGuest(exchange,.65,-3.11,0xc89b79,0x4b3d58,true,1))
+  staff.push(new CityGuest(hotel,-6.08,-7.08,0xab8069,0x384a45,true,1),new CityGuest(hotel,5.74,-7.09,0xbb9473,0x684458,true,2))
   staff.push(new CityGuest(exchange,FINANCIAL_ADVISOR.x,FINANCIAL_ADVISOR.z-1.82,0xa57556,0x304550,true,2))
   const lobbyDoors=slidingDoors(exchange),floor=tower(elevator(scene))
   rooms.cave.rotation.y=rooms.oasis.rotation.y=Math.PI
@@ -694,7 +702,7 @@ export function makeWorldArt(open:boolean){
     const target=zone==='cave'?.38:zone==='oasis'?.84:zone==='casino'?1.24:zone==='city'?1.95:1.62
     skylight.intensity=T.MathUtils.damp(skylight.intensity,target,3,dt)
   }
-  return {scene,lightZone,homes,urban,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
+  return {scene,resort,lightZone,homes,urban,actors,staff,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
 }
 function rouletteWagers(table:T.Group){
   const tones=[0xe9c186,0x72bcbc,0xcf8799,0xc2a8e5]

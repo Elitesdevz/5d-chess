@@ -237,3 +237,32 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .residential-food h3{margin:0 0 .55rem}
 .residential-food h3 small{color:#b1c2b4}
 .residential-bank button{min-width:3rem;font-size:1.16rem}
+
+.royal-service { color:#eadfce; display:grid; gap:.85rem }
+.royal-service p { margin:0; line-height:1.5 }
+.royal-service button { color:#f7e8cf; background:#2b4241; border:1px solid #8c7960; border-radius:.35rem; padding:.55rem .85rem; cursor:pointer }
+.royal-service button:hover:enabled,.royal-service button:focus-visible { background:#3d5b55; border-color:#e5c68b }
+.royal-service button:disabled { opacity:.6; cursor:default }
+.royal-floor { display:flex; align-items:center; gap:1rem; text-align:left }
+.royal-floor>b { color:#e9c98f; font:1.6rem Georgia,serif }
+.royal-floor strong,.royal-floor small,.royal-jackpot span,.royal-hand strong { display:block }
+.royal-floor small,.royal-room p,.royal-service details { color:#cabfaa }
+.royal-room,.royal-hand { border-top:1px solid #655c50; padding:.85rem 0 .2rem }
+.royal-room header,.royal-pay { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.4rem }
+.royal-room header h3 { margin:0; font:1.22rem Georgia,serif; color:#f2e3c5 }
+.royal-buttons,.royal-order { display:flex; align-items:end; flex-wrap:wrap; gap:.45rem; margin-top:.5rem }
+.royal-order label { display:grid; gap:.2rem }
+.royal-order input { width:6em; padding:.5rem; font:inherit }
+.royal-jackpot,.royal-reels { background:linear-gradient(115deg,#183b3b,#284d46); border-block:2px solid #ba996b; padding:1rem; text-align:center }
+.royal-jackpot strong { display:block; font:2.25rem Georgia,serif; color:#ffe3a6; padding:.25rem }
+.royal-reels { display:grid; grid-template-columns:repeat(3,1fr); gap:.4rem }
+.royal-felt { width:100%; height:auto; border-radius:.5rem; cursor:crosshair }
+.royal-reels b { padding:.75rem .2rem; border-radius:.35rem; background:#efe2cc; color:#673449; font:600 clamp(.95rem,4vw,1.4rem) Georgia,serif }
+.royal-card { display:inline-grid; width:2.3rem; height:3.1rem; align-items:center; justify-content:center; margin:.28rem .15rem .2rem 0; color:#253435; background:#f2ead8; border-radius:.25rem; font:bold 1.12rem Georgia,serif }
+.royal-card.red { color:#993b52 }
+.royal-card.back { color:#dab982; background:#573b4e; outline:1px solid #ad916b }
+.royal-discard { display:inline-block; cursor:pointer; position:relative }
+.royal-discard input { position:absolute; opacity:0 }
+.royal-discard input:checked+.royal-card,.royal-discard input:focus-visible+.royal-card { outline:3px solid #efbc71; transform:translateY(-.2rem) }
+.royal-service summary { cursor:pointer; padding:.4rem 0 }
+.royal-pay { padding:.22rem 0; border-bottom:1px solid #484d47 }

@@ -1,3 +1,4 @@
+import {SHARE_PRICE} from '../src/world/resort.ts'
 import type {Account} from './accounts.ts'
 import type {Reply} from './model.ts'
 import type {UnitOfWork} from './storage.ts'
@@ -26,7 +27,7 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
   if(!read&&(method!=='POST'||!['trade','market','order','cancel','support','vote','rescue'].some(k=>path==='/api/stocks/'+k)))return
   const e=companies(unit,now),quotes=unit.metadata<Record<string,StockQuote>>(STOCK_QUOTES)??{}
   const positions=portfolio(account),purse=wallet(account)
-  const view=():StockView=>({coins:purse.coins,portfolio:positions,quotes,cas:{...equityQuote(e.CAS),equity:e.CAS.holders[PE]??0,equityMoves:[]},
+  const view=():StockView=>({coins:purse.coins,portfolio:positions,quotes:{...quotes,LOT:{price:SHARE_PRICE,change:0,percent:0,updated:now,history:[]}},cas:{...equityQuote(e.CAS),equity:e.CAS.holders[PE]??0,equityMoves:[]},
     bank:equityQuote(e.BNK),companies:{CAS:companyView(e,e.CAS,account.name,now),BNK:companyView(e,e.BNK,account.name,now)},now})
   if(read){
     // Initial offering is created on first read even when using the application without its scheduler.

@@ -12,6 +12,7 @@ import {PlayerMotion,type PlayerSample} from './player-motion.ts'
 import {CityLighting} from './city-lighting.ts'
 import {CityAssets} from './city-assets.ts'
 import {resultRotation,v} from '../casino/scene/geometry.ts'
+import {guestFloor} from './resort.ts'
 import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
@@ -158,6 +159,7 @@ export class CityStage {
       this.art.seal.visible=!this.caveOpen&&next.zone!=='cave'
       this.art.grotto.visible=!this.art.seal.visible
       this.art.restaurant.update(view.restaurant)
+      this.art.resort(view,this.graphicsReady)
       const target=next.lift?.to??next.zone
       if(target.startsWith('floor:'))this.art.floor(target.slice(6))
     }
@@ -334,14 +336,14 @@ export class CityStage {
     const {x,z}=this.position
     if(this.view===this.promptedView&&x===this.promptedX&&z===this.promptedZ)return
     this.promptedView=this.view;this.promptedX=x;this.promptedZ=z
-    const zone=this.predictedHome??(this.zone?.startsWith('floor:')?this.zone:groundZone(this.position.x,this.position.z))
+    const zone=this.predictedHome??(this.zone&&(guestFloor(this.zone)||this.zone.startsWith('floor:'))?this.zone:groundZone(this.position.x,this.position.z))
     const seated=this.view?.you.boardSeat!==undefined||this.view?.you.barSeat!==undefined
     const pose=this.view?.you.homePose
     let candidate:WorldAction|undefined
     if(seated||pose)candidate={id:'stand-scenery',label:pose?.kind==='rest'?'Get up':'Stand up',x,z}
     else if(this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift){
       const points=zone==='kfc'?restaurantPoints(this.view?.restaurant,this.view?.you.dining).map(p=>({...p,...site(zone,p.x,p.z)})):
-        [...interactions(zone),...boardPoints(zone,this.view?.boardTaken),...residentialPoints(zone,this.position,this.view?.housing?.keys??[],this.view?.residential)]
+        [...interactions(zone,this.view?.housing?.keys),...boardPoints(zone,this.view?.boardTaken),...residentialPoints(zone,this.position,this.view?.housing?.keys??[],this.view?.residential)]
       let best=Infinity
       for(const point of points){
         const squared=(x-point.x)**2+(z-point.z)**2
@@ -576,9 +578,9 @@ export class CityStage {
     ctx.fillStyle='#14272d';ctx.fillRect(0,0,w,h)
     ctx.strokeStyle='#779d9151';ctx.lineWidth=1
     for(let i=-64;i<65;i+=2){const [x,z]=project(i,i);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.moveTo(0,z);ctx.lineTo(w,z);ctx.stroke()}
-    const landmarks=this.zone?.startsWith('floor:')?interactions(this.zone):[
+    const landmarks=this.zone&&(guestFloor(this.zone)||this.zone.startsWith('floor:'))?interactions(this.zone,this.view?.housing?.keys):[
       ...CITY_PORTALS.filter(p=>p.to!=='cave'||this.caveOpen).map(p=>({x:p.x,z:p.z,label:p.label||'Passage'})),
-      ...['casino','bank','exchange'].flatMap(zone=>interactions(zone as WorldZone)),
+      ...['hotel','casino','bank','exchange'].flatMap(zone=>interactions(zone as WorldZone)),
       {...site('hotel',0,-7.9),label:'Gaming floor'},
     ]
     for(const p of landmarks){const [x,y]=project(p.x,p.z);ctx.fillStyle='#8fe2b5';ctx.fillRect(x-8,y-8,16,16);ctx.fillStyle='#dfedda';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText(p.label,x,y-12)}
