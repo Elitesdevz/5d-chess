@@ -196,8 +196,10 @@ export class CityStage {
     s.sent=true;this.gesture?.(gesture)
   }
   resetTool(){if(this.station)Object.assign(this.station,{x:0,y:0,phase:0,sent:false,fillAt:0})}
-  resumeMouse(){
-    if(this.pause||!this.renderer||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||
+  private mouseLook=false
+  resumeMouse(requested=false){
+    if(requested)this.mouseLook=true
+    if(!this.mouseLook||this.pause||!this.renderer||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||
       !matchMedia('(any-pointer: fine)').matches||document.pointerLockElement===this.canvas)return
     this.lockedAt=performance.now()
     this.canvas.requestPointerLock?.()?.catch(()=>{})
@@ -291,7 +293,7 @@ export class CityStage {
     this.canvas.addEventListener('pointerdown',e=>{
       if(this.pause||!this.renderer||e.button!==0)return
       this.canvas.focus({preventScroll:true})
-      if(e.pointerType==='mouse'){this.resumeMouse();if(!this.station)return}
+      if(e.pointerType==='mouse'){this.resumeMouse(true);if(!this.station)return}
       if(this.drag)return
       this.canvas.setPointerCapture(e.pointerId);this.drag={id:e.pointerId,x:e.clientX,y:e.clientY}
     },{signal})
