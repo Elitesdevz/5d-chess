@@ -1,6 +1,10 @@
 // CACHE_NAME and FILES are emitted from the exact practice kit at build time.
 self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(FILES.map(path=>new Request(path,{cache:'reload'})))))
+  event.waitUntil((async()=>{
+    const cache=await caches.open(CACHE_NAME)
+    await cache.addAll(FILES.map(path=>new Request(path,{cache:'reload'})))
+    await self.skipWaiting()
+  })())
 })
 self.addEventListener('activate',event=>{
   event.waitUntil((async()=>{

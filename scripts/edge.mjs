@@ -18,7 +18,7 @@ export default {
       'Content-Type': type,
       'Cache-Control': 'public, max-age=0, must-revalidate',
       'X-Content-Type-Options': 'nosniff',
-      'Content-Security-Policy': "default-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+      'Content-Security-Policy': "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com 'sha256-DoIpoHN9tlbJqR6F+WhcxIOzrf+vYjyvX6l/N5KzMTU='; img-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
     }})
   }
 }
