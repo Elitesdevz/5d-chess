@@ -289,7 +289,7 @@ async function action(name:string,data:object){
     if(name==='use')await presence()
     if(closed)return
     const t=Date.now()
-    accepted(await api<WorldView>('/world/'+name,{...data,scene:true}),t,name==='resort-floor'||name==='teleport'||name==='exit-cave')
+    accepted(await api<WorldView>('/world/'+name,{...data,scene:true}),t,name==='floor'&&(data as {symbol?:string}).symbol==='residences'||name==='use'&&(data as {target?:string}).target==='exchange-lobby'||name==='resort-floor'||name==='teleport'||name==='exit-cave')
     if(name==='stand'||name==='stand-scenery'||name==='teleport')stage?.resumeMouse()
   }catch(error){showError(error instanceof Error?error.message:'City action failed');throw error}
   finally{performing=false;updateSelection()}

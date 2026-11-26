@@ -102,7 +102,7 @@ export class CityServices {
   residentialLift(zone:string,travel:(level:number)=>Promise<void>){
     const spot=residentialAt(zone)
     if(!spot||spot.building.block===undefined)return
-    this.render(RESIDENCES[spot.building.block].name,'Elevator',`<div class="world-button-row residential-bank">${[0,1,2,3,4].map(i=>`<button type="button" data-home-floor="${i}" ${i===spot.level?'disabled aria-current="location"':''}>${i||'G'}</button>`).join('')}</div>`)
+    this.render(RESIDENCES[spot.building.block].name,'Elevator',`<div class="world-button-row residential-bank">${spot.building.levels.map((_,i)=>`<button type="button" data-home-floor="${i}" ${i===spot.level?'disabled aria-current="location"':''}>${i||'G'}</button>`).join('')}</div>`)
     if(!this.dialog.open)this.dialog.showModal()
     this.host.querySelectorAll<HTMLButtonElement>('[data-home-floor]').forEach(button=>button.onclick=async()=>{
       button.disabled=true
@@ -146,9 +146,10 @@ export class CityServices {
     const render=()=>{
       const q=search.value.trim().toLowerCase()
       const matches=FLOOR_LIST.map((stock,i)=>({...stock,floor:i+1})).filter(s=>!q||s.symbol.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)||String(s.floor)===q)
-      list.innerHTML=(q?'':'<button type="button" data-floor=""><b>G</b><span>Reception</span></button>')+
+      const sky='exchange crown apartments'.includes(q)?'<button type="button" data-floor="residences"><b>PH</b><span><strong>Exchange Crown</strong><small>Apartment reception</small></span></button>':''
+      list.innerHTML=sky+(q?'':'<button type="button" data-floor=""><b>G</b><span>Reception</span></button>')+
         matches.map(s=>`<button type="button" data-floor="${s.symbol}"><b>${s.floor}</b><span><strong>${s.symbol}</strong> ${safeText(s.name)}</span><span aria-hidden="true">›</span></button>`).join('')
-      if(!matches.length)list.innerHTML='<p class="world-muted">No matching floors.</p>'
+      if(!matches.length&&!sky)list.innerHTML='<p class="world-muted">No matching floors.</p>'
     }
     search.oninput=render
     list.onclick=e=>{

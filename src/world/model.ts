@@ -6,7 +6,7 @@ import {PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
 import {vehicleContains,type TrafficView,type Vehicle} from './traffic.ts'
 import type {ResidentView} from './city-residents.ts'
 import {residentialAt,residentialHeight,residentialStep,type HomeZone,type HomePose,type ResidentialView} from './residential.ts'
-import {propertyPoints,officeObstacle,type HousingView} from './housing.ts'
+import {EXCHANGE_STOREY,propertyPoints,type HousingView} from './housing.ts'
 import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
 import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type KitchenMotion,type OrderItems} from './restaurant-model.ts'
 import {basinBed,tunnelBed,inPool,poolLevel,OASIS_MOUTH,CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,passableLand,terrainHeight} from './terrain.ts'
@@ -41,7 +41,7 @@ export const ZONE_ARRIVAL:Record<Exclude<WorldZone,GuestFloor|Gallery|HomeZone|`
   cave:{x:0,z:6.7,yaw:0},oasis:{x:.45,z:-6.2,yaw:Math.PI-.09},private:{x:0,z:0,yaw:0},
 }
 export const FLOOR_ARRIVAL={x:0,z:6,yaw:0}
-export const FLOOR_HEIGHT=6
+export const FLOOR_HEIGHT=EXCHANGE_STOREY
 export const CREDIT_ADVISOR={x:-6.86,z:3.56}
 export const FINANCIAL_ADVISOR={x:-5.47,z:2.42}
 export const BOARD_TABLE={x:0,z:3.39}
@@ -175,7 +175,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
   }
   if(openDoorway(x,z))return true
   if(Object.entries(footprint).some(([key,b])=>{const o=origins[key as Venue];return box(x,z,o.x,o.z,b.w/2+.15,b.d/2+.15)}))return false
-  if(urbanObstacle(x,z)||officeObstacle(x,z)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z))return false
+  if(urbanObstacle(x,z)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x)
     if(publicWall(room,p.x,p.z,.28))return false

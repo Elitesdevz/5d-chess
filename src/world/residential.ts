@@ -1,6 +1,6 @@
 import type {Position} from '../roulette-hall-model.ts'
 import {HOMES} from './terrain.ts'
-import {flatEdges,houseDesign,houseLevels,RESIDENCES,UNITS} from './housing.ts'
+import {flatEdges,houseDesign,houseLevels,COURTS,TOWERS,towerClerk,UNITS} from './housing.ts'
 
 export const STOREY=3.15
 export type HomeZone=`home:${string}:${number}`|`stairs:${string}:${number}`
@@ -14,7 +14,7 @@ export type HomePoint=Point&{id:string;label:string;range:number;unit?:string;do
 export type HomePose=Position&{id:string;kind:'sit'|'rest';height:number}
 type Floor={walls:Wall[];fixtures:Fixture[];doors:Door[];points:HomePoint[];units:{id:string;rect:Rect;exit:Point}[];tiles:{rect:Rect;kind:'bath'|'kitchen'|'balcony'}[]}
 type Stair={x:number;front:number;back:number;width:number}
-export type Building={id:string;x:number;z:number;facing:number;rect:Rect;levels:Floor[];style:number;block?:number;stairs?:Stair;lift?:Point}
+export type Building={id:string;x:number;z:number;facing:number;rect:Rect;levels:Floor[];style:number;block?:number;tower?:boolean;baseY?:number;stairs?:Stair;lift?:Point}
 
 const floor=():Floor=>({walls:[],fixtures:[],doors:[],points:[],units:[],tiles:[]})
 const all:Building[]=[]
@@ -49,7 +49,7 @@ function furnish(f:Floor,kind:Fixture['kind'],x:number,z:number,w:number,d:numbe
   if(kind==='counter'&&unit)f.points.push({...along(item,0,-d/2-.4,yaw),id:'drawer:'+id,label:'Open storage drawer',range:1.08,unit})
   if(kind==='fridge')f.points.push({...along(item,0,-d/2-.4,yaw),id:'fridge:'+id,label:'Open fridge',range:1.08,unit})
 }
-function plan(f:Floor,r:Rect,id:string,template:number,upper=false){
+function plan(f:Floor,r:Rect,id:string,template:number,upper=false,sideEntry=false){
   const {l,r:right,b,f:front}=r,w=right-l,row=b+(upper?3:3.18),family=template===2
   const split=l+w*(family?.5:.57)
   const interior=(label:string,at:number,reverse?:boolean)=>door(at,id+'-'+label,undefined,reverse)
@@ -88,7 +88,8 @@ function plan(f:Floor,r:Rect,id:string,template:number,upper=false){
   if(family&&w>7)fixture('media',l+2.32,front-.27,1.25,.39,Math.PI)
   const kitchenFront=family?row+2.25:row
   const run=Math.min(1.72,front-kitchenFront-1.04)
-  fixture('counter',right-.34,kitchenFront+run/2+.09,run,.58,Math.PI/2)
+  if(sideEntry)fixture('counter',right-1.75,front-.36,run,.58)
+  else fixture('counter',right-.34,kitchenFront+run/2+.09,run,.58,Math.PI/2)
   fixture('fridge',right-.4,front-.52,.67,.7,Math.PI/2)
   if(!family&&w>=5.7&&depth>=3.52){
     const tx=template===1?k+.62:right-1.83,tz=front-(template===1?.39:1.6)
@@ -113,7 +114,7 @@ function stairWalls(f:Floor,s:Stair,level:number,last:number){
     ...(level>0?[{kind:'lift' as const,at:x+width/2,width:width-.18}]:[]),
   ])
 }
-for(const [block,place] of RESIDENCES.entries()){
+for(const [block,place] of COURTS.entries()){
   const rect=bounds(-10.4,10.4,-8.5,7.1)
   // The switchback runs towards the street. The hallway is on the north side.
   const stair={x:-8.05,front:1.55,back:6.61,width:1.68}
@@ -163,6 +164,36 @@ for(const [block,place] of RESIDENCES.entries()){
   }
   all.push({id,...place,facing:1,rect,levels,style:block,block,stairs:stair,lift})
 }
+for(const [i,t] of TOWERS.entries()){
+  const block=COURTS.length+i,id='block-'+block,rect=bounds(-t.w/2,t.w/2,4.6-t.d,4.6)
+  const lift={x:rect.r-1.35,z:3.02},levels=Array.from({length:t.levels},floor)
+  const split=rect.r-2.87
+  for(const [level,f] of levels.entries()){
+    const front=level||t.baseY?[win(-t.w*.25),win(t.w*.14,1.08)]:[door(0,id+'-street'),win(-t.w*.31,1.38)]
+    shell(f,rect,front,[win(-t.w*.26,1.52),win(t.w*.22,1.36)],true)
+    for(const x of [lift.x-1.12,lift.x+1.12])wall(f,'z',x,2.03,4.42)
+    wall(f,'x',4.42,lift.x-1.12,lift.x+1.12)
+    wall(f,'x',2.03,lift.x-1.12,lift.x+1.12,[{kind:'lift',at:lift.x,width:1.53}])
+    f.points.push({id:'call:'+id,x:lift.x-1.03,z:1.61,label:'Call elevator',range:1.03},
+      {id:'lift:'+id,...lift,label:'Use elevator',range:.99})
+    if(level===0){
+      furnish(f,'desk',towerClerk.x,towerClerk.z+.84,2.26,.76,Math.PI)
+      furnish(f,'sofa',rect.l+.54,1.37,1.75,.80,-Math.PI/2)
+      furnish(f,'mail',rect.r-.26,-.86,1.15,.41,Math.PI/2)
+      furnish(f,'plant',rect.l+.53,rect.b+.61,.62,.62)
+      if(t.baseY)f.points.push({id:'exchange-lobby',label:'Take the express lift to reception',x:0,z:rect.b+.85,range:1.30})
+    }else{
+      const u=UNITS.find(u=>u.block===block&&u.floor===level)!
+      const unit=bounds(rect.l,split,rect.b,rect.f),entry=1.02
+      wall(f,'z',split,rect.b,rect.f,[door(entry,u.id,u.id)])
+      f.units.push({id:u.id,rect:unit,exit:{x:split+.66,z:entry}})
+      plan(f,unit,u.id,0,false,true)
+      furnish(f,'plant',rect.r-.49,rect.b+.58,.53,.53)
+    }
+  }
+  all.push({id,x:t.x,z:t.z+t.d/2-rect.f,facing:1,rect,levels,style:t.style,block,lift,tower:true,baseY:t.baseY})
+}
+
 for(const [i,[x,z]] of HOMES.entries()){
   const u=UNITS[i],style=houseDesign(i),levels=Array.from({length:houseLevels(i)},floor)
   const rect=style===3?bounds(-3.14,3.14,-4.1,3.35):bounds(-2.94,2.94,-3.85,3.35),id=u.id
@@ -207,7 +238,7 @@ export function residentialAt(zone:string){
   if(building&&f)return {building,level,f,stairs:kind==='stairs'}
 }
 export function streetBuilding(x:number,z:number,pad=0){
-  return all.find(b=>Math.abs(x-b.x)<12&&Math.abs(z-b.z)<10&&contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad))
+  return all.find(b=>!b.baseY&&Math.abs(x-b.x)<12&&Math.abs(z-b.z)<10&&contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad))
 }
 export function stairHeight(b:Building,z:number,side:number){
   const s=b.stairs!,t=Math.max(0,Math.min(1,((z-s.front)/(s.back-s.front)-.045)/.74))
@@ -217,7 +248,7 @@ export function residentialHeight(zone:string,x:number,z:number){
   const a=residentialAt(zone)
   if(!a)return
   const {building:b,level,stairs}=a
-  return level*STOREY+(stairs?stairHeight(b,(z-b.z)*b.facing,(x-b.x)*b.facing-b.stairs!.x):0)
+  return (b.baseY??0)+level*STOREY+(stairs?stairHeight(b,(z-b.z)*b.facing,(x-b.x)*b.facing-b.stairs!.x):0)
 }
 export interface LiftState {level:number;to?:number;started?:number;ends?:number;opened:number}
 export interface ResidentialView {doors:Record<string,number>;lifts:Record<string,LiftState>;fridge?:string;fridges?:string[]}
@@ -255,6 +286,7 @@ function doorHit(d:Door,x:number,z:number,angle:number,radius=.205){
   return end>-radius&&end<d.width+radius&&Math.abs(normal)<.047+radius
 }
 export function residentialOccludes(b:Building,x:number,y:number,z:number,state:ResidentialView|undefined,now:number){
+  y-=b.baseY??0
   const level=Math.floor((y+.10)/STOREY),f=b.levels[level]
   if(!contains(b.rect,x,z,.14)||y<0||level>b.levels.length)return false
   const s=b.stairs,inStairwell=s&&Math.abs(x-s.x)<s.width&&z>=Math.min(s.front,s.back)&&z<=Math.max(s.front,s.back)
@@ -308,7 +340,7 @@ export function residentialStep(zone:string,x:number,z:number,keys:readonly stri
     return Math.abs(p.x)<item.w/2+radius*.83&&Math.abs(p.z)<item.d/2+radius*.83
   }))return false
   if(contains(b.rect,dx,dz)||f.tiles.some(t=>t.kind==='balcony'&&contains({...t.rect,b:t.rect.b+.22,l:t.rect.l+.22,r:t.rect.r-.22,f:t.rect.f+.25},dx,dz)))return homeZone(b.id,level)
-  return previous&&level>0?false:'city'
+  return previous&&(level>0||b.baseY)?false:'city'
 }
 export function residentialPoints(zone:string,position:Point,keys:readonly string[],state?:ResidentialView):HomePoint[]{
   const found=residentialAt(zone)

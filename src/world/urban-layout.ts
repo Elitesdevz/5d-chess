@@ -2,7 +2,6 @@ import {entrances,threshold,footprint,origins,type Venue} from './civic-venues.t
 import {circle,distance,facade,LANDMARKS,nearestSidewalk,onRoad,PARK_FEATURES,PARKING,PARKS,PLACES,point,pond,railZ,STREETS,type Point} from './city-plan.ts'
 import {BUILDINGS,contains,residentialSite,type HomePoint} from './residential.ts'
 import {SIGNAL_HEADS} from './traffic.ts'
-import {OFFICES} from './housing.ts'
 import {BOULEVARD_TREES,HOMES,MARKET,homeFacing} from './terrain.ts'
 
 export type Footpath={id:string;points:Point[];width:number;purpose:'entry'|'walk'|'park'|'drive'}
@@ -14,8 +13,8 @@ export function homeStreet(x:number,z:number,facing=homeFacing(z)){
   return STREETS.find(s=>s.id===(x>0&&id==='linden'?'glass':x>0&&id==='westbank'?'eastbank':id))!
 }
 export const ENTRANCES=[
-  ...BUILDINGS.map(b=>{
-    const at=residentialSite(b,0,b.rect.f),road=b.block===undefined?homeStreet(b.x,b.z,b.facing):STREETS.find(s=>s.id===(b.block===2?'civic':b.x<0?'westbank':'eastbank'))!
+  ...BUILDINGS.filter(b=>!b.baseY).map(b=>{
+    const at=residentialSite(b,0,b.rect.f),road=b.block===undefined?homeStreet(b.x,b.z,b.facing):STREETS.find(s=>s.id===(b.tower?(b.x>0?'glass':b.z>14?'garden':'west'):b.block===2?'civic':b.x<0?'westbank':'eastbank'))!
     return {...at,id:b.id,front:residentialSite(b,0,b.rect.f+.87),road}
   }),
   ...Object.entries(entrances).map(([key,front])=>({...threshold(key as Venue,0),id:key==='station'?'police':key,front,road:STREETS.find(s=>s.id==='civic')!})),
@@ -74,8 +73,7 @@ function add(kind:StreetProp['kind'],x:number,z:number,yaw:number,radius:number,
 function solidStructure(x:number,z:number,pad:number){
   if(Object.entries(footprint).some(([id,f])=>{const o=origins[id as Venue];return Math.abs(x-o.x)<f.w/2+pad&&Math.abs(z-o.z)<f.d/2+pad}))return true
   if(LANDMARKS.some(b=>Math.abs(x-b.x)<b.w/2+pad&&Math.abs(z-b.z)<b.d/2+pad))return true
-  if(OFFICES.some(b=>Math.abs(x-b.x)<b.w/2+pad&&Math.abs(z-b.z)<b.d/2+pad))return true
-  if(BUILDINGS.some(b=>contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad)))return true
+  if(BUILDINGS.some(b=>!b.baseY&&contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad)))return true
   return [[0,-14.78,9.55,7.9],[0,-31.58,11.3,8.9],[-24,-2.3,10.3,7.5],[24,-2.5,8.2,7.6],[63,-.65,6.4,7]].some(([a,b,c,d])=>Math.abs(x-a)<c+pad&&Math.abs(z-b)<d+pad)
 }
 for(const [index,s] of STREETS.entries()){

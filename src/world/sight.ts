@@ -6,7 +6,6 @@ import {BUILDINGS,residentialOccludes,type ResidentialView} from './residential.
 import {center,ROOMS,venues} from './resort.ts'
 import {FLEET,LANDMARKS,urbanGround} from './city-plan.ts'
 import {STREET_PROPS} from './urban-layout.ts'
-import {OFFICES} from './housing.ts'
 import {terrainHeight,townFixture,treeObstacle} from './terrain.ts'
 import {vehicleContains,type Vehicle} from './traffic.ts'
 
@@ -14,7 +13,7 @@ type Actor={x:number;z:number;zone:string;height?:number}
 type Scene={residential?:ResidentialView;vehicles?:readonly Vehicle[];keys:readonly string[];caveOpen?:boolean}
 export const actorHeight=(p:Actor)=>p.height??walkingHeight(p.zone as WorldZone,p.x,p.z)
 export const actorDistance=(a:Actor,b:Actor)=>Math.hypot(b.x-a.x,b.z-a.z,actorHeight(b)-actorHeight(a))
-const staticBlocks=[...LANDMARKS.filter(b=>b.id!=='police'),...OFFICES]
+const staticBlocks=LANDMARKS.filter(b=>b.id!=='police')
 const civicVenues=['station','gunshop'] as const
 const leaves={station:doorLeaves('station'),gunshop:doorLeaves('gunshop')}
 function civicBlock(id:Venue,x:number,y:number,z:number){

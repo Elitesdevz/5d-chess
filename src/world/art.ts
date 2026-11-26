@@ -3,7 +3,6 @@ import {armoryClerk,bankStaff,hotelStaff,exchangeStaff,casinoStaff,floorStaff} f
 import {arcadeBuildings} from './arcade-art.ts'
 import {urbanArt} from './urban-art.ts'
 import {basinBed,tunnelBed,poolLevel} from './terrain.ts'
-import {district} from './district.ts'
 import {ownershipSegments} from './company-desk.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {salonBar} from './salon-bar.ts'
@@ -649,7 +648,6 @@ export function makeWorldArt(open:boolean){
   scene.add(skylight)
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());contactShade(scene);const water=fountain(scene),{wind,seal}=landscape(scene)
-  district(scene)
   const civic=arcadeBuildings(scene,(parent,text,size,point,fg,bg)=>banner(parent,text,size,point,fg,bg,true))
   const homes=residentialArt(scene,banner),urban=urbanArt(scene,banner)
   const ambient=(time:number)=>{water(time);wind(time);poolRipples(time)}
