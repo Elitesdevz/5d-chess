@@ -1,6 +1,5 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {createServer} from 'node:http'
 import {mkdtemp,rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
@@ -13,7 +12,7 @@ import {CRATES} from '../src/collection.ts'
 test('case archive descriptions are unique and odds round without rounding tiny probabilities to zero',()=>{assert.equal(new Set(CRATES.map(c=>CASE_DESCRIPTIONS[c.id])).size,CRATES.length);assert.ok(CRATES.every(c=>CASE_DESCRIPTIONS[c.id]?.length>30));assert.equal(caseOdds(123456),'12.35%');assert.equal(caseOdds(1),'＜0.01%');assert.equal(caseOdds(0),'0%')})
 test('desktop and phone players share a table and see the same draw',async t=>{
  const dir=await mkdtemp(join(tmpdir(),'roulette-room-'))
- const store=new ChessStore(dir),app=createApplication(store),server=createServer(app.handle)
+ const store=new ChessStore(dir),app=createApplication(store),server=app.createServer()
  await new Promise(r=>server.listen(0,'127.0.0.1',r))
  const base='http://127.0.0.1:'+server.address().port
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']})

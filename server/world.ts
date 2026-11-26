@@ -194,13 +194,13 @@ export class CityWorlds {
     this.step(now)
     this.arcade.active(name,now)
     const bookings=roster(this.store,now),booking=bookings.find(b=>b.user===name)
-    if(booking&&action!=='presence')fail(423,'In custody at Meridian Police')
+    if(booking&&action!=='presence'&&action!=='observe')fail(423,'In custody at Meridian Police')
     const account=this.store.rouletteWallet(name)??fail(401,'Log in first')
     const open=(account.coins??0)>=1&&account.caveDay!==dayKey(now)
     const avatar=account.avatar??'default'
     let world=this.occupants.get(name)
     if(!world){
-      if(action!=='presence'&&action!=='teleport'&&!(action==='exit-cave'&&account.caveActive))fail(409,'Join the city first')
+      if(action!=='observe'&&action!=='presence'&&action!=='teleport'&&!(action==='exit-cave'&&account.caveActive))fail(409,'Join the city first')
       world=this.enter(name,avatar,account.caveActive?'private':'city',now)
     }
     const me=world.members.get(name)!
@@ -227,8 +227,8 @@ export class CityWorlds {
       if(b.block===undefined)me.zone='city'
       delete me.homePose;delete me.homeExit;me.interaction=undefined
     }
-    if(me.zone==='private'&&action!=='presence'&&action!=='exit-cave'&&action!=='teleport')fail(409,'Leave the room first')
-    if(me.lift&&action!=='presence'&&action!=='teleport')fail(409,'Wait for the elevator to arrive')
+    if(me.zone==='private'&&action!=='observe'&&action!=='presence'&&action!=='exit-cave'&&action!=='teleport')fail(409,'Leave the room first')
+    if(me.lift&&action!=='observe'&&action!=='presence'&&action!=='teleport')fail(409,'Wait for the elevator to arrive')
     let resort:ResortView|undefined
     let hall:HallView|undefined,food:ReturnType<typeof residentialFood>|undefined
     const movement=action==='presence'?data:data.movement as Record<string,unknown>|undefined
@@ -248,8 +248,7 @@ export class CityWorlds {
         this.walkthrough(world,me,zone,open,now)
       }
     }
-    if(action==='presence'){/* Movement was applied above. */
-    }else if(action==='close-resort'){
+    if(action==='close-resort'){
       if(me.interaction===data.station&&me.interaction?.startsWith('resort:'))me.interaction=undefined
     }else if(action==='resort-floor'){
       const to=data.floor
@@ -401,7 +400,7 @@ export class CityWorlds {
     }else if(action==='stand'||action==='bet'){
       if(me.zone!=='casino')fail(409,'Visit the casino to use a table')
       hall=this.roulette.update(name,action,data,now,{id:world.id,position:this.boundPosition(me)})
-    }else if(action!=='arcade')fail(404,'Unknown city action')
+    }else if(action!=='arcade'&&action!=='presence'&&action!=='observe')fail(404,'Unknown city action')
     if(me.kitchenMotion&&!me.interaction?.startsWith('kfc:kitchen:'))delete me.kitchenMotion
     if(me.zone==='casino'){
       hall??=this.roulette.update(name,'presence',{},now,{id:world.id,position:this.boundPosition(me)})

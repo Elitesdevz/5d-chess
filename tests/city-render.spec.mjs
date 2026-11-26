@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import {readdir} from 'node:fs/promises'
-import {createServer} from 'node:http'
 import test from 'node:test'
 import {chromium} from 'playwright'
 import {createApplication} from '../server/application.ts'
@@ -8,7 +7,7 @@ import {CityLife} from '../server/city-life.ts'
 import {ChessStore} from '../server/storage.ts'
 
 test('turning from a quiet street toward city lights reuses prepared shaders', {timeout:105_000},async()=>{
-  const store=new ChessStore('.',{memory:true}),app=createApplication(store),server=createServer(app.handle)
+  const store=new ChessStore('.',{memory:true}),app=createApplication(store),server=app.createServer()
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
   let browser
   try{

@@ -6,7 +6,7 @@ import {roster,custodyView,puzzleAction,publicView} from './custody.ts'
 import {UsageStore,usagePath,usageApi,serverUsage,drainEconomyUsage,worldEconomyUsage} from './telemetry.ts'
 import {puzzleApi} from './puzzles.ts'
 import {AiScheduler} from './ai-scheduler.ts'
-import type {IncomingMessage, ServerResponse} from 'node:http'
+import {createServer,type IncomingMessage,type ServerResponse} from 'node:http'
 import type {ChessStore} from './storage.ts'
 import {body, checkOrigin, fail, json} from './http.ts'
 import {LoginLimiter, user} from './security.ts'
@@ -16,6 +16,7 @@ import {accountApi} from './account-api.ts'
 import {economyApi} from './economy-api.ts'
 import {gameApi} from './game-api.ts'
 import {eloApi} from './elo-gambling.ts'
+import {CityLive} from './world/live.ts'
 import {CityWorlds} from './world.ts'
 import {RouletteHall} from './roulette-hall.ts'
 import {StockHistory} from './stock-history.ts'
@@ -45,7 +46,12 @@ export function createApplication(store: ChessStore) {
   const ai=new AiScheduler(store)
   const roulette=new RouletteHall(store)
   const city=new CityWorlds(store,roulette)
-  const worldTimer=setInterval(()=>{try{city.step(Date.now())}catch(error){console.error('City tick failed',error)}},50)
+  const live=new CityLive((name,action,data)=>{
+    const view=city.update(name,action,data)
+    if(action==='use'||action==='floor')worldEconomyUsage(usage,store,name,action,view)
+    return publicView({...view,mapVersion:mapRelease.version},roster(store,Date.now())) as typeof view
+  },req=>user(store,req),mapRelease.version)
+  const worldTimer=setInterval(()=>{try{const now=Date.now();city.step(now);live.tick(now)}catch(error){console.error('City tick failed',error)}},50)
   worldTimer.unref()
   const stockHistory=new StockHistory()
   ai.kick()
@@ -55,7 +61,8 @@ export function createApplication(store: ChessStore) {
   const noticeTimer=setInterval(cleanNotices,60*1000);noticeTimer.unref()
   let draining = false
   return {
-    drain: () => {draining = true;clearInterval(worldTimer);clearInterval(resortTimer);ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
+    createServer(){const server=createServer(this.handle);live.attach(server);return server},
+    drain: () => {draining = true;live.close();clearInterval(worldTimer);clearInterval(resortTimer);ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       const started=Date.now();let actor:string|undefined,pathForUsage='',methodForUsage=req.method??'GET',beforeUsage:{coins?:number;elo?:number}|undefined
       const logUsage=(status:number)=>{try{serverUsage(usage,store,actor,pathForUsage,methodForUsage,status,started,typeof req.headers['x-client-trace']==='string'?req.headers['x-client-trace']:undefined,typeof req.headers['x-ui-action']==='string'?req.headers['x-ui-action']:undefined,beforeUsage)}catch{/* Diagnostics must not change an API response. */}}

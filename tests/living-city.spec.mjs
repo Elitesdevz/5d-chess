@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict'
-import {createServer} from 'node:http'
 import test from 'node:test'
 import {chromium} from 'playwright'
 import {createApplication} from '../server/application.ts'
@@ -11,7 +10,7 @@ test('two browser sessions can walk into the civic quarter and observe the same 
   const clock=Date.now
   let now=Math.floor(clock()/3600000)*3600000+14*150000
   Date.now=()=>now
-  const store=new ChessStore('.',{memory:true}),app=createApplication(store),server=createServer(app.handle)
+  const store=new ChessStore('.',{memory:true}),app=createApplication(store),server=app.createServer()
   await new Promise(r=>server.listen(0,'127.0.0.1',r))
   let browser
   try{

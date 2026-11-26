@@ -1,3 +1,4 @@
+import {commandResult,observeWire} from './live-wire.mjs'
 import {readdir} from 'node:fs/promises'
 import assert from 'node:assert/strict'
 import {cityRoute} from '../server/city-life.ts'
@@ -5,6 +6,7 @@ import {cityRoute} from '../server/city-life.ts'
 // Observe the real stage being driven by the ordinary world client. All movement
 // goes through browser controls, prediction, presence, and server collision.
 export async function observeCity(page){
+  observeWire(page)
   const stage=(await readdir('dist/chess/chunks')).find(f=>/^stage-.*\.js$/.test(f))
   await page.route('**/chess/world.js',async route=>{
     const response=await route.fetch()
@@ -77,7 +79,7 @@ export function browserWalker(page,touch=false){
       return !s.pause&&s.nearest?.id===id&&Math.hypot(s.position.x-q.x,s.position.z-q.z)<.20
     }
     await page.waitForFunction(ready,id,{timeout:9500})
-    const response=page.waitForResponse(r=>r.url().endsWith('/api/world/use'),{timeout:6000})
+    const response=commandResult(page,'use')
     if(touch)await page.locator('[data-world-use]').tap()
     else await page.keyboard.press('e')
     const result=await response.catch(async error=>{
@@ -87,8 +89,9 @@ export function browserWalker(page,touch=false){
       })
       throw Error(id+' '+JSON.stringify(state),{cause:error})
     })
-    assert.ok(result.ok(),id+' '+await result.text())
-    assert.equal(result.request().postDataJSON().target,id)
+    assert.equal(result.status,200,result.message)
+    assert.equal(result.request.data.target,id)
+    return result
   }
   return {walk,outside,use}
 }
