@@ -6,7 +6,8 @@ import {CityWorlds} from '../server/world.ts'
 import {pack} from '../server/city-inventory.ts'
 import {BITE_MS} from '../src/world/food.ts'
 import {storefront,storefrontPoints} from '../src/world/storefronts.ts'
-import {outdoorWalkable,site,walkingHeight} from '../src/world/model.ts'
+import {LANDMARKS,frontage} from '../src/world/city-plan.ts'
+import {outdoorWalkable,site,walkingHeight,worldMove} from '../src/world/model.ts'
 import {buildingById,homeZone,residentialSite} from '../src/world/residential.ts'
 import {crownBlock,TOWERS,UNITS} from '../src/world/housing.ts'
 
@@ -27,6 +28,16 @@ function guest(t){
   act('presence')
   return {db,act,walk,reconnect}
 }
+
+test('every town storefront has a continuous walk from pavement to counter',()=>{
+  for(const b of LANDMARKS.filter(b=>b.id!=='police')){
+    const [outside,desk]=storefrontPoints.filter(p=>p.id==='front:'+b.id)
+    const start=frontage(b,1.15),arrive=worldMove('city',{...start,yaw:0},desk.x,desk.z,15)
+    assert.ok(Math.hypot(arrive.x-desk.x,arrive.z-desk.z)<.01,b.name)
+    const leave=worldMove('city',arrive,outside.x,outside.z,15)
+    assert.ok(Math.abs(leave.z-outside.z)<.01,b.name+' exit')
+  }
+})
 
 test('street counters require a visit and a hotbar bite settles once across reconnection',t=>{
   for(const p of storefrontPoints)assert.ok(outdoorWalkable(p.x,p.z),p.id)

@@ -1,3 +1,4 @@
+import {counterInterior} from './storefronts.ts'
 import {entrances,threshold,footprint,origins,type Venue} from './civic-venues.ts'
 import {circle,distance,facade,LANDMARKS,nearestSidewalk,onRoad,PARK_FEATURES,PARKING,PARKS,PLACES,point,pond,railZ,STREETS,type Point} from './city-plan.ts'
 import {BUILDINGS,contains,residentialSite,type HomePoint} from './residential.ts'
@@ -119,7 +120,7 @@ const hardscape=[
   ...[-3.75,-2.5,0,2.5,3.75].map(dx=>({x:PARK_FEATURES.fuel.x+dx,z:PARK_FEATURES.fuel.z,w:.32,d:.41})),
 ]
 export function urbanObstacle(x:number,z:number){
-  if(LANDMARKS.some(b=>Math.abs(x-b.x)<b.w/2+.20&&Math.abs(z-b.z)<b.d/2+.20))return true
+  if(LANDMARKS.some(b=>b.id!=='police'&&counterInterior(b,x,z,.42,.20)))return true
   if(Math.hypot(x-circle.x,z-circle.z)<circle.radius-circle.width/2-.25)return true
   const p=point(x,z)
   if(hardscape.some(b=>Math.abs(x-b.x)<b.w+.16&&Math.abs(z-b.z)<b.d+.16))return true

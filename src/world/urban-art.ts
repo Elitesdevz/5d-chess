@@ -4,7 +4,7 @@ import {circle,FLEET,LANDMARKS,PARK_FEATURES,PARKING,PARKS,pond,railZ,STREETS,ty
 import {JUNCTIONS,SIGNAL_HEADS,type TrafficView,type Vehicle} from './traffic.ts'
 import {coachwork} from './coachwork.ts'
 import {batchOpaque} from '../casino/scene/static-batch.ts'
-import {STOREFRONTS} from './storefronts.ts'
+import {counterLayout,STOREFRONTS} from './storefronts.ts'
 import {STREET_PROPS} from './urban-layout.ts'
 import type {Letter} from './residential-art.ts'
 import {TERRAIN_EXTENT,terrainHeight} from './terrain.ts'
@@ -72,12 +72,21 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
     p.box(x,y,z+.062,.034,height,.046,edge)
     p.box(x,y-height/2,z+.137,width+.18,.078,.25,edge)
   }
-  const door=(x=0,width=1.7)=>{
-    reveal(x,1.18,front+.015,width,2.24,accent,0x40585a)
-    for(const dx of [-.17,.17])p.box(x+dx,1.09,front+.12,.045,.22,.05,0xbfa779)
-  }
-  p.box(0,.10,0,w+.15,.20,d+.16,trim)
-  p.box(0,h*.5,0,w,h,d,wall)
+  const publicRoom=b.id!=='police'
+  if(publicRoom){
+    const entry=b.id==='fire'?1.38:.77
+    p.box(0,-.018,0,w,.085,d,trim)
+    p.box(0,h*.5,-front,w,h,.15,wall)
+    for(const side of [-1,1]){
+      p.box(side*(w/2-.062),h*.5,0,.125,h,d,wall)
+      const wing=w/2-entry
+      p.box(side*(entry+wing/2),h*.5,front,wing,h,.15,wall)
+      p.box(side*(entry+.02),1.15,front+.025,.085,2.3,.22,accent)
+    }
+    p.box(0,(h+2.29)/2,front,entry*2,h-2.29,.15,wall)
+    p.box(0,2.31,front+.03,2*entry+.12,.11,.23,accent)
+    counterRoom(g,p,b,label,accent)
+  }else p.box(0,h/2,0,w,h,d,wall)
   p.box(0,h-.06,0,w+.22,.20,d+.25,accent)
   p.box(0,h+.12,0,w+.38,.14,d+.42,trim)
   const upper=Math.max(0,Math.floor((h-3.3)/2.2))
@@ -97,7 +106,6 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
       p.box(side*(w/2+.104),y-.67,z,.19,.085,1.37,trim)
     }
   }
-  if(b.id!=='fire')door(0,b.id==='hall'?2.57:b.id==='market'?2.8:1.8)
   if(b.id!=='station')p.slab(0,front+.48,w,.98,0xad9f87,-.008)
   const entranceSignWidth=Math.min(w-.4,w*.84,b.id==='hall'?7:8.2)
   const entranceSignHeight=w>8?.55:.42
@@ -130,6 +138,7 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
   }else if(b.id==='fire'){
     for(const x of [-4.55,-.69,3.22]){
       const z=front+.065
+      if(x===-.69){p.box(0,2.94,z,3.37,.69,.13,metal);continue}
       p.box(x,1.65,z,3.35,3.23,.11,0xc1bfb0)
       for(let i=0;i<13;i++)p.box(x,.15+i*.245,z+.071,3.20,.017,.043,coal)
       p.box(x,2.34,z+.102,2.4,.38,.037,0x6d9199)
@@ -258,6 +267,79 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
     for(let i=0;i<3;i++)p.box(x,h+.358,-d*.25+(i-1)*.12,.45,.035,.045,metal)
   }
   p.finish(g)
+}
+function counterRoom(g:T.Group,p:Props,b:Landmark,label:Letter,accent:number){
+  const {w,d,h}=b,back=-d/2,ceiling=Math.min(3.1,h-.19)
+  const {counterW,counterZ,shelfX,benchX,benchZ,bench}=counterLayout(b)
+  const care=['hospital','fire','pharmacy'].includes(b.id),food=['bakery','market','petrol','restaurant','cafe'].includes(b.id)
+  const floor=care?0xdce2d7:food?0xc6ac88:0xaf9477
+  p.box(0,.006,0,w-.13,.052,d-.13,floor)
+  p.box(0,ceiling,0,w-.08,.09,d-.09,0xe5dcc9)
+  for(let x=-w/2+.54;x<w/2-.05;x+=.56)p.box(x,.035,0,.012,.004,d-.13,0x968c79)
+  for(let z=back+.53;z<d/2-.05;z+=care?.56:1.64)p.box(0,.036,z,w-.13,.005,.01,0x968c79)
+  for(const side of [-1,1]){
+    p.box(side*(w/2-.10),.46,0,.07,.90,d-.15,accent)
+    p.box(side*(w/2-.14),.94,0,.07,.055,d-.15,wood)
+  }
+  p.box(0,.47,counterZ,counterW,.86,.57,accent)
+  p.box(0,.93,counterZ,counterW+.06,.10,.65,care?cream:wood)
+  const panels=Math.max(3,Math.round(counterW/.45))
+  for(let i=0;i<panels;i++)p.box((i+.5-panels/2)*counterW/panels,.45,counterZ+.298,counterW/panels-.045,.68,.045,wood)
+  p.box(-counterW*.28,1.029,counterZ,.29,.085,.24,coal)
+  p.box(-counterW*.28,1.172,counterZ-.04,.26,.21,.04,coal)
+  p.box(-counterW*.28,1.17,counterZ-.012,.20,.145,.012,0x87b4ac)
+  const boardW=Math.min(2.25,w*.53)
+  p.box(0,2.13,back+.12,boardW+.13,.81,.062,wood)
+  label(g,b.name,[boardW,.69],[0,2.13,back+.159],'#ffefd0','#344d49')
+  for(const y of [.69,1.25,1.81]){
+    p.box(shelfX,y,0,.39,.052,d*.52,wood)
+    for(let j=0;j<6;j++){
+      const z=(j-2.5)*d*.078,col=[cream,accent,0xb77e59,0x748e85][(j+Math.round(y*4))%4]
+      if(b.id==='bakery'){
+        p.orb(shelfX+.04,y+.097,z,.23,.14,.21,0xe0ae6d)
+        for(const dz of [-.05,.04])p.box(shelfX+.04,y+.154,z+dz,.12,.013,.018,cream,.2)
+      }else if(b.id==='florist'){
+        p.post(shelfX,y+.10,z,.13,.16,.13,0xb97b59)
+        p.orb(shelfX+.03,y+.23,z,.22,.16,.22,leaf);p.orb(shelfX+.055,y+.32,z,.11,.12,.11,col)
+      }else if(b.id==='books'||b.id==='hall'||b.id==='school'||b.id==='office'){
+        p.box(shelfX,y+.17,z,.22,.28+(j%3)*.037,.096,col)
+        p.box(shelfX+.115,y+.22,z,.011,.033,.072,cream)
+      }else if(care||b.id==='barber'){
+        p.post(shelfX,y+.13,z,.114,.21,.114,col);p.post(shelfX,y+.257,z,.078,.042,.078,coal)
+      }else {
+        p.box(shelfX,y+.14,z,.18,.23,.16,col);p.box(shelfX+.094,y+.14,z,.014,.083,.125,cream)
+      }
+    }
+  }
+  if(bench){
+    p.box(benchX,.23,benchZ,.43,.37,1.22,wood)
+    p.box(benchX,.45,benchZ,.58,.13,1.41,accent)
+    p.box(benchX+.255,.70,benchZ,.095,.49,1.4,accent)
+    for(const z of [-.63,.63])p.box(benchX,.55,benchZ+z,.52,.073,.065,wood)
+  }
+  for(const x of (w>7?[-w*.28,0,w*.28]:[0])){
+    p.post(x,ceiling-.20,.34,.034,.35,.034,coal)
+    p.post(x,ceiling-.39,.34,.47,.13,.47,accent)
+    p.post(x,ceiling-.465,.34,.40,.026,.40,light)
+  }
+  const cx=counterW*.23
+  if(b.id==='cafe'||b.id==='restaurant'){
+    p.box(cx,1.23,counterZ-.12,.51,.43,.31,metal)
+    p.box(cx,1.21,counterZ+.047,.42,.18,.038,coal)
+    for(const x of [-.12,.12]){p.post(cx+x,1.033,counterZ+.10,.101,.11,.101,cream);p.post(cx+x,1.16,counterZ+.075,.033,.09,.033,metal)}
+  }else if(b.id==='school'){
+    for(let i=0;i<8;i++)for(let j=0;j<8;j++)p.box(cx+(i-3.5)*.061,.989,counterZ+(j-3.5)*.061,.06,.013,.06,(i+j)%2?coal:cream)
+    for(let i=0;i<6;i++)p.post(cx+(i-2.5)*.061,1.046,counterZ+(i%2?.15:-.15),.038,.10,.038,i%2?coal:cream)
+  }else if(care){
+    p.box(cx,1.14,counterZ,.41,.32,.23,cream)
+    p.box(cx,1.14,counterZ+.12,.066,.19,.018,0xa8554d);p.box(cx,1.14,counterZ+.13,.19,.059,.018,0xa8554d)
+  }else if(b.id==='barber'){
+    p.box(cx,1.58,back+.11,.73,1.18,.09,wood)
+    p.box(cx,1.58,back+.173,.65,1.10,.045,0xa8c1bf)
+  }else if(b.id==='bakery'||b.id==='market'){
+    p.box(cx,1.0,counterZ,.62,.045,.37,cream)
+    for(let i=0;i<6;i++)p.orb(cx+((i%3)-1)*.17,1.078,counterZ+(Math.floor(i/3)-.5)*.14,.16,.12,.14,b.id==='bakery'?0xc99a61:i%2?0xb96849:0x92a165)
+  }
 }
 function railway(parent:T.Object3D,label:Letter){
   const trackside=new T.Group();trackside.name='Railway';parent.add(trackside)

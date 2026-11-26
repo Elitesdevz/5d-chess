@@ -1,5 +1,6 @@
 // Arcade visibility is measured in city coordinates. A room label supplies an
 // actor's elevation, while architecture and door positions determine occlusion.
+import {counterInterior} from './storefronts.ts'
 import {buildings,FLOOR_HEIGHT,FLOOR_LIST,localSite,PLAN,publicWall,groundZone,walkingHeight,type WorldZone} from './model.ts'
 import {doorLeaves,footprint,front,origins,rise,stair,shopCases,type Venue} from './civic-venues.ts'
 import {BUILDINGS,residentialOccludes,type ResidentialView} from './residential.ts'
@@ -75,7 +76,7 @@ export function clearSight(a:Actor,b:Actor,state:Scene,now:number){
     }
     if(civic.some(id=>civicBlock(id,x-origins[id].x,y,z-origins[id].z)))return false
     if(homes.some(h=>residentialOccludes(h,(x-h.x)*h.facing,y,(z-h.z)*h.facing,state.residential,now)))return false
-    if(blocks.some(p=>y>=0&&y<p.h&&Math.abs(x-p.x)<p.w/2&&Math.abs(z-p.z)<p.d/2))return false
+    if(blocks.some(p=>counterInterior(p,x,z,y,0)))return false
     if(cars.some(v=>y>=0&&y<FLEET[v.kind].height&&vehicleContains({x,z},v,0)))return false
     for(const p of props){
       const u=x-p.x,v=z-p.z

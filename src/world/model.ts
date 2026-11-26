@@ -1,7 +1,7 @@
 import {HOTEL_LIFT,guestFloor,resortPoints,resortWalkable,poolDepth,type GuestFloor,type ResortView} from './resort.ts'
 import {civicRoom,civicActions,civicHeight,groundVenue,openDoorway,nextCivicFloor,levelOf,rise,originOf,footprint,insideDoor,type Gallery} from './civic-venues.ts'
 import {origins,venueWalk,type ArcadeView,type Venue} from './arcade.ts'
-import {storefrontPoints} from './storefronts.ts'
+import {counterSeats,storefrontPoints} from './storefronts.ts'
 import {PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
 import {vehicleContains,type TrafficView,type Vehicle} from './traffic.ts'
 import type {ResidentView} from './city-residents.ts'
@@ -113,7 +113,7 @@ export interface WorldView{
 function localInteractions(zone:WorldZone,keys:readonly string[]):WorldAction[]{
   if(zone==='hotel'||guestFloor(zone))return resortPoints(zone,keys)
   if(civicRoom(zone))return civicActions(zone)
-  if(zone==='city')return [...storefrontPoints,...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
+  if(zone==='city')return [...storefrontPoints,...counterSeats,...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
   const home=residentialAt(zone)
   if(home?.building.block!==undefined&&home.level===0&&!home.stairs)return propertyPoints().filter(p=>p.id==='property:desk-'+home.building.block)
   if(zone==='casino')return [
