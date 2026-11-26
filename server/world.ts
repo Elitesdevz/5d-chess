@@ -1,6 +1,6 @@
 import {civicRoom,galleryZone} from '../src/world/civic-venues.ts'
 import {resortService} from './resort.ts'
-import {HOTEL_LIFT,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
+import {HOTEL_LIFT,gameStations,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
 import {randomUUID} from 'node:crypto'
 import {CityArcade} from './city-arcade.ts'
 import {roster,cellMove,custodyView} from './custody.ts'
@@ -231,14 +231,17 @@ export class CityWorlds {
         this.walkthrough(world,me,zone,open,now)
       }
     }else if(action==='close-resort'){
-      if(me.interaction===data.station&&me.interaction?.startsWith('resort:'))me.interaction=undefined
+      if(me.interaction===data.station&&me.interaction?.startsWith('resort:')){
+        if(me.homePose?.id.startsWith('salon-'))stand(me)
+        me.interaction=undefined
+      }
     }else if(action==='resort-floor'){
       const to=data.floor
       if(me.interaction!=='resort:lift'||(to!=='hotel'&&to!=='hotel:2'&&to!=='hotel:3'))fail(409,'Choose a floor from the hotel lift')
       this.arrive(world,me,to,now,{...HOTEL_LIFT,yaw:0})
     }else if(action==='resort'){
       const station=me.interaction
-      if(!station?.startsWith('resort:')||!this.points(world,me,now).some(p=>p.id===station&&near(me,p.x,p.z,p.range)))fail(409,'Visit the resort counter or table first')
+      if(!station?.startsWith('resort:')||!me.homePose?.id.startsWith('salon-')&&!this.points(world,me,now).some(p=>p.id===station&&near(me,p.x,p.z,p.range)))fail(409,'Visit the resort counter or table first')
       resort=this.store.transaction(u=>resortService(u,name,station!,now,data))
       housing=this.housing(name,now)
     }else if(action==='housing'){
@@ -310,6 +313,16 @@ export class CityWorlds {
         }else if(target.id.startsWith('resort:bath:')){
           me.shower={room:r.number,until:now+12_000};me.interaction=undefined
         }else me.interaction=target.id as WorldUse
+      }else if(['resort:poker','resort:blackjack','resort:slots'].includes(target.id)){
+        if(me.homePose)fail(409,'Stand up first')
+        const game=target.id.slice(7),local=localSite(me.zone,target.x,target.z)
+        const positions=game==='slots'?[{x:6.72,yaw:-Math.PI/2,id:'salon-slots-'+gameStations.find(s=>s.id===game&&Math.abs(local.z-s.z)<.01)!.z}]:
+          [1,-1].map(side=>({x:-6+side*1.64,yaw:side*Math.PI/2,id:'salon-'+game+'-'+side}))
+        const seat=positions.find(s=>![...world.members.values()].some(m=>m.zone===me.zone&&m.homePose?.id===s.id))
+        if(!seat)fail(409,'All seats are occupied')
+        const pose={...site(me.zone,seat.x,local.z),yaw:seat.yaw,id:seat.id,kind:'sit' as const,height:.53}
+        occupy(me,{...target,range:1.28,pose,exit:{x:me.x,z:me.z}},[])
+        me.interaction=target.id as WorldUse
       }else if(/^(door|furniture|call|lift|fridge|drawer):/.test(target.id)){
         this.homeUse(world,me,target as HomePoint,housing.keys,now)
       }else if(target.id.startsWith('seat:')||target.id.startsWith('couch:')){

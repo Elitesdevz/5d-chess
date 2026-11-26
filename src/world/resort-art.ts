@@ -1,4 +1,5 @@
 import * as T from 'three'
+import {salonGames} from './salon-games.ts'
 import {Scenery} from './landscape.ts'
 import {ROOMS,TIERS,venues,center,bedAt,fridgeAt,dresserAt,bathAt,HOTEL_LIFT,gameStations,guestFloor,type HotelRoom,type GuestFloor} from './resort.ts'
 import {floorHeight,type WorldView} from './model.ts'
@@ -14,6 +15,7 @@ export function royalResort(hotel:T.Group,sign:Sign){
     const panel=new T.Mesh(new T.PlaneGeometry(w,h),glazing)
     panel.position.set(x,y,z);panel.rotation.y=yaw;parent.add(panel)
   }
+  let games:ReturnType<typeof salonGames>|undefined
   const showers:{spray:T.Group;room:HotelRoom}[]=[]
   const levels:{floor:GuestFloor;group:T.Group;inside:T.Group}[]=[]
   const doors:{mesh:T.Group;room:HotelRoom}[]=[]
@@ -207,23 +209,38 @@ export function royalResort(hotel:T.Group,sign:Sign){
       }
     }
     if(!top){
+      games=salonGames(inside)
       for(const [i,station] of gameStations.entries()){
         const z=station.z
         if(i<2){
           parts.add('post',-6,.47,z,1.10,.9,1.2,walnut)
           parts.add('post',-6,.96,z,2.28,.16,2.47,gold)
           parts.add('post',-6,1.057,z,2.17,.05,2.35,i===0?jade:plum)
-          for(let j=0;j<5;j++)box(-6.52+j*.23,1.093,z,.14,.012,.22,ivory)
-          for(const ds of [-1,1]){box(-6,.49,z+ds*1.61,.68,.18,.61,velvet[2]);box(-6,.77,z+ds*1.89,.68,.70,.10,walnut)}
-          makeSign(inside,i===0?'FIVE-CARD DRAW':'BLACKJACK',-6,1.65,z-.60,1.65,.3)
+          for(const side of [-1,1]){
+            const x=-6+side*1.64
+            parts.add('post',x,.15,z,.58,.10,.58,gold)
+            parts.add('post',x,.32,z,.14,.36,.14,walnut)
+            box(x,.51,z,.66,.17,.68,velvet[2]);box(x+side*.30,.76,z,.12,.59,.67,walnut)
+            box(x+side*.231,.80,z,.09,.38,.57,velvet[2])
+            for(let k=0;k<5;k++)parts.add('post',-6+side*.81,1.105+k*.024,z-.37,.12,.024,.12,k%2?ivory:plum)
+          }
+          for(let j=0;j<7;j++)box(-6,1.093+j*.012,z-.86,.19,.011,.26,j%2?ivory:night)
+          parts.add('post',-6,3.88,z,.048,.95,.048,gold)
+          parts.add('pine',-6,3.32,z,1.51,.50,1.51,jade)
+          parts.add('post',-6,3.075,z,1.49,.045,1.49,0xffe2ac)
+          makeSign(inside,i===0?'FIVE-CARD DRAW':'BLACKJACK',-9.28,2.23,z,2.4,.41,Math.PI/2)
         }else{
           box(8.66,.85,z,.95,1.70,1.20,jade);box(8.37,1.84,z,.58,1.22,1.32,plum)
           box(8.06,1.81,z,.08,.60,1.18,gold)
-          for(let j=-1;j<=1;j++){
-            box(8.01,1.81,z+j*.34,.04,.41,.30,ivory)
-            parts.add('crown',7.98,1.81,z+j*.34,.06,.17,.17,[0xa44b50,gold,jade][j+1])
+          for(const side of [-1,1]){
+            box(8.035,1.82,z+side*.62,.09,1.22,.068,gold)
+            for(let k=0;k<6;k++)parts.add('crown',7.979,1.32+k*.187,z+side*.62,.06,.066,.066,0xffd494)
           }
           box(8.07,1.19,z,.66,.13,1.19,walnut);parts.add('post',7.88,1.28,z+.28,.17,.055,.17,gold)
+          box(7.88,1.27,z-.23,.19,.038,.29,night)
+          parts.add('post',6.72,.08,z,.60,.11,.60,gold)
+          parts.add('post',6.72,.32,z,.14,.45,.14,walnut)
+          parts.add('post',6.72,.54,z,.64,.15,.64,plum)
           makeSign(inside,'STARLIGHT',8.03,2.28,z,1.13,.23,-Math.PI/2)
         }
       }
@@ -269,7 +286,8 @@ export function royalResort(hotel:T.Group,sign:Sign){
     }
     parts.finish(inside);shell.finish(group)
   }
-  return (v:WorldView,prepared:boolean)=>{
+  const update=(v:WorldView,prepared:boolean)=>{
+    games?.update(v)
     for(const level of levels){
       level.group.visible=!prepared||(v.you.zone!=='hotel'&&v.you.zone!=='casino')
       level.inside.visible=!prepared||v.you.zone===level.floor
@@ -284,4 +302,5 @@ export function royalResort(hotel:T.Group,sign:Sign){
       mesh.rotation.y=open?room.side*Math.PI/2:0
     }
   }
+  return {update,tick:(reduced:boolean)=>games?.tick(reduced)}
 }

@@ -205,7 +205,7 @@ export class CityStage {
       this.art.seal.visible=!this.caveOpen&&next.zone!=='cave'
       this.art.grotto.visible=!this.art.seal.visible
       this.art.restaurant.update(view.restaurant)
-      this.art.resort(view,this.graphicsReady)
+      this.art.resort.update(view,this.graphicsReady)
       this.art.civic(next.zone,next.x,next.z)
       const hidden=view.arcade?.recoveringStaff??[]
       this.art.staff.forEach((a,i)=>a.root.visible=!hidden.includes(i<bankStaff.length?staffId('bank',i):staffId('exchange',i-bankStaff.length)))
@@ -570,6 +570,11 @@ export class CityStage {
       if(inPool(p.x,p.z))this.camera.position.y+=Math.sin(now*.0027)*.055
     }
     this.camera.rotation.set(T.MathUtils.clamp(this.pitch+(me?.homePose?.kind==='rest'?1.05:0),-1.55,1.55),this.yaw,0,'YXZ')
+    if(me?.homePose?.id.startsWith('salon-')){
+      const slots=me.homePose.id.startsWith('salon-slots')
+      const focus=site(me.zone,slots?8.02:-6,0)
+      this.camera.lookAt(focus.x,walkingHeight(me.zone,x,z)+(slots?1.58:.90),z)
+    }
     const chair=me?.chair,round=chair&&this.view?.hall?.tables[chair.table]
     if(chair&&round){
       const table=WORLD_TABLES[chair.table],dice=chair.table===DICE_TABLE_INDEX
@@ -629,6 +634,7 @@ export class CityStage {
   }
   private motion(now:number,dt:number){
     if(!this.art)return
+    if(this.zone==='hotel:2')this.art.resort.tick(this.reduced)
     this.art.lightZone(this.zone,dt)
     this.art.urban(this.view?.traffic,dt,this.reduced)
     this.art.homes.update(this.view?.residential,this.view?.housing?.occupied,now,dt,this.position.x,this.position.z)

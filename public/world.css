@@ -357,3 +357,24 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
  .armory-rack img{width:64%;height:28px;object-fit:contain;align-self:center}.armory-detail{padding:.6rem .85rem}
  .armory-head{padding:.5rem .85rem}.armory-head h2{font-size:1.5rem}
 }
+
+/* Leave the cabinet or table in view while the guest plays. */
+.world-dialog:has(.salon-controls){
+  inset:auto 1rem 1rem auto;margin:0;width:min(19rem,40vw);max-height:75svh;
+  border:1px solid #b59a68;border-top:3px double #d7b479;border-radius:6px;
+  padding:.85rem 1rem;background:linear-gradient(145deg,#1e3938f7,#132725fa)
+}
+.world-dialog:has(.salon-controls)::backdrop{background:transparent}
+.world-dialog:has(.salon-controls) .world-service-head{margin:0 0 .6rem;padding-bottom:.5rem}
+.salon-controls{gap:.55rem}
+.salon-controls .royal-reels{gap:.2rem;padding:.22rem;background:#191e21;border:1px solid #887c64}
+.salon-controls .royal-reels b{font-size:.89rem;padding:.28rem}
+.salon-controls .royal-card{width:1.8rem;height:2.45rem;font-size:1rem}
+.salon-controls .royal-hand{padding:.4rem 0 .1rem}
+.salon-controls button[data-command]{background:#e5c28c;color:#302b22;font-weight:700}
+@media(max-width:700px){
+  .world-dialog:has(.salon-controls){inset:auto .45rem .45rem;width:calc(100% - .9rem);max-height:41svh;padding:.55rem .8rem}
+  .salon-controls .royal-hand{display:flex;align-items:center;gap:.5rem}
+}
+.royal-reels[data-spinning] b{color:transparent;background:repeating-linear-gradient(0deg,#eee0bd 0 5px,#af9a76 7px,#fff6d7 10px);background-size:100% 150%;animation:reel-motion .15s linear infinite}
+@keyframes reel-motion{to{background-position:0 100%}}
