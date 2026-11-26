@@ -185,7 +185,13 @@ export class CityStage {
       if(this.reduced){this.yaw=Math.PI;this.pitch=0}
       else this.liftFacing={from:this.yaw,delta,started:performance.now()}
     }
+    const biteChanged=this.view?.arcade?.bite?.ends!==view.arcade?.bite?.ends
     this.clock=offset;this.view=view;this.zone=next.zone;this.caveOpen=view.caveOpen
+    if(biteChanged){
+      this.updateBite(view.now)
+      // Queue the first bite pose even when the previous street frame is still drawing.
+      if(view.arcade?.bite&&this.gl&&this.fence){this.gl.deleteSync(this.fence);this.fence=null}
+    }
     if(changedWorld){this.lastMessage=0;this.speech.clear();this.playerMotion.clear()}
     for(const member of view.players){
       let motion=this.playerMotion.get(member.name)
@@ -559,6 +565,25 @@ export class CityStage {
     }
     for(const [id,entry] of this.restaurantNpc)if(!active.has(id)){entry.figure.dispose();this.restaurantNpc.delete(id)}
   }
+  private updateBite(now:number){
+    const bite=this.view?.arcade?.bite,eating=!!bite&&now<bite.ends
+    if(this.snackHand)this.snackHand.visible=eating
+    if(bite&&eating){
+      if(!this.snackHand){this.snackHand=eatingHand();this.camera.add(this.snackHand)}
+      const hand=this.snackHand
+      for(const [id,snack] of this.snacks)snack.visible=id===bite.item
+      let snack=this.snacks.get(bite.item)
+      if(!snack){snack=foodVisual(bite.item);hand.add(snack);this.snacks.set(bite.item,snack)}
+      const t=T.MathUtils.clamp(1-(bite.ends-now)/BITE_MS,0,1)
+      const raised=Math.sin(Math.PI*t)**.7
+      snack.visible=true
+      hand.position.set(.17-.12*raised,-.36+.22*raised,-.53+.21*raised)
+      hand.rotation.set(raised*(bite.item==='cola'||bite.item==='coffee'||bite.item==='tea'?.69:.23),-.3,.09*Math.sin(t*Math.PI*4))
+      hand.scale.setScalar(1.35-.35*t)
+    }
+    this.parent.toggleAttribute('data-eating',eating)
+    return eating
+  }
   private cameraView(now:number){
     const me=this.view?.you,{x,z}=this.position
     if(this.liftFacing){
@@ -597,22 +622,7 @@ export class CityStage {
       this.camera.lookAt(p.x,1.16,p.z)
     }
     this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt,!!s?.phase)
-    const bite=this.view?.arcade?.bite,eating=!!bite&&now<bite.ends
-    this.parent.toggleAttribute('data-eating',eating)
-    if(this.snackHand)this.snackHand.visible=eating
-    if(bite&&eating){
-      if(!this.snackHand){this.snackHand=eatingHand();this.camera.add(this.snackHand)}
-      const hand=this.snackHand
-      for(const [id,snack] of this.snacks)snack.visible=id===bite.item
-      let snack=this.snacks.get(bite.item)
-      if(!snack){snack=foodVisual(bite.item);hand.add(snack);this.snacks.set(bite.item,snack)}
-      const t=T.MathUtils.clamp(1-(bite.ends-now)/BITE_MS,0,1)
-      const raised=Math.sin(Math.PI*t)**.7
-      snack.visible=true
-      hand.position.set(.17-.12*raised,-.36+.22*raised,-.53+.21*raised)
-      hand.rotation.set(raised*(bite.item==='cola'||bite.item==='coffee'||bite.item==='tea'?.69:.23),-.3,.09*Math.sin(t*Math.PI*4))
-      hand.scale.setScalar(1.35-.35*t)
-    }
+    const eating=this.updateBite(now)
     const free=!eating&&!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
     this.chaseVisible=false
     if(this.chase&&free){

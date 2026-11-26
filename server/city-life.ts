@@ -20,7 +20,8 @@ function outside(p:Point){
   const k=(Math.round(p.x*1000)+100_000)*200_000+Math.round(p.z*1000)+100_000
   const old=navCells.get(k)
   if(old!==undefined)return old
-  const okay=groundZone(p.x,p.z)==='city'&&!streetBuilding(p.x,p.z,.32)&&outdoorWalkable(p.x,p.z)&&!parkedCars.some(v=>vehicleContains(p,v,.35))
+  // Leave room to round corners between waypoints without grazing a residential wall.
+  const okay=groundZone(p.x,p.z)==='city'&&!streetBuilding(p.x,p.z,.52)&&outdoorWalkable(p.x,p.z)&&!parkedCars.some(v=>vehicleContains(p,v,.35))
   navCells.set(k,okay)
   return okay
 }
