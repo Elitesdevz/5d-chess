@@ -163,8 +163,9 @@ export function venueDetail(parent:T.Object3D,zone:'hotel'|'bank'|'exchange'|'ca
     }
     const desks=zone==='floor'?[-2.7,2.7]:[.63]
     for(const x of desks){
-      post(x,1.18,-1.89,.085,.31,bronze);box(x,1.48,-1.91,.85,.48,.11,0x273b3f)
-      box(x,1.47,-1.842,.73,.36,.012,symbol==='CAS'?0xa78253:0x578f8b)
+      const monitor=symbol==='LOT'?x+Math.sign(x)*.66:x
+      post(monitor,1.18,-1.89,.085,.31,bronze);box(monitor,1.48,-1.91,.85,.48,.11,0x273b3f)
+      box(monitor,1.47,-1.842,.73,.36,.012,symbol==='CAS'?0xa78253:0x578f8b)
       box(x+.68,1.08,-1.68,.36,.033,.29,cream)
     }
   }else{
