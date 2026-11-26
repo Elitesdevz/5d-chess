@@ -2,6 +2,7 @@ import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import {circle,FLEET,LANDMARKS,PARK_FEATURES,PARKING,PARKS,pond,railZ,STREETS,type Landmark, type VehicleKind} from './city-plan.ts'
 import {JUNCTIONS,SIGNAL_HEADS,type TrafficView,type Vehicle} from './traffic.ts'
+import {finishFloor} from './hotel-finishes.ts'
 import {coachwork} from './coachwork.ts'
 import {batchOpaque} from '../casino/scene/static-batch.ts'
 import {counterLayout,STOREFRONTS} from './storefronts.ts'
@@ -275,8 +276,7 @@ function counterRoom(g:T.Group,p:Props,b:Landmark,label:Letter,accent:number){
   const floor=care?0xdce2d7:food?0xc6ac88:0xaf9477
   p.box(0,.006,0,w-.13,.052,d-.13,floor)
   p.box(0,ceiling,0,w-.08,.09,d-.09,0xe5dcc9)
-  for(let x=-w/2+.54;x<w/2-.05;x+=.56)p.box(x,.035,0,.012,.004,d-.13,0x968c79)
-  for(let z=back+.53;z<d/2-.05;z+=care?.56:1.64)p.box(0,.036,z,w-.13,.005,.01,0x968c79)
+  finishFloor(g,care||b.id==='bakery'||b.id==='station'?'terrazzo':'parquet',0,.036,0,w-.13,d-.13,care?1.12:2.1)
   for(const side of [-1,1]){
     p.box(side*(w/2-.10),.46,0,.07,.90,d-.15,accent)
     p.box(side*(w/2-.14),.94,0,.07,.055,d-.15,wood)

@@ -32,11 +32,11 @@ function timber(tone:number){
   mat.map!.wrapS=mat.map!.wrapT=T.RepeatWrapping;boards.set(tone,mat)
   return mat
 }
-export function parquet(parent:T.Group,r:Rect,tone:number){
+export function parquet(parent:T.Object3D,r:Rect,tone:number,y=.002){
   const w=r.r-r.l,d=r.f-r.b,geo=new T.PlaneGeometry(w,d),uv=geo.attributes.uv
   for(let i=0;i<uv.count;i++)uv.setXY(i,(r.l+uv.getX(i)*w)/3.6,(uv.getY(i)*d-r.f)/1.86)
   const floor=new T.Mesh(geo,timber(tone));floor.rotation.x=-Math.PI/2
-  floor.position.set((r.l+r.r)/2,.002,(r.b+r.f)/2);parent.add(floor)
+  floor.position.set((r.l+r.r)/2,y,(r.b+r.f)/2);parent.add(floor)
 }
 const schemes=[
   ['#9f654e','#d5ab77','#354f52'],['#48686b','#d5c49e','#824e45'],['#846677','#e2be89','#4a595f'],

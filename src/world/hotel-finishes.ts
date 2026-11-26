@@ -1,4 +1,5 @@
 import * as T from 'three'
+import {parquet} from './domestic-finishes.ts'
 
 // Screen-printed travel posters, drawn once per palette for the guest floors.
 const prints=new Map<number,T.MeshBasicMaterial>()
@@ -92,4 +93,50 @@ export function bathWater(parent:T.Object3D){
       disturbance.value.set(x,z,time.value);lastX=x;lastZ=z
     }
   }
+}
+
+type FloorFinish='parquet'|'salon'|'arcade'|'terrazzo'
+const surfaces=new Map<FloorFinish,T.MeshStandardMaterial>()
+function surface(kind:FloorFinish){
+  const existing=surfaces.get(kind)
+  if(existing)return existing
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=256
+  const c=canvas.getContext('2d')!
+  let seed=7345
+  const random=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296)
+  if(kind==='terrazzo'){
+    c.fillStyle='#cbbfa7';c.fillRect(0,0,256,256)
+    for(let i=0;i<1500;i++){
+      const x=random()*256,y=random()*256,r=1+random()*4
+      c.fillStyle=['#a98f75','#e2d4b8','#9eaba1','#ede5cb','#ad9c88'][i%5]
+      c.beginPath();c.moveTo(x,y);c.lineTo(x+r*1.3,y-r*.4);c.lineTo(x+r*.6,y+r);c.fill()
+    }
+    c.strokeStyle='#988c7a';c.lineWidth=2;c.strokeRect(0,0,256,256)
+  }else{
+    const arcade=kind==='arcade'
+    c.fillStyle=arcade?'#343844':'#643f49';c.fillRect(0,0,256,256)
+    for(let row=-1;row<5;row++)for(let col=-1;col<3;col++){
+      const x=col*128+(row%2)*64,y=row*64
+      c.fillStyle=arcade?'#414754':'#704953';c.strokeStyle=arcade?'#677067':'#947261';c.lineWidth=1.8
+      c.beginPath();c.moveTo(x-64,y+64);c.quadraticCurveTo(x-51,y+15,x,y)
+      c.quadraticCurveTo(x+51,y+15,x+64,y+64);c.closePath();c.fill();c.stroke()
+      for(let k=-2;k<=2;k++){c.beginPath();c.moveTo(x,y+59);c.lineTo(x+k*15,y+10+Math.abs(k)*8);c.stroke()}
+    }
+    for(let i=0;i<6500;i++){
+      c.fillStyle=i%2?'#e2cfaa18':'#161c291c';c.fillRect(random()*256,random()*256,1,2)
+    }
+  }
+  const map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace;map.wrapS=map.wrapT=T.RepeatWrapping;map.anisotropy=4
+  const mat=new T.MeshStandardMaterial({map,roughness:kind==='terrazzo'?.52:.88})
+  surfaces.set(kind,mat);return mat
+}
+export function finishFloor(parent:T.Object3D,kind:FloorFinish,x:number,y:number,z:number,w:number,d:number,tile:number){
+  if(kind==='parquet'){
+    parquet(parent,{l:x-w/2,r:x+w/2,b:z-d/2,f:z+d/2},0xb49777,y)
+    return
+  }
+  const geometry=new T.PlaneGeometry(w,d),uv=geometry.attributes.uv
+  for(let i=0;i<uv.count;i++)uv.setXY(i,uv.getX(i)*w/tile,uv.getY(i)*d/tile)
+  const floor=new T.Mesh(geometry,surface(kind))
+  floor.rotation.x=-Math.PI/2;floor.position.set(x,y,z);parent.add(floor)
 }

@@ -1,5 +1,5 @@
 import * as T from 'three'
-import {bathWater,travelPrint} from './hotel-finishes.ts'
+import {bathWater,travelPrint,finishFloor} from './hotel-finishes.ts'
 import {salonGames} from './salon-games.ts'
 import {Scenery} from './landscape.ts'
 import {ROOMS,TIERS,venues,center,bedAt,fridgeAt,dresserAt,bathAt,HOTEL_LIFT,bathSeats,gameStations,guestFloor,type HotelRoom,type GuestFloor} from './resort.ts'
@@ -112,7 +112,11 @@ export function royalResort(hotel:T.Group,sign:Sign){
       }
       box(s*1.71,3.35,mid,.17,2.02,1.53,wall)
       makeSign(inside,room?String(room.number):('name' in bay?bay.name.toUpperCase():''),s*1.59,2.63,mid,room?.tier===4?1.65:1.50,.31,-s*Math.PI/2)
-      if(!room)continue
+      if(!room){
+        if(!top)finishFloor(inside,s<0?'salon':'arcade',s*5.62,.015,mid,7.70,depth-.12,1.43)
+        continue
+      }
+      finishFloor(inside,'parquet',s*5.62,.014,mid,7.70,depth-.13,2.65)
       const door=new T.Group(),leaf=new Scenery();inside.add(door);door.position.set(s*1.71,0,mid-.74)
       leaf.add('box',0,1.14,.73,.1,2.28,1.46,room.tier>=3?jade:walnut)
       leaf.add('box',-s*.061,1.34,.73,.025,1.57,1.11,room.tier>=3?0x39716c:0x745747)
@@ -121,13 +125,13 @@ export function royalResort(hotel:T.Group,sign:Sign){
       const tier=room.tier,bed=bedAt(room),fridge=fridgeAt(room),bath=bathAt(room)
       const wide=1.12+tier*.18
       box(bed.x,.27,bed.z,2.16,.52,wide+.12,walnut)
-      box(bed.x,.57,bed.z,2.13,.20,wide,linen[tier])
-      box(bed.x-s*.28,.69,bed.z,1.46,.08,wide+.035,velvet[tier])
-      box(bed.x+s*.78,.74,bed.z,.40,.12,wide*.78,ivory)
+      parts.add('cushion',bed.x,.57,bed.z,2.13,.20,wide,linen[tier])
+      parts.add('cushion',bed.x-s*.28,.69,bed.z,1.46,.08,wide+.035,velvet[tier])
+      parts.add('cushion',bed.x+s*.78,.74,bed.z,.40,.12,wide*.78,ivory)
       box(bed.x+s*1.12,.76,bed.z,.13,1.45,wide+.3,velvet[tier])
       if(tier>=2){
         for(let j=-3;j<=3;j++)box(bed.x+s*1.035,1.01,bed.z+j*wide/7,.092,.91,wide/8,velvet[tier])
-        for(const dz of [-.28,.28])box(bed.x+s*.63,.82,bed.z+dz,.40,.15,wide*.39,linen[tier])
+        for(const dz of [-.28,.28])parts.add('cushion',bed.x+s*.63,.82,bed.z+dz,.40,.15,wide*.39,linen[tier])
         box(bed.x-s*.53,.745,bed.z,.28,.03,wide+.04,tier===4?gold:jade)
       }
       // Layer a woven runner over the bed and print a different landscape for each tier.
@@ -235,15 +239,21 @@ export function royalResort(hotel:T.Group,sign:Sign){
       for(const [i,station] of gameStations.entries()){
         const z=station.z
         if(i<2){
+          parts.add('post',-6,.075,z,1.42,.15,1.54,walnut)
+          parts.add('post',-6,.16,z,1.32,.047,1.45,gold)
           parts.add('post',-6,.47,z,1.10,.9,1.2,walnut)
+          for(let k=0;k<12;k++){
+            const a=k*Math.PI/6
+            parts.add('post',-6+Math.sin(a)*.54,.48,z+Math.cos(a)*.59,.035,.56,.035,gold)
+          }
           parts.add('post',-6,.96,z,2.28,.16,2.47,gold)
           parts.add('post',-6,1.057,z,2.17,.05,2.35,i===0?jade:plum)
           for(const side of [-1,1]){
             const x=-6+side*1.64
             parts.add('post',x,.15,z,.58,.10,.58,gold)
             parts.add('post',x,.32,z,.14,.36,.14,walnut)
-            box(x,.51,z,.66,.17,.68,velvet[2]);box(x+side*.30,.76,z,.12,.59,.67,walnut)
-            box(x+side*.231,.80,z,.09,.38,.57,velvet[2])
+            parts.add('cushion',x,.51,z,.66,.17,.68,velvet[2]);box(x+side*.30,.76,z,.12,.59,.67,walnut)
+            parts.add('cushion',x+side*.231,.80,z,.09,.38,.57,velvet[2])
             for(let k=0;k<5;k++)parts.add('post',-6+side*.81,1.105+k*.024,z-.37,.12,.024,.12,k%2?ivory:plum)
           }
           for(let j=0;j<7;j++)box(-6,1.093+j*.012,z-.86,.19,.011,.26,j%2?ivory:night)
