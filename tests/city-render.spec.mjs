@@ -32,6 +32,7 @@ test('turning from a quiet street toward city lights reuses prepared shaders', {
       const gl=stage.renderer.getContext(),linkProgram=gl.linkProgram.bind(gl)
       let programs=0
       gl.linkProgram=program=>{programs++;linkProgram(program)}
+      const start=performance.now()
       stage.set(view,0,true)
       const deadline=performance.now()+30_000
       while(stage.preparingGraphics){
@@ -41,16 +42,19 @@ test('turning from a quiet street toward city lights reuses prepared shaders', {
       }
       stage.renderScene()
       gl.finish()
-      const initial=programs,draws=[]
+      const playableMs=performance.now()-start,initial=programs,draws=[],frames=[]
       for(const yaw of [5,6,7,0,1,2,3,4]){
+        const frameStart=performance.now()
         stage.yaw=yaw*Math.PI/4
         stage.cameraView(view.now)
         stage.renderScene()
+        gl.finish();frames.push(performance.now()-frameStart)
         draws.push(stage.renderer.info.render.calls)
       }
       gl.finish()
-      return {initial,compiledWhileTurning:programs-initial,draws}
+      return {playableMs,frames,initial,compiledWhileTurning:programs-initial,draws}
     },{url:base+'/chess/chunks/'+chunk,view})
+    if(process.env.CITY_BENCH)console.log(JSON.stringify(result))
     assert.ok(result.initial>0)
     assert.ok(result.draws.every(count=>count>0))
     assert.ok(Math.max(...result.draws)>Math.min(...result.draws)*2)
