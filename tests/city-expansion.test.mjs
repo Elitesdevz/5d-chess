@@ -74,6 +74,32 @@ test('the armory sells five weapons, validates cash and preserves magazine state
 const slots=v=>v.arcade.slots
 const count=(v,item)=>slots(v).reduce((n,s)=>n+(s?.item===item?s.count:0),0)
 
+test('armory checkout uses the chosen balance, respects capacity and charges each purchase once',async t=>{
+  const f=await fixture(t),name='Counter shopper'
+  await f.signup(name)
+  f.store.transaction(tx=>{const a=tx.users.get(name);a.wallet.coins=95.375;carry(pack(a),'cash',25)})
+  const shop=await f.counter(name,'gunshop','counter',0,-1.2)
+  const checkout=(payment,sequence=shop.arcade.sequence,item='ar')=>f.request(name,'world/arcade',{scene:true,operation:'buy',item,payment,sequence})
+  assert.match((await checkout('cash')).value.error,/Not enough carried cash/)
+  assert.equal((await checkout('unknown')).status,400)
+  const bought=await checkout('bank')
+  assert.equal(bought.status,200)
+  assert.equal(bought.value.coins,.375)
+  assert.equal(count(bought.value,'cash'),25)
+  assert.equal(count(bought.value,'ar'),1)
+  assert.equal((await checkout('bank')).status,409)
+  assert.match((await checkout('bank',bought.value.arcade.sequence,'blaster')).value.error,/Not enough banked coins/)
+  f.store.transaction(tx=>{const a=tx.users.get(name);a.wallet.coins=100;carry(pack(a),'smg',7)})
+  const full=await f.world(name,'presence')
+  assert.ok(full.arcade.slots.every(Boolean))
+  assert.match((await checkout('bank',full.arcade.sequence,'blaster')).value.error,/Free a hotbar slot/)
+  const exact=await checkout('cash',full.arcade.sequence,'blaster')
+  assert.equal(exact.status,200)
+  assert.equal(exact.value.coins,100)
+  assert.deepEqual(exact.value.arcade.slots[0],{item:'blaster',count:1})
+  assert.equal(count(exact.value,'cash'),0)
+})
+
 test('local HTTP migration, full hotbar, recovery, bank and arcade-counter transfers survive restart',async t=>{
   const f=await fixture(t),name='Mira'
   await f.signup(name)
@@ -161,7 +187,8 @@ test('local combat, eating, death, competing pickups, pursuit, offline sentence 
   assert.equal((await f.request(b,'profile?user=Odessa%20Finch')).status,404)
   assert.equal((await f.ok(b,'games/'+match.code)).seats.red,'Inmate 01')
   assert.equal((await f.ok(a,'me')).user,'Inmate 01')
-  const frozen=(await f.ok(a,'custody/position',{x:jail.x+.7,z:jail.z+.4,yaw:1})).custody
+  const frozen=(await f.world(a,'presence',{world:v.id,x:jail.x+.7,z:jail.z+.4,yaw:1})).arcade.custody
+  assert.deepEqual([frozen.x,frozen.z],[jail.x+.7,jail.z+.4])
   await f.ok(a,'logout',{})
   await f.restart()
   const visitor=f.route(b);await visitor.enter('station');v=await visitor.climb()
@@ -181,8 +208,8 @@ test('walk through both street entrances, visit the jail wing, and return to the
   const visitor=f.route(name)
   await visitor.read()
   for(const target of ['enter-station','enter-gunshop','gallery-up'])assert.equal((await f.request(name,'world/use',{target,scene:true})).status,409)
+  assert.equal((await f.request(name,'world/teleport',{to:'precinct:5'})).status,400)
   for(const zone of ['station','gunshop']){
-    assert.equal((await f.request(name,'world/teleport',{to:zone})).status,400)
     await visitor.enter(zone)
     if(zone==='station'){
       for(let floor=1;floor<=5;floor++)assert.equal((await visitor.climb()).you.zone,'precinct:'+floor)
@@ -195,7 +222,8 @@ test('walk through both street entrances, visit the jail wing, and return to the
     }
     const p=insideDoor(zone)
     assert.ok(await visitor.walk(at(zone,p.x,p.z)))
-    const v=await visitor.use('exit-venue')
+    assert.ok(await visitor.walk(entrances[zone]))
+    const v=visitor.view
     assert.equal(v.you.zone,'city')
     assert.ok(Math.hypot(v.you.x-entrances[zone].x,v.you.z-entrances[zone].z)<.01)
   }
@@ -293,7 +321,7 @@ test('bank and restaurant staff take arcade damage at their visible counters',as
     let v=await f.world(name,'teleport',{to})
     f.tick(1250)
     v=await f.world(name,'presence',{world:v.id,...site(to,0,.95),yaw:0})
-    const target=v.arcade.contacts.find(p=>p.id.startsWith(prefix)&&Math.hypot(v.you.x-p.x,v.you.z-p.z)<=8)
+    const target=v.arcade.contacts.find(p=>p.inSight&&p.id.startsWith(prefix)&&Math.hypot(v.you.x-p.x,v.you.z-p.z)<=8)
     assert.ok(target,'in-range staff at the '+to+' counter')
     v=await f.world(name,'arcade',{operation:'fire',sequence:v.arcade.sequence,slot:0,target:target.id})
     assert.equal(v.arcade.contacts.find(p=>p.id===target.id)?.hp,65)
@@ -368,4 +396,29 @@ test('a signed-in legacy inmate and an unclaimed venue bag migrate once across r
     assert.deepEqual(saved.tiles,puzzle.tiles);assert.equal(saved.placed.filter(Boolean).length,1);assert.ok(saved.placed[71])
     assert.deepEqual(f.store.metadataValue('cityDrops:1'),[{id:'legacy-bag',zone:'gunshop',items:contents,...at('gunshop',door.x,door.z)}])
   }
+})
+
+test('the server resolves two-player hits through an open doorway and rejects a target behind its wall',async t=>{
+  const f=await fixture(t),a='Outside Visitor',b='Inside Visitor'
+  for(const n of [a,b]){
+    await f.signup(n);f.store.transaction(tx=>carry(pack(tx.users.get(n)),'blaster',1))
+    await f.world(n,'teleport',{to:'gunshop'})
+  }
+  const visitor=f.route(a),shopper=f.route(b)
+  await visitor.read();await shopper.read()
+  assert.ok(await visitor.walk(entrances.gunshop));assert.equal(visitor.view.you.zone,'city')
+  for(const [name,other] of [[a,b],[b,a]]){
+    const v=await f.world(name,'presence'),id='player:'+other
+    assert.equal(v.arcade.contacts.find(c=>c.id===id)?.inSight,true)
+    await f.world(name,'arcade',{operation:'fire',target:id,slot:0,sequence:v.arcade.sequence})
+    assert.equal((await f.world(other,'presence')).arcade.hp,65)
+  }
+  const outside=entrances.gunshop,inside=insideDoor('gunshop')
+  assert.ok(await visitor.walk({...outside,x:outside.x+2.5}))
+  assert.ok(await shopper.walk(at('gunshop',inside.x,inside.z-1.4)))
+  assert.ok(await shopper.walk(at('gunshop',inside.x+2.5,inside.z-1.4)))
+  const v=await f.world(a,'presence'),id='player:'+b
+  assert.equal(v.arcade.contacts.find(c=>c.id===id)?.inSight,false)
+  assert.equal((await f.request(a,'world/arcade',{operation:'fire',target:id,slot:0,sequence:v.arcade.sequence})).status,409)
+  assert.equal((await f.world(b,'presence')).arcade.hp,65)
 })

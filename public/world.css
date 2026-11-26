@@ -3,7 +3,6 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .world [hidden]{display:none!important}
 #world-canvas,.world-dark,.world-names{position:absolute;width:100%;height:100%;inset:0}
 #world-canvas{outline:none;touch-action:none;cursor:crosshair}
-.world[data-flat=true] #world-canvas{cursor:default}
 .world-dark{pointer-events:none;background:#020504;opacity:0;transition:opacity .25s;z-index:1}
 .world-names{pointer-events:none;z-index:2}
 .world-name{position:absolute;top:0;left:0;white-space:nowrap;padding:2px 7px;border-radius:4px;background:#122420dc;border:1px solid #d4bd845c;color:#f3e6c9;font-size:11px}
@@ -279,12 +278,83 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .arcade-counter h3,.arcade-counter p{width:100%}
 .arcade-counter input{width:6em}
 @media(max-width:700px){#city-pack{bottom:5px;font-size:10px}.arcade-slots button{min-width:26px;font-size:9px}.world-chat{bottom:106px}}
-.city-armory{display:grid;grid-template-columns:repeat(auto-fit,minmax(9rem,1fr));gap:.6rem}
-.city-armory article{display:grid;gap:.42rem;padding:.75rem;background:#273937;border:1px solid #688077;border-radius:.35rem}
-.city-armory article h3{margin:0;color:#ffefd4}.city-armory small{color:#c3d2c9}
 .city-ammo{font:600 .78rem monospace;white-space:nowrap}.arcade-actions{flex-wrap:wrap}
 .world-camera{position:absolute;right:7.4rem;top:.72rem;z-index:3;padding:.48rem .68rem;border:1px solid #a7b3a54d;border-radius:.55rem;background:#182c29;color:#f5ead4;font-weight:650}
 .city-reticle{display:none;pointer-events:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #333}
 [data-armed] .city-reticle{display:block}
-[data-flat=true] .world-camera{display:none}
 [data-hit] .city-reticle{width:12px;height:12px;border:2px solid #ffdf86;background:transparent;transform:translate(-50%,-50%) rotate(45deg);border-radius:1px}
+
+.world[data-unavailable=true]>:not(#world-unavailable){display:none!important}
+#world-unavailable{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);width:min(32rem,90%);padding:1.5rem;background:#19292b;color:#f6f0df;border:1px solid #657675;border-radius:10px}
+#world-unavailable a{color:#ffd598;margin-right:1.25rem}
+.jigsaw-dialog{box-sizing:border-box;width:min(39rem,96vw);max-width:96vw;max-height:94dvh;overflow:auto;color:#f2eee4;background:#19282d;border:1px solid #627b7b;border-radius:12px;padding:0 1.2rem .65rem;font:normal 15px/1.35 system-ui;color-scheme:dark}
+.jigsaw-dialog::backdrop{background:#081217c9}
+.jigsaw-dialog header{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:2;background:#19282d;border-bottom:1px solid #425456;padding:.75rem 0}
+.jigsaw-dialog header small{color:#c4b999}
+.jigsaw-dialog h2{font:500 1.75rem Georgia,serif;margin:.1em 0}
+.jigsaw-dialog button,.puzzle-nav select{color:inherit;background:#293e43;border:1px solid #567074;border-radius:5px;font:inherit;cursor:pointer}
+.jigsaw-dialog [data-close-jigsaw],.puzzle-nav button{width:42px;height:42px;font-size:1.45rem}
+.jigsaw-dialog :focus-visible{outline:3px solid #f6c974;outline-offset:1px;z-index:1}
+.puzzle-overview{display:grid;grid-template-columns:minmax(90px,34%) 1fr;align-items:center;gap:1rem;margin:1rem 0}
+.puzzle-preview{width:100%;height:auto;border-radius:5px;display:block}
+.puzzle-overview p{margin:.35rem 0;color:#ced8d8;font-size:.86rem}
+.puzzle-overview .puzzle-total{font-size:1rem;color:#fff1d2;font-weight:600}
+.puzzle-overview progress{width:100%;accent-color:#dca958;height:.55rem}
+.puzzle-nav{display:flex;align-items:stretch;gap:.35rem}.puzzle-nav select{padding:0 .45rem}.puzzle-nav button:disabled{opacity:.4}
+.puzzle-status{color:#d8dddd;font-size:.9rem}.puzzle-status{min-height:1.4em;color:#f0c77f}
+.puzzle-halves{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.puzzle-halves h3{font-size:.96rem;margin:0 0 .35rem}
+.tile-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-content:start}
+.tile-grid button{aspect-ratio:1;position:relative;min-width:0;padding:0;border:0;background:#30464c;border-radius:0}
+.tile-grid canvas{width:100%;height:auto;display:block}
+.tile-grid.board{outline:1px solid #698482}.tile-grid.tray{gap:2px;color:#bdd3bf}
+.tile-grid.tray button{border-radius:4px;background:#283c41}
+.tile-grid.tray button[aria-pressed=true]{box-shadow:inset 0 0 0 3px #f0c577;background:#4c5248}
+.puzzle-instruction{display:flex;align-items:center;justify-content:space-between;gap:.5rem;min-height:48px}
+.puzzle-instruction .puzzle-status{margin:0}
+.puzzle-selection{width:42px;flex:none}.puzzle-selection canvas{display:block;width:100%;background:#33474a;border-radius:4px}
+.puzzle-switch{display:none}
+@media(max-width:520px){
+  .puzzle-switch{display:flex;gap:.35rem;margin-top:.5rem}
+  .puzzle-switch button{flex:1;min-height:44px}
+  .puzzle-switch button[aria-pressed=true]{background:#3c5355;border-color:#c4ae7e}
+  .puzzle-halves h3,.puzzle-halves[data-show=tray]>section:has(.board),.puzzle-halves[data-show=board]>section:has(.tray){display:none}
+  .jigsaw-dialog{padding-inline:.8rem}.puzzle-halves{grid-template-columns:1fr;gap:1rem}.tile-grid{width:min(100%,18rem);margin:auto}.puzzle-overview{margin:.55rem 0}.jigsaw-dialog header{padding:.4rem 0}}
+
+.world-dialog:has(.armory-shop){width:min(720px,calc(100% - 16px));padding:0;border-color:#62847f;background:#17292b;color:#eaf4ed}
+.armory-shop{font:normal .95rem/1.35 system-ui}
+.armory-head,.armory-shop footer{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.25rem;background:#233637}
+.armory-head{border-bottom:2px solid #9bc7b7}
+.armory-head small{font-size:.66rem;font-weight:750;letter-spacing:.17em;color:#afcfc4}
+.armory-head h2{margin:0;font:500 1.9rem Georgia,serif;color:#fff3d8}
+.armory-shop button{border:1px solid #526d6b;border-radius:6px;background:#213637;color:#eaf4ed}
+.armory-head button{min-width:42px;min-height:42px;font-size:1.5rem}
+.armory-counter{display:grid;grid-template-columns:minmax(9rem,32%) 1fr}
+.armory-rack{display:flex;flex-direction:column;gap:.4rem;padding:.75rem;background:#132326}
+.armory-rack button{text-align:left;display:flex;align-items:center;gap:.45rem;padding:.5rem;min-height:55px}
+.armory-rack button[aria-pressed=true]{background:#36534f;border-color:#a0d7c4}
+.armory-rack img{width:36%;height:auto}
+.armory-rack span,.armory-shop footer strong{font-weight:650}
+.armory-rack small,.armory-shop footer span{display:block;color:#b6c9bf;font-size:.75rem;font-weight:400}
+.armory-detail{min-width:0;padding:1rem}
+.armory-product{padding:.7rem 1rem;border:1px solid #55736d;border-radius:6px;background:radial-gradient(ellipse at 52% 70%,#6e9083,#3c5855 70%,#324b4b)}
+.world-dialog .armory-product h3{font:500 1.5rem Georgia,serif;color:#fff3d8;margin:0}
+.armory-photo{width:100%;height:clamp(64px,15vh,120px);object-fit:contain}
+.armory-detail dl{display:grid;grid-template-columns:repeat(3,1fr);margin:.8rem 0;border-bottom:1px solid #45615f;padding-bottom:.6rem}
+.armory-detail dt,.armory-detail legend{font-size:.76rem;color:#b7cdc6}
+.armory-detail dd{margin:.15rem 0 0;color:#f2ead0;font-weight:700}
+.armory-detail fieldset{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;padding:0;border:0;margin:0;min-width:0}
+.armory-detail legend{margin-bottom:.35rem}
+.armory-detail label{display:flex;align-items:center;gap:.35rem;min-height:45px;padding:.25rem .45rem;border:1px solid #4b6663;border-radius:5px;font-size:.78rem;cursor:pointer}
+.armory-detail label:has(:checked){border-color:#acd4bf;background:#2e4944}
+.armory-detail input{width:1rem;accent-color:#b6dbb8;margin:0}.armory-detail label strong{display:block;color:#f7efd8}
+.armory-detail .armory-buy{width:100%;min-height:44px;color:#102b27;background:#b6d9bb;border-color:#bedfc6;font-weight:720}
+.armory-detail .armory-buy:disabled{opacity:.52;cursor:default}
+.armory-shop footer{justify-content:flex-start;border-top:1px solid #425b58;padding:.6rem 1.25rem;min-height:2.6rem}
+.armory-shop footer strong{white-space:nowrap}.armory-shop footer p{color:#e1edcd;margin:0}
+@media(max-width:520px){
+ .armory-counter{display:block}.armory-rack{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(5.8rem,28%);overflow-x:auto}
+ .armory-rack button{flex-direction:column;align-items:flex-start;gap:.1rem;min-height:44px}
+ .armory-rack img{width:64%;height:28px;object-fit:contain;align-self:center}.armory-detail{padding:.6rem .85rem}
+ .armory-head{padding:.5rem .85rem}.armory-head h2{font-size:1.5rem}
+}

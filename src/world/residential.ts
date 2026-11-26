@@ -232,7 +232,7 @@ export function liftOpening(l:LiftState,level:number,now:number){
 }
 export const openLift=(l:LiftState|undefined,level:number,now:number)=>!!l&&l.to===undefined&&liftOpening(l,level,now)>.82
 const radius=.205
-function hitsWall(w:Wall,x:number,z:number){
+function hitsWall(w:Wall,x:number,z:number,radius=.205){
   const side=w.axis==='x'?x:z,depth=w.axis==='x'?z:x
   if(Math.abs(depth-(w.axis==='x'?w.z:w.x))>.11+radius||Math.abs(side-(w.axis==='x'?w.x:w.z))>w.length/2+radius)return false
   return !w.openings.some(o=>o.kind!=='window'&&Math.abs(side-o.at)<o.width/2-radius)
@@ -247,12 +247,28 @@ export function doorSwing(timestamp:number|undefined,now:number){
   const t=fraction((now-Math.abs(timestamp))/DOOR_TRAVEL),eased=t*t*(3-2*t)
   return (timestamp>0?eased:1-eased)*Math.PI/2
 }
-function doorHit(d:Door,x:number,z:number,angle:number){
+function doorHit(d:Door,x:number,z:number,angle:number,radius=.205){
   const along=(d.axis==='x'?x-d.x:z-d.z)+d.width/2
   const across=(d.axis==='x'?z-d.z:x-d.x)*(d.reverse?1:-1)
   const end=along*Math.cos(angle)+across*Math.sin(angle)
   const normal=across*Math.cos(angle)-along*Math.sin(angle)
   return end>-radius&&end<d.width+radius&&Math.abs(normal)<.047+radius
+}
+export function residentialOccludes(b:Building,x:number,y:number,z:number,state:ResidentialView|undefined,now:number){
+  const level=Math.floor((y+.10)/STOREY),f=b.levels[level]
+  if(!contains(b.rect,x,z,.14)||y<0||level>b.levels.length)return false
+  const s=b.stairs,inStairwell=s&&Math.abs(x-s.x)<s.width&&z>=Math.min(s.front,s.back)&&z<=Math.max(s.front,s.back)
+  const localY=y-level*STOREY
+  if(level>0&&localY<.10&&(!inStairwell||!f))return true
+  if(!f)return false
+  if(f.walls.some(w=>hitsWall(w,x,z,0)))return true
+  if(f.doors.some(d=>doorHit(d,x,z,doorSwing(state?.doors[d.id],now),0)))return true
+  if(insideLift(b,x,z)&&!openLift(state?.lifts[b.id]??{level:0,opened:0},level,now))return true
+  return f.fixtures.some(item=>{
+    if(!['fridge','wardrobe','shower'].includes(item.kind)||localY>1.95)return false
+    const p=along({x:0,z:0},x-item.x,z-item.z,-item.yaw)
+    return Math.abs(p.x)<item.w/2&&Math.abs(p.z)<item.d/2
+  })
 }
 function insideLift(b:Building,x:number,z:number,pad=0){
   return b.lift&&Math.abs(x-b.lift.x)<1.15+pad&&z>2.03-pad&&z<4.42+pad

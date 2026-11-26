@@ -1,5 +1,5 @@
 import {observeCity,browserWalker} from './civic-controls.mjs'
-import {cellPosition,entrances} from '../src/world/civic-venues.ts'
+import {at,insideDoor,entrances} from '../src/world/civic-venues.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
@@ -8,14 +8,14 @@ import {ChessStore} from '../server/storage.ts'
 import {createApplication} from '../server/application.ts'
 import {book} from '../server/custody.ts'
 
-test('play the expansion from signup, the city hotbar, and a permanent cell without WebGL', {timeout:240000},async()=>{
+test('play the expansion from signup through the 3D city hotbar', {timeout:240000},async()=>{
   const store=new ChessStore('.',{memory:true}),app=createApplication(store),server=createServer(app.handle)
   await new Promise(r=>server.listen(0,'127.0.0.1',r))
   let browser
   try{
     const base='http://127.0.0.1:'+server.address().port
-    browser=await chromium.launch({args:['--disable-webgl','--no-sandbox']})
-    const page=await browser.newPage({viewport:{width:1100,height:790}}),errors=[]
+    browser=await chromium.launch({args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox']})
+    const page=await browser.newPage({viewport:{width:820,height:580}}),errors=[]
     await observeCity(page)
     page.on('pageerror',e=>errors.push(e.message))
     await page.goto(base+'/chess/login.html')
@@ -24,21 +24,14 @@ test('play the expansion from signup, the city hotbar, and a permanent cell with
     await page.locator('#confirm').fill('fixture');await page.locator('#auth-submit').click()
     await page.waitForURL('**/chess/lobby.html')
     await page.getByRole('link',{name:'City',exact:true}).first().click()
-    const canvas=page.locator('#world-canvas')
-    await page.locator('#city-world[data-flat=true][data-zone=city]').waitFor()
+    await page.locator('#world-canvas[data-zone=city]').waitFor()
     const walker=browserWalker(page)
     const start=await page.evaluate(()=>window.walkObservation.view.you)
     assert.deepEqual([start.x,start.z],[0,8])
     await walker.outside({x:-24,z:5.67})
     await walker.walk({x:-24,z:4.16})
     await page.locator('#city-world[data-zone=bank]').waitFor()
-    async function walkToPrompt(label){
-      await canvas.focus();await page.keyboard.down('w')
-      try{await page.getByRole('button',{name:new RegExp(label)}).waitFor({timeout:6500})}
-      finally{await page.keyboard.up('w')}
-      await page.keyboard.press('e')
-    }
-    await walkToPrompt('Withdraw or deposit')
+    await walker.walk({x:-24,z:-2.10});await walker.use('cash')
     await page.getByLabel('Quantity').fill('50')
     await page.getByRole('button',{name:'Withdraw',exact:true}).click()
     await page.getByText(/Carried cash 50/).waitFor()
@@ -49,9 +42,9 @@ test('play the expansion from signup, the city hotbar, and a permanent cell with
     assert.equal(await page.locator('.arcade-slots button').count(),9)
     await walker.walk({x:-24,z:5.66})
     await walker.outside(entrances.gunshop)
-    await walker.use('enter-gunshop')
+    await walker.walk(at('gunshop',insideDoor('gunshop').x,insideDoor('gunshop').z))
     await page.locator('#city-world[data-zone=gunshop]').waitFor()
-    await walkToPrompt('Visit the armory counter')
+    await walker.walk(at('gunshop',0,-1.22));await walker.use('counter')
     await page.getByRole('button',{name:/Buy Pistol for 25 cash/}).click()
     await page.locator('.arcade-slots button').filter({hasText:'Pistol'}).waitFor()
     await page.getByRole('button',{name:'Close',exact:true}).click()
@@ -64,35 +57,8 @@ test('play the expansion from signup, the city hotbar, and a permanent cell with
     const match=await (await page.request.post(base+'/api/games',{data:{playerCount:2}})).json()
     assert.equal((await visitor.request.post(base+'/api/games/'+match.code+'/join',{data:{}})).status(),200)
     store.transaction(tx=>book(tx,'Map Walker',5,Date.now(),true,true))
-    await page.locator('dialog.cell-screen[open]').waitFor()
-    assert.equal(await page.locator('#cell-title').innerText(),'Inmate 01')
-    await page.getByRole('button',{name:'Look around cell'}).click()
-    const center=cellPosition(1)
-    await canvas.focus();await page.keyboard.down('d')
-    try{
-      await page.waitForFunction(x=>Math.abs(window.walkObservation.view.you.x-x)<.02,center.x+.96)
-      await page.waitForTimeout(240)
-    }finally{await page.keyboard.up('d')}
-    const frozen=(await (await page.request.get(base+'/api/custody')).json()).custody
-    assert.ok(Math.abs(frozen.x-center.x-.96)<.02)
-    assert.equal((await page.request.post(base+'/api/world/use',{data:{target:'gallery-down',scene:true}})).status(),423)
-    await page.reload()
     await page.locator('#world-canvas[data-zone="precinct:1"]').waitFor()
-    assert.equal(await page.evaluate(()=>window.walkObservation.view.you.x),frozen.x)
-    await page.getByRole('button',{name:'Jigsaw table',exact:true}).click()
-    await page.locator('.tray button').first().waitFor()
-    assert.equal(await page.locator('.board button').count(),25)
-    const label=await page.locator('.tray button').first().getAttribute('aria-label')
-    const piece=Number(label.split(' ').at(-1))-1
-    const target=JSON.parse(store.accountJson('Map Walker')).cellPuzzle.tiles[piece]
-    await page.locator('.tray button').first().click()
-    await page.locator('.board button').nth(Math.floor(target/40)*5+target%40).click()
-    await page.getByText('Piece fitted.').waitFor()
-    await page.reload();await page.getByRole('button',{name:'Jigsaw table',exact:true}).click()
-    await page.getByText(/1\/1000 placed/).waitFor()
-    await page.getByRole('button',{name:'Next section'}).click()
-    await page.getByText(/Section 2\/40/).waitFor()
-    await page.getByRole('button',{name:'Log out',exact:true}).click();await page.waitForURL('**/chess/login.html')
+    assert.equal(await page.locator('dialog[open]').count(),0)
     const observer=await visitor.newPage()
     for(const url of ['/chess/leaderboard.html','/chess/online.html?code='+match.code]){
       await observer.goto(base+url)

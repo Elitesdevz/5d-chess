@@ -2,6 +2,11 @@
 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#213633"><title>City | 5D Chess</title><link rel="icon" href="/chess/emblem.svg" type="image/svg+xml"><link rel="stylesheet" href="/chess/styles.css"><link rel="stylesheet" href="/chess/shell.css"><link rel="stylesheet" href="/chess/world.css"><script type="module" src="/chess/world.js"></script></head>
 <body data-page="world"><header class="masthead app-topbar"><a class="brand" id="brand-home" href="/chess/lobby.html"><img src="/chess/logo.png" width="48" height="48" alt=""><span><b>5D</b> Chess</span></a><div id="account-area" class="account-area"><a class="button" href="/chess/login.html">Log in</a></div></header>
 <main class="world" id="city-world">
+  <section id="world-unavailable" hidden aria-labelledby="unavailable-title"><h2 id="unavailable-title">City unavailable</h2><p role="alert"></p><div><a href="">Retry</a><a href="/chess/lobby.html">Back home</a></div></section>
+  <dialog class="jigsaw-dialog" id="cell-jigsaw" aria-labelledby="jigsaw-title">
+    <header><div><small>Cell table · Jigsaw</small><h2 id="jigsaw-title">Meridian at dusk</h2></div><button type="button" data-close-jigsaw aria-label="Close jigsaw" title="Close (E or Escape)" autofocus>×</button></header>
+    <div data-jigsaw-body></div>
+  </dialog>
   <canvas id="world-canvas" tabindex="0" aria-label="5D Chess City. Move with WASD or the joystick. Move the mouse or drag on touch to look. Click to capture the mouse, Escape to release it, and E to interact."></canvas>
   <div class="world-dark" aria-hidden="true"></div><div class="world-names" aria-hidden="true"></div>
   <p id="world-connection" class="world-notice" role="status">Entering the city…</p>

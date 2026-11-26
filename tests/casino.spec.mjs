@@ -54,10 +54,10 @@ test('physical dice controls, bounded camera and saved throw work with WebGL on 
  assert.equal(await page.locator('#dice-canvas').getAttribute('data-camera-locked'),'true');await page.locator('#dice-canvas').focus();await page.keyboard.press('ArrowDown');assert.equal(await page.locator('#dice-canvas').getAttribute('data-pitch'),'0.000');await page.mouse.move(190,260);await page.mouse.down();await page.mouse.move(240,310);await page.mouse.up();await page.locator('[data-phase="result"]').waitFor({timeout:30000});const motion=JSON.parse(await page.locator('#dice-canvas').getAttribute('data-throw-motion'));assert.ok(motion.x>0&&motion.z>0);assert.equal(await page.locator('#dice-canvas').getAttribute('data-camera-locked'),'false');assert.deepEqual(await view(),settled);assert.deepEqual(errors,[])
 })
 
-test('roulette works without WebGL and writes the shared receipt to history',async t=>{
- const {page,base,view,errors}=await fixture(t,['--disable-webgl'],false)
+test('roulette works in the 3D city and writes the shared receipt to history',async t=>{
+ const {page,base,view,errors}=await fixture(t,['--use-angle=swiftshader','--enable-unsafe-swiftshader'],false)
  await page.goto(base+'/chess/world.html?go=casino')
- await page.locator('[data-flat=true] #world-canvas[data-zone=hotel]').waitFor()
+ await page.locator('#world-canvas[data-zone=hotel]').waitFor()
  await page.keyboard.down('w')
  try{await page.getByRole('button',{name:/The Rift/}).waitFor()}finally{await page.keyboard.up('w')}
  await page.getByRole('button',{name:/The Rift/}).click()

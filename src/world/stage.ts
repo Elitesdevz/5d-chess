@@ -1,10 +1,9 @@
-import {civicMap} from './civic-map.ts'
 import {staffId,bankStaff} from './service-staff.ts'
-import {civicRoom,confined,tablePosition,levelOf,civicHeight,rise} from './civic-venues.ts'
+import {civicRoom,confined,tablePosition} from './civic-venues.ts'
 import {HeldModel} from './overrun-models.ts'
 import {WEAPONS,type WeaponId} from './arcade.ts'
 import {supportModel} from './arcade-art.ts'
-import {residentialAt,residentialPoints,type HomeZone} from './residential.ts'
+import {residentialAt,residentialPoints} from './residential.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
@@ -18,8 +17,7 @@ import {PlayerMotion,type PlayerSample} from './player-motion.ts'
 import {CityLighting} from './city-lighting.ts'
 import {CityAssets} from './city-assets.ts'
 import {resultRotation,v} from '../casino/scene/geometry.ts'
-import {guestFloor} from './resort.ts'
-import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,SPRINT_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
+import {CITY,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,SPRINT_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
 const TAU=Math.PI*2
@@ -33,7 +31,7 @@ function shadow(){
 }
 type Avatar={figure:Figure;tag?:HTMLElement;props?:ReturnType<typeof staffProps>;target?:WorldView['you'];sample?:PlayerSample}
 export class CityStage {
-  private renderer?:T.WebGLRenderer
+  private renderer:T.WebGLRenderer
   private gl?:WebGL2RenderingContext
   private fence:WebGLSync|null=null
   private art?:ReturnType<typeof makeWorldArt>
@@ -78,10 +76,10 @@ export class CityStage {
     const reach=WEAPONS[this.weapon].range,me=this.view.you
     let nearest=Infinity,target:string|undefined
     for(const c of this.view.arcade?.contacts??[]){
-      if(c.zone!==me.zone||c.kind==='dog'||c.kind==='helicopter')continue
-      const distance=Math.hypot(c.x-me.x,c.z-me.z)
+      if(!c.inSight||c.kind==='dog'||c.kind==='helicopter')continue
+      const distance=c.distance??Math.hypot(c.x-me.x,c.z-me.z)
       if(distance>reach||distance>=nearest)continue
-      const p=this.labelPoint.set(c.x,walkingHeight(me.zone,c.x,c.z)+1.12,c.z).project(this.camera)
+      const p=this.labelPoint.set(c.x,(c.height??walkingHeight(c.zone as WorldZone,c.x,c.z))+1.12,c.z).project(this.camera)
       // Project the city character's torso into the reticle in screen space.
       if(p.z>0&&p.z<1&&Math.abs(p.x)*this.camera.aspect<.42/Math.max(1,distance)&&Math.abs(p.y)<1.65/Math.max(1,distance)){
         nearest=distance;target=c.id
@@ -103,7 +101,7 @@ export class CityStage {
   private pitch=0
   private clock=0
   private zone?:WorldZone
-  private predictedHome?:HomeZone
+  private predictedZone?:WorldZone
   private caveOpen=true
   private pause=false
   private lastMessage=0
@@ -127,7 +125,7 @@ export class CityStage {
   position:Position={...CITY}
   get moving(){return (this.arrows.size>Number(this.arrows.has('shift'))||Math.hypot(this.stick.x,this.stick.z)>.09)&&!this.pause}
   get preparingGraphics(){return !!this.art&&!this.graphicsReady}
-  constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void,onPause:()=>void=()=>{},private onMovementChange=()=>{},private onGraphicsReady=()=>{}){
+  constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void,onPause:()=>void=()=>{},private onMovementChange=()=>{},private onGraphicsReady=()=>{},private onGraphicsError=()=>{}){
     this.canvas=canvas;this.parent=parent;this.onAction=onAction;this.onPause=onPause
     this.promptButton=parent.querySelector('[data-world-use]')!
     this.promptLabel=this.promptButton.querySelector('span')!
@@ -139,8 +137,7 @@ export class CityStage {
       renderer.setPixelRatio(Math.min(devicePixelRatio,1.4));renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.22
       this.shadow=shadow()
     }catch{
-      const flat=canvas.cloneNode() as HTMLCanvasElement;canvas.replaceWith(flat);this.canvas=flat
-      parent.dataset.flat='true'
+      throw new Error('The city requires WebGL 2. Enable hardware acceleration in your browser and try again.')
     }
     this.resize=new ResizeObserver(()=>this.fit());this.resize.observe(this.canvas)
     this.bind();this.fit();this.frame=requestAnimationFrame(this.tick)
@@ -157,15 +154,14 @@ export class CityStage {
     const housingChanged=this.view?.housing?.keys.some(key=>!view.housing?.keys.includes(key))
     const reported=sent??this.position
     const changedVenue=prior?.zone!==next.zone&&(civicRoom(next.zone)||!!prior&&civicRoom(prior.zone))
-    const inCellDialog=view.arcade?.custody&&document.querySelector('.cell-screen[open]')
     // The two flights are less than a metre apart. A wall or stair landing can
     // stop a server step sooner than prediction when the player turns a corner.
     const correctionLimit=civicRoom(next.zone)?.27:1.35
-    if(changedWorld||reposition||seatChanged||changedVenue||inCellDialog||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit){
+    if(changedWorld||reposition||seatChanged||changedVenue&&this.predictedZone!==next.zone||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
-      this.predictedHome=residentialAt(next.zone)?next.zone as HomeZone:undefined
+      this.predictedZone=next.zone
     }
-    if(changedWorld||reposition||seatChanged||changedVenue){
+    if(changedWorld||reposition||seatChanged){
       this.liftFacing=undefined
       this.yaw=next.yaw;this.pitch=0
       if(next.chair){
@@ -200,7 +196,7 @@ export class CityStage {
       const tag=this.figures.get(line.name)?.tag
       if(tag){tag.textContent=line.text;tag.classList.add('speech')}
     }
-    if(!this.art&&this.renderer)this.buildScene()
+    if(!this.art)this.buildScene()
     if(this.art){
       this.art.seal.visible=!this.caveOpen&&next.zone!=='cave'
       this.art.grotto.visible=!this.art.seal.visible
@@ -209,6 +205,7 @@ export class CityStage {
       this.art.civic(next.zone,next.x,next.z)
       const hidden=view.arcade?.recoveringStaff??[]
       this.art.staff.forEach((a,i)=>a.root.visible=!hidden.includes(i<bankStaff.length?staffId('bank',i):staffId('exchange',i-bankStaff.length)))
+      this.art.shopClerk.root.visible=!hidden.includes(staffId('gunshop',0))
       this.art.hotelClerks.forEach((a,i)=>a.root.visible=!hidden.includes(staffId('hotel',i)))
       this.art.actors.forEach((a,i)=>a.root.visible=!hidden.includes(staffId('casino',i)))
       this.art.bar.bartender.root.visible=!hidden.includes(staffId('casino',4))
@@ -227,10 +224,12 @@ export class CityStage {
     this.station=point?{point,x:0,y:0,phase:0,sent:false,fillAt:0}:undefined
     this.arrows.clear()
   }
+  get kitchenMotion(){return this.station&&{x:this.station.x,y:this.station.y}}
   private moveTool(dx:number,dy:number){
     const s=this.station,r=this.view?.restaurant,job=r?.kitchen
     if(!s||!job||s.sent)return
     s.x=T.MathUtils.clamp(s.x+dx/110,-1,1);s.y=T.MathUtils.clamp(s.y-dy/110,-1,1)
+    this.onMovementChange()
     const now=Date.now()+this.clock
     if(s.point.endsWith(':soda')){
       if(s.y>.32&&Math.abs(s.x)<.23&&!s.fillAt)s.fillAt=performance.now()+560
@@ -253,7 +252,7 @@ export class CityStage {
   private mouseLook=false
   resumeMouse(requested=false){
     if(requested)this.mouseLook=true
-    if(!this.mouseLook||this.pause||!this.renderer||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||
+    if(!this.mouseLook||this.pause||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||
       !matchMedia('(any-pointer: fine)').matches||document.pointerLockElement===this.canvas)return
     this.lockedAt=performance.now()
     this.canvas.requestPointerLock?.()?.catch(()=>{})
@@ -263,7 +262,7 @@ export class CityStage {
     this.voluntaryUnlock=true;document.exitPointerLock()
   }
   private turn(dx:number,dy:number){
-    if(this.pause||!this.renderer||this.view?.you.chair)return
+    if(this.pause||this.view?.you.chair)return
     if(this.station){this.moveTool(dx,dy);return}
     this.liftFacing=undefined
     this.yaw-=dx*.0032
@@ -276,7 +275,7 @@ export class CityStage {
     this.lighting=new CityLighting(this.art.scene)
   }
   private prepareGraphics(now:number){
-    if(this.graphicsReady||!this.art||!this.renderer)return
+    if(this.graphicsReady||!this.art)return
     if(!this.preparing){
       this.cameraView(now);this.avatars(.016,now);this.motion(now,.016)
       this.lighting?.update(this.camera)
@@ -288,7 +287,7 @@ export class CityStage {
     }
   }
   private renderScene(){
-    if(!this.art||!this.renderer)return
+    if(!this.art)return
     this.lighting?.update(this.camera)
     this.renderer.render(this.art.scene,this.camera)
   }
@@ -317,8 +316,7 @@ export class CityStage {
     if(w===this.viewportWidth&&h===this.viewportHeight)return
     this.viewportWidth=w;this.viewportHeight=h
     this.camera.aspect=w/h;this.camera.fov=w<h?67:56;this.camera.updateProjectionMatrix()
-    if(this.renderer)this.renderer.setSize(w,h,false)
-    else {this.canvas.width=w;this.canvas.height=h}
+    this.renderer.setSize(w,h,false)
   }
   private bind(){
     const {signal}=this.input,allowed=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift']
@@ -347,7 +345,7 @@ export class CityStage {
       this.turn(e.movementX,e.movementY)
     },{signal})
     this.canvas.addEventListener('pointerdown',e=>{
-      if(this.pause||!this.renderer)return
+      if(this.pause)return
       if(document.pointerLockElement===this.canvas&&this.weapon&&this.parent.hasAttribute('data-armed')){
         if(e.button===2){this.aiming=true;return}
         if(e.button===0){this.holdingFire=true;this.fireAtReticle();return}
@@ -380,7 +378,7 @@ export class CityStage {
     stick.addEventListener('pointerdown',e=>{if(this.pause||pointer!==undefined)return;e.preventDefault();pointer=e.pointerId;stick.setPointerCapture(pointer);move(e)},{signal})
     stick.addEventListener('pointermove',e=>{if(e.pointerId===pointer)move(e)},{signal})
     stick.addEventListener('lostpointercapture',()=>{pointer=undefined;this.stick={x:0,z:0};thumb.style.transform=''},{signal})
-    window.addEventListener('pagehide',e=>{if(!e.persisted){this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame);this.clearScene();this.renderer?.dispose()}},{signal})
+    window.addEventListener('pagehide',e=>{if(!e.persisted)this.stop()},{signal})
   }
   private lastCivicDirection=0
   private step(dt:number){
@@ -393,19 +391,17 @@ export class CityStage {
       if(direction!==this.lastCivicDirection){this.lastCivicDirection=direction;this.onMovementChange()}
     }
     const length=Math.max(1,Math.hypot(x,z)),speed=(this.sprinting?SPRINT_SPEED:WORLD_SPEED)*dt/length*(this.zone==='oasis'&&inPool(localSite(this.zone,this.position.x,this.position.z).x,localSite(this.zone,this.position.x,this.position.z).z)?.53:1)
-    const heading=this.renderer?this.yaw:0
-    if(!this.renderer&&(x||z))this.yaw=Math.atan2(-x,-z)
+    const heading=this.yaw
     if(this.view?.arcade?.custody){
-      if(document.querySelector('.cell-screen[open]'))return
       Object.assign(this.position,confined(this.view.arcade.custody.cell,
         this.position.x+(x*Math.cos(heading)+z*Math.sin(heading))*speed,
         this.position.z+(z*Math.cos(heading)-x*Math.sin(heading))*speed))
     }else if(x||z){
       const dx=x*Math.cos(heading)+z*Math.sin(heading),dz=z*Math.cos(heading)-x*Math.sin(heading)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
-      const zone=this.predictedHome??(residentialAt(this.zone)?'city':this.zone)
-      const {homeZone,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,(this.sprinting?SPRINT_SPEED:WORLD_SPEED)*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock,this.view?.traffic?.vehicles)
-      this.position=position;this.predictedHome=homeZone
+      const zone=this.predictedZone??this.zone
+      const {zone:destination,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,(this.sprinting?SPRINT_SPEED:WORLD_SPEED)*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock,this.view?.traffic?.vehicles)
+      this.position=position;this.predictedZone=destination
     }
     this.position.yaw=this.yaw
   }
@@ -413,13 +409,13 @@ export class CityStage {
     const {x,z}=this.position
     if(this.view===this.promptedView&&x===this.promptedX&&z===this.promptedZ)return
     this.promptedView=this.view;this.promptedX=x;this.promptedZ=z
-    const zone=this.predictedHome??(this.zone&&(guestFloor(this.zone)||civicRoom(this.zone)||this.zone.startsWith('floor:'))?this.zone:groundZone(this.position.x,this.position.z))
+    const zone=this.predictedZone??this.zone??groundZone(x,z)
     const seated=this.view?.you.boardSeat!==undefined||this.view?.you.barSeat!==undefined
     const pose=this.view?.you.homePose
     let candidate:WorldAction|undefined
     if(this.view?.arcade?.custody){
       const b=this.view.arcade.custody,{x:tx,z:tz}=tablePosition(b.cell)
-      if(b.ends===null&&Math.hypot(x-tx,z-tz)<1.7)candidate={id:'cell-table',label:'Sit at the jigsaw table',x:tx,z:tz}
+      if(b.ends===null&&Math.hypot(x-tx,z-tz)<1.7)candidate={id:'cell-table',label:'Open jigsaw table',x:tx,z:tz}
     }
     else if(seated||pose)candidate={id:'stand-scenery',label:pose?.kind==='rest'?'Get up':'Stand up',x,z}
     else if(this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift){
@@ -427,7 +423,6 @@ export class CityStage {
         [...interactions(zone,this.view?.housing?.keys),...boardPoints(zone,this.view?.boardTaken),...residentialPoints(zone,this.position,this.view?.housing?.keys??[],this.view?.residential)]
       let best=Infinity
       for(const point of points){
-        if(point.id==='gallery-up'&&civicRoom(zone)&&civicHeight(zone,x,z)<(levelOf(zone)+1)*rise-.47)continue
         const squared=(x-point.x)**2+(z-point.z)**2
         if(squared<best&&squared<=(point.range??1.65)**2){candidate=point;best=squared}
       }
@@ -466,7 +461,7 @@ export class CityStage {
       }
       const sample=motion?current.sample:undefined
       const height=sample?.height??riderHeight(member,now)
-      figure.root.position.y=local&&!member.lift?walkingHeight(this.predictedHome??member.zone,this.position.x,this.position.z):
+      figure.root.position.y=local&&!member.lift?walkingHeight(this.predictedZone??member.zone,this.position.x,this.position.z):
         height
       const cleaning=(member.workingUntil??0)>now&&(member.workKind==='mop'||member.workKind==='wipe')
       if((member.carrying||cleaning||member.kfcRole)&&!current.props)current.props=staffProps(figure.root)
@@ -477,7 +472,7 @@ export class CityStage {
         current.props.mop.visible=cleaning&&member.workKind==='mop'
         current.props.mop.rotation.z=.19+Math.sin(now*.008)*.13
       }
-      figure.pose(member.online?dt:0,member.online?now:0,local?this.position:sample,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now,member.homePose)
+      figure.pose(member.online?dt:0,member.online?now:0,local?this.position:sample,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now,member.homePose,local?this.kitchenMotion:member.kitchenMotion)
       const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
       if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
       if(interior){
@@ -564,7 +559,7 @@ export class CityStage {
       this.yaw=from+delta*progress*progress*(3-2*progress)
       if(progress===1)this.liftFacing=undefined
     }
-    this.camera.position.set(x,(me&&!me.lift?walkingHeight(this.predictedHome??(residentialAt(me.zone)?'city':me.zone),x,z):me?riderHeight(me,now):0)+(me?.homePose?(me.homePose.kind==='rest'?me.homePose.height+.16:me.homePose.height+.91):(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE)),z)
+    this.camera.position.set(x,(me&&!me.lift?walkingHeight(this.predictedZone??me.zone,x,z):me?riderHeight(me,now):0)+(me?.homePose?(me.homePose.kind==='rest'?me.homePose.height+.16:me.homePose.height+.91):(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE)),z)
     if(me?.zone==='oasis'){
       const p=localSite('oasis',x,z)
       if(inPool(p.x,p.z))this.camera.position.y+=Math.sin(now*.0027)*.055
@@ -588,7 +583,6 @@ export class CityStage {
       const side=fryer||soda
       this.camera.position.set(p.x-(side?1.16:0),1.90,p.z+(side?0:1.09))
       this.camera.lookAt(p.x,1.16,p.z)
-      if(!this.pause&&s.fillAt&&performance.now()>=s.fillAt)this.completeTool('fill')
     }
     this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt,!!s?.phase)
     const free=!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
@@ -622,6 +616,7 @@ export class CityStage {
     this.art.urban(this.view?.traffic,dt,this.reduced)
     this.art.homes.update(this.view?.residential,this.view?.housing?.occupied,now,dt,this.position.x,this.position.z)
     if(!this.reduced){this.art.ambient?.(now);this.art.restaurant.tick(now)}
+    if(this.zone==='gunshop')this.art.shopClerk.pose(now,this.view?.interaction==='counter'?.16:0)
     if(this.zone==='hotel')this.art.hotelClerks.forEach(actor=>actor.pose(now))
     if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))
     const zones=[this.view?.you.zone,this.view?.you.lift?.to].filter((z):z is WorldZone=>!!z)
@@ -660,8 +655,19 @@ export class CityStage {
       }else{die.quaternion.copy(resultRotation(n));die.position.set(0,1.165,.08)}
     }
   }
+  stop(){
+    if(this.input.signal.aborted)return
+    this.lock(true)
+    this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame)
+    this.clearScene();this.renderer.dispose()
+  }
   private tick=(time:number)=>{
+    try{this.updateFrame(time)}catch(error){
+      console.error('City graphics failed',error);this.stop();this.onGraphicsError();return
+    }
     this.frame=requestAnimationFrame(this.tick)
+  }
+  private updateFrame(time:number){
     if(document.hidden){this.lastStep=0;return}
     const stepTime=Math.min(.25,(time-(this.lastStep||time))/1000)
     this.lastStep=time
@@ -670,6 +676,7 @@ export class CityStage {
       this.prepareGraphics(Date.now()+this.clock)
       if(this.preparingGraphics)return
     }
+    if(!this.pause&&this.station?.fillAt&&time>=this.station.fillAt)this.completeTool('fill')
     this.step(stepTime);this.prompt()
     const moving=this.moving
     if(moving!==this.wasMoving){this.wasMoving=moving;this.onMovementChange()}
@@ -678,40 +685,16 @@ export class CityStage {
       this.gl.deleteSync(this.fence);this.fence=null
     }
     const dt=Math.min(.14,(time-this.last)/1000||.035);this.last=time
-    if(this.art&&this.renderer){
+    if(this.art){
       const now=Date.now()+this.clock
       this.cameraView(now);this.avatars(dt,now);this.motion(now,dt)
       this.renderScene()
       if(this.gl){this.fence=this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE,0);this.gl.flush()}
-    }else if(!this.renderer)this.drawFlat()
+    }
     const zone=this.zone??''
     if(this.canvas.dataset.zone!==zone)this.canvas.dataset.zone=zone
     const {x,z}=this.position,ground=!this.zone?.startsWith('floor:')&&groundZone(x,z)
     const opacity=ground==='cave'?String(Math.max(0,(7.7-localSite('cave',x,z).z)/15)**1.55*.94):'0'
     if(this.darkness.style.opacity!==opacity)this.darkness.style.opacity=opacity
-  }
-  private drawFlat(){
-    const c=this.canvas,ctx=c.getContext('2d')
-    if(!ctx)return
-    if(this.view&&civicMap(ctx,c.width,c.height,this.view,this.position))return
-    const w=c.width,h=c.height,size=this.zone==='city'?Math.min(12,w/38):Math.min(42,w/14),o=this.position
-    const project=(x:number,z:number)=>[w/2+(x-o.x)*size,h/2+(z-o.z)*size] as const
-    ctx.fillStyle='#14272d';ctx.fillRect(0,0,w,h)
-    ctx.strokeStyle='#779d9151';ctx.lineWidth=1
-    for(let i=-64;i<65;i+=2){const [x,z]=project(i,i);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.moveTo(0,z);ctx.lineTo(w,z);ctx.stroke()}
-    const landmarks=this.zone&&(guestFloor(this.zone)||this.zone.startsWith('floor:'))?interactions(this.zone,this.view?.housing?.keys):[
-      ...CITY_PORTALS.filter(p=>p.to!=='cave'||this.caveOpen).map(p=>({x:p.x,z:p.z,label:p.label||'Passage'})),
-      ...['hotel','casino','bank','exchange'].flatMap(zone=>interactions(zone as WorldZone)),
-      {...site('hotel',0,-7.9),label:'Gaming floor'},
-    ]
-    if(this.zone){
-      landmarks.push(...interactions(this.zone),...residentialPoints(this.zone,o,this.view?.housing?.keys??[],this.view?.residential))
-      for(const c of this.view?.arcade?.contacts??[])landmarks.push({...c,label:c.label})
-      for(const d of this.view?.arcade?.drops??[])landmarks.push({...d,label:'Dropped items'})
-
-    }
-    for(const p of landmarks){const [x,y]=project(p.x,p.z);ctx.fillStyle='#8fe2b5';ctx.fillRect(x-8,y-8,16,16);ctx.fillStyle='#dfedda';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText(p.label,x,y-12)}
-    for(const other of this.view?.players??[]){const [x,z]=project(other.x,other.z);ctx.fillStyle='#f1c78b';ctx.beginPath();ctx.arc(x,z,5,0,TAU);ctx.fill();ctx.fillText(other.name,x,z+17)}
-    ctx.fillStyle='#b0eada';ctx.beginPath();ctx.arc(w/2,h/2,7,0,TAU);ctx.fill()
   }
 }

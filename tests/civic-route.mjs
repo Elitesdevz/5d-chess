@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import {cityRoute} from '../server/city-life.ts'
-import {at,entrances,stair} from '../src/world/civic-venues.ts'
+import {at,entrances,insideDoor,stair} from '../src/world/civic-venues.ts'
 
 export function visitorRoute(action,advance){
   let view
@@ -29,15 +29,16 @@ export function visitorRoute(action,advance){
     await read()
     if(view.you.zone==='bank')assert.ok(await walk({x:-24,z:5.65}))
     assert.equal(view.you.zone,'city')
-    await outside(entrances[id]);return use('enter-'+id)
+    await outside(entrances[id]);const p=insideDoor(id)
+    assert.ok(await walk({...at(id,p.x,p.z),yaw:p.yaw}));return view
   }
   async function step(x,z){assert.ok(await walk(at('station',x,z)),JSON.stringify({x,z,from:view.you}))}
   async function climb(){
     await step(stair.up,0);await step(stair.up,2.90);await step(stair.down,2.90)
-    await step(stair.down,stair.start+.12);return use('gallery-up')
+    await step(stair.down,stair.start-.38);return view
   }
   async function descend(){
-    await step(stair.down,stair.start-.53);await use('gallery-down')
+    await step(stair.down,stair.start-.53)
     await step(stair.down,2.90);await step(stair.up,2.90);await step(stair.up,0)
     return view
   }

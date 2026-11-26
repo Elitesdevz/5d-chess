@@ -10,6 +10,7 @@ export class CityAssets {
   private meshCursor=0
   private textureCursor=0
   private shadersReady=false
+  private shaderFailure=false
   private scratch=new T.Scene()
   private camera=new T.Camera()
   private target=new T.WebGLRenderTarget(1,1)
@@ -40,10 +41,11 @@ export class CityAssets {
     })
     this.textures=[...textures]
     for(const probe of [...this.plain,...this.instanced])probe.frustumCulled=false
-    void renderer.compileAsync(scene,camera).then(()=>{this.shadersReady=true},()=>{this.shadersReady=true})
+    void renderer.compileAsync(scene,camera).then(()=>{this.shadersReady=true},()=>{this.shaderFailure=true})
   }
 
   step(){
+    if(this.shaderFailure)throw new Error('City shaders could not load.')
     const renderer=this.renderer,deadline=performance.now()+4
     // Cap each batch as well as its CPU budget so GLES uploads stay bounded
     // even when the driver queues transfers quickly on the caller thread.

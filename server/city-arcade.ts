@@ -2,7 +2,10 @@ import {deskFurniture,at,insideDoor,venue} from '../src/world/civic-venues.ts'
 import {randomUUID} from 'node:crypto'
 import type {ChessStore,UnitOfWork} from './storage.ts'
 import {CLEAR_MINUTES,MAX_HP,WEAPONS,isWeapon,type ArcadeView,type Contact,type Stack,type Item} from '../src/world/arcade.ts'
-import {near,localSite,site,type WorldPlayer} from '../src/world/model.ts'
+import {actorDistance,clearSight} from '../src/world/sight.ts'
+import type {Vehicle} from '../src/world/traffic.ts'
+import type {ResidentialView} from '../src/world/residential.ts'
+import {near,localSite,site,riderHeight,type WorldPlayer} from '../src/world/model.ts'
 import {UNITS,type Deeds} from '../src/world/housing.ts'
 import {buildingById,homeZone,residentialSite,residentialAt,contains} from '../src/world/residential.ts'
 import {ROOMS,center,guestFloor,roomAt} from '../src/world/resort.ts'
@@ -13,8 +16,9 @@ import {fail} from './http.ts'
 type Located={x:number;z:number;zone:string}
 type Drop=Located&{id:string;items:Stack[]}
 type NpcHealth={hp:number;returns:number}
-type Scene={world:string;shard:number;me:WorldPlayer;players:WorldPlayer[];residents:(Located&{id:string;name:string})[];keys:string[];drawer?:string;bank:boolean;shop:boolean}
+type Scene={residential?:ResidentialView;vehicles?:readonly Vehicle[];caveOpen?:boolean;world:string;shard:number;me:WorldPlayer;players:WorldPlayer[];residents:(Located&{id:string;name:string})[];keys:string[];drawer?:string;bank:boolean;shop:boolean}
 type Search={id:string;world:string;units:Contact[];cursor:number;lastKnown:Located;last:number;arrived:number;raidAt:number;dogAt:number;dogWarningUntil?:number;searched:string[];warning:string}
+const longestRange=Math.max(...Object.values(WEAPONS).map(w=>w.range))
 const searchSites=[
   ...UNITS.map(unit=>{
     const building=buildingById.get(unit.block===undefined?unit.id:'block-'+unit.block)!
@@ -167,9 +171,14 @@ export class CityArcade {
     const patrols=()=>[...this.searches.values()].filter(search=>search.world===world&&now-search.last<30000).flatMap(search=>search.units)
     const staff=[...this.staff(now),...patrols()]
     const bookings=roster(this.store,now)
-    const people:Contact[]=s.players.filter(o=>o.name!==me.name&&!bookings.some(b=>b.user===o.name)).map(o=>({x:o.x,z:o.z,zone:o.zone,id:'player:'+o.name,label:o.name,kind:'player'}))
+    const people:Contact[]=s.players.filter(o=>o.zone!=='private'&&o.name!==me.name&&!bookings.some(b=>b.user===o.name)).map(o=>({x:o.x,z:o.z,zone:o.zone,height:riderHeight(o,now),id:'player:'+o.name,label:o.name,kind:'player'}))
     const civilians:Contact[]=[...people,...s.residents.map(o=>({...o,id:o.id,label:o.name,kind:'resident' as const}))]
     const targets=[...staff,...civilians]
+    const observer={...me,height:riderHeight(me,now)},visibility=new Map<string,boolean>()
+    const canTarget=(c:Contact)=>{
+      if(!visibility.has(c.id))visibility.set(c.id,clearSight(observer,c,s,now))
+      return visibility.get(c.id)!
+    }
     let respawn:string|undefined
     const saved=data?undefined:this.store.cityPack(me.name)
     const {p,drops,health}=saved&&Object.keys(saved.drawers).every(id=>s.keys.includes(id))?{
@@ -195,8 +204,8 @@ export class CityArcade {
           }
           if(now<(p.nextShot??(p.lastShot??-Infinity)+WEAPONS.blaster.delay))fail(409,'Weapon recharging')
           if(!magazine.rounds)fail(409,'Reload your weapon')
-          const t=targets.find(c=>c.id===data.target&&c.zone===me.zone&&near(me,c.x,c.z,weapon.range))
-          if(data.target&&!t)fail(409,'Target moved out of range')
+          const t=targets.find(c=>c.id===data.target&&actorDistance(observer,c)<=weapon.range&&canTarget(c))
+          if(data.target&&!t)fail(409,'Target is out of sight or range')
           magazine.rounds--;p.nextShot=now+weapon.delay
           p.lastShot=now;p.lastHit=!!t;advance(p,1)
           if(t?.kind==='player'){
@@ -225,7 +234,7 @@ export class CityArcade {
           if(i<0)fail(409,'Move closer to an available drop')
           for(const item of drops[i].items)carry(p,item.item,item.count)
           drops.splice(i,1);tx.putMetadata(dropKey,drops);mirrorFood(a)
-        }else transfer(a,op,data.item as Item,quantity(data.amount??1),s.bank,s.shop,s.drawer,now)
+        }else transfer(a,op,data.item as Item,quantity(data.amount??1),s.bank,s.shop,s.drawer,now,data.payment)
         p.sequence++
       }
       return {p,drops,health}
@@ -234,7 +243,15 @@ export class CityArcade {
     const search=this.searches.get(me.name)
     // A raid has its own write transaction after the encounter.
     if(search?.raidAt===now&&search.cursor)Object.assign(p,this.store.cityPack(me.name))
-    const contacts=[...this.staff(now),...patrols(),...civilians].filter(t=>t.zone===me.zone&&near(me,t.x,t.z,36)&&!(health[t.id]?.returns>now)).map(t=>({...t,hp:t.kind==='player'?this.store.cityStats(t.label)?.hp??MAX_HP:health[t.id]?.hp||MAX_HP}))
+    const armed=p.slots.some(slot=>isWeapon(slot?.item))
+    const contacts:Contact[]=[]
+    for(const t of [...this.staff(now),...patrols(),...civilians]){
+      if(me.zone==='private'||t.zone==='private'||health[t.id]?.returns>now||!near(me,t.x,t.z,36))continue
+      const distance=actorDistance(observer,t)
+      if(distance>36)continue
+      const hp=t.kind==='player'?this.store.cityStats(t.label)?.hp:health[t.id]?.hp
+      contacts.push({...t,distance,inSight:armed&&distance<=longestRange&&canTarget(t),hp:hp??MAX_HP})
+    }
     if(p.stars===5&&search){const lead=search.units[0];contacts.push({...lead,id:'heli',label:'Police helicopter',kind:'helicopter',hp:100},{...lead,x:lead.x+.8,id:'dog',label:'Dog team',kind:'dog',hp:100})}
     const view:ArcadeView={magazines:p.magazines,lastShot:p.lastShot,lastHit:p.lastHit,sequence:p.sequence,slots:p.slots,hp:p.hp,stars:p.stars,remaining:p.remaining,contacts,
       drops:drops.filter(d=>d.zone===me.zone&&near(me,d.x,d.z,28)).map(({id,x,z})=>({id,x,z})),

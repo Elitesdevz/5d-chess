@@ -37,6 +37,7 @@ export const SUPPLIES={
 } as const
 export const stationPoint=(slot:number)=>({x:GRILLS[slot],z:-5.46})
 export type Ingredient='bun'|'raw'|'bag'|'cup'
+export type KitchenMotion={x:number;y:number}
 export type KitchenHand=Ingredient|MenuItem|'tray'
 export type Patty='empty'|'raw'|'flipped'
 export type KitchenJob={ticket:TicketView;done:OrderItems;hand?:KitchenHand;bun:boolean;patty:Patty;readyAt:number}

@@ -1,13 +1,13 @@
 import {HOTEL_LIFT,guestFloor,resortPoints,resortWalkable,poolDepth,type GuestFloor,type ResortView} from './resort.ts'
-import {civicRoom,civicActions,civicHeight,levelOf,rise,originOf,footprint,insideDoor,type Gallery} from './civic-venues.ts'
-import {entrances,origins,venueWalk,type ArcadeView,type Venue} from './arcade.ts'
+import {civicRoom,civicActions,civicHeight,groundVenue,openDoorway,nextCivicFloor,levelOf,rise,originOf,footprint,insideDoor,type Gallery} from './civic-venues.ts'
+import {origins,venueWalk,type ArcadeView,type Venue} from './arcade.ts'
 import {PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
 import {vehicleContains,type TrafficView,type Vehicle} from './traffic.ts'
 import type {ResidentView} from './city-residents.ts'
 import {residentialAt,residentialHeight,residentialStep,type HomeZone,type HomePose,type ResidentialView} from './residential.ts'
 import {propertyPoints,officeObstacle,type HousingView} from './housing.ts'
 import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
-import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type OrderItems} from './restaurant-model.ts'
+import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type KitchenMotion,type OrderItems} from './restaurant-model.ts'
 import {basinBed,tunnelBed,inPool,poolLevel,OASIS_MOUTH,CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,passableLand,terrainHeight} from './terrain.ts'
 import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
@@ -20,8 +20,8 @@ FLOOR_LIST.push({symbol:'CAS',name:'The Casino'},{symbol:'BNK',name:'Fifth Dimen
 export const stockFloor=(symbol:string)=>symbol==='CAS'||symbol==='BNK'||STOCK_SYMBOLS.has(symbol)
 export type PublicZone=GuestFloor|Gallery|Venue|'city'|'hotel'|'casino'|'bank'|'exchange'|'kfc'|'cave'|'oasis'|`floor:${string}`|HomeZone
 export type WorldZone=PublicZone|'private'
-export type Destination='city'|'casino'|'bank'|'stocks'|'kfc'
-export const DESTINATIONS={city:'city',casino:'hotel',bank:'bank',stocks:'exchange',kfc:'kfc'} as const
+export const DESTINATIONS={city:'city',casino:'hotel',bank:'bank',stocks:'exchange',kfc:'kfc',gunshop:'gunshop',prison:'station'} as const
+export type Destination=keyof typeof DESTINATIONS
 export const CITY_PORTALS=[
   {to:'hotel',x:0,z:-7,label:'Royal Hotel & Casino'},
   {to:'bank',x:-24,z:5,label:'Fifth Dimension Bank'},
@@ -82,7 +82,7 @@ export function spawn(zone:WorldZone,point=levelOf(zone)?{x:0,z:0,yaw:0}:guestFl
   return {...site(zone,point.x,point.z),yaw:point.yaw+(reverse(zone)<0?Math.PI:0)}
 }
 export type LiftRide={to:WorldZone;started:number;ends:number}
-export type WorldPlayer=HallPlayer&{zone:WorldZone;equipped?:import('./arcade.ts').WeaponId;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;carriedItems?:OrderItems;shower?:{room:number;until:number};barSeat?:number;boardSeat?:number;homePose?:HomePose}
+export type WorldPlayer=HallPlayer&{zone:WorldZone;equipped?:import('./arcade.ts').WeaponId;lift?:LiftRide;dining?:number;eatingUntil?:number;carrying?:boolean;workingUntil?:number;workKind?:WorkKind;kfcRole?:KfcRole;kitchenHand?:KitchenHand;kitchenMotion?:KitchenMotion;carriedItems?:OrderItems;shower?:{room:number;until:number};barSeat?:number;boardSeat?:number;homePose?:HomePose}
 export function riderHeight(player:WorldPlayer,now:number){
   const from=residentialHeight(player.zone,player.x,player.z)??floorHeight(player.zone),ride=player.lift
   if(!ride)return walkingHeight(player.zone,player.x,player.z)
@@ -112,7 +112,7 @@ export interface WorldView{
 function localInteractions(zone:WorldZone,keys:readonly string[]):WorldAction[]{
   if(zone==='hotel'||guestFloor(zone))return resortPoints(zone,keys)
   if(civicRoom(zone))return civicActions(zone)
-  if(zone==='city')return [...Object.entries(entrances).map(([id,p])=>({...p,range:.95,id:'enter-'+id,label:id==='station'?'Enter Meridian Police':'Enter arcade gun shop'})),...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
+  if(zone==='city')return [...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
   const home=residentialAt(zone)
   if(home?.building.block!==undefined&&home.level===0&&!home.stairs)return propertyPoints().filter(p=>p.id==='property:desk-'+home.building.block)
   if(zone==='casino')return [
@@ -128,8 +128,19 @@ function localInteractions(zone:WorldZone,keys:readonly string[]):WorldAction[]{
 export const interactions=(zone:WorldZone,keys:readonly string[]=[])=>localInteractions(zone,keys).map(action=>({...action,...site(zone,action.x,action.z)}))
 export const near=(p:Position,x:number,z:number,max=1.65)=>Math.hypot(p.x-x,p.z-z)<=max
 const box=(x:number,z:number,a:number,b:number,w:number,d:number)=>Math.abs(x-a)<w&&Math.abs(z-b)<d
-const buildings=['hotel','casino','bank','exchange','kfc'] as const
+export const buildings=['hotel','casino','bank','exchange','kfc'] as const
+// The public room shells use the same openings for walking and sight.
+export function publicWall(room:typeof buildings[number],x:number,z:number,pad:number,upper=false){
+  const {width,back,front}=PLAN[room],side=Math.abs(x)
+  const opening=room==='bank'?1.13:room==='exchange'?1.02:room==='kfc'?1.28:1.25
+  if(side>=width+pad||z<=back-pad||z>=front+pad)return false
+  if(side>width-pad)return true
+  if(Math.abs(z-front)<pad)return upper||side>=opening
+  return Math.abs(z-back)<pad&&(upper||room!=='hotel'||side>=1.25)
+}
 export function groundZone(x:number,z:number):PublicZone{
+  const civic=groundVenue(x,z)
+  if(civic)return civic
   for(const zone of buildings){
     const room=PLAN[zone],p=localSite(zone,x,z)
     if(Math.abs(p.x)<room.width&&p.z>=room.back&&p.z<room.front)return zone
@@ -161,13 +172,12 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
     const p=localSite(zone,x,z),shaft=Math.abs(p.x)<1.42
     return Math.abs(p.x)<7.72&&p.z<7.29&&p.z>(shaft?-6.21:-5.98)&&!roomObstacles(zone,p.x,p.z)
   }
+  if(openDoorway(x,z))return true
   if(Object.entries(footprint).some(([key,b])=>{const o=origins[key as Venue];return box(x,z,o.x,o.z,b.w/2+.15,b.d/2+.15)}))return false
   if(urbanObstacle(x,z)||officeObstacle(x,z)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z))return false
   for(const room of buildings){
-    const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x),opening=room==='bank'?1.13:room==='exchange'?1.02:room==='kfc'?1.28:1.25
-    if(side<width+.28&&side>width-.28&&p.z>back-.28&&p.z<front+.28)return false
-    if(side<width+.28&&Math.abs(p.z-front)<.28&&side>=opening)return false
-    if(side<width+.28&&Math.abs(p.z-back)<.28&&(room!=='hotel'||side>=1.25))return false
+    const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x)
+    if(publicWall(room,p.x,p.z,.28))return false
     if(side<width&&p.z>=back&&p.z<front){
       if(room==='exchange'&&p.z<-5.93&&(side>=1.42||p.z<-6.21))return false
       if(roomObstacles(room,p.x,p.z))return false
@@ -180,14 +190,25 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
   return true
 }
 export const outdoorWalkable=(x:number,z:number)=>walkable('city',x,z,true)
-export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true,keys:readonly string[]=[],residential?:ResidentialView,now=Date.now(),vehicles:readonly Vehicle[]=[]):Position&{homeZone?:HomeZone}{
+export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:number,caveOpen=true,keys:readonly string[]=[],residential?:ResidentialView,now=Date.now(),vehicles:readonly Vehicle[]=[]):Position&{zone:WorldZone}{
   const d=Math.hypot(x-from.x,z-from.z)
-  if(!Number.isFinite(d)||d===0||limit<=0)return {x:from.x,z:from.z,yaw:from.yaw,homeZone:residentialAt(zone)?zone as HomeZone:undefined}
+  if(!Number.isFinite(d)||d===0||limit<=0)return {x:from.x,z:from.z,yaw:from.yaw,zone}
   const scale=Math.min(1,limit/d),steps=Math.max(1,Math.ceil(d*scale/.13))
   const dx=(x-from.x)*scale/steps,dz=(z-from.z)*scale/steps
   let ax=from.x,az=from.z,current=zone
   function step(x:number,z:number){
-    if(civicRoom(current)&&Math.abs(civicHeight(current,x,z)-civicHeight(current,ax,az))>.34)return false
+    if(civicRoom(current)||current==='city'){
+      const ground=groundVenue(x,z)
+      if(civicRoom(current)||ground){
+        const next=civicRoom(current)?nextCivicFloor(current,x,az,z):ground!
+        if(civicRoom(current)&&!levelOf(current)&&!ground){
+          if(!openDoorway(x,z))return false
+          current='city';return true
+        }
+        if(!venueWalk(next,x,z)||Math.abs(civicHeight(next,x,z)-walkingHeight(current,ax,az))>.34)return false
+        current=next;return true
+      }
+    }
     if(guestFloor(current)){const p=localSite(current,x,z);return resortWalkable(current,p.x,p.z,keys)}
     if(current==='city'&&vehicles.some(v=>vehicleContains({x,z},v)&&
       (!vehicleContains({x:ax,z:az},v)||Math.hypot(x-v.x,z-v.z)<=Math.hypot(ax-v.x,az-v.z))))return false
@@ -203,5 +224,6 @@ export function worldMove(zone:WorldZone,from:Position,x:number,z:number,limit:n
     if(dx&&step(ax+dx,az))ax+=dx
     if(dz&&step(ax,az+dz))az+=dz
   }
-  return {x:ax,z:az,yaw:from.yaw,homeZone:residentialAt(current)?current as HomeZone:undefined}
+  const layered=current==='private'||guestFloor(current)||civicRoom(current)||current.startsWith('floor:')||residentialAt(current)
+  return {x:ax,z:az,yaw:from.yaw,zone:layered?current:groundZone(ax,az)}
 }

@@ -59,8 +59,29 @@ export function civicHeight(zone:CivicRoom,x:number,z:number){
   const n=levelOf(zone),o=origins.station
   return n*rise+(n<5?stairHeight(x-o.x,z-o.z):0)
 }
+const venues:readonly Venue[]=['station','gunshop']
+export function groundVenue(x:number,z:number){
+  return venues.find(id=>Math.abs(x-origins[id].x)<footprint[id].w/2&&Math.abs(z-origins[id].z)<footprint[id].d/2)
+}
+export function openDoorway(x:number,z:number){
+  return venues.some(id=>{
+    const d=front[id],o=origins[id]
+    return Math.abs(x-o.x-d.x)<.70&&Math.abs(z-o.z-d.z)<.42
+  })
+}
+// Both ends of the switchback share a floor edge. The right flight connects
+// to the gallery above it, the left flight starts on the current gallery.
+export function nextCivicFloor(zone:CivicRoom,x:number,fromZ:number,z:number):CivicRoom{
+  if(zone==='gunshop')return zone
+  const u=x-origins.station.x,edge=origins.station.z+stair.start,n=levelOf(zone)
+  if(u<=.12||u>=stair.half)return zone
+  if(fromZ>=edge&&z<edge&&n<5)return levelZone(n+1)
+  if(fromZ<edge&&z>=edge&&n>0)return levelZone(n-1)
+  return zone
+}
 export function venueWalk(zone:CivicRoom,x:number,z:number){
   const o=originOf(zone),u=x-o.x,v=z-o.z,{w,d}=footprint[design(zone)]
+  if(venue(zone)&&openDoorway(x,z))return true
   if(Math.abs(u)>w/2-.24||Math.abs(v)>d/2-.24)return false
   const inside=(r:{x:number;z:number;w:number;d:number})=>Math.abs(u-r.x)<r.w/2+.18&&Math.abs(v-r.z)<r.d/2+.18
   if(venue(zone)&&doorLeaves(zone).some(inside))return false
@@ -72,16 +93,10 @@ export function venueWalk(zone:CivicRoom,x:number,z:number){
 export function civicActions(zone:CivicRoom){
   const n=levelOf(zone)
   const actions:{id:string;label:string;x:number;z:number;range:number}[]=[]
-  if(venue(zone)){
-    const p=insideDoor(zone)
-    actions.push({...p,id:'exit-venue',label:'Exit to Civic Avenue',range:.85})
-  }
   if(zone==='gunshop'){
     actions.push({id:'counter',label:'Visit the armory counter',x:shopCounter.x,z:shopCounter.z+1,range:1.22})
   }else{
     if(!n)for(const d of deskFurniture)actions.push({id:d.id,label:d.label,x:d.x,z:d.z-.97,range:1.22})
-    if(n<5)actions.push({id:'gallery-up',label:'Enter jail level '+(n+1),x:stair.down,z:stair.start+.12,range:.32})
-    if(n)actions.push({id:'gallery-down',label:'Descend toward '+(n===1?'the lobby':'level '+(n-1)),x:stair.down,z:stair.start-.53,range:.35})
   }
   return actions
 }

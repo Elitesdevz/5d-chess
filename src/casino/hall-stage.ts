@@ -1,4 +1,5 @@
 import type {HomePose} from '../world/residential.ts'
+import type {KitchenMotion} from '../world/restaurant-model.ts'
 import * as T from 'three'
 import {OverrunPlayer} from '../world/overrun-models.ts'
 import type {WeaponId} from '../world/arcade.ts'
@@ -102,7 +103,7 @@ export class Figure {
     this.firstPerson=value;this.head.visible=!value
     if(this.rig)this.rig.root.visible=!value
   }
-  pose(dt:number,now:number,local?:Position,serving=false,eating=false,homePose?:HomePose){
+  pose(dt:number,now:number,local?:Position,serving=false,eating=false,homePose?:HomePose,kitchen?:KitchenMotion){
     const target=local??this.target,chair=this.target.chair||this.target.lounge
     const speed=Math.hypot(target.x-this.root.position.x,target.z-this.root.position.z)
     const f=local?1:1-Math.exp(-dt*10)
@@ -114,7 +115,7 @@ export class Figure {
       this.lastX=this.root.position.x;this.lastZ=this.root.position.z
       this.strideSpeed=T.MathUtils.damp(this.strideSpeed,dt?Math.min(8,distance/dt):0,12,dt)
       this.shadow.visible=!homePose
-      if(!this.firstPerson)this.rig.pose(dt,this.strideSpeed,!!chair,homePose,serving,eating,this.equipped)
+      if(!this.firstPerson)this.rig.pose(dt,this.strideSpeed,!!chair,homePose,serving,eating,this.equipped,kitchen)
       return
     }
     this.motion=T.MathUtils.damp(this.motion,!chair&&speed>.018?1:0,9,dt)

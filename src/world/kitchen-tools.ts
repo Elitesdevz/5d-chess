@@ -24,6 +24,17 @@ export function kitchenTools(scene:T.Scene){
   cylinder(stream,.004,.16,[0,0,0],dark,7)
   box(bag,[.15,.10,.12],[0,.042,0],wood,.018)
   box(bag,[.128,.016,.096],[0,.1,0],dark,.01)
+  const glove=new T.MeshStandardMaterial({color:0xf6f1df,roughness:.85})
+  for(const [tool,z,y] of [[spatula,.18,.035],[scoop,.15,.025],[cup,0,.05]] as const){
+    const grip=new T.Group();tool.add(grip);grip.name='Kitchen glove'
+    grip.position.set(tool===cup?.048:.020,y,z)
+    box(grip,[.064,.064,.088],[.019,0,0],glove,.022)
+    for(let i=0;i<4;i++)box(grip,[.052,.022,.016],[-.012,-.018,(i-1.5)*.019],glove,.008)
+    box(grip,[.050,.023,.031],[-.009,.022,-.018],glove,.010)
+    box(grip,[.063,.054,.10],[.042,-.003,.066],cream,.017)
+  }
+  const cuff=mesh(new T.CylinderGeometry(.047,.032,1,12),wood,group,[0,0,0])
+  const wrist=new T.Vector3(),elbow=new T.Vector3(.39,.10,.90),along=new T.Vector3(),up=new T.Vector3(0,1,0)
   group.visible=false
   const aim=(point:string,view:RestaurantView)=>{
     const fryer=point.endsWith(':fryer'),soda=point.endsWith(':soda')
@@ -44,6 +55,12 @@ export function kitchenTools(scene:T.Scene){
     scoop.rotation.z=-x*.55
     cup.position.set(x*.26,-.19+y*.105,.24)
     stream.position.set(cup.position.x,cup.position.y+.19,cup.position.z)
+    const tool=fryer?scoop:soda?cup:spatula
+    tool.updateMatrix()
+    wrist.set(soda?.09:.062,soda?.05:fryer?.025:.035,soda?.075:fryer?.22:.25).applyMatrix4(tool.matrix)
+    along.subVectors(elbow,wrist)
+    cuff.position.copy(wrist).lerp(elbow,.5)
+    cuff.scale.y=along.length();cuff.quaternion.setFromUnitVectors(up,along.normalize())
   }
   return {aim,show}
 }
