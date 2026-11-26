@@ -1,5 +1,5 @@
-import {CROSSINGS,distance,onRoad,point,PREVIEW_BOUNDS,STREETS,type Point} from './city-plan.ts'
-import {distSegment,pathClearance} from './urban-layout.ts'
+import {shared} from './map-data.ts'
+import {distance,point,PREVIEW_BOUNDS,type Point} from './city-plan.ts'
 
 type Cell=Point&{g:number;f:number;prior?:Cell}
 class SearchQueue {
@@ -68,14 +68,10 @@ export function findPath(from:Point,to:Point,step:number,valid:(p:Point)=>boolea
   }
   return []
 }
-const outdoorWeights=new Map<string,number>()
+const grid=shared.navigation
+export const outdoorGrid=grid.step
 export function pedestrianCost(p:Point){
-  const id=p.x+','+p.z,cached=outdoorWeights.get(id)
-  if(cached!==undefined)return cached
-  const nearCross=CROSSINGS.some(c=>Math.abs(p.x-c.x)<(c.axis==='x'?c.width/2+.8:1.54)&&Math.abs(p.z-c.z)<(c.axis==='z'?c.width/2+.8:1.54))
-  const pavement=STREETS.some(s=>s.walk>0&&distSegment(p,s.a,s.b)<s.width/2+s.walk+.25&&!onRoad(p,.05))
-  const cost=onRoad(p)?nearCross?1.15:9:pavement||pathClearance(p,.45)?1:2.2
-  outdoorWeights.set(id,cost)
-  return cost
+  const value=grid.rows[Math.round(p.z/grid.step)-grid.top]?.[Math.round(p.x/grid.step)-grid.left]
+  return value==='W'?1:value==='R'?9:value==='C'?1.15:2.2
 }
 export const cityGridBounds=(p:Point)=>p.x>=PREVIEW_BOUNDS.west-1&&p.x<=PREVIEW_BOUNDS.east+1&&p.z>=PREVIEW_BOUNDS.north&&p.z<=PREVIEW_BOUNDS.south+2

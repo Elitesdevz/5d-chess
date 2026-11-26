@@ -1,3 +1,4 @@
+import {visual} from './map-visual.ts'
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import {circle,FLEET,LANDMARKS,PARK_FEATURES,PARKING,PARKS,pond,railZ,STREETS,type Landmark, type VehicleKind} from './city-plan.ts'
@@ -64,7 +65,8 @@ function clock(parent:T.Object3D,x:number,y:number,z:number){
 }
 function building(parent:T.Object3D,b:Landmark,label:Letter){
   const g=new T.Group();g.position.set(b.x,0,b.z);g.rotation.y=b.facing<0?Math.PI:0;parent.add(g)
-  const p=new Props(),[wall,trim,accent]=palette[b.id],{w,d,h}=b,front=d/2
+  const p=new Props(),[wall,trim,baseAccent]=palette[b.id],{w,d,h}=b,front=d/2
+  const finish=visual.facades[b.id],accent=new T.Color(baseAccent).lerp(new T.Color(finish===1?0xb88656:0x4a7276),finish ? .13 : 0).getHex()
   const sign=(name:string,x:number,y:number,z:number,width:number,height=.37)=>label(g,name,[width,height],[x,y,z],'#fff2d3','#2c413f')
   const reveal=(x:number,y:number,z:number,width:number,height:number,edge=trim,c=glass)=>{
     p.box(x,y,z-.04,width,height,.10,coal)

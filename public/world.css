@@ -400,3 +400,26 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .street-row button{border:1px solid #b4976e;background:#ecd4a9;color:#302f27;padding:.45rem .7rem;border-radius:4px}
 .street-reading{padding:.65rem .85rem;border:1px solid #9a886455;border-left:4px solid #b58e60;background:#2e4139;border-radius:4px}
 .street-reading .street-row{margin-top:.6rem}
+.advisor-summary,.advisor-returns,.advisor-actions,.advisor-list-head,.advisor-stock-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.advisor-summary{background:linear-gradient(115deg,#254d40,#15362c 70%);border:1px solid #5a7b68;border-radius:9px;padding:16px;color:#fff0cb}
+.advisor-summary>div,.advisor-returns>div,.advisor-actions>div{display:grid;gap:4px}
+.advisor-summary strong{font:normal clamp(1.35rem,4vw,2rem) Georgia,serif}
+.advisor-summary small,.advisor-returns small,.advisor-actions small{color:#c3d1c6;font-size:.75rem}
+.advisor-returns{margin-top:10px;align-items:stretch;gap:6px}
+.advisor-returns>div{flex:1;padding:9px;border-bottom:2px solid #647d66;background:#1c332b}
+.advisor-note,.advisor-position,.advisor-holdings li>small{font-size:.78rem;color:#cbdbcf;line-height:1.5}
+.advisor-holdings{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:8px}
+.advisor-holdings li{display:grid;gap:6px;background:#142c23;border:1px solid #456352;border-radius:8px;padding:12px}
+.advisor-stock-title{align-items:start}.advisor-stock-title span{display:block;color:#d7ded4;font-size:.8rem}
+.advisor-actions{justify-content:start;border-top:1px solid #385044;padding-top:8px;font-variant-numeric:tabular-nums}
+.advisor-actions>div{min-width:24%}.advisor-actions button{margin-left:auto}
+.advisor-list-head{margin:10px 0}.advisor-list-head h3{margin:0}
+.advisor-holdings [data-confirm]:not([hidden]){border-top:1px solid #6a7862;padding-top:3px}
+.advisor-returns b,.advisor-holdings b,.advisor-summary b{overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+@media(max-width:460px){.advisor-summary{align-items:start;padding:10px;gap:8px}.advisor-returns{gap:4px}.advisor-returns>div{padding:7px 5px}.advisor-actions{gap:7px}}
+.advisor-list-head button,.advisor-holdings button{cursor:pointer;font:inherit;font-size:.82rem;font-weight:650;background:#29453a;color:#edf4e7;border:1px solid #6a8572;border-radius:6px;min-height:36px;padding:5px 12px}
+.advisor-holdings [data-sell]{background:#e2d2ac;color:#243b2b;border-color:#f0dfbb}
+.advisor-holdings [data-execute]{background:#c2e4c3;color:#1d3b2a}
+.advisor-holdings button:disabled{opacity:.48;cursor:default}
+.advisor-holdings button:focus-visible,.advisor-list-head button:focus-visible{outline:2px solid #ffe3a4;outline-offset:2px}
+@media(pointer:coarse),(max-width:460px){.advisor-holdings button,.advisor-list-head button{min-height:44px}}

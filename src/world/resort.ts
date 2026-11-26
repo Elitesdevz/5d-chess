@@ -40,7 +40,7 @@ export const gameStations=[
 export const bathSeats=[-14.36,-19.46]
 export function resortPoints(zone:string,keys:readonly string[]=[]){
   if(zone==='hotel')return [liftPoint,{id:'resort:desk',label:'Book a room',x:-6.25,z:-4.96},
-    {id:'resort:lottery',label:'Weekly lottery & shares',x:5.8,z:-4.85}]
+    {id:'resort:lottery',label:'Weekly lottery tickets',x:5.8,z:-4.85}]
   if(!guestFloor(zone))return []
   return [liftPoint,...(zone==='hotel:3'?[...bathSeats.map((z,i)=>({id:'bath-seat:'+i,label:'Sit by the pool',x:2.98,z,range:.82})),{id:'resort:billiards',label:'Play three-ball pool',x:-5.6,z:4.76,range:.95}]:[]),...(zone==='hotel:2'?gameStations.map(s=>({...s,id:'resort:'+s.id,range:1.28})):[]),
     ...ROOMS.filter(r=>r.floor===zone&&keys.includes(r.id)).flatMap(roomPoints)]
@@ -93,7 +93,7 @@ export interface TableView{
   dealer:number[];result?:string;turn?:string;bet?:boolean;actions:string[];hands?:{name:string;cards:number[];stake:number;active:boolean}[]
 }
 export interface LotteryView{
-  until:number;pool:number;npc:number;tickets:number;mine:number;shares:number;available:number
+  until:number;pool:number;npc:number;tickets:number;mine:number;shares:number
   last?:{winner:string;prize:number;dividend:number};dividends:number
 }
 export interface ResortView{

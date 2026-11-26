@@ -3,3 +3,7 @@ dist/
 .playwright/
 .cloudflare/
 data/
+
+.meridian/
+
+.wrangler/

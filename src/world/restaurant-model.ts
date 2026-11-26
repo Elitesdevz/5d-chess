@@ -1,5 +1,6 @@
 export const RESTAURANT_NAME='Krulliversal Fried Chicken'
-export const RESTAURANT={x:63,z:-.65,width:6.3,back:-7,front:6.5}
+import {shared} from './map-data.ts'
+export const RESTAURANT=shared.rooms.kfc
 export const MENU=[
   {id:'burger',name:'Krull burger',description:'Griddled patty on a toasted bun',price:14},
   {id:'fries',name:'Seasoned fries',description:'Bagged hot from the fryer',price:9},

@@ -1,3 +1,4 @@
+import {visual} from './map-visual.ts'
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import {MARKET,BOULEVARD_TREES} from './terrain.ts'
@@ -9,32 +10,9 @@ const cream=0xe1d0a8,bronze=0xa77b45,wood=0x684c3e,green=0x486552
 export function avenues(parent:T.Object3D){
   const p=new Scenery()
   const slab=(x:number,z:number,w:number,d:number,color:number,y:number)=>p.add('box',x,y,z,w,.012,d,color)
-  const roads=STREETS.map(s=>({x:(s.a.x+s.b.x)/2,z:(s.a.z+s.b.z)/2,length:Math.hypot(s.b.x-s.a.x,s.b.z-s.a.z),width:s.width,vertical:s.a.x===s.b.x,major:s.traffic&&s.limit>6.7,walk:s.walk,traffic:s.traffic}))
-  const xs=new Set<number>(),zs=new Set<number>()
-  for(const r of roads){
-    const lateral=r.vertical?xs:zs,along=r.vertical?zs:xs
-    const mid=r.vertical?r.x:r.z,end=r.vertical?r.z:r.x
-    for(const side of [-1,1]){
-      for(const edge of [0,.18,Math.max(.18,r.walk)])lateral.add(mid+side*(r.width/2+edge))
-      along.add(end+side*r.length/2)
-    }
-    if(r.major)for(let a=2-r.length/2;a<r.length/2-1;a+=4.4){
-      if(roads.some(other=>other.vertical!==r.vertical&&Math.abs((r.vertical?other.z:other.x)-end-a)<other.width/2+1&&Math.abs((r.vertical?other.x:other.z)-mid)<other.length/2))continue
-      if(Math.hypot(r.x+(r.vertical?0:a)-circle.x,r.z+(r.vertical?a:0)-circle.z)<circle.radius+3.45)continue
-      slab(r.x+(r.vertical?0:a),r.z+(r.vertical?a:0),r.vertical?.085:1.48,r.vertical?1.48:.085,0xcfbf9a,-.012)
-    }
-  }
-  const xx=[...xs].sort((a,b)=>a-b),zz=[...zs].sort((a,b)=>a-b)
+  for(const [x,z,w,d,c,y] of visual.markings)slab(x,z,w,d,c,y)
   const positions:number[]=[],colors:number[]=[],color=new T.Color()
-  for(let i=1;i<xx.length;i++)for(let j=1;j<zz.length;j++){
-    const l=xx[i-1],r=xx[i],t=zz[j-1],b=zz[j],x=(l+r)/2,z=(t+b)/2
-    let layer=0
-    for(const street of roads){
-      const dx=Math.abs(x-street.x),dz=Math.abs(z-street.z),offset=(street.vertical?dx:dz)-street.width/2
-      if((street.vertical?dz:dx)>=street.length/2||offset>=Math.max(.18,street.walk))continue
-      layer=Math.max(layer,offset<0&&street.traffic?(street.major?4:3):offset<.18&&street.traffic?2:1)
-    }
-    if(!layer)continue
+  for(const [l,t,r,b,layer] of visual.surfaces){
     color.setHex([0,0xb4aaa0,0xd1c5af,0x726d64,0x535a5b][layer])
     const y=-.026
     positions.push(l,y,t,l,y,b,r,y,b,l,y,t,r,y,b,r,y,t)
@@ -67,6 +45,10 @@ export function avenues(parent:T.Object3D){
     const a=path.points[i-1],b=path.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz)
     if(len>.07)p.add('box',(a.x+b.x)/2,path.purpose==='drive'?-.034:-.038,(a.z+b.z)/2,path.width,.016,len+.1,
       path.purpose==='park'?0xbda784:path.purpose==='drive'?0x827b70:0xbfb29b,Math.atan2(dx,dz))
+  }
+  for(const tile of visual.inlays){
+    const top=tile.w<.1||tile.d<.1?.014:.008
+    p.add('box',tile.x,top,tile.z,tile.w,.007,tile.d,tile.color,tile.yaw)
   }
   for(const side of [-1,1]){
     // Boulevard trees, root grates, and low rectangular parterres.
@@ -163,8 +145,9 @@ export function venueDetail(parent:T.Object3D,zone:'hotel'|'bank'|'exchange'|'ca
     }
     const desks=zone==='floor'?[-2.7,2.7]:[.63]
     for(const x of desks){
-      post(x,1.18,-1.89,.085,.31,bronze);box(x,1.48,-1.91,.85,.48,.11,0x273b3f)
-      box(x,1.47,-1.842,.73,.36,.012,symbol==='CAS'?0xa78253:0x578f8b)
+      const monitor=symbol==='LOT'?x+Math.sign(x)*.66:x
+      post(monitor,1.18,-1.89,.085,.31,bronze);box(monitor,1.48,-1.91,.85,.48,.11,0x273b3f)
+      box(monitor,1.47,-1.842,.73,.36,.012,symbol==='CAS'?0xa78253:0x578f8b)
       box(x+.68,1.08,-1.68,.36,.033,.29,cream)
     }
   }else{

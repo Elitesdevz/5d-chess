@@ -126,6 +126,10 @@ export class CityWorlds {
     const member=this.occupants.get(name)?.members.get(name)
     return typeof symbol==='string'&&Boolean(member&&now-member.seen<TIMEOUT&&member.interaction==='trader'&&member.zone==='floor:'+symbol)
   }
+  atFinancialAdvisor(name:string,now=Date.now()){
+    const m=this.occupants.get(name)?.members.get(name)
+    return !!m&&now-m.seen<TIMEOUT&&m.zone==='exchange'&&m.interaction==='advisor'
+  }
   canBank(name:string,kind:string,now=Date.now()){
     const member=this.occupants.get(name)?.members.get(name)
     return Boolean(member&&now-member.seen<TIMEOUT&&member.zone==='bank'&&member.interaction===(kind==='borrow'?'loans':'payments'))

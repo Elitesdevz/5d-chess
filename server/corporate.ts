@@ -1,3 +1,4 @@
+import {LOT_SHARES,SHARE_PRICE} from '../src/world/resort.ts'
 import {startingPolicies} from '../src/equity-v2.ts'
 import {BNK,CAS,equityPrice,fromStockUnits,toStockUnits,type EquitySymbol,type PricePoint,type StockSide} from '../src/stock-model.ts'
 import {CASINO_OWNER} from '../src/casino-model.ts'
@@ -24,7 +25,9 @@ export const ESCROW='rouletteHallEscrow'
 export const PE='\u0000pe'
 export const INVENTORY='\u0000inventory'
 export const BUYBACK='\u0000buyback'
-export const holderLabel=(id:string)=>id===PE?'Private equity':id===INVENTORY?'Company inventory':id===BUYBACK?'Company buyback':id
+const residentFunds=()=>Object.fromEntries(['Amira','Bram','Inez'].map(name=>['\u0000resident:'+name,toStockUnits(250)]))
+export const residentHolder=(id:string)=>id.startsWith('\u0000resident:')
+export const holderLabel=(id:string)=>residentHolder(id)?id.slice(10)+' (resident)':id===PE?'Private equity':id===INVENTORY?'Company inventory':id===BUYBACK?'Company buyback':id
 export const dictionary=<T>(contents:Record<string,T>={}):Record<string,T>=>Object.assign(Object.create(null),contents)
 export const symbols=[CAS,BNK] as const
 export type Order={id:string;holder:string;side:StockSide;price:number;shares:number;at:number;seq:number;initial:number;market?:{quote:number;total:number}}
@@ -33,25 +36,32 @@ type LedgerEntry={at:number;kind:string;units:number;shares?:number}
 export type Ballot={id:string;symbol:EquitySymbol;policy:string;value:number;ends:number;snapshot:Record<string,number>;votes:Record<string,'yes'|'no'>}
 export type Support={at:number;options:Record<string,number>}
 type Insolvency={at:number;need:number;stage:number;selected:number[];support:Record<string,number[]>;snapshot:Record<string,number>;outcome?:string;offer?:Ballot}
-export interface Company {
-  symbol:EquitySymbol;issued:number;inventory:number;holders:Record<string,number>;cash:number
+interface Listing {
+  issued:number;inventory:number;holders:Record<string,number>;cash:number
   price:number;quotes:PricePoint[];orders:Order[];trades:Trade[];nextOrder:number
+  ledger:LedgerEntry[];buybackCash:number;lastDividend?:{day:string;pool:number;paid:number}
+}
+export interface Company extends Listing {
+  symbol:EquitySymbol
   policy:Record<string,number>;cooldowns:Record<string,number>;supports:Record<string,Record<string,Support>>
   marks:Record<string,{shares:number;eligible:number;reached:number}>;lastBallot?:{policy:string;value:number;passed:boolean;at:number}
-  loss:number;profit:number;nextDividend:number;nextOperatingCost?:number;lastDividend?:{day:string;pool:number;paid:number}
-  ledger:LedgerEntry[];issuance:{at:number;shares:number;basis:number}[];buybackCash:number
+  loss:number;profit:number;nextDividend:number;nextOperatingCost?:number
+  issuance:{at:number;shares:number;basis:number}[]
   pending:number;receivables:number;nonperforming:number;obligations:number
   loan?:{principal:number;rate:number;opened:number;due:number}
   bankruptcy?:Insolvency;recoveryUntil:number
 }
+export interface LotteryCompany extends Listing {symbol:'LOT'}
+export type ListedCompany=Company|LotteryCompany
 export interface Companies {
+  residents:Record<string,number>; LOT:LotteryCompany;
   CAS:Company;BNK:Company;peCash:number;nextPE:number;peLadder?:true;lastSlot:number;ballot?:Ballot;reversals:Record<string,{buyer:string;at:number}>;dividendCadence?:'daily-amsterdam-v1'
 }
 export const cashUnits=toStockUnits
 export function ratio(amount:number,numerator:number,denominator=100){
   return Number(BigInt(amount)*BigInt(numerator)/BigInt(denominator))
 }
-export function journal(c:Company,kind:string,units:number,at:number,shares?:number){
+export function journal(c:ListedCompany,kind:string,units:number,at:number,shares?:number){
   c.ledger.push({kind,units,at,shares})
 }
 export function operating(c:Company,kind:string,units:number,at:number){
@@ -59,15 +69,15 @@ export function operating(c:Company,kind:string,units:number,at:number){
   journal(c,kind,units,at)
 }
 export const saveCompanies=(u:UnitOfWork,e:Companies)=>u.putMetadata(COMPANIES,e)
-export const sharesOf=(c:Company,name:string)=>c.holders[name]??0
+export const sharesOf=(c:ListedCompany,name:string)=>c.holders[name]??0
 export const eligible=(c:Company)=>c.issued-c.inventory
-export function equityPosition(c:Company,account:Account,delta:number,paid:number){
+export function equityPosition(c:ListedCompany,account:Account,delta:number,paid:number){
   const p=portfolio(account),old=p.positions[c.symbol]??{shares:0,cost:0},shares=old.shares+delta
   if(shares<0)throw new Error('Negative share holding')
   if(shares)p.positions[c.symbol]={shares,cost:fromStockUnits(delta>0?toStockUnits(old.cost)+paid:ratio(toStockUnits(old.cost),shares,old.shares))}
   else delete p.positions[c.symbol]
 }
-export function setHolding(c:Company,name:string,delta:number){
+export function setHolding(c:ListedCompany,name:string,delta:number){
   const after=sharesOf(c,name)+delta
   if(after<0)throw new Error('Negative share holding')
   if(after)c.holders[name]=after
@@ -88,9 +98,26 @@ function openingCompany(symbol:EquitySymbol,old:Legacy|undefined,now:number):Com
     loss:0,profit:symbol===CAS?old?.margin??0:old?.collectedInterest??0,nextDividend:now+7*DAY,nextOperatingCost:now+DAY,ledger:[],issuance:[],
     buybackCash:0,pending:0,receivables:0,nonperforming:0,obligations:0,recoveryUntil:0}
 }
+function openingLottery(unit:UnitOfWork,now:number):LotteryCompany{
+  const draw=unit.metadata<{holders?:{name:string;count:number}[];principal?:number}>('royalWeeklyLottery')
+  const holders=dictionary<number>(),price=toStockUnits(SHARE_PRICE)
+  let inventory=LOT_SHARES
+  for(const h of draw?.holders??[]){holders[h.name]=h.count;inventory-=h.count}
+  if(draw?.holders){
+    const {holders:oldHolders,principal,...tickets}=draw
+    unit.putMetadata('royalWeeklyLottery',tickets)
+  }
+  // The old stand always traded at par, including the day before migration.
+  const firstQuote=draw?.holders?now-DAY:now
+  return {symbol:'LOT',issued:LOT_SHARES,inventory,holders,cash:draw?.principal??0,buybackCash:0,
+    price,quotes:[{at:firstQuote,price:SHARE_PRICE}],orders:[],trades:[],nextOrder:0,ledger:[]}
+}
 export function companies(unit:UnitOfWork,now=Date.now()):Companies{
   const existing=unit.metadata<Companies>(COMPANIES)
   if(existing){
+    existing.residents??=residentFunds()
+    if(!existing.LOT){existing.LOT=openingLottery(unit,now);saveCompanies(unit,existing)}
+    existing.LOT.holders=dictionary(existing.LOT.holders)
     for(const c of [existing.CAS,existing.BNK]){
       c.holders=dictionary(c.holders)
       for(const policy of Object.keys(c.supports))c.supports[policy]=dictionary(c.supports[policy])
@@ -143,7 +170,7 @@ export function companies(unit:UnitOfWork,now=Date.now()):Companies{
       cas.profit+=toStockUnits(bet.stake)
     }
   }
-  const result={CAS:cas,BNK:bank,peCash:cashUnits(50_000),nextPE:now+DAY,lastSlot:Math.floor((now-DAY/2)/DAY)-1,reversals:{},dividendCadence:'daily-amsterdam-v1' as const}
+  const result={residents:residentFunds(),LOT:openingLottery(unit,now),CAS:cas,BNK:bank,peCash:cashUnits(50_000),nextPE:now+DAY,lastSlot:Math.floor((now-DAY/2)/DAY)-1,reversals:{},dividendCadence:'daily-amsterdam-v1' as const}
   saveCompanies(unit,result)
   return result
 }

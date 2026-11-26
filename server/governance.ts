@@ -5,8 +5,8 @@ import type {UnitOfWork} from './storage.ts'
 import {DAY,income,updateCredit} from './credit.ts'
 import {wallet} from './economy.ts'
 import {portfolio} from './cas-shares.ts'
-import {PE,BUYBACK,postCreditCollections,dictionary,holderLabel,cashUnits,assets,liabilities,shortfall,lendable,cashForDistribution,safetyReserve,coverOperatingCosts,eligible,sharesOf,ratio,journal,operating,repayCorporate,debt,companies,saveCompanies,setHolding,amsterdamDay,nextAmsterdamMidnight,type Ballot,type Company,type Companies} from './corporate.ts'
-import {book,cancelOrders,maintainOrders,offerInventory,submit} from './order-book.ts'
+import {residentHolder,PE,BUYBACK,postCreditCollections,dictionary,holderLabel,cashUnits,assets,liabilities,shortfall,lendable,cashForDistribution,safetyReserve,coverOperatingCosts,eligible,sharesOf,ratio,journal,operating,repayCorporate,debt,companies,saveCompanies,setHolding,amsterdamDay,nextAmsterdamMidnight,type Ballot,type Company,type Companies} from './corporate.ts'
+import {book,orderBookView,cancelOrders,maintainOrders,offerInventory,submit} from './order-book.ts'
 import {fail} from './http.ts'
 import {notify} from './accounts.ts'
 
@@ -198,13 +198,14 @@ function distribute(unit:UnitOfWork,e:Companies,c:Company,now:number){
   if(pool)for(const [name,shares] of Object.entries(c.holders)){
     const units=ratio(pool,shares,owners)
     if(!units)continue
-    if(name===PE)e.peCash+=units
+    if(residentHolder(name))e.residents[name]+=units
+    else if(name===PE)e.peCash+=units
     else{
       const account=unit.users.get(name)
       if(!account)continue
       wallet(account);income(account,units,now)
       const p=portfolio(account),field=c.symbol==='CAS'?'dividendsPaid':'bankDividendsPaid',amount=fromStockUnits(units)
-      p.dividends.unshift({day,shares,amount,symbol:c.symbol})
+      p.dividends.unshift({at,day,shares,amount,symbol:c.symbol})
       notify(account,{kind:'casino',title:`${c.symbol} dividend received`,detail:`You got ${amount} coins from ${c.symbol} dividends.`,code:c.symbol})
       unit.economyUsage(account.name,'/api/stocks',{action:'dividend',symbol:c.symbol,shares,coins:amount},at)
       p[field]=fromStockUnits(cashUnits(p[field]??0)+units)
@@ -289,7 +290,6 @@ export function maintainEconomy(unit:UnitOfWork,now=Date.now()){
   advanceEconomy(unit,companies(unit,now),now)
 }
 
-const displayOrder=({id,holder,side,price,shares,at}:import('./corporate.ts').Order)=>({id,holder:holderLabel(holder),side,price:fromStockUnits(price),shares,at})
 export function companyView(e:Companies,c:Company,name:string,now:number):CompanyView{
   const b=c.bankruptcy,active=e.ballot?.symbol===c.symbol?e.ballot:c.symbol==='BNK'?e.CAS.bankruptcy?.offer:undefined
   const ballotFor=(active:Ballot):BallotView=>({id:active.id,symbol:active.symbol,policy:active.policy,value:active.value,ends:active.ends,
@@ -300,8 +300,8 @@ export function companyView(e:Companies,c:Company,name:string,now:number):Compan
     profit:fromStockUnits(c.profit),losses:fromStockUnits(c.loss),availableCapital:fromStockUnits(lendable(c.symbol==='BNK'?c:e.BNK,now)),
     policies:c.policy,cooldowns:c.cooldowns,supports:Object.fromEntries(Object.entries(c.marks).map(([k,v])=>[k,v.shares])),
     supported:Object.entries(c.supports).flatMap(([p,s])=>Object.keys(s[name]?.options??{}).map(v=>key(p,Number(v)))),
-    eligible:eligible(c),votingShares:sharesOf(c,name),bids:book(c,'buy').slice(0,20).map(displayOrder),asks:book(c,'sell').slice(0,20).map(displayOrder),
-    orders:c.orders.filter(o=>o.holder===name&&o.shares).map(displayOrder),trades:c.trades.slice(-35).reverse().map(t=>({...t,buy:holderLabel(t.buy),sell:holderLabel(t.sell),price:fromStockUnits(t.price)})),
+    eligible:eligible(c),votingShares:sharesOf(c,name),...orderBookView(c,name),
+    trades:c.trades.slice(-35).reverse().map(t=>({...t,buy:holderLabel(t.buy),sell:holderLabel(t.sell),price:fromStockUnits(t.price)})),
     ballot:active&&ballotFor(active),rescueBallot:c.symbol==='BNK'&&e.CAS.bankruptcy?.offer?ballotFor(e.CAS.bankruptcy.offer):undefined,lastBallot:c.lastBallot,recoveryUntil:c.recoveryUntil,
     bankruptcy:b&&{at:b.at,day7:b.at+DAY*7,need:fromStockUnits(b.need),outcome:b.outcome,
       stage:c.symbol==='CAS'?{index:b.stage,ends:b.at+DAY*(b.stage+1),support:rescueTally(c),selected:b.selected,mine:b.support[name]}:undefined},

@@ -1,3 +1,5 @@
+import {advanceResidentStocks} from './resident-stocks.ts'
+import mapRelease from '../.meridian/manifest.json' with {type:'json'}
 import {advanceLottery} from './weekly-lottery.ts'
 import {advanceTable} from './card-salon.ts'
 import {roster,custodyView,puzzleAction,publicView} from './custody.ts'
@@ -34,6 +36,7 @@ export function createApplication(store: ChessStore) {
   const settleResort=()=>store.transaction(unit=>{
     const now=Date.now()
     advanceLottery(unit,now)
+    advanceResidentStocks(unit,now)
     for(const game of ['poker','blackjack'] as const)advanceTable(unit,game,now)
   })
   settleResort()
@@ -66,7 +69,7 @@ export function createApplication(store: ChessStore) {
           const now=Date.now(),name=user(store,req),bookings=roster(store,now)
           const booking=bookings.find(b=>b.user===name)
           const homeRead=method==='GET'&&['/api/leaderboard','/api/notifications','/api/economy'].includes(path)
-          if(booking&&!homeRead&&!['/api/login','/api/logout','/api/me','/api/custody','/api/custody/puzzle','/api/world/presence'].includes(path))
+          if(booking&&!homeRead&&!['/api/login','/api/logout','/api/me','/api/custody','/api/custody/puzzle','/api/world/presence','/api/world/map-version'].includes(path))
             fail(423,'In custody at Meridian Police')
           if(track&&name&&!path.startsWith('/api/world/'))city.arcade.active(name,now)
           return {name,booking,bookings}
@@ -100,14 +103,19 @@ export function createApplication(store: ChessStore) {
           const result=store.transaction(tx=>puzzleAction(tx,booking,method==='POST'?data:undefined))
           json(res,200,result);return
         }
+        if(path==='/api/world/map-version'&&method==='GET'){
+          if(!name)fail(401,'Log in first')
+          json(res,200,{version:mapRelease.version});return
+        }
         if(path.startsWith('/api/world/')&&method==='POST'){
           actor=user(store,req)??fail(401,'Log in first')
+          if((req.headers.origin||data.mapVersion!==undefined)&&data.mapVersion!==mapRelease.version)fail(412,'Meridian map version changed. Reload the city.')
           const action=path.slice('/api/world/'.length)
           const view=store.withWriteCheck(()=>{
             const fresh=authorize(false).booking
             if(fresh&&!booking)fail(423,'In custody at Meridian Police')
           },()=>city.update(name!,action,data))
-          json(res,200,project(view))
+          json(res,200,project({...view,mapVersion:mapRelease.version}))
           if(action==='use'||action==='floor')worldEconomyUsage(usage,store,actor,action,view)
           if(action!=='presence')logUsage(200)
           return
@@ -130,7 +138,10 @@ export function createApplication(store: ChessStore) {
           if (auth){const named=(auth.value as {user?:unknown}).user;if(typeof named==='string')actor=named;return auth}
           const me = user(unit,req) ?? fail(401,'Log in first')
           const account = ensureAccount(unit.users.get(me) ?? fail(401,'Log in first'));actor=me;beforeUsage={coins:account.wallet?.coins,elo:account.rating?.value}
-          if(method==='POST'&&(path==='/api/stocks/trade'||path==='/api/stocks/market'||path==='/api/stocks/order')&&!city.canTrade(me,data.symbol))fail(403,'Talk to the trader on that stock floor')
+          if(method==='POST'&&['/api/stocks/trade','/api/stocks/market','/api/stocks/order'].includes(path)){
+            const advisorSale=path!=='/api/stocks/order'&&data.side==='sell'&&data.sellAll===true&&city.atFinancialAdvisor(me)
+            if(!advisorSale&&!city.canTrade(me,data.symbol))fail(403,'Talk to the trader on that stock floor')
+          }
           if(method==='POST'&&['support','rescue','vote'].some(action=>path==='/api/stocks/'+action)&&!city.canVote(me,data.symbol))fail(403,'Visit the company board table')
           if(method==='POST'&&(path==='/api/bank/borrow'||path==='/api/bank/repay')&&!city.canBank(me,path.split('/').at(-1)!))fail(403,'Visit the appropriate bank counter')
           return usageApi(usage,store,me,path,method,data)

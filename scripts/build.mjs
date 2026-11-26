@@ -1,6 +1,16 @@
-import {build} from 'esbuild'
+import {build as bundle} from 'esbuild'
+import {resolve} from 'node:path'
 import {cp, mkdir, rm, readFile, writeFile, readdir} from 'node:fs/promises'
 
+// Browsers load map sections on world entry. Node embeds the same compiled bytes
+// at build time so the Pi can still start without a Cloudflare connection.
+const mapPlugin={name:'meridian-map',setup(build){
+  build.onLoad({filter:/[/\\]world[/\\]map-(data|visual)\.ts$/},({path})=>{
+    const key=path.endsWith('map-data.ts')?'shared':'visual'
+    return {contents:`import {loadSection} from './load-map.ts'; export const ${key}=await loadSection('${key}');`,resolveDir:resolve('src/world')}
+  })
+}}
+const build=options=>bundle({...options,plugins:options.platform==='node'?[]:[mapPlugin]})
 await rm('dist', {recursive: true, force: true})
 await mkdir('dist/chess', {recursive: true})
 await cp('public', 'dist/chess', {recursive: true})
@@ -24,7 +34,7 @@ await build({entryPoints: ['src/portal.ts'], bundle: true, minify: true, format:
 await build({entryPoints: ['src/online.ts'], bundle: true, minify: true, format: 'esm',
   target: ['es2022'], outfile: 'dist/chess/online.js', legalComments: 'none'})
 await build({entryPoints: ['src/store.ts'], bundle:true, minify:true, format:'esm',target:['es2022'],outfile:'dist/chess/collection.js',legalComments:'none'})
-await build({entryPoints:{world:'src/world/client.ts',bank:'src/bank-client.ts',casino:'src/casino/main.ts','roulette-hall':'src/casino/hall-client.ts'},bundle:true,minify:true,format:'esm',target:['es2022'],splitting:true,outdir:'dist/chess',entryNames:'[name]',chunkNames:'chunks/[name]-[hash]',legalComments:'none'})
+await build({entryPoints:{world:'src/world/entry.ts',bank:'src/bank-client.ts',casino:'src/casino/main.ts','roulette-hall':'src/casino/hall-client.ts'},bundle:true,minify:true,format:'esm',target:['es2022'],splitting:true,outdir:'dist/chess',entryNames:'[name]',chunkNames:'chunks/[name]-[hash]',legalComments:'none'})
 await build({entryPoints:['src/stocks.ts'],bundle:true,minify:true,format:'esm',target:['es2022'],outfile:'dist/chess/stocks.js',legalComments:'none'})
 await build({entryPoints:['src/profile.ts'],bundle:true,minify:true,format:'esm',target:['es2022'],outfile:'dist/chess/profile.js',legalComments:'none'})
 await build({entryPoints:['src/leaderboard.ts'],bundle:true,minify:true,format:'esm',target:['es2022'],outfile:'dist/chess/leaderboard.js',legalComments:'none'})
@@ -50,3 +60,14 @@ const assets = Object.fromEntries(await Promise.all(Object.entries(types).map(as
 await mkdir('.cloudflare', {recursive: true})
 await writeFile('.cloudflare/worker.mjs', `const assets = ${JSON.stringify(assets)};
 ${await readFile('scripts/edge.mjs', 'utf8')}`)
+
+const mapDir='chess/maps/meridian',manifest=JSON.parse(await readFile('.meridian/manifest.json','utf8'))
+await rm('.cloudflare/static',{recursive:true,force:true})
+for(const root of ['dist','.cloudflare/static']){
+  const dest=root+'/'+mapDir
+  await mkdir(dest,{recursive:true})
+  await cp('.meridian/manifest.json',dest+'/manifest.json')
+  for(const [key,section] of Object.entries(manifest.sections))await cp('.meridian/'+key+'.json',dest+'/'+section.file)
+}
+const cacheRules=Object.values(manifest.sections).map(s=>'/'+mapDir+'/'+s.file+'\n  Cache-Control: public, max-age=31536000, immutable')
+await writeFile('.cloudflare/static/_headers',['/'+mapDir+'/manifest.json\n  Cache-Control: no-cache',...cacheRules].join('\n')+'\n')

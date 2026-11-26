@@ -9,6 +9,8 @@ import {RouletteHall} from '../server/roulette-hall.ts'
 import {resortService} from '../server/resort.ts'
 import {advanceTable,cardAction,pokerScore} from '../server/card-salon.ts'
 import {advanceLottery} from '../server/weekly-lottery.ts'
+import {stockApi} from '../server/stock-api.ts'
+import {portfolio} from '../server/cas-shares.ts'
 import {companies} from '../server/corporate.ts'
 import {site,floorHeight,walkingHeight} from '../src/world/model.ts'
 import {blackjackTotal,ROOMS,STAY_MS,resortWalkable,slotPays} from '../src/world/resort.ts'
@@ -169,11 +171,23 @@ test('blackjack refunds unmatched seats and settles doubled and split hands agai
   assert.equal(f.db.transaction(u=>companies(u,f.now()).CAS.pending),0)
 })
 
-test('weekly draw, sales and independent redeemable shares reconcile across the boundary',t=>{
+test('legacy lottery shares migrate once, earn the draw dividend and can be sold through the exchange',t=>{
   const boundary=nextWeek(),f=fixture(t,boundary-1000)
   const initial=f.use('Ada','lottery').lottery
   assert.equal(initial.until,boundary)
-  f.order('Ada','lottery',{kind:'buy',count:3});f.order('Bea','lottery',{kind:'buy',count:1})
+  f.db.transaction(u=>{
+    const {LOT,residents,...previousEconomy}=companies(u,f.now())
+    u.putMetadata('economyV2',previousEconomy)
+    const draw=u.metadata('royalWeeklyLottery')
+    u.putMetadata('royalWeeklyLottery',{...draw,holders:[{name:'Ada',count:3},{name:'Bea',count:1}],principal:100*10000})
+    for(const [name,shares] of [['Ada',3],['Bea',1]]){
+      const a=u.users.get(name);a.wallet.coins-=shares*25;portfolio(a).positions.LOT={shares,cost:shares*25}
+    }
+  })
+  const stocks=(action,body={})=>f.db.transaction(u=>stockApi(u,u.users.get('Ada'),'/api/stocks'+action,action?'POST':'GET',body,f.now()).value)
+  assert.equal(stocks('').lottery.available,996)
+  assert.equal(stocks('').lottery.available,996)
+  assert.throws(()=>f.order('Ada','lottery',{kind:'buy',count:1}),/Exchange Tower/)
   const ticket=f.make('Bea',{kind:'ticket',count:10,draw:boundary})
   assert.equal(f.use('Bea','lottery',ticket).lottery.pool,99)
   assert.equal(f.use('Bea','lottery',ticket).lottery.mine,10)
@@ -183,8 +197,13 @@ test('weekly draw, sales and independent redeemable shares reconcile across the 
   assert.equal(next.pool,0);assert.equal(next.dividends,.75);assert.equal(next.last.winner,'Bea')
   assert.equal(f.balance('Bea'),974.25)
   assert.throws(()=>f.order('Ada','lottery',{kind:'ticket',count:1,draw:boundary}),/new draw/)
-  f.order('Ada','lottery',{kind:'sell',count:3});assert.equal(f.balance('Ada'),1000.75)
-  assert.equal(f.db.metadataValue('royalWeeklyLottery').principal,25*10000)
+  const sale=stocks('/market',{symbol:'LOT',side:'sell',shares:3,sellAll:true,id:crypto.randomUUID(),total:74.25})
+  assert.equal(sale.portfolio.dividends[0].symbol,'LOT')
+  assert.equal(f.balance('Ada'),1000)
+  assert.equal(f.db.metadataValue('royalWeeklyLottery').principal,undefined)
+  const lot=f.db.metadataValue('economyV2').LOT
+  assert.equal(lot.cash+lot.buybackCash,25.75*10000)
+  assert.equal(lot.inventory,999)
   f.tick(2*3600_000)
   const npc=f.use('Bea','lottery').lottery
   assert.ok(npc.npc>=4);assert.equal(npc.pool,npc.npc*99/10)
