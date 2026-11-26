@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
 import {chromium} from 'playwright'
-import worker from '../.cloudflare/worker.mjs'
+import worker from './helpers/healthy-frontend.mjs'
 import {initialState} from '../src/model.ts'
 async function fixture(t){const server=createServer(async(req,res)=>{const r=await worker.fetch(new Request('http://localhost'+req.url));res.writeHead(r.status,Object.fromEntries(r.headers));res.end(Buffer.from(await r.arrayBuffer()))});await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,args:['--no-sandbox']});t.after(async()=>{await browser.close();await new Promise(r=>{server.close(r);server.closeAllConnections()})});return {browser,base:'http://127.0.0.1:'+server.address().port}}
 test('flat default, full-window canvas, movable island, and guest move/replay preserve zoom',async t=>{

@@ -19,3 +19,23 @@ The landing page remains the local game for visitors who are logged out. Logged-
 Set `DATA_DIR` to a directory writable by the service account and include its `multiplayer.json` file in backups. A restart loads accounts, sessions, rooms, and game progress. The server is designed for one Node process; do not run multiple processes against the same data file. For a service manager, run `npm run server` from the repository directory with `DATA_DIR`, `HOST`, and `PORT` set in its environment. Rebuild after updating the branch, then restart that process.
 
 `npm run deploy` is the original static Cloudflare Worker command. It does not deploy the Node multiplayer server.
+
+## Update screen during redeployments
+
+On the Pi, create an empty file named `update-in-progress` in the running server's data directory. For example, from the server's working directory with the same `DATA_DIR` setting:
+
+```sh
+touch "${DATA_DIR:-data}/update-in-progress"
+```
+
+Remove the flag when the new backend is ready:
+
+```sh
+rm -f "${DATA_DIR:-data}/update-in-progress"
+```
+
+The public `GET /api/health` stays healthy during a planned update and adds `"updating": true`. This flag controls the player-facing screen. It does not drain active matches or change their clocks; use the existing server shutdown procedure for that. No browser or public endpoint can change the flag.
+
+New pages check immediately. Visible open pages check every 15 seconds and on connectivity changes. During an update players see **UPDATE IN PROGRESS**. A failed health probe brings up **SERVER UNREACHABLE**. Both offer Snake and an unrated, device-saved duel with Pip. Neither game submits moves or rewards to the API. Once the backend recovers, **Return to game** goes back to the original page. Players can finish a local game first.
+
+Cloudflare serves the screen even when the Pi is down. On HTTPS (or localhost) a small service worker also caches the practice page, games and styles after a successful visit. That lets returning players reopen the screen if the frontend itself becomes unreachable. A first-time visitor needs the frontend to load once. Publishing this feature requires the frontend build and the Node backend; the operator flag is optional.

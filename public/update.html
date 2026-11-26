@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#152726">
+<title>Update screen · 5D Chess</title><link rel="icon" href="/chess/emblem.svg"><link rel="stylesheet" href="/chess/update.css"><script type="module" src="/chess/update.js"></script>
+</head><body>
+<header><img src="/chess/emblem.svg" alt="" width="36" height="36"><b>5D Chess</b></header>
+<main>
+<section class="service" aria-labelledby="headline"><div class="signal" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<h1 id="headline" aria-live="polite">CONNECTING…</h1>
+<p id="message">Checking the game server.</p>
+<div class="actions"><a id="practice" hidden href="/chess/practice.html">Play chess with AI <span aria-hidden="true">→</span></a><a id="back" hidden>Return to game <span aria-hidden="true">→</span></a><button id="retry" type="button">Check connection</button></div>
+<p class="note">Games here run on this device. No coins or ratings are awarded.</p></section>
+<section class="arcade" aria-labelledby="snake-title">
+<div class="scorebar"><h2 id="snake-title">Snake</h2><span>Score <strong id="score">0</strong></span></div>
+<div class="board"><canvas id="snake" width="360" height="360" tabindex="0" aria-label="Snake board. Use the arrow keys, WASD, or the direction buttons."></canvas>
+<div id="cover"><button type="button" id="start">Play Snake</button></div></div>
+<div class="foot"><div><p id="snake-status" role="status">Arrow keys or WASD</p><button type="button" id="pause" hidden>Pause</button></div>
+<div class="pad" role="group" aria-label="Snake direction"><button data-dir="up" aria-label="Up">↑</button><button data-dir="left" aria-label="Left">←</button><button data-dir="down" aria-label="Down">↓</button><button data-dir="right" aria-label="Right">→</button></div></div>
+</section>
+</main></body></html>
