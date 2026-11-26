@@ -24,13 +24,20 @@ const factionNames: Record<Player, string> = {red: 'Red', blue: 'Blue', yellow: 
 const seats: Record<Player, string> = {red: 'South', blue: 'West', yellow: 'North', green: 'East'}
 const motion = matchMedia('(prefers-reduced-motion: reduce)')
 let localIdentity:Profile|undefined
-const guestMatch = !new URLSearchParams(location.search).has('local')
-void initShell({redirectHome:guestMatch}).then(data=>{localIdentity=data.profile??undefined;if(data.profile)setCosmetics(Object.fromEntries(['red','blue','yellow','green'].map(p=>[p,data.profile!.loadout]))); else if(guestMatch) renderGuestNav(() => loginPrompt());update()})
+const practice = location.pathname === '/chess/practice.html'
+const guestMatch = practice || !new URLSearchParams(location.search).has('local')
+if(practice){
+  const back = '/chess/update.html'+location.hash
+  element<HTMLAnchorElement>('brand-home').href=back
+  const home=document.querySelector<HTMLAnchorElement>('.match-home')!
+  home.href=back;home.textContent='← Update screen';home.setAttribute('aria-label','Update screen')
+  element('account-area').remove()
+} else void initShell({redirectHome:guestMatch}).then(data=>{localIdentity=data.profile??undefined;if(data.profile)setCosmetics(Object.fromEntries(['red','blue','yellow','green'].map(p=>[p,data.profile!.loadout]))); else if(guestMatch) renderGuestNav(() => loginPrompt());update()})
 const requestedCount = new URLSearchParams(location.search).get('players')
-let localMode: PlayerCount = new URLSearchParams(location.search).has('local') && ['2', '3', '4'].includes(requestedCount ?? '')
+let localMode: PlayerCount = !guestMatch && new URLSearchParams(location.search).has('local') && ['2', '3', '4'].includes(requestedCount ?? '')
   ? Number(requestedCount) as PlayerCount : guestMatch ? 2 : 4
 let movement: Movement = !guestMatch && new URLSearchParams(location.search).get('movement') === 'classic' ? 'classic' : 'live'
-const saveKey = (count: PlayerCount) => guestMatch ? `${SAVE_KEY}/guest-pip` : `${SAVE_KEY}/${movement}/${count}`
+const saveKey = (count: PlayerCount) => practice ? `${SAVE_KEY}/practice-pip` : guestMatch ? `${SAVE_KEY}/guest-pip` : `${SAVE_KEY}/${movement}/${count}`
 let session = newSession(localMode, movement)
 let saveError = false
 let restoreNotice = ''
@@ -125,7 +132,7 @@ function update() {
   draftForScene = currentDraft()
   syncScene()
   const s = shown()
-  element('mode-label').textContent = guestMatch ? 'LIVE · GUEST MATCH' : `${playerCount(s) === 2 ? 'TWO' : playerCount(s) === 3 ? 'THREE' : 'FOUR'}-PLAYER · ${s.movement?.toUpperCase() ?? 'LEGACY'} · LOCAL`
+  element('mode-label').textContent = practice ? 'OFFLINE · PRACTICE WITH PIP' : guestMatch ? 'LIVE · GUEST MATCH' : `${playerCount(s) === 2 ? 'TWO' : playerCount(s) === 3 ? 'THREE' : 'FOUR'}-PLAYER · ${s.movement?.toUpperCase() ?? 'LEGACY'} · LOCAL`
   const playing = planner(session)
   const presentTime = present(s)
   const past = frame !== null
@@ -377,6 +384,10 @@ function handleDialogAction(action: string) {
   if (action === 'import') file.click()
   if (action === 'guest-gated') { loginPrompt(); return }
   if (action === 'guest-reset') { setSession(newSession(2, 'live'), false); dialog.close(); return }
+  if (action === 'new' && practice) {
+    modal('<h2>Restart practice?</h2><p>This replaces your local match with Pip.</p><div class="dialog-row"><button class="button" data-dialog="close">Keep playing</button><button class="button primary" data-dialog="guest-reset">Restart</button></div>')
+    return
+  }
   if (action === 'new' && guestMatch) {
     modal('<p class="eyebrow">NEW GAME</p><h2>Choose your next game</h2><p>Start a fresh game against Pip, or log in to play with more players.</p><div class="guest-game-options"><button class="button primary" data-dialog="guest-reset">1 vs 1 - Play Pip</button><button class="button" data-dialog="guest-gated">3 players</button><button class="button" data-dialog="guest-gated">4 players</button><button class="button" data-dialog="guest-gated">Play online</button></div><button class="text-button guest-cancel" data-dialog="close">Cancel</button>')
     return
