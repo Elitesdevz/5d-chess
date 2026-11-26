@@ -28,7 +28,7 @@ Stage both packages before switching traffic. Compare the static manifest versio
 
 ## Local verification
 
-The default sections measure 620,394 and 38,838 bytes for shared and visual data respectively. Node gzip measured 47,413 and 6,228 bytes. The manifest is 495 bytes. Local Wrangler returned `application/json`, respected the cache headers and returned 304 for matching ETags on all three files. A missing section returned 404. Login and City HTML, legacy venue redirects, and the separate API route were checked locally. Chromium observed zero map requests on the lobby and exactly three on first City entry. A separate altered build moved the shop by one metre, loaded its matching version in Chromium, and accepted a front-door walk and counter interaction at its new location.
+The default sections measure 620,394 and 38,838 bytes for shared and visual data respectively. Node gzip measured 46,683 and 6,228 bytes. The manifest is 495 bytes. Local Wrangler returned `application/json`, respected the cache headers and returned 304 for matching ETags on all three files. A missing section returned 404. Login and City HTML, legacy venue redirects, and the separate API route were checked locally. Chromium observed zero map requests on the lobby and exactly three on first City entry. A separate altered build moved the shop by one metre, loaded its matching version in Chromium, and accepted a front-door walk and counter interaction at its new location.
 
 The map preview is a plan projection. Artist-authored meshes, fixture animation, terrain shading and dynamic actors remain in the game renderer. Use the in-game captures to judge the street-level result.
 

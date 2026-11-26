@@ -7,7 +7,7 @@ import {pack} from '../server/city-inventory.ts'
 import {BITE_MS} from '../src/world/food.ts'
 import {storefront,storefrontPoints} from '../src/world/storefronts.ts'
 import {LANDMARKS,frontage} from '../src/world/city-plan.ts'
-import {outdoorWalkable,site,walkingHeight,worldMove} from '../src/world/model.ts'
+import {FLOOR_HEIGHT,floorHeight,outdoorWalkable,site,walkingHeight,worldMove} from '../src/world/model.ts'
 import {buildingById,homeZone,residentialSite} from '../src/world/residential.ts'
 import {crownBlock,TOWERS,UNITS} from '../src/world/housing.ts'
 
@@ -65,6 +65,7 @@ test('street counters require a visit and a hotbar bite settles once across reco
 test('Exchange Crown connects the trading lift, housing clerk, residential lift and keyed apartment',t=>{
   const {act,walk}=guest(t)
   const tower=buildingById.get('block-'+crownBlock),unit=UNITS.find(u=>u.block===crownBlock)
+  assert.equal(tower.baseY,floorHeight('floor:LOT')+FLOOR_HEIGHT)
   for(const t of TOWERS)assert.ok(UNITS.some(u=>u.name.startsWith(t.name+' · ')))
   let v=act('teleport',{to:'stocks'})
   const local=(x,z)=>{const p=site('exchange',x,z);walk(p.x,p.z)}

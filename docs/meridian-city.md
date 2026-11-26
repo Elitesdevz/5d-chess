@@ -2,6 +2,8 @@
 
 Open the City from the signed-in header. Walk with WASD or the joystick and press E or the interaction button at a counter or a closed residential door. The city requires WebGL 2. If graphics are unavailable, the city entrance offers Retry and Back home.
 
+[View the hotel, tower apartments, bakery and taxi rank in game](review/visualupgrade/meridian.webp)
+
 ## Bank, hotbar and homes
 
 The middle counter at Fifth Dimension Bank exchanges whole coins between the existing wallet and carried cash. Loans, repayments, rewards and existing shops continue to use the wallet. A withdrawal leaves fractional bank balances intact.
