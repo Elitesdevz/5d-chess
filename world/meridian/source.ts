@@ -30,7 +30,7 @@ export const meridian = {
     {"id":"market","name":"Harvest Market","district":"outskirts","w":15.6,"d":7.6,"h":4.45,"facing":-1,"frontage":{"street":"market","along":34.0,"side":"right","setback":10.1}},
     {"id":"petrol","name":"Meridian Petrol","district":"outskirts","w":10,"d":4,"h":3.25,"facing":-1,"frontage":{"street":"market","along":55.0,"side":"right","setback":11.1}},
     {"id":"school","name":"Eastbank School","district":"civic","w":20,"d":9.4,"h":6.1,"facing":1,"frontage":{"street":"market","along":52.5,"side":"left","setback":11.0}},
-    {"id":"station","name":"Meridian Central","district":"outskirts","w":16,"d":4,"h":5.1,"facing":1,"frontage":{"street":"station","along":8.8,"side":"right","setback":0.0}},
+    {"id":"station","name":"Meridian Central","district":"outskirts","w":16,"d":4,"h":5.1,"facing":1,"frontage":{"street":"station","along":8.8,"side":"right","setback":0,"beyondEnd":4.0}},
     {"id":"bakery","name":"Linden Bread & Butter","district":"centre","w":3.6,"d":4.2,"h":3.85,"facing":1,"frontage":{"street":"linden","along":35.5,"side":"left","setback":4.85}},
     {"id":"cafe","name":"Clockwork Café","district":"centre","w":3.5,"d":4.1,"h":3.4,"facing":1,"frontage":{"street":"glass","along":14.0,"side":"left","setback":4.8}},
     {"id":"books","name":"Fable Books","district":"entertainment","w":4.55,"d":6.3,"h":4.35,"facing":1,"frontage":{"street":"linden","along":47.7,"side":"left","setback":5.4}},

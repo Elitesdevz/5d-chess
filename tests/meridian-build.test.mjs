@@ -15,7 +15,7 @@ const json=file=>JSON.parse(readFileSync(file,'utf8'))
 const release=json('.meridian/manifest.json')
 test('clean Meridian build pins its seed, shared and visual bytes across Pi and frontend',()=>{
   assert.equal(meridian.seed,6821)
-  assert.equal(release.version,'33d4f2b89da4897620764735bd81d1c2d798b6e7a6d4744db4ab2e3ba8f2a31d')
+  assert.equal(release.version,'64bd949bd869559f1b951f072efcecc52fb54a664cd0249de5a48a3b5afb0df8')
   const output=compile()
   for(const [key,data] of Object.entries({shared,visual})){
     const bytes=Buffer.from(JSON.stringify(output[key])),section=release.sections[key]
@@ -56,6 +56,15 @@ test('corrupt edits identify the parcel, street, exclusion or occupied footprint
   assert.deepEqual(compile(s).shared.units,shared.units)
 })
 test('the two seats on every rendered bench and the directory signs have reachable approaches',()=>{
+  for(const path of shared.paths.filter(p=>p.purpose==='entry')){
+    for(const [i,b] of path.points.slice(1).entries()){
+      const a=path.points[i],steps=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/.2))
+      for(let j=0;j<=steps;j++){
+        const x=a.x+(b.x-a.x)*j/steps,z=a.z+(b.z-a.z)*j/steps
+        assert.ok(!shared.lots.some(l=>Math.abs(x-l.x)<l.w/2-.01&&Math.abs(z-l.z)<l.d/2-.01),path.id+' crosses a footprint')
+      }
+    }
+  }
   for(const bench of shared.props.filter(p=>p.kind==='bench')){
     const seats=shared.seats.filter(s=>s.pose.id.startsWith(bench.id+'-'))
     assert.equal(seats.length,2,bench.id)

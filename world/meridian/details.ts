@@ -18,7 +18,6 @@ export function streetDetails(s:Resolved, BUILDINGS:Building[], civic:ReturnType
   const guide={id:'clock-directory',kind:'notice' as const,label:'Clock Square',yaw:s.square.directory.yaw,
     ...point(s.square.x+s.square.directory.across,s.square.z+s.square.directory.along)}
   const roomEntrances=(['hotel','bank','exchange','kfc'] as const).map(id=>({id,...point(s.rooms[id].x,s.rooms[id].z+s.rooms[id].front)}))
-  const access=(id:string,start:Point,end:Point,w=1.55):Footpath=>({id,points:[start,end],width:w,purpose:'entry'})
   const ENTRANCES=[
     ...BUILDINGS.map(b=>{
       const at=residentialSite(b,0,b.rect.f),parcel=b.block===undefined?s.houses.find(h=>h.id===b.id)!:s.apartments[b.block],road=STREETS.find(r=>r.id===parcel.street)!
@@ -30,7 +29,7 @@ export function streetDetails(s:Resolved, BUILDINGS:Building[], civic:ReturnType
   ]
   const route=(id:string,points:Point[],width:number,purpose:Footpath['purpose']='walk'):Footpath=>({id,points,width,purpose})
   const PATHS:Footpath[]=[
-    ...ENTRANCES.map(e=>access(e.id,e.front,nearestSidewalk(e.front,e.road),e.id.startsWith('block-')?2.1:1.45)),
+    ...ENTRANCES.map(e=>route(e.id,[e.front,nearestSidewalk(e.front,e.road)],e.id.startsWith('block-')?2.1:1.45,'entry')),
     ...s.paths as Footpath[],
   ]
   // Split the hotel approach around the fountain. The two signed promenades meet at the forecourt.
@@ -106,6 +105,27 @@ export function streetDetails(s:Resolved, BUILDINGS:Building[], civic:ReturnType
     if(i===2)add('lamp',x+1.15,z,0,.21,undefined,0)
   }
 
+  // Lots with legacy frontage inside the sidewalk band get a clear lateral connector.
+  for(const path of PATHS.filter(p=>p.purpose==='entry'&&p.points.length===2)){
+    const entry=ENTRANCES.find(e=>e.id===path.id)!,start=entry.front,end=path.points[1]
+    const blocked=(a:Point,b:Point)=>{
+      const n=Math.max(1,Math.ceil(distance(a,b)/.3))
+      for(let j=0;j<=n;j++)if(solidStructure(a.x+(b.x-a.x)*j/n,a.z+(b.z-a.z)*j/n,.08))return true
+      return false
+    }
+    if(!blocked(start,end))continue
+    const vertical=entry.road.a.x===entry.road.b.x
+    let found=false
+    for(let delta=1;delta<18&&!found;delta++)for(const side of [-1,1]){
+      const dx=vertical?0:side*delta,dz=vertical?side*delta:0
+      const bend=point(start.x+dx,start.z+dz),walk=nearestSidewalk(bend,entry.road)
+      if(blocked(start,bend)||blocked(bend,walk))continue
+      if(STREET_PROPS.some(p=>Math.min(distSegment(p,start,bend),distSegment(p,bend,walk))<p.radius+.20))continue
+      if(PARKING.some(p=>distSegment(p,start,bend)<path.width/2||distSegment(p,bend,walk)<path.width/2))continue
+      path.points=[start,bend,walk];found=true;break
+    }
+    if(!found)throw Error(entry.id+': no clear sidewalk alongside this footprint')
+  }
   for(const rule of s.frontageDetails){
     const e=ENTRANCES.find(e=>e.id===rule.parcel)
     if(!e)throw Error('frontageDetails: unknown parcel '+rule.parcel)

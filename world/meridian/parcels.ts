@@ -9,7 +9,7 @@ function unique(items:{id:string}[],group:string){
     ids.add(id)
   }
 }
-type Placement={street:string;along:number;side:string;setback:number}
+type Placement={street:string;along:number;side:string;setback:number;beyondEnd?:number}
 // Along is measured from endpoint A. Right and left are relative to A → B on the map.
 export function resolveParcels(s:MeridianSource){
   if(!Number.isSafeInteger(s.seed))throw Error('seed: expected an integer')
@@ -25,6 +25,7 @@ export function resolveParcels(s:MeridianSource){
     if(!r)throw Error(id+': unknown frontage street '+p.street)
     const length=distance(r.a,r.b)
     if(!Number.isFinite(p.along)||!Number.isFinite(p.setback)||p.setback<0||!['left','right'].includes(p.side))throw Error(id+': invalid frontage, check along, side and setback')
+    if(p.along<0||p.along>length+(p.beyondEnd??0)+.00001)throw Error(id+': frontage outside '+r.id+' endpoints')
     const u=(r.b.x-r.a.x)/length,v=(r.b.z-r.a.z)/length
     const side=p.side==='right'?p.setback:-p.setback
     return {x:round(r.a.x+u*p.along-v*side),z:round(r.a.z+v*p.along+u*side),street:r.id}
@@ -45,6 +46,10 @@ export function resolveParcels(s:MeridianSource){
   const hotel=room('hotel'),{parent,offset,...casino}=s.rooms.casino
   if(parent!=='hotel')throw Error('casino: expected the attached hotel')
   const rooms={hotel,casino:{...casino,x:hotel.x,z:Math.round((hotel.z+offset)*1e6)/1e6},bank:room('bank'),exchange:room('exchange'),kfc:room('kfc'),cave:s.rooms.cave,oasis:s.rooms.oasis}
+  unique(s.keepClear,'keep-clear areas')
+  for(const path of s.paths)if(path.points.length<2||!(path.width>0))throw Error(path.id+': public path needs at least two points and positive width')
+  for(const h of s.houses)if(![1,2].includes(h.levels))throw Error(h.id+': house requires one or two storeys')
+  for(const a of s.apartments)if(a.levels!==5)throw Error(a.id+': expected lobby and four residential storeys')
   for(const a of s.keepClear)if(!(a.w>0&&a.d>0))throw Error(a.id+': keep-clear dimensions must be positive')
   for(const id of Object.keys(s.overrides))if(!roads.has(id)&&!s.parks.some(p=>p.id===id))throw Error('override: unknown street or park '+id)
   for(const l of s.landmarks)if(!(l.w>0&&l.h>0&&l.d>0))throw Error(l.id+': footprint dimensions must be positive')
