@@ -1,6 +1,6 @@
 import {advanceLottery} from './weekly-lottery.ts'
 import {advanceTable} from './card-salon.ts'
-import {roster,cellMove,custodyView,puzzleAction,publicView} from './custody.ts'
+import {roster,custodyView,puzzleAction,publicView} from './custody.ts'
 import {UsageStore,usagePath,usageApi,serverUsage,drainEconomyUsage,worldEconomyUsage} from './telemetry.ts'
 import {puzzleApi} from './puzzles.ts'
 import {AiScheduler} from './ai-scheduler.ts'
@@ -20,7 +20,7 @@ import {StockHistory} from './stock-history.ts'
 import {bankApi} from './bank.ts'
 import {stockApi} from './stock-api.ts'
 import {casinoApi} from './casino-api.ts'
-import {ensureAccount,pruneNotices} from './accounts.ts'
+import {ensureAccount,profile,pruneNotices} from './accounts.ts'
 import {staticFile} from './static.ts'
 import {STORAGE_SCHEMA} from './storage.ts'
 
@@ -65,7 +65,8 @@ export function createApplication(store: ChessStore) {
         const authorize=(track=true)=>{
           const now=Date.now(),name=user(store,req),bookings=roster(store,now)
           const booking=bookings.find(b=>b.user===name)
-          if(booking&&!['/api/login','/api/logout','/api/me','/api/custody','/api/custody/puzzle','/api/custody/position','/api/world/presence'].includes(path))
+          const homeRead=method==='GET'&&['/api/leaderboard','/api/notifications','/api/economy'].includes(path)
+          if(booking&&!homeRead&&!['/api/login','/api/logout','/api/me','/api/custody','/api/custody/puzzle','/api/world/presence'].includes(path))
             fail(423,'In custody at Meridian Police')
           if(track&&name&&!path.startsWith('/api/world/'))city.arcade.active(name,now)
           return {name,booking,bookings}
@@ -93,11 +94,6 @@ export function createApplication(store: ChessStore) {
         if(path==='/api/custody'&&method==='GET'){
           if(!name)fail(401,'Log in first')
           json(res,200,{custody:booking?custodyView(booking):null});return
-        }
-        if(path==='/api/custody/position'&&method==='POST'){
-          if(!booking)fail(403,'No active sentence')
-          store.transaction(tx=>cellMove(tx,booking,data.x,data.z,data.yaw))
-          json(res,200,{custody:custodyView(booking)});return
         }
         if(path==='/api/custody/puzzle'&&(method==='GET'||method==='POST')){
           if(!booking)fail(403,'No active sentence')
@@ -128,7 +124,7 @@ export function createApplication(store: ChessStore) {
           const {booking}=authorize(false)
           unit.usageTrace(req.headers['x-client-trace'],req.headers['x-ui-action'])
           actor=user(unit,req)
-          if(booking&&path==='/api/me'&&method==='GET')return {status:200,value:{user:booking.name,profile:null,custody:custodyView(booking)},headers:undefined}
+          if(booking&&path==='/api/me'&&method==='GET')return {status:200,value:{user:booking.name,profile:profile(unit.users.get(booking.user)!),custody:custodyView(booking)},headers:undefined}
           if(name&&path==='/api/logout')city.disconnect(name)
           const auth = authApi(unit,req,path,data,limiter)
           if (auth){const named=(auth.value as {user?:unknown}).user;if(typeof named==='string')actor=named;return auth}

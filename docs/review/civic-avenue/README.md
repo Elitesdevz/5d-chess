@@ -6,7 +6,7 @@ These 960 × 600 captures come from signed-in Chromium sessions on a local game 
 | --- | --- | --- |
 | [![Bank counters and vault](bank.jpg)](bank.jpg) | [![Police public enquiries counter](reception.jpg)](reception.jpg) | [![Arcade blaster counter and display cases](showroom.jpg)](showroom.jpg) |
 
-| On foot | 3D client | Overhead client |
+| On foot | 3D client | Archived overhead client |
 | --- | --- | --- |
 | Civic Avenue outside the precinct | [![Street entrance and jail frontage](precinct.jpg)](precinct.jpg) | [![Precinct sidewalk approach](precinct-plan.jpg)](precinct-plan.jpg) |
 | Precinct and attached jail from across the block | [![Five jail levels over the precinct](precinct-block.jpg)](precinct-block.jpg) | [![Civic Avenue at the fire station and police block](precinct-block-plan.jpg)](precinct-block-plan.jpg) |
@@ -20,7 +20,7 @@ These 960 × 600 captures come from signed-in Chromium sessions on a local game 
 
 ## Forced 2D before and after
 
-The left column shows the previous destinations on main at `6b42ee8`. The right column shows the corresponding physical rooms on this branch.
+The left column shows the previous destinations on main at `6b42ee8`. The right column shows the corresponding physical rooms before the overhead client was retired. The current city requires WebGL 2.
 
 | Venue | Previous public client | New public client |
 | --- | --- | --- |

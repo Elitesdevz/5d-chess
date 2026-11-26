@@ -44,17 +44,47 @@ function outline(c:CanvasRenderingContext2D,col:number,row:number){
   edge(0,1,0,-1,col?-dir(col-1,row):0)
   c.closePath()
 }
-export async function jigsaw(host:HTMLElement){
+let saving:Promise<unknown>=Promise.resolve()
+export async function jigsaw(host:HTMLElement,noRelease=false){
   async function request(data?:object){
     const r=await fetch('/api/custody/puzzle',data?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)}:{})
     const result=await r.json()
-    if(!r.ok)throw Error(result.error)
+    if(!r.ok)throw Error(result.error||'Puzzle unavailable. Close the table and try again.')
     return result as {puzzle:Puzzle;released?:boolean}
   }
-  let {puzzle}=await request(),page=0,selected=-1,busy=false
-  const art=panorama()
-  host.innerHTML='<h3>Meridian at dusk</h3><p>Choose a loose piece, then its matching space. Each section holds 25 pieces.</p><canvas class="puzzle-preview" width="400" height="250" aria-label="Meridian panorama and current puzzle section"></canvas><div class="puzzle-nav"><button data-prev>Previous section</button><strong></strong><button data-next>Next section</button></div><p role="status"></p><div class="puzzle-halves"><section><h4>Board</h4><div class="tile-grid board"></div></section><section><h4>Loose pieces</h4><div class="tile-grid tray"></div></section></div>'
+  await saving
+  let {puzzle}=await request()
+  if(!host.isConnected)return
+  const art=panorama(),sectionCount=COLS*ROWS/(SIDE*SIDE)
+  const sectionOf=(target:number)=>Math.floor(target%COLS/SIDE)+Math.floor(target/COLS/SIDE)*(COLS/SIDE)
+  const firstOpen=Math.min(...puzzle.tiles.filter((_,i)=>!puzzle.placed[i]).map(sectionOf))
+  let page=Number.isFinite(firstOpen)?firstOpen:0,selected=-1,busy=false
+  host.innerHTML=`<div class="puzzle-overview"><canvas class="puzzle-preview" width="400" height="250" aria-label="Panorama with the current section highlighted"></canvas>
+    <div><p class="puzzle-total"></p><progress max="${PUZZLE_SIZE}" aria-label="Overall puzzle progress"></progress>
+    <p>${noRelease?'Your progress is saved. Only a moderator can release you.':'Fit all 1,000 pieces to earn your release. Progress saves after each piece.'}</p></div></div>
+    <nav class="puzzle-nav" aria-label="Puzzle sections"><button data-prev aria-label="Previous section">‹</button><select aria-label="Puzzle section"></select><button data-next aria-label="Next section">›</button></nav>
+    <div class="puzzle-switch" role="group" aria-label="Table view"><button data-pane="tray">Loose pieces</button><button data-pane="board">Board</button></div>
+    <div class="puzzle-instruction"><p role="status" class="puzzle-status"></p><span class="puzzle-selection" aria-label="Selected piece"></span></div>
+    <div class="puzzle-halves"><section><h3>Board</h3><div class="tile-grid board"></div></section><section><h3>Loose pieces</h3><div class="tile-grid tray"></div></section></div>
+`
   const status=host.querySelector<HTMLElement>('[role=status]')!
+  const sample=host.querySelector<HTMLElement>('.puzzle-selection')!
+  const hint='Choose a loose piece, then its matching space on the board.'
+  status.textContent=hint
+  const sections=host.querySelector('select')!
+  const panes=host.querySelector<HTMLElement>('.puzzle-halves')!
+  const switches=host.querySelectorAll<HTMLButtonElement>('[data-pane]')
+  function showPane(pane:string){
+    panes.dataset.show=pane
+    for(const control of switches)control.setAttribute('aria-pressed',String(control.dataset.pane===pane))
+  }
+  for(const control of switches)control.onclick=()=>showPane(control.dataset.pane!)
+
+  for(let i=0;i<sectionCount;i++)sections.add(new Option('Section '+(i+1)+' of '+sectionCount,String(i)))
+  function go(next:number){
+    if(busy)return
+    page=next;selected=-1;status.textContent=hint;render()
+  }
   function tile(target:number,placed:boolean,loose:boolean){
     const canvas=document.createElement('canvas');canvas.width=canvas.height=84
     const c=canvas.getContext('2d')!,col=target%COLS,row=Math.floor(target/COLS)
@@ -71,22 +101,31 @@ export async function jigsaw(host:HTMLElement){
     ctx.drawImage(art,0,0,400,250);ctx.fillStyle='#1b2c4266'
     for(const [piece,index] of puzzle.tiles.entries())if(!puzzle.placed[piece])ctx.fillRect(index%COLS*10,Math.floor(index/COLS)*10,10,10)
     ctx.strokeStyle='#ffebaa';ctx.lineWidth=2;ctx.strokeRect(firstX*10+1,firstY*10+1,48,48)
-    preview.onclick=e=>{const r=preview.getBoundingClientRect();page=Math.min(4,Math.floor((e.clientY-r.top)/r.height*5))*8+Math.min(7,Math.floor((e.clientX-r.left)/r.width*8));selected=-1;render()}
     const targets=Array.from({length:25},(_,i)=>(firstY+Math.floor(i/SIDE))*COLS+firstX+i%SIDE)
     const board=host.querySelector('.board')!,tray=host.querySelector('.tray')!
     board.replaceChildren();tray.replaceChildren()
-    host.querySelector('strong')!.textContent='Section '+(page+1)+'/40 · '+puzzle.placed.filter(Boolean).length+'/'+PUZZLE_SIZE+' placed'
+    const count=puzzle.placed.filter(Boolean).length
+    host.querySelector('.puzzle-total')!.textContent=count.toLocaleString()+' / 1,000 pieces placed'
+    host.querySelector('progress')!.value=count
+    sections.value=String(page)
+    showPane('tray');sample.replaceChildren()
     for(const [i,target] of targets.entries()){
       const piece=puzzle.tiles.indexOf(target),b=document.createElement('button')
       b.setAttribute('aria-label','Board row '+(1+Math.floor(i/5))+', column '+(1+i%5));b.disabled=puzzle.placed[piece]
       b.append(tile(target,puzzle.placed[piece],false));board.append(b)
       b.onclick=async()=>{
-        if(busy||selected<0){status.textContent='Select a loose piece first.';return}
+        if(busy)return
+        if(selected<0){status.textContent='Select a loose piece first.';return}
         busy=true
         try{
-          const result=await request({piece:selected,target})
+          const move=request({piece:selected,target})
+          saving=move.catch(()=>{})
+          const result=await move
           if(result.released){location.replace('/chess/world.html');return}
-          puzzle=result.puzzle;selected=-1;status.textContent=puzzle.placed.every(Boolean)?'Puzzle complete. Awaiting moderation release.':'Piece fitted.';render()
+          if(!host.isConnected)return
+          puzzle=result.puzzle;selected=-1;status.textContent='Piece fitted and saved.';render()
+          const next=tray.querySelector<HTMLButtonElement>('button')??sections
+          next.focus({preventScroll:true})
         }catch(e){status.textContent=e instanceof Error?e.message:'Please try again.'}finally{busy=false}
       }
     }
@@ -94,12 +133,25 @@ export async function jigsaw(host:HTMLElement){
       if(puzzle.placed[piece]||!targets.includes(target))continue
       const b=document.createElement('button');b.append(tile(target,false,true));tray.append(b)
       b.setAttribute('aria-label','Loose piece '+(piece+1));b.setAttribute('aria-pressed',String(selected===piece))
-      b.onclick=()=>{selected=piece;for(const button of tray.querySelectorAll('button'))button.setAttribute('aria-pressed',String(b===button));status.textContent='Choose a space on the board.'}
+      b.onclick=event=>{
+        if(busy)return
+        selected=piece;sample.replaceChildren(tile(target,false,true))
+        for(const button of tray.querySelectorAll('button'))button.setAttribute('aria-pressed',String(b===button))
+        status.textContent='Choose a space on the board.'
+        showPane('board')
+        if(event.detail===0)board.querySelector<HTMLButtonElement>('button:enabled')?.focus()
+      }
+    }
+    if(!tray.childElementCount){
+      showPane('board')
+      tray.textContent='All 25 pieces fitted.'
+      status.textContent=count===PUZZLE_SIZE?'Panorama complete. Your progress is saved.':'Section complete. Choose another section to continue.'
     }
     host.querySelector<HTMLButtonElement>('[data-prev]')!.disabled=page===0
-    host.querySelector<HTMLButtonElement>('[data-next]')!.disabled=page===39
+    host.querySelector<HTMLButtonElement>('[data-next]')!.disabled=page===sectionCount-1
   }
-  host.querySelector<HTMLButtonElement>('[data-prev]')!.onclick=()=>{if(page>0){page--;selected=-1;render()}}
-  host.querySelector<HTMLButtonElement>('[data-next]')!.onclick=()=>{if(page<39){page++;selected=-1;render()}}
+  sections.onchange=()=>{if(busy)sections.value=String(page);else go(Number(sections.value))}
+  host.querySelector<HTMLButtonElement>('[data-prev]')!.onclick=()=>go(page-1)
+  host.querySelector<HTMLButtonElement>('[data-next]')!.onclick=()=>go(page+1)
   render()
 }

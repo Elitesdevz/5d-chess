@@ -80,14 +80,13 @@ function noticeRow(notice:Notice,open:()=>void){
   row.onclick=open;return row
 }
 async function lobby(){
-  let nextPuzzle=1
-  el('open-puzzle').onclick=()=>{location.href='/chess/puzzles.html?lesson='+nextPuzzle}
-  void api<{completed:number[];next:number}>('/puzzles').then(progress=>{nextPuzzle=progress.next;document.querySelector('.puzzle-number b')!.textContent=String(nextPuzzle);el('open-puzzle').innerHTML=(progress.completed.length===30?'Review tutorial':progress.completed.length?'Continue tutorial':'Start tutorial')+' '+icon('play');el('open-puzzle').title=progress.completed.length+' of 30 lessons completed'}).catch(()=>{})
-  const rewardHint=()=>{el('game-reward-hint').textContent=el<HTMLSelectElement>('game-movement').value==='classic'?'Unrated · Earn coins, no Elo changes.':'Rated · Completed Live games award Elo and coins.'}
-  el('game-movement').addEventListener('change',rewardHint);rewardHint()
   const session=await getSession().catch(()=>null)
   if(!session?.user){location.replace('/chess/login.html');return}
-  if(session.custody)return
+  let nextPuzzle=1
+  el('open-puzzle').onclick=()=>{location.href='/chess/puzzles.html?lesson='+nextPuzzle}
+  if(!session.custody)void api<{completed:number[];next:number}>('/puzzles').then(progress=>{nextPuzzle=progress.next;document.querySelector('.puzzle-number b')!.textContent=String(nextPuzzle);el('open-puzzle').innerHTML=(progress.completed.length===30?'Review tutorial':progress.completed.length?'Continue tutorial':'Start tutorial')+' '+icon('play');el('open-puzzle').title=progress.completed.length+' of 30 lessons completed'}).catch(()=>{})
+  const rewardHint=()=>{el('game-reward-hint').textContent=el<HTMLSelectElement>('game-movement').value==='classic'?'Unrated · Earn coins, no Elo changes.':'Rated · Completed Live games award Elo and coins.'}
+  el('game-movement').addEventListener('change',rewardHint);rewardHint()
   if(!session.profile){error('lobby-error','The home page needs the matching updated game server.');return}
   let profile:Profile=session.profile
   let count=profile.settings.players,movement:Movement=profile.settings.movement,place:'online'|'local'='online',showAll=false
@@ -163,6 +162,18 @@ async function lobby(){
     }catch(cause){
       if(request===leaderboardRequest){root.textContent=cause instanceof Error?cause.message:'Could not load leaderboard';summary.textContent=''}
     }finally{if(request===leaderboardRequest)root.setAttribute('aria-busy','false')}
+  }
+  if(session.custody){
+    const deals=new HomeDeals(el('home-daily-deals'))
+    el('home-daily-deals').inert=true
+    await Promise.allSettled([
+      loadLeaderboard(),loadNotices().catch(()=>{el('notification-feed').textContent='Notifications unavailable.'}),
+      api<Economy>('/economy').then(data=>{deals.update(data);return initDailySpin(data)}).catch(()=>{
+        deals.unavailable();el('daily-spin').textContent='Daily spin unavailable.'
+      })
+    ])
+    for(const a of el('home').querySelectorAll('a')){a.removeAttribute('href');a.setAttribute('aria-disabled','true')}
+    return
   }
   const leaderboardTabs=document.querySelectorAll<HTMLButtonElement>('[data-leaderboard]')
   for(const button of leaderboardTabs)button.onclick=()=>{

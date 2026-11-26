@@ -1,4 +1,3 @@
-import {civicMap} from './civic-map.ts'
 import {staffId,bankStaff} from './service-staff.ts'
 import {civicRoom,confined,tablePosition} from './civic-venues.ts'
 import {HeldModel} from './overrun-models.ts'
@@ -18,8 +17,7 @@ import {PlayerMotion,type PlayerSample} from './player-motion.ts'
 import {CityLighting} from './city-lighting.ts'
 import {CityAssets} from './city-assets.ts'
 import {resultRotation,v} from '../casino/scene/geometry.ts'
-import {guestFloor} from './resort.ts'
-import {CITY,CITY_PORTALS,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,SPRINT_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
+import {CITY,DICE_TABLE_INDEX,walkingHeight,boardPoints,groundZone,interactions,localSite,riderHeight,site,worldMove,WORLD_SPEED,SPRINT_SPEED,WORLD_TABLES,type WorldAction,type WorldView,type WorldZone} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
 const TAU=Math.PI*2
@@ -33,7 +31,7 @@ function shadow(){
 }
 type Avatar={figure:Figure;tag?:HTMLElement;props?:ReturnType<typeof staffProps>;target?:WorldView['you'];sample?:PlayerSample}
 export class CityStage {
-  private renderer?:T.WebGLRenderer
+  private renderer:T.WebGLRenderer
   private gl?:WebGL2RenderingContext
   private fence:WebGLSync|null=null
   private art?:ReturnType<typeof makeWorldArt>
@@ -127,7 +125,7 @@ export class CityStage {
   position:Position={...CITY}
   get moving(){return (this.arrows.size>Number(this.arrows.has('shift'))||Math.hypot(this.stick.x,this.stick.z)>.09)&&!this.pause}
   get preparingGraphics(){return !!this.art&&!this.graphicsReady}
-  constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void,onPause:()=>void=()=>{},private onMovementChange=()=>{},private onGraphicsReady=()=>{}){
+  constructor(canvas:HTMLCanvasElement,parent:HTMLElement,onAction:(point?:WorldAction)=>void,onPause:()=>void=()=>{},private onMovementChange=()=>{},private onGraphicsReady=()=>{},private onGraphicsError=()=>{}){
     this.canvas=canvas;this.parent=parent;this.onAction=onAction;this.onPause=onPause
     this.promptButton=parent.querySelector('[data-world-use]')!
     this.promptLabel=this.promptButton.querySelector('span')!
@@ -139,8 +137,7 @@ export class CityStage {
       renderer.setPixelRatio(Math.min(devicePixelRatio,1.4));renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.22
       this.shadow=shadow()
     }catch{
-      const flat=canvas.cloneNode() as HTMLCanvasElement;canvas.replaceWith(flat);this.canvas=flat
-      parent.dataset.flat='true'
+      throw new Error('The city requires WebGL 2. Enable hardware acceleration in your browser and try again.')
     }
     this.resize=new ResizeObserver(()=>this.fit());this.resize.observe(this.canvas)
     this.bind();this.fit();this.frame=requestAnimationFrame(this.tick)
@@ -157,11 +154,10 @@ export class CityStage {
     const housingChanged=this.view?.housing?.keys.some(key=>!view.housing?.keys.includes(key))
     const reported=sent??this.position
     const changedVenue=prior?.zone!==next.zone&&(civicRoom(next.zone)||!!prior&&civicRoom(prior.zone))
-    const inCellDialog=view.arcade?.custody&&document.querySelector('.cell-screen[open]')
     // The two flights are less than a metre apart. A wall or stair landing can
     // stop a server step sooner than prediction when the player turns a corner.
     const correctionLimit=civicRoom(next.zone)?.27:1.35
-    if(changedWorld||reposition||seatChanged||changedVenue&&this.predictedZone!==next.zone||inCellDialog||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit){
+    if(changedWorld||reposition||seatChanged||changedVenue&&this.predictedZone!==next.zone||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
       this.predictedZone=next.zone
     }
@@ -200,7 +196,7 @@ export class CityStage {
       const tag=this.figures.get(line.name)?.tag
       if(tag){tag.textContent=line.text;tag.classList.add('speech')}
     }
-    if(!this.art&&this.renderer)this.buildScene()
+    if(!this.art)this.buildScene()
     if(this.art){
       this.art.seal.visible=!this.caveOpen&&next.zone!=='cave'
       this.art.grotto.visible=!this.art.seal.visible
@@ -255,7 +251,7 @@ export class CityStage {
   private mouseLook=false
   resumeMouse(requested=false){
     if(requested)this.mouseLook=true
-    if(!this.mouseLook||this.pause||!this.renderer||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||
+    if(!this.mouseLook||this.pause||this.view?.you.chair||this.view?.you.lounge||this.view?.you.dining!==undefined||this.view?.you.barSeat!==undefined||this.view?.you.boardSeat!==undefined||
       !matchMedia('(any-pointer: fine)').matches||document.pointerLockElement===this.canvas)return
     this.lockedAt=performance.now()
     this.canvas.requestPointerLock?.()?.catch(()=>{})
@@ -265,7 +261,7 @@ export class CityStage {
     this.voluntaryUnlock=true;document.exitPointerLock()
   }
   private turn(dx:number,dy:number){
-    if(this.pause||!this.renderer||this.view?.you.chair)return
+    if(this.pause||this.view?.you.chair)return
     if(this.station){this.moveTool(dx,dy);return}
     this.liftFacing=undefined
     this.yaw-=dx*.0032
@@ -278,7 +274,7 @@ export class CityStage {
     this.lighting=new CityLighting(this.art.scene)
   }
   private prepareGraphics(now:number){
-    if(this.graphicsReady||!this.art||!this.renderer)return
+    if(this.graphicsReady||!this.art)return
     if(!this.preparing){
       this.cameraView(now);this.avatars(.016,now);this.motion(now,.016)
       this.lighting?.update(this.camera)
@@ -290,7 +286,7 @@ export class CityStage {
     }
   }
   private renderScene(){
-    if(!this.art||!this.renderer)return
+    if(!this.art)return
     this.lighting?.update(this.camera)
     this.renderer.render(this.art.scene,this.camera)
   }
@@ -319,8 +315,7 @@ export class CityStage {
     if(w===this.viewportWidth&&h===this.viewportHeight)return
     this.viewportWidth=w;this.viewportHeight=h
     this.camera.aspect=w/h;this.camera.fov=w<h?67:56;this.camera.updateProjectionMatrix()
-    if(this.renderer)this.renderer.setSize(w,h,false)
-    else {this.canvas.width=w;this.canvas.height=h}
+    this.renderer.setSize(w,h,false)
   }
   private bind(){
     const {signal}=this.input,allowed=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift']
@@ -349,7 +344,7 @@ export class CityStage {
       this.turn(e.movementX,e.movementY)
     },{signal})
     this.canvas.addEventListener('pointerdown',e=>{
-      if(this.pause||!this.renderer)return
+      if(this.pause)return
       if(document.pointerLockElement===this.canvas&&this.weapon&&this.parent.hasAttribute('data-armed')){
         if(e.button===2){this.aiming=true;return}
         if(e.button===0){this.holdingFire=true;this.fireAtReticle();return}
@@ -382,7 +377,7 @@ export class CityStage {
     stick.addEventListener('pointerdown',e=>{if(this.pause||pointer!==undefined)return;e.preventDefault();pointer=e.pointerId;stick.setPointerCapture(pointer);move(e)},{signal})
     stick.addEventListener('pointermove',e=>{if(e.pointerId===pointer)move(e)},{signal})
     stick.addEventListener('lostpointercapture',()=>{pointer=undefined;this.stick={x:0,z:0};thumb.style.transform=''},{signal})
-    window.addEventListener('pagehide',e=>{if(!e.persisted){this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame);this.clearScene();this.renderer?.dispose()}},{signal})
+    window.addEventListener('pagehide',e=>{if(!e.persisted)this.stop()},{signal})
   }
   private lastCivicDirection=0
   private step(dt:number){
@@ -395,10 +390,8 @@ export class CityStage {
       if(direction!==this.lastCivicDirection){this.lastCivicDirection=direction;this.onMovementChange()}
     }
     const length=Math.max(1,Math.hypot(x,z)),speed=(this.sprinting?SPRINT_SPEED:WORLD_SPEED)*dt/length*(this.zone==='oasis'&&inPool(localSite(this.zone,this.position.x,this.position.z).x,localSite(this.zone,this.position.x,this.position.z).z)?.53:1)
-    const heading=this.renderer?this.yaw:0
-    if(!this.renderer&&(x||z))this.yaw=Math.atan2(-x,-z)
+    const heading=this.yaw
     if(this.view?.arcade?.custody){
-      if(document.querySelector('.cell-screen[open]'))return
       Object.assign(this.position,confined(this.view.arcade.custody.cell,
         this.position.x+(x*Math.cos(heading)+z*Math.sin(heading))*speed,
         this.position.z+(z*Math.cos(heading)-x*Math.sin(heading))*speed))
@@ -421,7 +414,7 @@ export class CityStage {
     let candidate:WorldAction|undefined
     if(this.view?.arcade?.custody){
       const b=this.view.arcade.custody,{x:tx,z:tz}=tablePosition(b.cell)
-      if(b.ends===null&&Math.hypot(x-tx,z-tz)<1.7)candidate={id:'cell-table',label:'Sit at the jigsaw table',x:tx,z:tz}
+      if(b.ends===null&&Math.hypot(x-tx,z-tz)<1.7)candidate={id:'cell-table',label:'Open jigsaw table',x:tx,z:tz}
     }
     else if(seated||pose)candidate={id:'stand-scenery',label:pose?.kind==='rest'?'Get up':'Stand up',x,z}
     else if(this.zone&&!this.view?.you.chair&&!this.view?.you.lounge&&!this.view?.you.lift){
@@ -660,8 +653,19 @@ export class CityStage {
       }else{die.quaternion.copy(resultRotation(n));die.position.set(0,1.165,.08)}
     }
   }
+  stop(){
+    if(this.input.signal.aborted)return
+    this.lock(true)
+    this.input.abort();this.resize.disconnect();cancelAnimationFrame(this.frame)
+    this.clearScene();this.renderer.dispose()
+  }
   private tick=(time:number)=>{
+    try{this.updateFrame(time)}catch(error){
+      console.error('City graphics failed',error);this.stop();this.onGraphicsError();return
+    }
     this.frame=requestAnimationFrame(this.tick)
+  }
+  private updateFrame(time:number){
     if(document.hidden){this.lastStep=0;return}
     const stepTime=Math.min(.25,(time-(this.lastStep||time))/1000)
     this.lastStep=time
@@ -679,40 +683,16 @@ export class CityStage {
       this.gl.deleteSync(this.fence);this.fence=null
     }
     const dt=Math.min(.14,(time-this.last)/1000||.035);this.last=time
-    if(this.art&&this.renderer){
+    if(this.art){
       const now=Date.now()+this.clock
       this.cameraView(now);this.avatars(dt,now);this.motion(now,dt)
       this.renderScene()
       if(this.gl){this.fence=this.gl.fenceSync(this.gl.SYNC_GPU_COMMANDS_COMPLETE,0);this.gl.flush()}
-    }else if(!this.renderer)this.drawFlat()
+    }
     const zone=this.zone??''
     if(this.canvas.dataset.zone!==zone)this.canvas.dataset.zone=zone
     const {x,z}=this.position,ground=!this.zone?.startsWith('floor:')&&groundZone(x,z)
     const opacity=ground==='cave'?String(Math.max(0,(7.7-localSite('cave',x,z).z)/15)**1.55*.94):'0'
     if(this.darkness.style.opacity!==opacity)this.darkness.style.opacity=opacity
-  }
-  private drawFlat(){
-    const c=this.canvas,ctx=c.getContext('2d')
-    if(!ctx)return
-    if(this.view&&civicMap(ctx,c.width,c.height,this.view,this.position))return
-    const w=c.width,h=c.height,size=this.zone==='city'?Math.min(12,w/38):Math.min(42,w/14),o=this.position
-    const project=(x:number,z:number)=>[w/2+(x-o.x)*size,h/2+(z-o.z)*size] as const
-    ctx.fillStyle='#14272d';ctx.fillRect(0,0,w,h)
-    ctx.strokeStyle='#779d9151';ctx.lineWidth=1
-    for(let i=-64;i<65;i+=2){const [x,z]=project(i,i);ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.moveTo(0,z);ctx.lineTo(w,z);ctx.stroke()}
-    const landmarks=this.zone&&(guestFloor(this.zone)||this.zone.startsWith('floor:'))?interactions(this.zone,this.view?.housing?.keys):[
-      ...CITY_PORTALS.filter(p=>p.to!=='cave'||this.caveOpen).map(p=>({x:p.x,z:p.z,label:p.label||'Passage'})),
-      ...['hotel','casino','bank','exchange'].flatMap(zone=>interactions(zone as WorldZone)),
-      {...site('hotel',0,-7.9),label:'Gaming floor'},
-    ]
-    if(this.zone){
-      landmarks.push(...interactions(this.zone),...residentialPoints(this.zone,o,this.view?.housing?.keys??[],this.view?.residential))
-      for(const c of this.view?.arcade?.contacts??[])landmarks.push({...c,label:c.label})
-      for(const d of this.view?.arcade?.drops??[])landmarks.push({...d,label:'Dropped items'})
-
-    }
-    for(const p of landmarks){const [x,y]=project(p.x,p.z);ctx.fillStyle='#8fe2b5';ctx.fillRect(x-8,y-8,16,16);ctx.fillStyle='#dfedda';ctx.font='13px system-ui';ctx.textAlign='center';ctx.fillText(p.label,x,y-12)}
-    for(const other of this.view?.players??[]){const [x,z]=project(other.x,other.z);ctx.fillStyle='#f1c78b';ctx.beginPath();ctx.arc(x,z,5,0,TAU);ctx.fill();ctx.fillText(other.name,x,z+17)}
-    ctx.fillStyle='#b0eada';ctx.beginPath();ctx.arc(w/2,h/2,7,0,TAU);ctx.fill()
   }
 }

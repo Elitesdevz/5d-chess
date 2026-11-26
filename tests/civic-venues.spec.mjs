@@ -7,14 +7,14 @@ import {ChessStore} from '../server/storage.ts'
 import {at,cells,entrances,insideDoor,stair} from '../src/world/civic-venues.ts'
 import {browserWalker,observeCity} from './civic-controls.mjs'
 
-for(const flat of [true,false])test('walk from Clock Square through both Civic Avenue venues with '+(flat?'2D keyboard':'3D touch controls'),{timeout:520000},async()=>{
+for(const keyboard of [true,false])test('walk from Clock Square through both Civic Avenue venues with '+(keyboard?'3D keyboard':'3D touch controls'),{timeout:520000},async()=>{
   const store=new ChessStore('.',{memory:true}),app=createApplication(store),server=createServer(app.handle)
   await new Promise(r=>server.listen(0,'127.0.0.1',r))
   let browser
   try{
     const base='http://127.0.0.1:'+server.address().port
-    browser=await chromium.launch({args:['--no-sandbox',...(flat?['--disable-webgl']:['--use-angle=swiftshader','--enable-unsafe-swiftshader'])]})
-    const context=await browser.newContext(flat?{viewport:{width:960,height:600}}:{viewport:{width:480,height:540},deviceScaleFactor:1,isMobile:true,hasTouch:true,reducedMotion:'reduce'})
+    browser=await chromium.launch({args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']})
+    const context=await browser.newContext(keyboard?{viewport:{width:960,height:600}}:{viewport:{width:480,height:540},deviceScaleFactor:1,isMobile:true,hasTouch:true,reducedMotion:'reduce'})
     const page=await context.newPage(),errors=[],travel=[]
     await observeCity(page)
     page.on('pageerror',e=>errors.push(e.message))
@@ -24,10 +24,10 @@ for(const flat of [true,false])test('walk from Clock Square through both Civic A
     await page.getByRole('link',{name:'City',exact:true}).first().click()
     const zone=z=>page.locator('#world-canvas[data-zone="'+z+'"]').waitFor({timeout:60000})
     await zone('city')
-    assert.equal(await page.locator('#city-world').getAttribute('data-flat'),flat?'true':null)
+    assert.ok(await page.evaluate(()=>window.walkObservation.renderer.getContext() instanceof WebGL2RenderingContext))
     const v=await page.evaluate(()=>window.walkObservation.view.you)
     assert.deepEqual([v.x,v.z],[0,8])
-    const {walk,outside,use}=browserWalker(page,!flat)
+    const {walk,outside,use}=browserWalker(page,!keyboard)
     await outside(entrances.station);await walk(at('station',insideDoor('station').x,insideDoor('station').z));await zone('station')
     await walk(at('station',-4.45,.39));await use('desk')
     await page.getByRole('heading',{name:'Meridian Police front desk'}).waitFor()

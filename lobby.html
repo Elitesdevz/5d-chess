@@ -10,7 +10,7 @@
   <header class="masthead app-topbar"><a class="brand" id="brand-home" href="/chess/lobby.html"><img src="/chess/logo.png" width="48" height="48" alt=""><span><b>5D</b> Chess</span></a><div id="account-area" class="account-area"><a id="account-link" class="button subtle" href="/chess/login.html">Log in</a></div></header>
   <main class="portal lobby dashboard-page">
     <p id="lobby-error" class="form-error" role="alert" hidden></p>
-    <section id="home" class="lobby-view dashboard" aria-label="5D Chess home">
+    <fieldset id="home-controls" aria-label="Home dashboard"><section id="home" class="lobby-view dashboard" aria-label="5D Chess home">
       <div class="play-home-column"><section class="portal-card play-card" aria-labelledby="play-title">
         <h2 class="sr-only" id="play-title">Choose a game</h2>
         <div class="segmented location-choice" role="group" aria-label="Where to play"><button type="button" data-place="online" aria-pressed="true"><span data-icon="online"></span>Online</button><button type="button" data-place="local" aria-pressed="false"><span data-icon="monitor"></span>Local</button></div>
@@ -26,6 +26,7 @@
       </div>
       <div class="right-home-column"><section class="portal-card notifications-card" aria-labelledby="notifications-title"><div class="card-heading"><h2 id="notifications-title"><span data-icon="bell"></span>Notifications <span data-notification-count hidden></span></h2><button class="text-button" id="read-all" type="button">Mark read</button></div><div id="notification-feed" class="notification-list"><p class="card-empty">Loading notifications&hellip;</p></div><button class="text-button view-all" data-view="notifications" type="button">View all notifications</button></section><section id="daily-spin" class="daily-spin-card" aria-label="Daily spin"></section></div>
     </section>
+    </fieldset>
     <div id="flow-header" class="flow-header" hidden><button class="text-button back-home" data-view="home" type="button"><span data-icon="back"></span>Home</button><h2 id="flow-title">Create game</h2><p id="flow-description" class="portal-intro"></p></div>
     <section id="ai" class="lobby-view ai-view" hidden aria-label="AI opponents">
       <div class="ai-intro"><div><p class="eyebrow">FIVE MINDS. FIVE WAYS TO PLAY.</p><h2>Choose your opponent</h2><p>Unrated duels. Real coin rewards. Same multiverse rules.</p></div><label>Movement<select id="ai-movement"><option value="live">Live · simultaneous plans</option><option value="classic">Classic · take turns</option></select></label></div>

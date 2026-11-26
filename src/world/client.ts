@@ -1,6 +1,6 @@
 import {ResortUI} from './resort-ui.ts'
 import {ArcadeControls,counterUI} from './arcade-ui.ts'
-import {showCustody,openCellTable} from '../custody-ui.ts'
+import {jigsaw} from '../jigsaw.ts'
 import {RestaurantUI} from './restaurant-ui.ts'
 import {api,ApiError,getSession,initShell,updateWalletBalance} from '../shell.ts'
 import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type CasinoView,type RouletteChoice} from '../casino-model.ts'
@@ -14,10 +14,11 @@ const cast=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementBy
 const host=cast('city-world'),connection=cast('world-connection'),panel=cast('world-table'),dialog=cast<HTMLDialogElement>('world-service')
 const graphicsMessage='Preparing city graphics…'
 const pause=cast('world-pause'),chatForm=cast<HTMLFormElement>('world-chat-form'),chatInput=chatForm.querySelector('input')!
+const puzzleDialog=cast<HTMLDialogElement>('cell-jigsaw')
 let paused=false,chatting=false
-function syncControls(){stage?.lock(paused||chatting||dialog.open)}
+function syncControls(){stage?.lock(closed||paused||chatting||dialog.open||puzzleDialog.open)}
 function showPause(){
-  if(view?.arcade?.custody){document.querySelector<HTMLDialogElement>('.cell-screen:not([open])')?.showModal();return}
+  if(puzzleDialog.open)return
   if(closed||paused)return
   paused=true;pause.hidden=false
   if(chatting)chatInput.blur()
@@ -163,8 +164,12 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   const observedOffset=next.now-(start+Date.now())/2
   offset=view?.id===next.id&&Math.abs(observedOffset-offset)<650?offset+.2*(observedOffset-offset):observedOffset
   const scope=next.id+':'+next.you.zone,changed=viewKey!==scope
+  if(closed)return
+  if(Boolean(next.arcade?.custody)!==document.body.classList.contains('in-custody')){
+    closed=true;location.reload();return
+  }
+  if(puzzleDialog.open&&(next.arcade?.custody?.ends!==null||next.arcade.custody.cell!==view?.arcade?.custody?.cell))puzzleDialog.close()
   view=next;packUI.update(next);syncLoadout()
-  if(next.arcade?.custody){if(dialog.open)dialog.close();paused=false;pause.hidden=true;showCustody(next.arcade.custody)}
   if(next.you.zone==='private'){
     closed=true;location.replace('/chess/dice.html?cave=1');return
   }
@@ -236,7 +241,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
 }
 async function presence(){
   const t=Date.now(),sent=stage&&{...stage.position}
-  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,slot:packUI.slot,sprint:stage?.sprinting,kitchenMotion:stage?.kitchenMotion,...(view?.arcade?.custody&&document.querySelector('.cell-screen[open]')?{}:sent)}),signal:AbortSignal.timeout(5500)})
+  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,slot:packUI.slot,sprint:stage?.sprinting,kitchenMotion:stage?.kitchenMotion,...(view?sent:{})}),signal:AbortSignal.timeout(5500)})
   if(!response.ok){
     if(response.status===401){closed=true;location.replace('/chess/login.html')}
     throw new Error('City connection lost')
@@ -258,7 +263,16 @@ async function action(name:string,data:object){
   finally{performing=false;updateSelection()}
 }
 function use(point?:WorldAction){
-  if(point?.id==='cell-table'){openCellTable();return}
+  if(view?.arcade?.custody){
+    if(point?.id==='cell-table'&&view.arcade.custody.ends===null&&!puzzleDialog.open){
+      const content=document.createElement('div')
+      puzzleDialog.querySelector('[data-jigsaw-body]')!.replaceChildren(content)
+      content.textContent='Loading puzzle…'
+      puzzleDialog.showModal();syncControls()
+      void jigsaw(content,view.arcade.custody.noRelease).catch(error=>{content.textContent=error instanceof Error?error.message:'Could not open puzzle.'})
+    }
+    return
+  }
   if(view?.interaction?.startsWith('kfc:kitchen:')){
     void action('restaurant',{command:'leave-station'}).catch(()=>{});return
   }
@@ -270,6 +284,18 @@ function use(point?:WorldAction){
   if(shownService===point.id)shownService=''
   void action('use',{target:point.id}).catch(()=>undefined)
 }
+puzzleDialog.querySelector<HTMLButtonElement>('[data-close-jigsaw]')!.onclick=()=>puzzleDialog.close()
+puzzleDialog.onkeydown=event=>{
+  if(event.key==='Escape'||event.key.toLowerCase()==='e'){
+    event.preventDefault();event.stopPropagation()
+    if(!event.repeat)puzzleDialog.close()
+  }
+}
+puzzleDialog.onclose=()=>{
+  puzzleDialog.querySelector('[data-jigsaw-body]')!.replaceChildren()
+  syncControls()
+  if(!closed){cast('world-canvas').focus();stage?.resumeMouse()}
+}
 host.querySelector<HTMLButtonElement>('[data-world-use]')!.onclick=()=>stage?.act()
 dialog.addEventListener('close',()=>{
   syncControls();if(!paused)stage?.resumeMouse()
@@ -279,12 +305,13 @@ dialog.addEventListener('close',()=>{
 host.querySelector<HTMLButtonElement>('[data-city-camera]')!.onclick=()=>stage?.toggleCamera()
 host.querySelector<HTMLButtonElement>('[data-world-food]')!.onclick=()=>{shownService='';void action('food',{}).catch(()=>{})}
 document.addEventListener('keydown',event=>{
+  if(closed||puzzleDialog.open)return
   if(event.key==='Escape'){
     if(chatting){chatInput.blur();stage?.resumeMouse();event.preventDefault()}
     else if(!paused){showPause();event.preventDefault()}
     return
   }
-  if((event.key==='/'||event.key.toLowerCase()==='t')&&!event.ctrlKey&&!event.metaKey&&!dialog.open&&!paused&&
+  if((event.key==='/'||event.key.toLowerCase()==='t')&&!event.ctrlKey&&!event.metaKey&&!view?.arcade?.custody&&!dialog.open&&!paused&&
       !(event.target instanceof HTMLElement&&event.target.matches('input,textarea,select,[contenteditable]'))){
     event.preventDefault();chatInput.focus()
   }
@@ -312,7 +339,7 @@ async function start(){
   }
   stage=new CityStage(cast('world-canvas'),host,use,showPause,wakePresence,()=>{
     if(connection.textContent===graphicsMessage)connection.hidden=true
-  })
+  },()=>unavailable('The city could not render its 3D scene. Retry to rejoin the city.'))
   const url=new URL(location.href),go=url.searchParams.get('go')??''
   if(!auth.custody&&url.searchParams.get('exit')==='cave')await action('exit-cave',{})
   else if(!auth.custody&&like(go))await action('teleport',{to:go})
@@ -334,7 +361,7 @@ async function start(){
   }
   document.addEventListener('visibilitychange',wakePresence)
   void beat();window.setInterval(tableStatus,160)
-  window.setInterval(()=>{if(!document.hidden&&view&&/^floor:(CAS|BNK)$/.test(view.you.zone))void floorScreens(view.you.zone)},12_000)
+  window.setInterval(()=>{if(!closed&&!document.hidden&&view&&/^floor:(CAS|BNK)$/.test(view.you.zone))void floorScreens(view.you.zone)},12_000)
 }
 document.addEventListener('click',event=>{
   const link=(event.target as Element).closest<HTMLAnchorElement>('a')
@@ -344,8 +371,20 @@ document.addEventListener('click',event=>{
   const to=url.searchParams.get('go')??''
   if(!like(to))return
   event.preventDefault()
+  if(view.arcade?.custody)return
   services?.close()
   if(paused){paused=false;pause.hidden=true;syncControls()}
   void action('teleport',{to}).catch(()=>undefined)
 })
-void start().catch(error=>{connection.hidden=false;connection.textContent=error instanceof Error?error.message:'The city could not open.'})
+function unavailable(message:string){
+  closed=true;stage?.stop()
+  if(puzzleDialog.open)puzzleDialog.close()
+  if(dialog.open)dialog.close()
+  const notice=cast('world-unavailable')
+  notice.querySelector('p')!.textContent=message
+  host.dataset.unavailable='true';notice.hidden=false
+}
+cast('world-canvas').addEventListener('webglcontextlost',event=>{
+  event.preventDefault();unavailable('The browser lost its 3D graphics connection. Retry to rejoin the city.')
+})
+void start().catch(error=>unavailable(error instanceof Error?error.message:'The city could not open.'))

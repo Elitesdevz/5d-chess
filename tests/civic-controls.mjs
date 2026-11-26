@@ -49,7 +49,7 @@ export function browserWalker(page,touch=false){
             }
             if(d<best-.045){best=d;last=performance.now()}
             if(performance.now()-last>4500)return {blocked:pt,position:{...p},zone:stage.view.you.zone,server:stage.view.you}
-            const a=stage.renderer?stage.position.yaw:0
+            const a=stage.position.yaw
             const scale=touch?Math.max(d,.92):d
             steer((dx*Math.cos(a)-dz*Math.sin(a))/scale,(dz*Math.cos(a)+dx*Math.sin(a))/scale)
             await new Promise(requestAnimationFrame)

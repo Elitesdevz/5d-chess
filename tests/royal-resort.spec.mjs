@@ -91,7 +91,7 @@ test('two browser guests draw and check through the same poker hand',{timeout:90
   let browser
   try{
     const base='http://127.0.0.1:'+server.address().port
-    browser=await chromium.launch({args:['--no-sandbox','--disable-webgl']})
+    browser=await chromium.launch({args:['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader']})
     async function seat(name,width){
       const context=await browser.newContext({viewport:{width,height:700}})
       assert.equal((await context.request.post(base+'/api/signup',{data:{username:name,password:'fixture',confirm:'fixture'}})).status(),201)

@@ -138,13 +138,14 @@ export async function revealDrop(drop:Drop,mode:'spin'|'crate',tier=0,onChange?:
   if(dialog.open)result.querySelector<HTMLButtonElement>('button')?.focus()
  }finally{running=false;cancelAnimationFrame(ticker);animations.forEach(a=>a.cancel())}
 }
-export async function initDailySpin(){
+export async function initDailySpin(readOnlyState?:Economy){
  const host=document.getElementById('daily-spin');if(!host)return
- let state:Economy|undefined
+ let state=readOnlyState
  host.innerHTML=`<button type="button" class="spin-thumb" aria-label="Preview daily wheel">${wheelSVG(state?.spinRewards??SPIN_REWARDS)}<span class="spin-thumb-caption">FORTUNE<br>FAVORS YOU.</span><i>✦</i><span class="spin-orbit"></span></button><div class="daily-spin-copy"><strong>DAILY SPIN</strong><small>Free every day · Netherlands time</small></div><div class="daily-spin-actions"><button type="button" class="spin-now">SPIN NOW</button><button type="button" class="spin-again" hidden>${icon('coin')}<span>Spin again · ${PAID_SPIN_PRICE} coins</span></button></div><p class="spin-error form-error" role="alert" hidden></p>`
  const button=host.querySelector<HTMLButtonElement>('.spin-now')!,again=host.querySelector<HTMLButtonElement>('.spin-again')!,error=host.querySelector<HTMLElement>('.spin-error')!
  let busy=false,freeRequest=requestId(),paidRequest=requestId(),clockOffset=0
  const render=()=>{if(!state)return;const ready=state.spinReady||Date.now()+clockOffset>=state.reset;button.classList.toggle('used',!ready);host.classList.toggle('spin-cooldown',!ready);button.textContent=busy?'Spinning…':ready?'SPIN NOW':`Next free spin · ${countdown(state.reset,Date.now()+clockOffset)}`;button.disabled=busy||!ready;again.hidden=ready;again.disabled=busy||state.wallet.coins<state.paidSpinPrice;again.title=again.disabled?`You need ${state.paidSpinPrice} coins for another spin`:'';again.querySelector('span')!.textContent=`Spin again · ${state.paidSpinPrice} coins`}
+ if(readOnlyState){clockOffset=readOnlyState.now-Date.now();render();return}
  const refresh=async()=>{state=await api<Economy>('/economy');clockOffset=state.now-Date.now();const thumb=host.querySelector('.spin-thumb svg');if(thumb)thumb.outerHTML=wheelSVG(state.spinRewards);render()}
  await refresh().catch(()=>{error.textContent='Daily spin is unavailable. Try again shortly.';error.hidden=false;button.disabled=true})
  const play=async(paid:boolean)=>{

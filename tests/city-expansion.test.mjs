@@ -161,7 +161,8 @@ test('local combat, eating, death, competing pickups, pursuit, offline sentence 
   assert.equal((await f.request(b,'profile?user=Odessa%20Finch')).status,404)
   assert.equal((await f.ok(b,'games/'+match.code)).seats.red,'Inmate 01')
   assert.equal((await f.ok(a,'me')).user,'Inmate 01')
-  const frozen=(await f.ok(a,'custody/position',{x:jail.x+.7,z:jail.z+.4,yaw:1})).custody
+  const frozen=(await f.world(a,'presence',{world:v.id,x:jail.x+.7,z:jail.z+.4,yaw:1})).arcade.custody
+  assert.deepEqual([frozen.x,frozen.z],[jail.x+.7,jail.z+.4])
   await f.ok(a,'logout',{})
   await f.restart()
   const visitor=f.route(b);await visitor.enter('station');v=await visitor.climb()

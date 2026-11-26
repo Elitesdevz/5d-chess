@@ -1,4 +1,4 @@
-import {showCustody,custodyHeartbeat} from './custody-ui.ts'
+import {setCustody,custodyHeartbeat} from './custody-ui.ts'
 import type {CustodyView} from './world/arcade.ts'
 import {startUsage,recordBalance,usageTrace,recordApi} from './telemetry.ts'
 import {profileHref} from './profile-model.ts'
@@ -16,7 +16,7 @@ export async function api<T>(path:string,data?:unknown):Promise<T> {
   let result:T&{error?:string}
   try{result=await response.json()}catch{throw new ApiError('Online play is unavailable. Please try again.',response.status)}
   if(!response.ok)throw new ApiError(result.error||'Request failed',response.status)
-  const profile=(result as {profile?:Profile}).profile;if(profile)void startUsage(profile)
+  const profile=(result as {profile?:Profile}).profile;if(profile&&!(result as {custody?:CustodyView}).custody)void startUsage(profile)
   return result
   }finally{recordApi(path,data===undefined?'GET':'POST',status,trace)}
 }
@@ -36,8 +36,8 @@ export function updateWalletBalance(coins:number){
   recordBalance(current)
   applyRating()
 }
-export function renderAccount(profile:Profile){
-  current=profile;void startUsage(profile);recordBalance(profile)
+export function renderAccount(profile:Profile,trackUsage=true){
+  current=profile;if(trackUsage){void startUsage(profile);recordBalance(profile)}
   const host=document.getElementById('account-area')
   if(!host)return
   const open=host.querySelector('details')?.open??false
@@ -110,13 +110,15 @@ export async function initShell(options:{redirectHome?:boolean}={}){
   try{
     const data=await getSession()
     if(data.user){
-      custodyHeartbeat()
-      if(data.custody){showCustody(data.custody);return data}
+      const page=document.body.dataset.page
+      if(page!=='world')custodyHeartbeat()
+      if(data.custody&&page!=='world'&&page!=='lobby'){location.replace('/chess/lobby.html');return data}
       if(options.redirectHome){location.replace('/chess/lobby.html');return data}
-      renderAccount(data.profile??fallback(data.user))
-      if(document.body.dataset.page!=='lobby'){
+      renderAccount(data.profile??fallback(data.user),!data.custody)
+      setCustody(!!data.custody)
+      if(!data.custody&&page!=='lobby'){
         void fetchNotices().catch(()=>{})
-        window.setInterval(()=>{if(document.visibilityState==='visible')void fetchNotices().catch(()=>{})},15000)
+        window.setInterval(()=>{if(document.visibilityState==='visible'&&!document.body.classList.contains('in-custody'))void fetchNotices().catch(()=>{})},15000)
       }
     }
     return data
