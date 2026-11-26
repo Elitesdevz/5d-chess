@@ -1,67 +1,20 @@
+import {shared} from './map-data.ts'
 import {circle,CROSSINGS,distance,FLEET,PARKING,parkedCars,point,STREETS,type Point,type VehicleKind} from './city-plan.ts'
 
-type Axis='x'|'z'
-type Junction=Point&{id:string;roads:Set<string>;signal:boolean;round?:number}
+export type Axis='x'|'z'
+export type Junction=Point&{id:string;roads:Set<string>;signal:boolean;round?:number}
 export type Lane={id:string;street:string;from:string;to:string;limit:number;axis:Axis;points:Point[];length:number;next:string[]}
 export type Vehicle=Point&{id:string;kind:VehicleKind;yaw:number;speed:number;turn:number;brake:boolean;paint?:number;parking?:string}
 export type TrafficView={vehicles:Vehicle[];signals:Record<string,'x'|'z'|'all-red'>}
-const intersections=new Map<string,Junction>()
-const key=(p:Point)=>p.x+','+p.z
-function vertex(p:Point,road:string){
-  const id=key(p)
-  let v=intersections.get(id)
-  if(!v){v={...p,id,roads:new Set(),signal:false};intersections.set(id,v)}
-  v.roads.add(road)
-  return v
-}
-const streets=STREETS.filter(s=>s.traffic)
-function nearSegment(p:Point,a:Point,b:Point){
-  return p.x>=Math.min(a.x,b.x)&&p.x<=Math.max(a.x,b.x)&&p.z>=Math.min(a.z,b.z)&&p.z<=Math.max(a.z,b.z)
-}
-for(const s of streets){vertex(s.a,s.id);vertex(s.b,s.id)}
-for(const a of streets)for(const b of streets){
-  if(a.a.x!==a.b.x||b.a.z!==b.b.z)continue
-  const cross=point(a.a.x,b.a.z)
-  if(nearSegment(cross,a.a,a.b)&&nearSegment(cross,b.a,b.b)){vertex(cross,a.id).roads.add(b.id)}
-}
-const roundPoints=Array.from({length:4},(_,i)=>vertex(point(circle.x+[8,0,-8,0][i],circle.z+[0,-8,0,8][i]),'ring'))
-roundPoints.forEach((p,i)=>p.round=i)
-export const JUNCTIONS=[...intersections.values()]
-for(const j of JUNCTIONS)j.signal=j.roads.size>1&&!j.roads.has('ring')&&(j.roads.has('boulevard')||j.roads.has('court'))
-export const SIGNAL_HEADS=JUNCTIONS.filter(j=>j.signal).flatMap(j=>
-  [[-3.65,-3.65,'z'],[3.65,3.65,'z'],[-3.65,3.65,'x'],[3.65,-3.65,'x']].map(([dx,dz,axis])=>
-    ({x:j.x+Number(dx),z:j.z+Number(dz),junction:j.id,axis:axis as Axis})))
+export const JUNCTIONS:Junction[]=shared.junctions.map(j=>({...j,roads:new Set(j.roads)}))
+const intersections=new Map(JUNCTIONS.map(j=>[j.id,j]))
+export const SIGNAL_HEADS=shared.signalHeads
+export const LANES=new Map(shared.lanes.map(l=>[l.id,l]))
 export function signalPhase(time:number,id:string):TrafficView['signals'][string]{
   const p=((time+id.length*327)%14400+14400)%14400
   return p<6250?'x':p<7200?'all-red':p<13450?'z':'all-red'
 }
 const length=(path:Point[])=>path.slice(1).reduce((l,p,i)=>l+distance(p,path[i]),0)
-export const LANES=new Map<string,Lane>()
-function add(id:string,street:string,from:Junction,to:Junction,points:Point[],limit:number,axis:Axis){
-  LANES.set(id,{id,street,from:from.id,to:to.id,points,length:length(points),limit,axis,next:[]})
-}
-for(const s of streets){
-  const order=[...intersections.values()].filter(j=>j.roads.has(s.id)).sort((a,b)=>a.x-b.x||a.z-b.z)
-  for(let i=1;i<order.length;i++)for(const direction of [-1,1]){
-    const a=order[direction===1?i-1:i],b=order[direction===1?i:i-1]
-    const span=distance(a,b),dx=(b.x-a.x)/span,dz=(b.z-a.z)/span,lateral=s.width/4
-    const trim=Math.min(2.6,span*.27),lane=(p:Point,d:number)=>point(p.x+dx*d-dz*lateral,p.z+dz*d+dx*lateral)
-    add(s.id+':'+i+':'+direction,s.id,a,b,[lane(a,trim),lane(b,-trim)],s.limit,dx?'x':'z')
-  }
-}
-for(const [i,src] of roundPoints.entries()){
-  const dst=roundPoints[(i+1)%4]
-  const pts=Array.from({length:11},(_,k)=>{
-    const a=(i+k/10)*Math.PI/2,r=circle.radius-.12
-    return point(circle.x+Math.cos(a)*r,circle.z-Math.sin(a)*r)
-  })
-  add('ring:'+i,'ring',src,dst,pts,4.6,'x')
-}
-for(const lane of LANES.values()){
-  const exits=[...LANES.values()].filter(to=>to.from===lane.to&&to.id!==lane.id)
-  const choices=exits.filter(to=>to.to!==lane.from&&(!(lane.street==='ring'&&to.street==='ring')||lane.id!==to.id))
-  lane.next=(choices.length?choices:exits).map(to=>to.id)
-}
 export function alongPath(path:readonly Point[],travel:number){
   for(let i=1;i<path.length;i++){
     const a=path[i-1],b=path[i],d=distance(a,b)

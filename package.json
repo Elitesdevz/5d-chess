@@ -7,7 +7,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc --noEmit && node scripts/build.mjs",
+    "build": "npm run world:build && tsc --noEmit && node scripts/build.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
     "dev": "npm run build && node scripts/serve.mjs",
     "preview": "node scripts/serve.mjs",
@@ -19,7 +19,8 @@
     "data:migrate": "node dist/storage-admin.mjs migrate",
     "data:backup": "node dist/storage-admin.mjs backup",
     "data:export": "node dist/storage-admin.mjs export",
-    "demo": "npm run build && node scripts/demo.mjs"
+    "demo": "npm run build && node scripts/demo.mjs",
+    "world:build": "node scripts/world-build.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

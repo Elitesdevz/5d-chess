@@ -1,3 +1,4 @@
+import {staticFile} from '../server/static.ts'
 import {createServer} from 'node:http'
 import worker from '../.cloudflare/worker.mjs'
 
@@ -8,6 +9,10 @@ createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || host}`)
     if (url.pathname === '/') {
       res.writeHead(307, {Location: '/chess/'}).end()
+      return
+    }
+    if(url.pathname.startsWith('/chess/maps/')){
+      try{await staticFile(req,res,url.pathname)}catch{res.writeHead(404).end()}
       return
     }
     const result = await worker.fetch(new Request(url, {method: req.method}))

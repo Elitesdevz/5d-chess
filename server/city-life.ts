@@ -1,5 +1,5 @@
 import {distance,parkedCars,point,type Point} from '../src/world/city-plan.ts'
-import {cityGridBounds,findPath,pedestrianCost} from '../src/world/city-navigation.ts'
+import {cityGridBounds,findPath,pedestrianCost,outdoorGrid} from '../src/world/city-navigation.ts'
 import {assignResidents,CITY_DAY_MS,routine,scheduledPlace,type Resident,type ResidentView} from '../src/world/city-residents.ts'
 import {UNITS,type Deeds} from '../src/world/housing.ts'
 import {groundZone,outdoorWalkable,riderHeight,worldMove,type WorldZone} from '../src/world/model.ts'
@@ -14,7 +14,6 @@ type Citizen=Occupant&{
   routeAt:number;closed?:HomePoint;stair?:{building:string;floor:number;up:boolean;way:number};lastLift?:number;liftWait?:number
 }
 const navCells=new Map<number,boolean>(),navEdges=new Map<number,boolean>(),cachedPaths=new Map<string,Point[]>()
-const outdoorGrid=.93
 function outside(p:Point){
   if(!cityGridBounds(p))return false
   const k=(Math.round(p.x*1000)+100_000)*200_000+Math.round(p.z*1000)+100_000

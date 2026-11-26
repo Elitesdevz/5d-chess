@@ -1,3 +1,5 @@
+import {mapVersion} from './load-map.ts'
+import {DIRECTORY} from './urban-layout.ts'
 import {ResortUI} from './resort-ui.ts'
 import {openArmory} from './armory-ui.ts'
 import {ArcadeControls,counterUI} from './arcade-ui.ts'
@@ -7,7 +9,8 @@ import {api,ApiError,getSession,initShell,updateWalletBalance} from '../shell.ts
 import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type CasinoView,type RouletteChoice} from '../casino-model.ts'
 import {cityQuote,isEquity,type StockView,type PricePoint} from '../stock-model.ts'
 import {DICE_TABLE_INDEX,DESTINATIONS,WORLD_TABLES,type Destination,type WorldAction,type WorldView} from './model.ts'
-import {CityServices,coins,safeText} from './services.ts'
+import {ResidentialServices} from './residential-services.ts'
+import {coins,safeText} from './services.ts'
 import type {CityStage} from './stage.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
@@ -53,7 +56,7 @@ let resortUI:ResortUI|undefined
 const packUI=new ArcadeControls(cast('city-pack'),action,syncLoadout)
 function syncLoadout(){stage?.setLoadout(packUI.weapon,(op,target)=>packUI.trigger(op,target))}
 let restaurant:RestaurantUI|undefined
-let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined
+let stage:CityStage|undefined,services:ResidentialServices|undefined,view:WorldView|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
 let updateArmory:((next:WorldView)=>void)|undefined
 let viewKey='',shownService='',lastFloor='';let closeAfterFloor=false
@@ -162,7 +165,8 @@ async function floorScreens(zone:string){
     }
   }catch{}
 }
-function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
+function accepted(next:WorldView & {mapVersion?:string},start:number,reposition=false,sent?:Position){
+  if(next.mapVersion!==mapVersion){unavailable('Meridian is updating. Retry to load the current map.');return}
   const observedOffset=next.now-(start+Date.now())/2
   offset=view?.id===next.id&&Math.abs(observedOffset-offset)<650?offset+.2*(observedOffset-offset):observedOffset
   const scope=next.id+':'+next.you.zone,changed=viewKey!==scope
@@ -188,7 +192,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   updateWalletBalance(next.coins)
   restaurant?.update(next)
   if(changed){
-    const nav=next.you.zone.startsWith('hotel')||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='station'||next.you.zone.startsWith('precinct:')?'prison':next.you.zone==='gunshop'?'gunshop':next.you.zone==='city'?'city':''
+    const nav=next.you.zone.startsWith('hotel')||next.you.zone==='casino'?'casino-floor':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='station'||next.you.zone.startsWith('precinct:')?'prison':next.you.zone==='gunshop'?'gunshop':next.you.zone==='city'?'city':''
     for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
       if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
       else a.removeAttribute('aria-current')
@@ -220,6 +224,12 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   if(!paused&&service&&shownService!==service){
     shownService=service
     if(station)return
+    if(service.startsWith('directory:')){
+      const marker=DIRECTORY.find(p=>p.id===service)
+      if(!marker)return
+      services?.directory(marker)
+      stage?.lock(true);return
+    }
     if(['cash','desk','booking'].includes(service)||service.startsWith('drawer:')){
       stage?.lock(true)
       const render=()=>{if(view&&view.interaction===service)counterUI(dialog,view,async data=>{await action('arcade',data);render()})}
@@ -253,8 +263,9 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
 }
 async function presence(){
   const t=Date.now(),sent=stage&&{...stage.position}
-  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,slot:packUI.slot,sprint:stage?.sprinting,kitchenMotion:stage?.kitchenMotion,...(view?sent:{})}),signal:AbortSignal.timeout(5500)})
+  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({mapVersion,scene:true,world:view?.id,zone:view?.you.zone,slot:packUI.slot,sprint:stage?.sprinting,kitchenMotion:stage?.kitchenMotion,...(view?sent:{})}),signal:AbortSignal.timeout(5500)})
   if(!response.ok){
+    if(response.status===412)unavailable('Meridian has a new map. Retry to load it.')
     if(response.status===401){closed=true;location.replace('/chess/login.html')}
     throw new Error('City connection lost')
   }
@@ -269,9 +280,13 @@ async function action(name:string,data:object){
     if(name==='use')await presence()
     if(closed)return
     const t=Date.now()
-    accepted(await api<WorldView>('/world/'+name,{...data,scene:true}),t,name==='resort-floor'||name==='teleport'||name==='exit-cave')
+    accepted(await api<WorldView>('/world/'+name,{...data,mapVersion,scene:true}),t,name==='resort-floor'||name==='teleport'||name==='exit-cave')
     if(name==='stand'||name==='stand-scenery'||name==='teleport')stage?.resumeMouse()
-  }catch(error){showError(error instanceof Error?error.message:'City action failed');throw error}
+  }catch(error){
+    if(error instanceof ApiError&&error.status===412)unavailable('Meridian has a new map. Retry to load it.')
+    else showError(error instanceof Error?error.message:'City action failed')
+    throw error
+  }
   finally{performing=false;updateSelection()}
 }
 function use(point?:WorldAction){
@@ -333,7 +348,7 @@ window.addEventListener('pagehide',e=>{if(!e.persisted)closed=true})
 async function start(){
   await initShell();const auth=await getSession()
   if(!auth.user){location.replace('/chess/login.html');return}
-  services=new CityServices(dialog,auth.user,symbol=>{
+  services=new ResidentialServices(dialog,auth.user,symbol=>{
     if(closeAfterFloor)return
     closeAfterFloor=true
     void action('floor',{symbol}).then(()=>services?.close()).catch(()=>undefined).finally(()=>closeAfterFloor=false)
@@ -353,6 +368,8 @@ async function start(){
   stage=new CityStage(cast('world-canvas'),host,use,showPause,wakePresence,()=>{
     if(connection.textContent===graphicsMessage)connection.hidden=true
   },()=>unavailable('The city could not render its 3D scene. Retry to rejoin the city.'))
+  const release=await fetch('/api/world/map-version',{cache:'no-store'})
+  if(!release.ok||(await release.json()).version!==mapVersion)throw Error('Meridian is updating. Retry when the city and its map are on the same version.')
   const url=new URL(location.href),go=url.searchParams.get('go')??''
   if(!auth.custody&&url.searchParams.get('exit')==='cave')await action('exit-cave',{})
   else if(!auth.custody&&like(go))await action('teleport',{to:go})
@@ -378,7 +395,7 @@ async function start(){
 }
 document.addEventListener('click',event=>{
   const link=(event.target as Element).closest<HTMLAnchorElement>('a')
-  if(!link||!view||event.defaultPrevented||event instanceof MouseEvent&&(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey))return
+  if(!link||!view||performing||event.defaultPrevented||event instanceof MouseEvent&&(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey))return
   const url=new URL(link.href)
   if(url.origin!==location.origin||url.pathname!=='/chess/world.html')return
   const to=url.searchParams.get('go')??''
