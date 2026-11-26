@@ -261,7 +261,7 @@ export class CityLife {
     }
     if(clear(pos)){
       const old=actor.zone,yaw=Math.atan2(actor.x-pos.x,actor.z-pos.z)
-      actor.zone=pos.homeZone??'city'
+      actor.zone=pos.zone
       actor.x=pos.x;actor.z=pos.z;actor.yaw=yaw
       if(old!==actor.zone&&!actor.zone.startsWith('stairs:'))actor.route=[]
       if(distance(actor,next)<.14)actor.route.shift()

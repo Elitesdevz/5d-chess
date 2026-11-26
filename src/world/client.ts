@@ -181,7 +181,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
   updateWalletBalance(next.coins)
   restaurant?.update(next)
   if(changed){
-    const nav=next.you.zone.startsWith('hotel')||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='city'?'city':''
+    const nav=next.you.zone.startsWith('hotel')||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='station'||next.you.zone.startsWith('precinct:')?'prison':next.you.zone==='gunshop'?'gunshop':next.you.zone==='city'?'city':''
     for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
       if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
       else a.removeAttribute('aria-current')
@@ -236,7 +236,7 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
 }
 async function presence(){
   const t=Date.now(),sent=stage&&{...stage.position}
-  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,slot:packUI.slot,sprint:stage?.sprinting,...(view?.arcade?.custody&&document.querySelector('.cell-screen[open]')?{}:sent)}),signal:AbortSignal.timeout(5500)})
+  const response=await fetch('/api/world/presence',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scene:true,world:view?.id,zone:view?.you.zone,slot:packUI.slot,sprint:stage?.sprinting,kitchenMotion:stage?.kitchenMotion,...(view?.arcade?.custody&&document.querySelector('.cell-screen[open]')?{}:sent)}),signal:AbortSignal.timeout(5500)})
   if(!response.ok){
     if(response.status===401){closed=true;location.replace('/chess/login.html')}
     throw new Error('City connection lost')

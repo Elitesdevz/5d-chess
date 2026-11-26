@@ -1,10 +1,10 @@
 import {civicMap} from './civic-map.ts'
 import {staffId,bankStaff} from './service-staff.ts'
-import {civicRoom,confined,tablePosition,levelOf,civicHeight,rise} from './civic-venues.ts'
+import {civicRoom,confined,tablePosition} from './civic-venues.ts'
 import {HeldModel} from './overrun-models.ts'
 import {WEAPONS,type WeaponId} from './arcade.ts'
 import {supportModel} from './arcade-art.ts'
-import {residentialAt,residentialPoints,type HomeZone} from './residential.ts'
+import {residentialAt,residentialPoints} from './residential.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
@@ -78,10 +78,10 @@ export class CityStage {
     const reach=WEAPONS[this.weapon].range,me=this.view.you
     let nearest=Infinity,target:string|undefined
     for(const c of this.view.arcade?.contacts??[]){
-      if(c.zone!==me.zone||c.kind==='dog'||c.kind==='helicopter')continue
-      const distance=Math.hypot(c.x-me.x,c.z-me.z)
+      if(!c.inSight||c.kind==='dog'||c.kind==='helicopter')continue
+      const distance=c.distance??Math.hypot(c.x-me.x,c.z-me.z)
       if(distance>reach||distance>=nearest)continue
-      const p=this.labelPoint.set(c.x,walkingHeight(me.zone,c.x,c.z)+1.12,c.z).project(this.camera)
+      const p=this.labelPoint.set(c.x,(c.height??walkingHeight(c.zone as WorldZone,c.x,c.z))+1.12,c.z).project(this.camera)
       // Project the city character's torso into the reticle in screen space.
       if(p.z>0&&p.z<1&&Math.abs(p.x)*this.camera.aspect<.42/Math.max(1,distance)&&Math.abs(p.y)<1.65/Math.max(1,distance)){
         nearest=distance;target=c.id
@@ -103,7 +103,7 @@ export class CityStage {
   private pitch=0
   private clock=0
   private zone?:WorldZone
-  private predictedHome?:HomeZone
+  private predictedZone?:WorldZone
   private caveOpen=true
   private pause=false
   private lastMessage=0
@@ -161,11 +161,11 @@ export class CityStage {
     // The two flights are less than a metre apart. A wall or stair landing can
     // stop a server step sooner than prediction when the player turns a corner.
     const correctionLimit=civicRoom(next.zone)?.27:1.35
-    if(changedWorld||reposition||seatChanged||changedVenue||inCellDialog||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit){
+    if(changedWorld||reposition||seatChanged||changedVenue&&this.predictedZone!==next.zone||inCellDialog||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit){
       this.position={x:next.x,z:next.z,yaw:next.yaw}
-      this.predictedHome=residentialAt(next.zone)?next.zone as HomeZone:undefined
+      this.predictedZone=next.zone
     }
-    if(changedWorld||reposition||seatChanged||changedVenue){
+    if(changedWorld||reposition||seatChanged){
       this.liftFacing=undefined
       this.yaw=next.yaw;this.pitch=0
       if(next.chair){
@@ -227,10 +227,12 @@ export class CityStage {
     this.station=point?{point,x:0,y:0,phase:0,sent:false,fillAt:0}:undefined
     this.arrows.clear()
   }
+  get kitchenMotion(){return this.station&&{x:this.station.x,y:this.station.y}}
   private moveTool(dx:number,dy:number){
     const s=this.station,r=this.view?.restaurant,job=r?.kitchen
     if(!s||!job||s.sent)return
     s.x=T.MathUtils.clamp(s.x+dx/110,-1,1);s.y=T.MathUtils.clamp(s.y-dy/110,-1,1)
+    this.onMovementChange()
     const now=Date.now()+this.clock
     if(s.point.endsWith(':soda')){
       if(s.y>.32&&Math.abs(s.x)<.23&&!s.fillAt)s.fillAt=performance.now()+560
@@ -403,9 +405,9 @@ export class CityStage {
     }else if(x||z){
       const dx=x*Math.cos(heading)+z*Math.sin(heading),dz=z*Math.cos(heading)-x*Math.sin(heading)
       const inCave=groundZone(this.position.x,this.position.z)==='cave'
-      const zone=this.predictedHome??(residentialAt(this.zone)?'city':this.zone)
-      const {homeZone,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,(this.sprinting?SPRINT_SPEED:WORLD_SPEED)*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock,this.view?.traffic?.vehicles)
-      this.position=position;this.predictedHome=homeZone
+      const zone=this.predictedZone??this.zone
+      const {zone:destination,...position}=worldMove(zone,this.position,this.position.x+dx*speed,this.position.z+dz*speed,(this.sprinting?SPRINT_SPEED:WORLD_SPEED)*dt,this.caveOpen||inCave,this.view?.housing?.keys,this.view?.residential,Date.now()+this.clock,this.view?.traffic?.vehicles)
+      this.position=position;this.predictedZone=destination
     }
     this.position.yaw=this.yaw
   }
@@ -413,7 +415,7 @@ export class CityStage {
     const {x,z}=this.position
     if(this.view===this.promptedView&&x===this.promptedX&&z===this.promptedZ)return
     this.promptedView=this.view;this.promptedX=x;this.promptedZ=z
-    const zone=this.predictedHome??(this.zone&&(guestFloor(this.zone)||civicRoom(this.zone)||this.zone.startsWith('floor:'))?this.zone:groundZone(this.position.x,this.position.z))
+    const zone=this.predictedZone??this.zone??groundZone(x,z)
     const seated=this.view?.you.boardSeat!==undefined||this.view?.you.barSeat!==undefined
     const pose=this.view?.you.homePose
     let candidate:WorldAction|undefined
@@ -427,7 +429,6 @@ export class CityStage {
         [...interactions(zone,this.view?.housing?.keys),...boardPoints(zone,this.view?.boardTaken),...residentialPoints(zone,this.position,this.view?.housing?.keys??[],this.view?.residential)]
       let best=Infinity
       for(const point of points){
-        if(point.id==='gallery-up'&&civicRoom(zone)&&civicHeight(zone,x,z)<(levelOf(zone)+1)*rise-.47)continue
         const squared=(x-point.x)**2+(z-point.z)**2
         if(squared<best&&squared<=(point.range??1.65)**2){candidate=point;best=squared}
       }
@@ -466,7 +467,7 @@ export class CityStage {
       }
       const sample=motion?current.sample:undefined
       const height=sample?.height??riderHeight(member,now)
-      figure.root.position.y=local&&!member.lift?walkingHeight(this.predictedHome??member.zone,this.position.x,this.position.z):
+      figure.root.position.y=local&&!member.lift?walkingHeight(this.predictedZone??member.zone,this.position.x,this.position.z):
         height
       const cleaning=(member.workingUntil??0)>now&&(member.workKind==='mop'||member.workKind==='wipe')
       if((member.carrying||cleaning||member.kfcRole)&&!current.props)current.props=staffProps(figure.root)
@@ -477,7 +478,7 @@ export class CityStage {
         current.props.mop.visible=cleaning&&member.workKind==='mop'
         current.props.mop.rotation.z=.19+Math.sin(now*.008)*.13
       }
-      figure.pose(member.online?dt:0,member.online?now:0,local?this.position:sample,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now,member.homePose)
+      figure.pose(member.online?dt:0,member.online?now:0,local?this.position:sample,!!member.carrying||!!member.kitchenHand||(member.workingUntil??0)>now,(member.eatingUntil??0)>now,member.homePose,local?this.kitchenMotion:member.kitchenMotion)
       const interior=member.zone==='exchange'||member.zone.startsWith('floor:')
       if(interior&&member.zone.startsWith('floor:'))this.art.floor(member.zone.slice(6))
       if(interior){
@@ -564,7 +565,7 @@ export class CityStage {
       this.yaw=from+delta*progress*progress*(3-2*progress)
       if(progress===1)this.liftFacing=undefined
     }
-    this.camera.position.set(x,(me&&!me.lift?walkingHeight(this.predictedHome??(residentialAt(me.zone)?'city':me.zone),x,z):me?riderHeight(me,now):0)+(me?.homePose?(me.homePose.kind==='rest'?me.homePose.height+.16:me.homePose.height+.91):(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE)),z)
+    this.camera.position.set(x,(me&&!me.lift?walkingHeight(this.predictedZone??me.zone,x,z):me?riderHeight(me,now):0)+(me?.homePose?(me.homePose.kind==='rest'?me.homePose.height+.16:me.homePose.height+.91):(me?.chair||me?.lounge||me?.dining!==undefined||me?.barSeat!==undefined||me?.boardSeat!==undefined?SEATED_EYE:STANDING_EYE)),z)
     if(me?.zone==='oasis'){
       const p=localSite('oasis',x,z)
       if(inPool(p.x,p.z))this.camera.position.y+=Math.sin(now*.0027)*.055
@@ -588,7 +589,6 @@ export class CityStage {
       const side=fryer||soda
       this.camera.position.set(p.x-(side?1.16:0),1.90,p.z+(side?0:1.09))
       this.camera.lookAt(p.x,1.16,p.z)
-      if(!this.pause&&s.fillAt&&performance.now()>=s.fillAt)this.completeTool('fill')
     }
     this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt,!!s?.phase)
     const free=!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
@@ -670,6 +670,7 @@ export class CityStage {
       this.prepareGraphics(Date.now()+this.clock)
       if(this.preparingGraphics)return
     }
+    if(!this.pause&&this.station?.fillAt&&time>=this.station.fillAt)this.completeTool('fill')
     this.step(stepTime);this.prompt()
     const moving=this.moving
     if(moving!==this.wasMoving){this.wasMoving=moving;this.onMovementChange()}

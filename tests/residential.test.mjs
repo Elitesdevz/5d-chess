@@ -49,7 +49,7 @@ test('every apartment storey and two-storey house can be traversed both ways wit
     function step(x,z){
       const target=residentialSite(b,x,z),v=worldMove(zone,p,target.x,target.z,9,true,keys)
       assert.ok(Math.hypot(v.x-target.x,v.z-target.z)<.06,b.id+' stair blocked at '+[x,z])
-      p=v;zone=v.homeZone
+      p=v;zone=v.zone
     }
     const dz=s.back-s.front,landing=s.front+dz*.9,outside=s.front-Math.sign(dz)*.43
     for(let floor=1;floor<b.levels.length;floor++){
@@ -138,10 +138,10 @@ test('private door collision and shared furniture prevent unauthorized entry and
   const f=city(t),b=buildingById.get('house-10'),u=UNITS.find(u=>u.id===b.id)
   const zone=homeZone(b.id,0),front={...residentialSite(b,0,4.25),yaw:0},inside=residentialSite(b,0,2.72)
   const step=(keys,doors)=>worldMove('city',front,inside.x,inside.z,4,true,keys,{doors,lifts:{}})
-  assert.equal(step([],{}).homeZone,undefined)
-  assert.equal(step([u.id],{}).homeZone,undefined)
-  assert.equal(step([],{[u.id]:1}).homeZone,undefined)
-  assert.equal(step([u.id],{[u.id]:1}).homeZone,zone)
+  assert.equal(step([],{}).zone,'city')
+  assert.equal(step([u.id],{}).zone,'city')
+  assert.equal(step([],{[u.id]:1}).zone,'city')
+  assert.equal(step([u.id],{[u.id]:1}).zone,zone)
   const apartment=lobby(f,'Alice',0)
   f.move('Bob',0,11);f.move('Bob',-61.5,11);f.move('Bob',-61.5,-30.75);f.move('Bob',apartment.x,-30.75)
   f.walk('Bob',apartment,0,3.8)

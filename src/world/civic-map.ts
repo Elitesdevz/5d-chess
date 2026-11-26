@@ -7,13 +7,12 @@ import {CITY_PORTALS,interactions,PLAN,type WorldView} from './model.ts'
 export function civicMap(ctx:CanvasRenderingContext2D,w:number,h:number,view:WorldView,eye:Point&{yaw:number}){
   const room=view.you.zone,out=room==='city'
   if(!out&&!civicRoom(room))return false
-  // The outdoor plan leaves enough street on screen to choose the next turn.
-  const plot=out?undefined:footprint[design(room as CivicRoom)]
-  // Keep the complete plan, including a player just inside the door, above
-  // the interaction prompt and nine-slot hotbar on short screens.
-  const planHeight=Math.max(h*.48,h-176)
-  const size=plot?Math.min((w-24)/(plot.w+1),planHeight/(plot.d+1.35),52):Math.max(6,Math.min(13,w/61))
-  const center=out?eye:origins[design(room as CivicRoom)],middle=out?h/2:35+planHeight/2
+  // Keep the street and floor plan in one player-centred view through the doorway.
+  const distance=Math.min(...Object.values(origins).map(o=>Math.hypot(eye.x-o.x,eye.z-o.z)))
+  const close=Math.max(0,Math.min(1,(17-distance)/12))
+  const streetScale=Math.max(6,Math.min(13,w/61))
+  const size=streetScale+(Math.min(40,w/18,h/14)-streetScale)*close
+  const center=eye,middle=h/2
   const px=(x:number)=>w/2+(x-center.x)*size,py=(z:number)=>middle+(z-center.z)*size
   const visible=(x:number,z:number,margin=90)=>px(x)>-margin&&px(x)<w+margin&&py(z)>-margin&&py(z)<h+margin
   function rect(x:number,z:number,a:number,b:number,fill:string,line?:string){
@@ -33,7 +32,7 @@ export function civicMap(ctx:CanvasRenderingContext2D,w:number,h:number,view:Wor
     if(bg){const tw=ctx.measureText(label).width;ctx.fillStyle=bg;ctx.fillRect(px(x)-tw/2-5,py(z)-font*.8,tw+10,font*1.65)}
     ctx.fillStyle=color;ctx.fillText(label,px(x),py(z))
   }
-  ctx.fillStyle=out?'#536b5d':'#243637';ctx.fillRect(0,0,w,h)
+  ctx.fillStyle='#536b5d';ctx.fillRect(0,0,w,h)
   function street(){
     for(const p of PARKS)rect(p.x,p.z,p.w,p.d,'#476a50','#809879')
     for(const s of STREETS)path([s.a,s.b],s.width+s.walk*2,'#b2ab93')
@@ -55,7 +54,7 @@ export function civicMap(ctx:CanvasRenderingContext2D,w:number,h:number,view:Wor
       if(!p.label)text('Passage',p.x,p.z-.64,'#fff0d2',10,'#42524c')
     }
     for(const p of [...interactions('city',view.housing?.keys),...residentialPoints('city',eye,view.housing?.keys??[],view.residential)]){
-      if(p.id.startsWith('enter-')||Math.hypot(p.x-eye.x,p.z-eye.z)>10)continue
+      if(Math.hypot(p.x-eye.x,p.z-eye.z)>10)continue
       rect(p.x,p.z,.25,.25,'#ffe0a5')
       text(p.label,p.x,p.z-.60,'#eff1dc',10,'#455551db')
     }
@@ -127,8 +126,12 @@ export function civicMap(ctx:CanvasRenderingContext2D,w:number,h:number,view:Wor
       }
     }
   }
-  if(out)street();else interior(room as CivicRoom)
-  const inmates=view.players.filter(p=>p.zone===room),active=view.arcade?.contacts.filter(c=>c.kind!=='player'&&c.zone===room)??[]
+  street()
+  for(const id of ['station','gunshop'] as const){
+    if(Math.hypot(eye.x-origins[id].x,eye.z-origins[id].z)<17)interior(civicRoom(room)&&design(room)===id?room:id)
+  }
+  const onFloor=(p:{zone:string})=>p.zone===room||levelOf(room)===0&&['city','gunshop','station'].includes(p.zone)
+  const inmates=view.players.filter(onFloor),active=view.arcade?.contacts.filter(c=>c.kind!=='player'&&onFloor(c))??[]
   for(const p of active){if(!visible(p.x,p.z,10))continue;ctx.beginPath();ctx.arc(px(p.x),py(p.z),out?3:5,0,Math.PI*2);ctx.fillStyle=p.kind==='officer'?'#8ac9ea':'#edcd92';ctx.fill()}
   for(const p of inmates){ctx.beginPath();ctx.arc(px(p.x),py(p.z),5,0,Math.PI*2);ctx.fillStyle='#f4b576';ctx.fill();text(p.name,p.x,p.z+.38,'#fff4ce',10,'#364246')}
   for(const p of view.arcade?.drops??[])rect(p.x,p.z,.48,.42,'#deb879','#704c30')

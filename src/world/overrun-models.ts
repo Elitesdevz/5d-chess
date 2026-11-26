@@ -1,3 +1,4 @@
+import type {KitchenMotion} from '../world/restaurant-model.ts'
 import * as T from 'three'
 import {GLTFLoader,type GLTF} from 'three/addons/loaders/GLTFLoader.js'
 import {clone} from 'three/addons/utils/SkeletonUtils.js'
@@ -74,7 +75,7 @@ export class OverrunPlayer {
     const parent=bone.parent!.getWorldQuaternion(this.rotation)
     bone.quaternion.premultiply(this.parentRotation.copy(parent).invert().multiply(delta).multiply(parent))
   }
-  pose(dt:number,speed:number,seated:boolean,home:HomePose|undefined,work:boolean,eating:boolean,id?:WeaponId){
+  pose(dt:number,speed:number,seated:boolean,home:HomePose|undefined,work:boolean,eating:boolean,id?:WeaponId,kitchen?:KitchenMotion){
     const rest=home?.kind==='rest',moving=!home&&!seated&&speed>.16
     const target=moving?(speed>5.3?2:1):0
     for(const [i,a] of this.clips.entries())a.setEffectiveWeight(T.MathUtils.damp(a.getEffectiveWeight(),i===target?1:0,14,dt))
@@ -86,12 +87,18 @@ export class OverrunPlayer {
       this.pointBone(side+'UpLeg',side+'Leg',0,-.12,-1)
       this.pointBone(side+'Leg',side+'Foot',0,-1,.08)
     }
-    if(!id)for(const [side,sign] of [['Left',-1],['Right',1]] as const){
+    const held=rest||work||seated||eating||kitchen?undefined:id
+    if(!held)for(const [side,sign] of [['Left',-1],['Right',1]] as const){
+      if(kitchen&&side==='Right'){
+        this.pointBone('RightArm','RightForeArm',.18+kitchen.x*.60,-.72+kitchen.y*.45,-.76)
+        this.pointBone('RightForeArm','RightHand',kitchen.x*.78,.12+kitchen.y*.78,-1)
+        continue
+      }
       this.pointBone(side+'Arm',side+'ForeArm',sign*.15,-1,work?-.7:-.08)
       this.pointBone(side+'ForeArm',side+'Hand',0,eating&&side==='Right'?.35:-.85,work||eating||bent?-.85:-.2)
     }
-    this.held.setWeapon(rest||work||seated?undefined:id)
-    if(id){
+    this.held.setWeapon(held)
+    if(held){
       const hand=this.bones.get('RightHand')!
       hand.getWorldPosition(this.point);this.held.position.copy(this.pivot.worldToLocal(this.point))
     }

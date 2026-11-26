@@ -28,29 +28,31 @@ for(const flat of [true,false])test('walk from Clock Square through both Civic A
     const v=await page.evaluate(()=>window.walkObservation.view.you)
     assert.deepEqual([v.x,v.z],[0,8])
     const {walk,outside,use}=browserWalker(page,!flat)
-    await outside(entrances.station);await use('enter-station');await zone('station')
+    await outside(entrances.station);await walk(at('station',insideDoor('station').x,insideDoor('station').z));await zone('station')
     await walk(at('station',-4.45,.39));await use('desk')
     await page.getByRole('heading',{name:'Meridian Police front desk'}).waitFor()
     await page.getByRole('button',{name:'Close',exact:true}).click()
     for(let n=1;n<=5;n++){
-      await walk(at('station',stair.up,0),at('station',stair.up,2.90),at('station',stair.down,2.90),at('station',stair.down,stair.start+.12))
-      await use('gallery-up');await zone('precinct:'+n)
+      await walk(at('station',stair.up,0),at('station',stair.up,2.90),at('station',stair.down,2.90),at('station',stair.down,stair.start-.38))
+      await zone('precinct:'+n)
     }
     await walk(at('station',cells[49].x,0))
     for(let n=5;n>0;n--){
-      await walk(at('station',stair.down,stair.start-.53));await use('gallery-down');await zone(n===1?'station':'precinct:'+(n-1))
+      await walk(at('station',stair.down,stair.start-.53));await walk(at('station',stair.down,stair.start+.40));await zone(n===1?'station':'precinct:'+(n-1))
       await walk(at('station',stair.down,2.90),at('station',stair.up,2.90),at('station',stair.up,0))
     }
     for(const id of ['station','gunshop']){
       if(id==='gunshop'){
-        await outside(entrances.gunshop);await use('enter-gunshop');await zone('gunshop')
+        await outside(entrances.gunshop);await walk(at(id,insideDoor(id).x,insideDoor(id).z));await zone('gunshop')
         await walk(at(id,0,-1.22));await use('counter')
         await page.getByRole('button',{name:/Buy Pistol for 25 cash/}).waitFor()
         await page.getByRole('button',{name:'Close',exact:true}).click()
       }
-      const p=insideDoor(id);await walk(at(id,p.x,p.z));await use('exit-venue');await zone('city')
-      const pos=await page.evaluate(()=>window.walkObservation.view.you)
-      assert.ok(Math.hypot(pos.x-entrances[id].x,pos.z-entrances[id].z)<.36)
+      const p=insideDoor(id);await walk(at(id,p.x,p.z));await walk(entrances[id]);await zone('city')
+      await page.waitForFunction(goal=>{
+        const p=window.walkObservation.view.you
+        return p.zone==='city'&&Math.hypot(p.x-goal.x,p.z-goal.z)<.36
+      },entrances[id])
     }
     assert.ok(travel.every(to=>to==='city'));assert.deepEqual(errors,[])
   }finally{await browser?.close();server.closeAllConnections();await new Promise(r=>server.close(r));app.drain();store.close()}

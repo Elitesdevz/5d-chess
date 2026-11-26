@@ -39,7 +39,7 @@ export class ArcadeControls {
     if(!a||a.custody)return
     this.host.querySelector('.arcade-meter')!.textContent='HP '+a.hp+'/100'+(a.stars?' · '+ '★'.repeat(a.stars)+' · '+Math.ceil(a.remaining/60000)+' min · '+(a.warning??'Patrol searching'):'')
     const dist=(p:{x:number;z:number})=>Math.hypot(view.you.x-p.x,view.you.z-p.z)
-    const targets=a.contacts.filter(c=>c.kind!=='dog'&&c.kind!=='helicopter'&&dist(c)<=(this.weapon?WEAPONS[this.weapon].range:0))
+    const targets=a.contacts.filter(c=>c.inSight&&c.kind!=='dog'&&c.kind!=='helicopter'&&(c.distance??dist(c))<=(this.weapon?WEAPONS[this.weapon].range:0))
     const drops=a.drops.filter(d=>dist(d)<=1.85)
     const weapon=this.weapon,mag=weapon?a.magazines?.[weapon]:undefined
     const reloading=!!mag&&mag.readyAt>view.now

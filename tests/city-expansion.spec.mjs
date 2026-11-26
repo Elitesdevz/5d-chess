@@ -1,5 +1,5 @@
 import {observeCity,browserWalker} from './civic-controls.mjs'
-import {cellPosition,entrances} from '../src/world/civic-venues.ts'
+import {at,insideDoor,cellPosition,entrances} from '../src/world/civic-venues.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
@@ -32,13 +32,7 @@ test('play the expansion from signup, the city hotbar, and a permanent cell with
     await walker.outside({x:-24,z:5.67})
     await walker.walk({x:-24,z:4.16})
     await page.locator('#city-world[data-zone=bank]').waitFor()
-    async function walkToPrompt(label){
-      await canvas.focus();await page.keyboard.down('w')
-      try{await page.getByRole('button',{name:new RegExp(label)}).waitFor({timeout:6500})}
-      finally{await page.keyboard.up('w')}
-      await page.keyboard.press('e')
-    }
-    await walkToPrompt('Withdraw or deposit')
+    await walker.walk({x:-24,z:-2.10});await walker.use('cash')
     await page.getByLabel('Quantity').fill('50')
     await page.getByRole('button',{name:'Withdraw',exact:true}).click()
     await page.getByText(/Carried cash 50/).waitFor()
@@ -49,9 +43,9 @@ test('play the expansion from signup, the city hotbar, and a permanent cell with
     assert.equal(await page.locator('.arcade-slots button').count(),9)
     await walker.walk({x:-24,z:5.66})
     await walker.outside(entrances.gunshop)
-    await walker.use('enter-gunshop')
+    await walker.walk(at('gunshop',insideDoor('gunshop').x,insideDoor('gunshop').z))
     await page.locator('#city-world[data-zone=gunshop]').waitFor()
-    await walkToPrompt('Visit the armory counter')
+    await walker.walk(at('gunshop',0,-1.22));await walker.use('counter')
     await page.getByRole('button',{name:/Buy Pistol for 25 cash/}).click()
     await page.locator('.arcade-slots button').filter({hasText:'Pistol'}).waitFor()
     await page.getByRole('button',{name:'Close',exact:true}).click()

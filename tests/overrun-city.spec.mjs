@@ -5,8 +5,9 @@ import {readdir} from 'node:fs/promises'
 import {chromium} from 'playwright'
 import {ChessStore} from '../server/storage.ts'
 import {createApplication} from '../server/application.ts'
+import {observeCity,browserWalker} from './civic-controls.mjs'
 import {visitorRoute} from './civic-route.mjs'
-import {origins} from '../src/world/civic-venues.ts'
+import {origins,entrances} from '../src/world/civic-venues.ts'
 import {carry,pack} from '../server/city-inventory.ts'
 
 test('the five-model armory, hotbar, camera and reload work in the WebGL city',{timeout:120000},async t=>{
@@ -30,7 +31,7 @@ test('the five-model armory, hotbar, camera and reload work in the WebGL city',{
   assert.equal((await route.enter('gunshop')).you.zone,'gunshop')
   const page=await ctx.newPage(),errors=[]
   page.on('pageerror',e=>errors.push(e.message))
-  await page.goto(base+'/chess/world.html')
+  await observeCity(page);await page.goto(base+'/chess/world.html')
   await page.locator('#world-canvas[data-zone="gunshop"]').waitFor()
   await page.locator('#world-canvas').focus()
   await page.keyboard.down('w')
@@ -43,12 +44,40 @@ test('the five-model armory, hotbar, camera and reload work in the WebGL city',{
   await page.locator('.arcade-slots').getByRole('button',{name:/Shotgun/}).waitFor()
   await shop.getByRole('button',{name:'Close',exact:true}).click()
   await page.locator('.arcade-slots').getByRole('button',{name:/Shotgun/}).click()
-  await page.getByRole('button',{name:'Fire',exact:true}).click()
+  const cameraButton=page.getByRole('button',{name:'Switch camera'})
+  await cameraButton.click();await page.locator('#city-world[data-camera="third"]').waitFor()
+  await cameraButton.click();await page.locator('#city-world[data-camera="first"]').waitFor()
+  const visitor=await browser.newContext()
+  assert.equal((await visitor.request.post(base+'/api/signup',{data:{username:'Doorway guest',password:'fixture',confirm:'fixture'}})).status(),201)
+  const arrival=await visitor.request.post(base+'/api/world/teleport',{data:{to:'gunshop',scene:true}})
+  const inside=await arrival.json()
+  assert.equal(inside.you.zone,'gunshop')
+  await visitor.request.post(base+'/api/world/presence',{data:{scene:true,world:inside.id,x:inside.you.x,z:inside.you.z,yaw:Math.PI}})
+  await page.getByRole('link',{name:'GUNS',exact:true}).click()
+  await browserWalker(page).walk({...entrances.gunshop,z:entrances.gunshop.z+2.3})
+  await page.waitForFunction(()=>window.walkObservation.view.you.zone==='city'&&window.walkObservation.view.arcade.contacts.some(c=>c.id==='player:Doorway guest'&&c.inSight&&c.distance<5))
+  const canvas=page.locator('#world-canvas')
+  if(!await canvas.evaluate(c=>document.pointerLockElement===c))await canvas.click()
+  await page.waitForFunction(()=>document.pointerLockElement===document.querySelector('#world-canvas'))
+  await page.waitForFunction(()=>{
+    const s=window.walkObservation
+    return s.held.children.length&&s.figures.get('Doorway guest')?.figure.rig&&Math.abs(s.camera.position.z-s.position.z)<.1
+  })
+  if(process.env.CITY_REVIEW_DIR){
+    const frame=await page.evaluate(()=>window.walkObservation.renderer.info.render.frame)
+    await page.waitForFunction(n=>window.walkObservation.renderer.info.render.frame>=n+3,frame)
+    await page.evaluate(()=>window.walkObservation.gl.finish())
+    await page.screenshot({path:process.env.CITY_REVIEW_DIR+'/doorway.png'})
+  }
+  const shot=page.waitForResponse(r=>r.url().endsWith('/api/world/arcade')&&r.request().postDataJSON().operation==='fire')
+  await page.mouse.down();await page.mouse.up()
+  const hit=await shot
+  assert.equal(hit.request().postDataJSON().target,'player:Doorway guest')
+  const outcome=await hit.json()
+  assert.equal(outcome.arcade.contacts.find(c=>c.id==='player:Doorway guest').hp,42)
   await page.getByText('4 / 5',{exact:true}).waitFor()
   await page.keyboard.press('r')
   await page.getByText('5 / 5',{exact:true}).waitFor()
-  await page.getByRole('button',{name:'Switch camera'}).click()
-  await page.locator('#city-world[data-camera="third"]').waitFor()
   assert.deepEqual(errors,[])
 
   // Check skinned vertices after animation, when the GPU actually draws them.
@@ -73,9 +102,17 @@ test('the five-model armory, hotbar, camera and reload work in the WebGL city',{
           mesh.getVertexPosition(i,v);mesh.localToWorld(v);min=Math.min(min,v.y);max=Math.max(max,v.y)
         }
       })
-      return max-min
+      const wrist=figure.rig.bones.get('RightHand'),point=wrist.position.clone()
+      figure.rig.pose(.016,0,false,undefined,true,false,'blaster',{x:-.6,y:-.6})
+      const low=wrist.getWorldPosition(point).clone()
+      figure.rig.pose(.016,0,false,undefined,true,false,'blaster',{x:.6,y:.6})
+      return {height:max-min,handTravel:low.distanceTo(wrist.getWorldPosition(point)),holding:figure.rig.held.children.length}
     })
   },{file:stageFile,origin:origins.gunshop})
   assert.equal(heights.length,2)
-  for(const height of heights)assert.ok(height>1.5&&height<2,'Animated player height: '+height)
+  for(const {height,handTravel,holding} of heights){
+    assert.ok(height>1.5&&height<2,'Animated player height: '+height)
+    assert.ok(handTravel>.12,'Cook wrist travel: '+handTravel)
+    assert.equal(holding,0)
+  }
 })

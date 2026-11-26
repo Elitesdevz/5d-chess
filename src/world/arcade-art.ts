@@ -3,7 +3,7 @@ import {Scenery} from './landscape.ts'
 import type {Letter} from './residential-art.ts'
 import {weaponIds,WEAPONS,type WeaponId,type Contact} from './arcade.ts'
 import {HeldModel} from './overrun-models.ts'
-import {origins,footprint,front,doorLeaves,cells,stair,rise,levelOf,deskFurniture,shopCounter,shopCases,type Venue} from './civic-venues.ts'
+import {origins,footprint,front,doorLeaves,cells,stair,rise,deskFurniture,shopCounter,shopCases,type Venue} from './civic-venues.ts'
 
 const ivory=0xe4d8bb,brass=0xbb8c49,steel=0x617c85,ink=0x192c39,navy=0x294a5e,stone=0xa9afa7,walnut=0x624438,oak=0x94674d,glass=0x60939c,burgundy=0x69394b
 // Batch opaque, burnished, illuminated and transparent surfaces separately.
@@ -102,7 +102,7 @@ function precinctExterior(k:Kit){
   k.sign('CUSTODY WINGS  A · B',5.5,2.61,z-.21,3.7,.34,Math.PI)
   for(let n=1;n<=5;n++){
     const y=n*rise
-    k.box(0,y+rise/2,0,w,rise,d,stone)
+    for(const side of [-1,1])k.box(side*(w/2+.02),y+rise/2,0,.12,rise,d,stone)
     for(const side of [-1,1]){
       const wall=side*(d/2+.05)
       k.box(0,y+1.63,wall,w-.4,1.73,.12,navy)
@@ -111,7 +111,9 @@ function precinctExterior(k:Kit){
         for(const dx of [-.48,.48])k.trim(x+dx,y+1.68,wall+side*.22,.055,1.15,.065,steel)
       }
     }
-    k.box(0,y+.10,0,w+.2,.20,d+.19,ivory);k.trim(0,y+.23,0,w+.19,.055,d+.22)
+    for(const side of [-1,1]){
+      k.box(0,y+.10,side*d/2,w+.2,.20,.19,ivory);k.trim(0,y+.23,side*d/2,w+.19,.055,.22)
+    }
     for(const x of [-9.09,-1.42,1.42,9.09])k.box(x,y+1.8,z-.17,.27,rise-.1,.27,ivory)
   }
   k.box(0,6*rise,0,w+.35,.28,d+.41,navy)
@@ -179,7 +181,7 @@ function stairs(k:Kit){
 }
 function galleryFloor(k:Kit,n:number){
   const {w,d}=footprint.station
-  // A continuous floor surrounds the stair opening. Only the current level's detail is rendered.
+  // A continuous floor surrounds the stair opening.
   k.box(0,-.10,-1.31,w,.19,4.22,ink)
   for(const side of [-1,1])k.box(side*(w/4+.61),-.10,2.07,w/2-1.21,.19,2.63,ink)
   k.tileFloor(w-.15,d-.1,[0xb4b7ac,0x809899],(x,z)=>Math.abs(x)<1.45&&z>.55)
@@ -271,16 +273,15 @@ export function arcadeBuildings(scene:T.Scene,label:Letter){
   base.add(lobbyLights);retail.add(shopLights)
   light(lobbyLights,-4.45,2.86,.15,0xffdbab,19,6.3);light(lobbyLights,4.65,2.86,.15,0xb9e1df,16,6)
   light(shopLights,0,3.32,-1.9,0xffc087,24,7);light(shopLights,-3.25,2.4,1.5,0x88e7d6,14,5.2)
-  const floors=Array.from({length:5},(_,i)=>{const g=group('station',(i+1)*rise),k=builder(g,label);galleryFloor(k,i+1);k.finish();light(g,-4.4,2.85,0,0xffdfa7,14,5);light(g,4.4,2.85,0,0xcdeae7,14,5);return g})
+  for(let n=1;n<=5;n++){
+    const g=group('station',n*rise),k=builder(g,label)
+    galleryFloor(k,n);k.finish();light(g,-4.4,2.85,0,0xffdfa7,14,5);light(g,4.4,2.85,0,0xcdeae7,14,5)
+  }
   return (zone:string,x:number,z:number)=>{
-    const n=levelOf(zone),street=zone==='city'
-    exterior.visible=street
-    base.visible=street||zone==='station'||n===1
-    retail.visible=street||zone==='gunshop'
+    const street=zone==='city'
     if(retail.visible&&Math.hypot(x-origins.gunshop.x,z-origins.gunshop.z)<16)showModels()
     lobbyLights.visible=zone==='station'||street&&Math.hypot(x-origins.station.x,z-origins.station.z)<13
     shopLights.visible=zone==='gunshop'||street&&Math.hypot(x-origins.gunshop.x,z-origins.gunshop.z)<13
-    floors.forEach((g,i)=>g.visible=n>0&&Math.abs(i+1-n)<=1||zone==='station'&&i===0)
   }
 }
 export function supportModel(kind:Contact['kind']|'drop'){

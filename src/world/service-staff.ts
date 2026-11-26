@@ -1,6 +1,6 @@
 import {BAR} from './bar-menu.ts'
 import {CREDIT_ADVISOR,FINANCIAL_ADVISOR,PUBLIC_DICE,site,type WorldZone} from './model.ts'
-import {residentialAt,residentialSite} from './residential.ts'
+import {BUILDINGS,homeZone,residentialAt,residentialSite} from './residential.ts'
 
 type Worker={name:string;x:number;z:number}
 const worker=(name:string,x:number,z:number):Worker=>({name,x,z})
@@ -17,3 +17,9 @@ export function serviceStaff(zone:WorldZone){
     zone.startsWith('floor:')?floorStaff:home?.building.block!==undefined&&home.level===0&&!home.stairs?[housingClerk]:[]
   return team.map((p,i)=>({id:staffId(zone,i),name:p.name,zone,...(home?residentialSite(home.building,p.x,p.z):site(zone,p.x,p.z))}))
 }
+
+// Fixed staff occupy the same city space for every observer.
+export const cityStaff=[
+  ...(['hotel','casino','exchange','bank'] as const).flatMap(serviceStaff),
+  ...BUILDINGS.filter(b=>b.block!==undefined).flatMap(b=>serviceStaff(homeZone(b.id,0))),
+]

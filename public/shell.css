@@ -126,6 +126,8 @@ body[data-page=collection] .equipment-slots button,body[data-page=collection] .o
 .has-economy .economy-nav .bank-nav-button:hover,.has-economy .economy-nav .bank-nav-button[aria-current=page]{background:#315e72a0;border-color:#91c3d5;color:#e7f6ff}
 .has-economy .economy-nav .kfc-nav-button{border:1px solid #e0918670;background:#71343c68;color:#ffe1bc;justify-content:center}
 .has-economy .economy-nav .kfc-nav-button:hover,.has-economy .economy-nav .kfc-nav-button[aria-current=page]{border-color:#e5938a;background:#8c3743;color:#fff2d9}
+.has-economy .economy-nav a[href$="?go=gunshop"]{border:1px solid #c6948559;background:#563a4366;color:#f2d3bf;justify-content:center}
+.has-economy .economy-nav a[href$="?go=prison"]{border:1px solid #88a7b45e;background:#34465075;color:#d0e4eb;justify-content:center}
 .kfc-nav-button b{font-size:1.05em;letter-spacing:.1em}
 
 .in-custody .masthead,.in-custody main:not(.world){filter:grayscale(1);opacity:.42;pointer-events:none}

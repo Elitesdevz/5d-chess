@@ -23,7 +23,7 @@ export const PUZZLE_SIZE=1000
 export const alias=(cell:number)=>'Inmate '+String(cell).padStart(2,'0')
 export {entrances,origins,venue,venueWalk,cellPosition,type Venue} from './civic-venues.ts'
 export interface CustodyView {cell:number;name:string;ends:number|null;noRelease:boolean;x:number;z:number;yaw:number}
-export interface Contact {id:string;label:string;x:number;z:number;zone:string;hp?:number;kind:'officer'|'dog'|'helicopter'|'resident'|'player'}
+export interface Contact {height?:number;distance?:number;inSight?:boolean;id:string;label:string;x:number;z:number;zone:string;hp?:number;kind:'officer'|'dog'|'helicopter'|'resident'|'player'}
 export interface ArcadeView {
   sequence:number;slots:(Stack|null)[];hp:number;stars:number;remaining:number;contacts:Contact[]
   magazines?:Partial<Record<WeaponId,Magazine>>;lastShot?:number;lastHit?:boolean

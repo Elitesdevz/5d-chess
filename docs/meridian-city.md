@@ -1,6 +1,6 @@
 # Meridian city expansion
 
-Open the City from the signed-in header. Walk with WASD or the joystick and press E or the interaction button at a counter or door. The same controls work on the overhead canvas when WebGL is unavailable.
+Open the City from the signed-in header. Walk with WASD or the joystick and press E or the interaction button at a counter or a closed residential door. The same controls work on the overhead canvas when WebGL is unavailable.
 
 ## Bank, hotbar and homes
 
@@ -16,15 +16,17 @@ Existing SQLite accounts acquire the hotbar on first use. Older food quantities 
 
 The kitchen counter has a storage drawer in each house and apartment. An active deed or lease allows its resident to put away and retrieve cash and weapons. Walk up to the drawer to use it. Food goes in the existing fridge.
 
-Pulse & Pixel, the arcade gun shop, stands on the north sidewalk at the northwest end of Civic Avenue. Use the lit storefront door, walk to the display counter and leave through the same doorway. The rack sells the Pistol (25 carried cash), SMG (60), Assault Rifle (95), Shotgun (80), and Sniper Rifle (140). Existing pulse blasters appear as Pistols. Each weapon type has its own magazine. Stowing a weapon, switching slots, or logging out preserves that magazine.
+Pulse & Pixel, the arcade gun shop, stands on the north sidewalk at the northwest end of Civic Avenue. Walk through the lit storefront door, walk to the display counter and leave through the same doorway. The rack sells the Pistol (25 carried cash), SMG (60), Assault Rifle (95), Shotgun (80), and Sniper Rifle (140). Existing pulse blasters appear as Pistols. Each weapon type has its own magazine. Stowing a weapon, switching slots, or logging out preserves that magazine.
 
-In the 3D view, click to capture the mouse, then click to fire at the reticle. Hold the mouse button for automatic fire with the SMG or Assault Rifle. Hold the right button to aim, press R to reload, and hold Shift while moving to sprint. V or the Camera button switches between first and third person. The hotbar also offers target selection, Fire and Reload on touch screens and the overhead map. Firing raises the wanted level. Players respawn at the city entrance. The carried slots become one collectible bag at the death location. Pickup requires room for the entire bag. Banked coins, cosmetics and home contents stay with their owner. When a secondary city instance empties, its unclaimed bags move to the same coordinates in the first instance.
+In the 3D view, click to capture the mouse, then click to fire at the reticle. Hold the mouse button for automatic fire with the SMG or Assault Rifle. Hold the right button to aim, press R to reload, and hold Shift while moving to sprint. V or the Camera button switches between first and third person. The hotbar also offers target selection, Fire and Reload on touch screens and the overhead map. Arcade shots cross open doorways in either direction. Walls, closed doors and solid floors block the line of sight. Firing raises the wanted level. Players respawn at the city entrance. The carried slots become one collectible bag at the death location. Pickup requires room for the entire bag. Banked coins, cosmetics and home contents stay with their owner. When a secondary city instance empties, its unclaimed bags move to the same coordinates in the first instance.
 
 [Player models at Pulse & Pixel](review/overrun/players.webp) · [First-person showroom view](review/overrun/shop.webp) · [Asset provenance](../provenance.txt)
 
+At KFC, move the spatula, scoop and soda cup with the mouse, touch or arrow keys. The gloved hand follows the utensil, and nearby players see the cook move their arm. [Grill screenshot](review/overrun/kitchen.webp)
+
 ## Meridian Police
 
-Enter Meridian Police from the south sidewalk on Civic Avenue, between the signed front columns near the patrol cars. Public enquiries and booking face the lobby. The central staircase leads to five visitor galleries. Walk both flights to the landing and press E or the touch interaction button to continue. Take the staircase back down to leave through the lobby. West Wing holds cells 01–25 and East Wing holds 26–50, five on each side of each gallery. Cell 50 faces the public corridor on level five. Bars separate visitors from the cell interiors. Occupied cells show their inmate even after logout or a server restart.
+Enter Meridian Police from the south sidewalk on Civic Avenue, between the signed front columns near the patrol cars. Public enquiries and booking face the lobby. The central staircase leads to five visitor galleries. Walk both flights and turn on the landing to reach each gallery. The GUNS and PRISON header links take you directly to the showroom and the public police lobby. Take the staircase back down to leave through the lobby. West Wing holds cells 01–25 and East Wing holds 26–50, five on each side of each gallery. Cell 50 faces the public corridor on level five. Bars separate visitors from the cell interiors. Occupied cells show their inmate even after logout or a server restart. [Lobby and stairs](review/overrun/prison.webp)
 
 | Stars | Patrol | Active time to clear | Sentence |
 | --- | --- | --- | --- |
