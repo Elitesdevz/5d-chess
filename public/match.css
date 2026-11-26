@@ -77,3 +77,13 @@
 .match-screen .online-seats .match-player span{padding:0;border:0;background:none;border-radius:0;overflow-wrap:normal;line-height:inherit}
 .match-screen .online-seats .match-player>.player-profile-link{overflow:visible;max-width:none}
 .match-screen .match-player .you-tag{display:inline;width:auto;height:auto;background:none;border-radius:0;flex:none;font-style:normal}
+
+.match-screen .has-economy>.economy-nav{display:flex;align-items:center;justify-content:flex-start;flex:1 1 0;min-width:0;gap:4px}
+.match-venue-links{display:flex;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.match-screen .match-venue-links a{flex:none;white-space:nowrap}
+@media(max-width:760px){
+  .match-screen .masthead.app-topbar.has-economy{flex-wrap:wrap;height:auto;flex-basis:auto;row-gap:0}
+  .match-screen .has-economy>.economy-nav{order:1;flex-basis:100%;margin:0}
+  .match-venue-links{flex:1}
+  .match-screen .match-venue-links a{flex:1 0 auto}
+}

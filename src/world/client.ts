@@ -192,7 +192,7 @@ function accepted(next:WorldView & {mapVersion?:string},start:number,reposition=
   updateWalletBalance(next.coins)
   restaurant?.update(next)
   if(changed){
-    const nav=next.you.zone.startsWith('hotel')||next.you.zone==='casino'?'casino':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='station'||next.you.zone.startsWith('precinct:')?'prison':next.you.zone==='gunshop'?'gunshop':next.you.zone==='city'?'city':''
+    const nav=next.you.zone.startsWith('hotel')||next.you.zone==='casino'?'casino-floor':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='station'||next.you.zone.startsWith('precinct:')?'prison':next.you.zone==='gunshop'?'gunshop':next.you.zone==='city'?'city':''
     for(const a of document.querySelectorAll<HTMLAnchorElement>('.economy-nav a[href*="world.html"]')){
       if(new URL(a.href).searchParams.get('go')===nav)a.setAttribute('aria-current','page')
       else a.removeAttribute('aria-current')
@@ -395,7 +395,7 @@ async function start(){
 }
 document.addEventListener('click',event=>{
   const link=(event.target as Element).closest<HTMLAnchorElement>('a')
-  if(!link||!view||event.defaultPrevented||event instanceof MouseEvent&&(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey))return
+  if(!link||!view||performing||event.defaultPrevented||event instanceof MouseEvent&&(event.metaKey||event.ctrlKey||event.shiftKey||event.altKey))return
   const url=new URL(link.href)
   if(url.origin!==location.origin||url.pathname!=='/chess/world.html')return
   const to=url.searchParams.get('go')??''
