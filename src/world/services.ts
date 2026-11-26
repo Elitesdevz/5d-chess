@@ -1,6 +1,7 @@
 import {MENU} from './restaurant-model.ts'
 import type {FoodView} from './food.ts'
 import {residentialAt} from './residential.ts'
+import {GROCERIES} from './food.ts'
 import {UNITS,RESIDENCES} from './housing.ts'
 import type {WorldView} from './model.ts'
 import {DRINKS,type BarService} from './bar-menu.ts'
@@ -107,11 +108,11 @@ export class CityServices {
     })
   }
   food(food:FoodView,send:(data:object)=>Promise<void>){
-    const renderItems=(storage:boolean)=>MENU.map(item=>{
-      const quantity=(storage?food.stored!:food.personal)[item.id]
+    const renderItems=(storage:boolean)=>GROCERIES.map(item=>{
+      const quantity=(storage?food.stored!:food.personal)[item.id]??0
       const transfer=storage?'take':'store',label=storage?'Take':'Store'
       const submit=(op:string,title:string,all=false)=>`<button type="submit" value="${op}" data-all="${all}" ${all||op==='eat'?'formnovalidate':''} ${quantity?'':'disabled'}>${title}</button>`
-      return `<form class="world-ballot residential-food" data-food-item="${item.id}"><h3>${item.name} <small>×${quantity}</small></h3><div class="world-button-row">${food.stored?`<input type="number" aria-label="Quantity" name="quantity" min="1" max="${Math.max(1,quantity)}" value="1">${submit(transfer,label)}${submit(transfer,label+' all',true)}`:''}${storage?'':submit('eat',item.id==='cola'?'Drink one':'Eat one')}</div></form>`
+      return `<form class="world-ballot residential-food" data-food-item="${item.id}"><h3>${item.name} <small>×${quantity}</small></h3><div class="world-button-row">${food.stored?`<input type="number" aria-label="Quantity" name="quantity" min="1" max="${Math.max(1,quantity)}" value="1">${submit(transfer,label)}${submit(transfer,label+' all',true)}`:''}</div></form>`
     }).join('')
     this.render('FOOD',food.stored?'Refrigerator':'Food inventory',`<div class="residential-food-columns"><section><h3>Your food inventory</h3>${renderItems(false)}</section>${food.stored?`<section><h3>Stored here</h3>${renderItems(true)}</section>`:''}</div>`)
     if(!this.dialog.open)this.dialog.showModal()

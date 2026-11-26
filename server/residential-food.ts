@@ -1,6 +1,6 @@
 import {pack,carry,remove,releaseFridge,heal,mirrorFood} from './city-inventory.ts'
-import {blankOrder,MENU,type MenuItem} from '../src/world/restaurant-model.ts'
-import type {FoodView} from '../src/world/food.ts'
+import {blankOrder} from '../src/world/restaurant-model.ts'
+import {isGrocery,type FoodView,type Pantry} from '../src/world/food.ts'
 import {access} from '../src/world/residential.ts'
 import type {Account} from './accounts.ts'
 import type {ChessStore} from './storage.ts'
@@ -20,13 +20,13 @@ export function residentialFood(store:ChessStore,name:string,keys:readonly strin
     const p=pack(account)
     for(const id of Object.keys(account.fridges??{}))if(!access(id,keys))releaseFridge(account,id)
     const personal=mirrorFood(account)
-    const stored=unit?(account.fridges?.[unit]??blankOrder()):undefined
+    const stored:Pantry|undefined=unit?(account.fridges?.[unit]??blankOrder()):undefined
     if(command){
       const {id,item,operation,amount}=command
-      if(typeof id!=='string'||!/^[-\w]{12,80}$/.test(id)||!MENU.some(entry=>entry.id===item)||
+      if(typeof id!=='string'||!/^[-\w]{12,80}$/.test(id)||!isGrocery(item)||
         (operation!=='eat'&&operation!=='store'&&operation!=='take'))fail(400,'Choose a valid food action')
       if(operation!=='eat'&&(!stored||!unit||!access(unit,keys)))fail(409,'Open an accessible refrigerator first')
-      const type=item as MenuItem
+      const type=item
       const source=operation==='take'?stored!:personal
       const quantity=amount==='all'?source[type]:amount
       const receipt=JSON.stringify([operation,type,amount,operation==='eat'?null:unit])
@@ -34,11 +34,11 @@ export function residentialFood(store:ChessStore,name:string,keys:readonly strin
       if(receipts[id]!==undefined){
         if(receipts[id]!==receipt)fail(409,'This request has already been used')
       }else{
-        if(typeof quantity!=='number'||!Number.isSafeInteger(quantity)||quantity<1||quantity>source[type])fail(409,'Choose an available quantity')
-        if(operation==='take'){carry(p,type,quantity);stored![type]-=quantity}
+        if(typeof quantity!=='number'||!Number.isSafeInteger(quantity)||quantity<1||quantity>(source[type]??0))fail(409,'Choose an available quantity')
+        if(operation==='take'){carry(p,type,quantity);stored![type]=(stored![type]??0)-quantity}
         else remove(p,type,quantity)
         if(operation==='eat')heal(account,quantity*20)
-        if(operation==='store')stored![type]+=quantity
+        if(operation==='store')stored![type]=(stored![type]??0)+quantity
         if(stored&&unit)(account.fridges??={})[unit]=stored
         mirrorFood(account)
         p.sequence++

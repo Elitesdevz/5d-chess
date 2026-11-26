@@ -92,9 +92,22 @@ function trimFront(g:T.Object3D){
   sign(g,['KFC'],-3.96,4.22,-7.02,2.99,1.21,{bg:'#8b292e',rotation:Math.PI,font:165})
 }
 const rawMeat=metal(0xa94e51),cookedMeat=metal(0x6e422e)
-function foodVisual(item:Exclude<KitchenHand,'tray'>){
+export function foodVisual(item:Exclude<KitchenHand,'tray'>|import('./food.ts').Grocery){
   const food=new T.Group()
-  if(item==='burger'||item==='bun'){
+  if(item==='bread'){
+    const loaf=mesh(new T.SphereGeometry(.09,20,12),chip,food,[0,.064,0]);loaf.scale.set(1.32,.67,.85)
+    for(const x of [-.053,0,.053]){
+      const slash=mesh(new T.SphereGeometry(.019,10,6),birch,food,[x,.116-Math.abs(x)*.13,0]);slash.scale.set(.48,.29,1.60);slash.rotation.y=.39
+    }
+  }else if(item==='apple'){
+    const fruit=mesh(new T.SphereGeometry(.065,16,12),redTrim,food,[0,.071,0]);fruit.scale.y=.90
+    block(food,.009,.035,.009,0,.138,0,wood)
+    const leaf=mesh(new T.SphereGeometry(.02,8,6),teal,food,[.014,.145,0]);leaf.scale.set(1,.18,.49)
+  }else if(item==='coffee'){
+    mesh(new T.CylinderGeometry(.050,.034,.13,18),birch,food,[0,.066,0])
+    mesh(new T.CylinderGeometry(.045,.039,.05,18),teal,food,[0,.070,0])
+    cylinder(food,.053,.013,[0,.135,0],cream,18)
+  }else if(item==='burger'||item==='bun'){
     const top=mesh(new T.SphereGeometry(.096,14,8),chip,food,[0,.071,0]);top.scale.y=.43
     cylinder(food,.088,.022,[0,.03,0],birch,16)
     if(item==='burger'){

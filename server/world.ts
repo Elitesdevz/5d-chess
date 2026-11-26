@@ -276,7 +276,7 @@ export class CityWorlds {
       }else{
         if(data.operation!=='eat'&&data.operation!==undefined&&!target)fail(409,'Open an accessible refrigerator first')
         food=residentialFood(this.store,name,housing.keys,target?.unit,data.operation===undefined?undefined:data)
-        if(!target)me.interaction='food'
+        if(!target&&data.operation===undefined)me.interaction='food'
       }
     }else if(action==='chat'){
       const text=typeof data.text==='string'?data.text.replace(/[\p{Cc}\p{Cf}]/gu,' ').trim():''
@@ -405,6 +405,7 @@ export class CityWorlds {
     const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents,
       residential:world.residential,vehicles:world.life.traffic.vehicles,caveOpen:open||me.zone==='cave',keys:housing.keys,drawer,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
     if((action==='presence'||action==='arcade')&&typeof data.slot==='number'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<SLOT_COUNT)me.slot=data.slot
+    if(simulation.view.bite)me.eatingUntil=simulation.view.bite.ends
     const item=simulation.view.slots[me.slot??0]?.item
     me.equipped=isWeapon(item)?item:undefined
     if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;delete victim.equipped;this.arrive(world,victim,'city',now)}

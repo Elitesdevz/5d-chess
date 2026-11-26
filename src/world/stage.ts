@@ -7,7 +7,8 @@ import {residentialAt,residentialPoints} from './residential.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
-import {staffProps} from './restaurant-art.ts'
+import {BITE_MS,type Grocery} from './food.ts'
+import {foodVisual,staffProps} from './restaurant-art.ts'
 import {WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts'
 import {terrainHeight,inPool} from './terrain.ts'
 import * as T from 'three'
@@ -57,13 +58,16 @@ export class CityStage {
   private held=new HeldModel(true)
   private chase=false
   private chaseVisible=false
+  private snacks=new Map<Grocery,T.Group>()
+  private eat?:()=>boolean
   private weapon?:WeaponId
   private firing?:(operation:'fire'|'reload',target?:string)=>void
   private holdingFire=false
   private nextTrigger=0
   private aiming=false
   get sprinting(){return !this.pause&&!this.aiming&&!this.view?.arcade?.custody&&this.arrows.has('shift')}
-  setLoadout(id:WeaponId|undefined,fire:(operation:'fire'|'reload',target?:string)=>void){
+  setLoadout(id:WeaponId|undefined,fire:(operation:'fire'|'reload',target?:string)=>void,eat:()=>boolean){
+    this.eat=eat
     if(this.weapon!==id){this.holdingFire=false;this.aiming=false}
     this.weapon=id;this.firing=fire
     if(!id)this.aiming=false
@@ -346,6 +350,7 @@ export class CityStage {
     },{signal})
     this.canvas.addEventListener('pointerdown',e=>{
       if(this.pause)return
+      if(e.button===0&&document.pointerLockElement===this.canvas&&!this.station&&this.eat?.())return
       if(document.pointerLockElement===this.canvas&&this.weapon&&this.parent.hasAttribute('data-armed')){
         if(e.button===2){this.aiming=true;return}
         if(e.button===0){this.holdingFire=true;this.fireAtReticle();return}
@@ -585,7 +590,19 @@ export class CityStage {
       this.camera.lookAt(p.x,1.16,p.z)
     }
     this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt,!!s?.phase)
-    const free=!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
+    const bite=this.view?.arcade?.bite,eating=!!bite&&now<bite.ends
+    for(const snack of this.snacks.values())snack.visible=false
+    if(bite&&eating){
+      let snack=this.snacks.get(bite.item)
+      if(!snack){snack=foodVisual(bite.item);this.camera.add(snack);this.snacks.set(bite.item,snack)}
+      const t=T.MathUtils.clamp(1-(bite.ends-now)/BITE_MS,0,1)
+      const raised=Math.sin(Math.PI*t)**.7
+      snack.visible=true
+      snack.position.set(.17-.12*raised,-.36+.22*raised,-.53+.21*raised)
+      snack.rotation.set(raised*(bite.item==='cola'||bite.item==='coffee'?.69:.23),-.3,.09*Math.sin(t*Math.PI*4))
+      snack.scale.setScalar(1.35-.35*t)
+    }
+    const free=!eating&&!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
     this.chaseVisible=false
     if(this.chase&&free){
       const behind=worldMove(me.zone,{x,z,yaw:this.yaw},x+2.8*Math.sin(this.yaw),z+2.8*Math.cos(this.yaw),2.8,true,this.view?.housing?.keys,this.view?.residential,now)

@@ -51,7 +51,7 @@ chatForm.onsubmit=async e=>{
 }
 let resortUI:ResortUI|undefined
 const packUI=new ArcadeControls(cast('city-pack'),action,syncLoadout)
-function syncLoadout(){stage?.setLoadout(packUI.weapon,(op,target)=>packUI.trigger(op,target))}
+function syncLoadout(){stage?.setLoadout(packUI.weapon,(op,target)=>packUI.trigger(op,target),()=>packUI.eat())}
 let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
@@ -316,7 +316,6 @@ dialog.addEventListener('close',()=>{
   if(view?.interaction==='food'||view?.interaction?.startsWith('fridge:'))void action('close-fridge',{}).catch(()=>{})
 })
 host.querySelector<HTMLButtonElement>('[data-city-camera]')!.onclick=()=>stage?.toggleCamera()
-host.querySelector<HTMLButtonElement>('[data-world-food]')!.onclick=()=>{shownService='';void action('food',{}).catch(()=>{})}
 document.addEventListener('keydown',event=>{
   if(closed||puzzleDialog.open)return
   if(event.key==='Escape'){

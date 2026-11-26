@@ -1,4 +1,4 @@
-import type {MenuItem} from './restaurant-model.ts'
+import type {Bite,Grocery} from './food.ts'
 
 // Keep the first slot's historic item ID so existing hotbars, drawers, drops and bank recovery still work.
 export const WEAPONS={
@@ -12,7 +12,7 @@ export type WeaponId=keyof typeof WEAPONS
 export const weaponIds=Object.keys(WEAPONS) as WeaponId[]
 export function isWeapon(value:unknown):value is WeaponId{return typeof value==='string'&&Object.hasOwn(WEAPONS,value)}
 export type Magazine={rounds:number;readyAt:number}
-export type Item = MenuItem | 'cash' | WeaponId
+export type Item = Grocery | 'cash' | WeaponId
 export type Stack = {item:Item; count:number}
 export type ArmoryPayment='cash'|'bank'
 export function armoryQuote(slots:readonly (Stack|null)[],coins:number,id:WeaponId,payment:ArmoryPayment){
@@ -40,6 +40,7 @@ export {entrances,origins,venue,venueWalk,cellPosition,type Venue} from './civic
 export interface CustodyView {cell:number;name:string;ends:number|null;noRelease:boolean;x:number;z:number;yaw:number}
 export interface Contact {height?:number;distance?:number;inSight?:boolean;id:string;label:string;x:number;z:number;zone:string;hp?:number;kind:'officer'|'dog'|'helicopter'|'resident'|'player'}
 export interface ArcadeView {
+  bite?:Bite
   sequence:number;slots:(Stack|null)[];hp:number;stars:number;remaining:number;contacts:Contact[]
   magazines?:Partial<Record<WeaponId,Magazine>>;lastShot?:number;lastHit?:boolean
   register?:string[];recoveringStaff?:string[];drawer?:Stack[];recovery?:Stack[];drops:{id:string;x:number;z:number}[];warning?:string;searches?:string[];custody?:CustodyView
