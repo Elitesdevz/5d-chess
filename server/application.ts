@@ -1,3 +1,5 @@
+import {stat} from 'node:fs/promises'
+import {dirname,join} from 'node:path'
 import {advanceResidentStocks} from './resident-stocks.ts'
 import mapRelease from '../.meridian/manifest.json' with {type:'json'}
 import {advanceLottery} from './weekly-lottery.ts'
@@ -26,7 +28,7 @@ import {ensureAccount,profile,pruneNotices} from './accounts.ts'
 import {staticFile} from './static.ts'
 import {STORAGE_SCHEMA} from './storage.ts'
 
-export function createApplication(store: ChessStore) {
+export function createApplication(store: ChessStore, updateFlag = store.path === ':memory:' ? undefined : join(dirname(store.path),'update-in-progress')) {
   const usage=new UsageStore(usagePath(store))
   let telemetryWarning=false
   const collectEconomy=()=>{try{drainEconomyUsage(usage,store)}catch{
@@ -64,7 +66,15 @@ export function createApplication(store: ChessStore) {
         pathForUsage=path
         checkOrigin(req)
         const method = req.method || 'GET'
-        if (path === '/api/health' && method === 'GET') {store.ready(); json(res,200,{ok: true, storageSchema: STORAGE_SCHEMA}); return}
+        if (path === '/api/health' && method === 'GET') {
+          store.ready()
+          const updating = updateFlag && await stat(updateFlag).then(file=>file.isFile(),error=>{
+            if(error.code==='ENOENT')return false
+            throw error
+          })
+          json(res,200,{ok:true,storageSchema:STORAGE_SCHEMA,...(updating?{updating:true}:{})})
+          return
+        }
         const authorize=(track=true)=>{
           const now=Date.now(),name=user(store,req),bookings=roster(store,now)
           const booking=bookings.find(b=>b.user===name)

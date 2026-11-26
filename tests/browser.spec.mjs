@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import {createServer} from 'node:http'
 import {readFile} from 'node:fs/promises'
 import {chromium} from 'playwright'
-import worker from '../.cloudflare/worker.mjs'
+import worker from './helpers/healthy-frontend.mjs'
 
 async function server(t) {
   const http = createServer(async (request, response) => {
@@ -27,7 +27,7 @@ test('production paths serve on refresh, with chess-only routing', async t => {
   assert.equal((await fetch(base + '/chess/nothing')).status, 404)
   const root = await fetch(base + '/chess/')
   assert.equal(root.status, 200)
-  assert.match(await root.text(), /src="\/chess\/game\.js"/)
+  assert.match(await root.text(), /src="\/chess\/availability\.js" data-entry="\/chess\/game\.js"/)
   for (const asset of ['game.js', 'styles.css', 'emblem.svg', 'shell.css', 'collection.html', 'collection.css', 'collection.js','world.html','world.js','world.css','casino.js','casino.css','roulette.css','third-party-notices.txt']) {
     assert.equal((await fetch(base + '/chess/' + asset)).status, 200)
   }
