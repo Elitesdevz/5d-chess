@@ -45,6 +45,8 @@ export function createApplication(store: ChessStore) {
   const ai=new AiScheduler(store)
   const roulette=new RouletteHall(store)
   const city=new CityWorlds(store,roulette)
+  const worldTimer=setInterval(()=>{try{city.step(Date.now())}catch(error){console.error('City tick failed',error)}},50)
+  worldTimer.unref()
   const stockHistory=new StockHistory()
   ai.kick()
   const limiter = new LoginLimiter()
@@ -53,7 +55,7 @@ export function createApplication(store: ChessStore) {
   const noticeTimer=setInterval(cleanNotices,60*1000);noticeTimer.unref()
   let draining = false
   return {
-    drain: () => {draining = true;clearInterval(resortTimer);ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
+    drain: () => {draining = true;clearInterval(worldTimer);clearInterval(resortTimer);ai.stop();roulette.stop();stockHistory.close();clearInterval(noticeTimer);clearInterval(economyUsageTimer);collectEconomy();usage.close()},
     handle: async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       const started=Date.now();let actor:string|undefined,pathForUsage='',methodForUsage=req.method??'GET',beforeUsage:{coins?:number;elo?:number}|undefined
       const logUsage=(status:number)=>{try{serverUsage(usage,store,actor,pathForUsage,methodForUsage,status,started,typeof req.headers['x-client-trace']==='string'?req.headers['x-client-trace']:undefined,typeof req.headers['x-ui-action']==='string'?req.headers['x-ui-action']:undefined,beforeUsage)}catch{/* Diagnostics must not change an API response. */}}

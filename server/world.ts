@@ -24,9 +24,11 @@ import type {ChessStore} from './storage.ts'
 import type {RouletteHall} from './roulette-hall.ts'
 import {fail} from './http.ts'
 
+import {WorldClock} from './world/clock.ts'
+
 const TIMEOUT=27_000
 type Member=WorldPlayer&{slot?:number;seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position;cell?:number}
-type World={id:string;shard:number;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView;life:CityLife}
+type World={clock:WorldClock;id:string;shard:number;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView;life:CityLife}
 export interface CaveVisit {day:string;active:boolean}
 const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,kitchenMotion,carriedItems,barSeat,boardSeat,homePose,shower,equipped}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,kitchenMotion,carriedItems,barSeat,boardSeat,homePose,shower,equipped})
 
@@ -49,6 +51,7 @@ export class CityWorlds {
       for(const [name,member] of room.members){
         if(now-member.seen<TIMEOUT)continue
         if(member.zone==='casino')this.roulette.detach(name,room.id)
+        this.arcade.leaveCity(name)
         room.restaurant.leave(name)
         room.lastChat.delete(name)
         room.members.delete(name);this.occupants.delete(name)
@@ -56,9 +59,21 @@ export class CityWorlds {
       if(!room.members.size){this.arcade.retire(room.shard);this.worlds.delete(room.id)}
     }
   }
+  step(now:number){
+    this.clean(now)
+    for(const world of this.worlds.values())if(world.clock.advance(now,at=>{
+      world.restaurant.tick(at)
+      world.life.tick(at,world.residential,world.members.values())
+      settleResidentialLifts(world.residential,[...world.members.values()],at)
+      for(const me of world.members.values())this.finishLift(me,at)
+    }))this.arcade.step(world.id,now)
+  }
+  private finishLift(me:Member,now:number){
+    if(me.lift&&now>=me.lift.ends){me.zone=me.lift.to;me.lift=undefined;me.liftArrived=true;me.moved=now}
+  }
   private enter(name:string,avatar:string,zone:WorldZone,now:number){
     let world=[...this.worlds.values()].find(w=>w.members.size<WORLD_CAPACITY)
-    if(!world){let shard=1;while([...this.worlds.values()].some(w=>w.shard===shard))shard++;world={id:'W-'+randomUUID().slice(0,8),shard,members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}},life:new CityLife(now,this.store.metadataValue('cityDeeds') as Deeds|undefined)};this.worlds.set(world.id,world)}
+    if(!world){let shard=1;while([...this.worlds.values()].some(w=>w.shard===shard))shard++;world={clock:new WorldClock(now),id:'W-'+randomUUID().slice(0,8),shard,members:new Map(),restaurant:new Restaurant(this.store),chat:[],nextChat:0,lastChat:new Map(),barReceipts:new Map(),residential:{doors:{},lifts:{}},life:new CityLife(now,this.store.metadataValue('cityDeeds') as Deeds|undefined)};this.worlds.set(world.id,world)}
     const member:Member={name,avatar,zone,...FLOOR_ARRIVAL,seen:now,moved:now,online:true}
     this.arrive(world,member,zone,now)
     world.members.set(name,member);this.occupants.set(name,world)
@@ -176,7 +191,7 @@ export class CityWorlds {
   }
 
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
-    this.clean(now)
+    this.step(now)
     this.arcade.active(name,now)
     const bookings=roster(this.store,now),booking=bookings.find(b=>b.user===name)
     if(booking&&action!=='presence')fail(423,'In custody at Meridian Police')
@@ -199,11 +214,8 @@ export class CityWorlds {
     if(me.cell){delete me.cell;this.arrive(world,me,'station',now)}
     let housing=this.housing(name,now)
     const shared=data.scene===true
-    world.restaurant.tick(now)
     me.seen=now;me.avatar=avatar
-    world.life.tick(now,world.residential,world.members.values())
-    settleResidentialLifts(world.residential,[...world.members.values()],now)
-    if(me.lift&&now>=me.lift.ends){me.zone=me.lift.to;me.lift=undefined;me.liftArrived=true;me.moved=now}
+    this.finishLift(me,now)
     if(guestFloor(me.zone)){
       const p=localSite(me.zone,me.x,me.z),room=roomAt(me.zone,p.x,p.z)
       if(room&&!housing.keys.includes(room.id))this.arrive(world,me,me.zone,now,{x:0,z:p.z,yaw:0})
@@ -219,21 +231,24 @@ export class CityWorlds {
     if(me.lift&&action!=='presence'&&action!=='teleport')fail(409,'Wait for the elevator to arrive')
     let resort:ResortView|undefined
     let hall:HallView|undefined,food:ReturnType<typeof residentialFood>|undefined
-    if(action==='presence'){
-      const motion=data.kitchenMotion as {x?:unknown;y?:unknown}|undefined
+    const movement=action==='presence'?data:data.movement as Record<string,unknown>|undefined
+    if(movement){
+      const motion=movement.kitchenMotion as {x?:unknown;y?:unknown}|undefined
       if(me.zone==='kfc'&&['kfc:kitchen:station','kfc:kitchen:soda','kfc:kitchen:fryer'].includes(me.interaction??'')&&motion&&
         typeof motion.x==='number'&&Number.isFinite(motion.x)&&typeof motion.y==='number'&&Number.isFinite(motion.y)){
         me.kitchenMotion={x:Math.max(-1,Math.min(1,motion.x)),y:Math.max(-1,Math.min(1,motion.y))}
       }else delete me.kitchenMotion
-      const {x,z,yaw}=data
-      const currentFloor=data.zone===undefined||data.zone===me.zone||!(civicRoom(me.zone)||typeof data.zone==='string'&&civicRoom(data.zone))
-      if(data.world===world.id&&currentFloor&&(shared||data.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&!me.homePose&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
-        const limit=(data.sprint===true?SPRINT_SPEED:WORLD_SPEED)*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
+      const {x,z,yaw}=movement
+      const currentFloor=movement.zone===undefined||movement.zone===me.zone||!(civicRoom(me.zone)||typeof movement.zone==='string'&&civicRoom(movement.zone))
+      if(movement.world===world.id&&currentFloor&&(shared||movement.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&!me.homePose&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
+        const limit=(movement.sprint===true?SPRINT_SPEED:WORLD_SPEED)*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
         const {zone,...pos}=worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys,world.residential,now,world.life.traffic.vehicles)
         Object.assign(me,pos,{yaw:Math.atan2(Math.sin(yaw as number),Math.cos(yaw as number)),moved:now})
         if(me.kitchenMotion)me.yaw=me.interaction==='kfc:kitchen:station'?0:-Math.PI/2
         this.walkthrough(world,me,zone,open,now)
       }
+    }
+    if(action==='presence'){/* Movement was applied above. */
     }else if(action==='close-resort'){
       if(me.interaction===data.station&&me.interaction?.startsWith('resort:'))me.interaction=undefined
     }else if(action==='resort-floor'){

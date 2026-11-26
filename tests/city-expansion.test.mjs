@@ -257,7 +257,7 @@ test('all 50 cells exclude a 51st booking, enforce each deadline and serialize r
     f.tick(750);v=await f.world('Late arrival','presence')
   }
   assert.match(v.arcade.warning,/Booking full/);assert.equal(v.arcade.custody,undefined)
-  f.operator('release','Booked 50')
+  f.operator('release','Booked 50');f.tick(50)
   v=await f.world('Late arrival','presence');assert.equal(v.arcade.custody.cell,1)
 })
 

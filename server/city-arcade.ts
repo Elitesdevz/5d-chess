@@ -41,6 +41,7 @@ function advance(p:Pack,by:number){
 export class CityArcade {
   private store:ChessStore
   private seen=new Map<string,number>()
+  private tracked=new Map<string,{scene:Scene;stars:number}>()
   private searches=new Map<string,Search>()
   constructor(store:ChessStore){
     this.store=store
@@ -69,7 +70,14 @@ export class CityArcade {
       tx.putMetadata('dropDistricts',(tx.metadata<number[]>('dropDistricts')??[]).filter(n=>n!==shard))
     })
   }
-  offline(name:string){this.seen.delete(name)}
+  leaveCity(name:string){this.tracked.delete(name);this.searches.delete(name)}
+  offline(name:string){this.seen.delete(name);this.leaveCity(name)}
+  step(world:string,now:number){
+    for(const [name,entry] of this.tracked){
+      if(entry.scene.world!==world)continue
+      if(this.pursue(entry.scene,entry.stars,now))this.tracked.delete(name)
+    }
+  }
   active(name:string,now:number){
     const last=this.seen.get(name)
     this.seen.set(name,now)
@@ -78,7 +86,7 @@ export class CityArcade {
     this.store.transaction(tx=>{
       const p=pack(tx.users.get(name)!)
       p.remaining=Math.max(0,p.remaining-(now-last))
-      if(!p.remaining){p.stars=0;this.searches.delete(name)}
+      if(!p.remaining){p.stars=0;this.tracked.delete(name);this.searches.delete(name)}
     })
   }
   private staff(now:number):Contact[]{
@@ -102,9 +110,9 @@ export class CityArcade {
       if(p.slots.some(i=>isWeapon(i?.item))){p.slots=p.slots.map(i=>isWeapon(i?.item)?null:i);p.sequence++}
     }
   }
-  private pursue(s:Scene,p:Pack,now:number){
+  private pursue(s:Scene,stars:number,now:number){
     const me=s.me
-    if(!p.stars){this.searches.delete(me.name);return}
+    if(!stars){this.searches.delete(me.name);return}
     let search=this.searches.get(me.name)
     if(!search){
       search={id:randomUUID(),world:s.world,units:[],cursor:0,lastKnown:{x:me.x,z:me.z,zone:me.zone},last:now,arrived:now,raidAt:now,dogAt:now-RULES.dogCooldown,searched:[],warning:'Meridian patrol is searching'}
@@ -116,36 +124,36 @@ export class CityArcade {
     const local=guestFloor(me.zone)?localSite(me.zone,me.x,me.z):undefined
     const guestRoom=local&&roomAt(me.zone,local.x,local.z)
     const room=guestRoom??residence?.f.units.find(u=>contains(u.rect,(me.x-residence.building.x)*residence.building.facing,(me.z-residence.building.z)*residence.building.facing))
-    const canEnter=(!residence&&!guestRoom)||p.stars>=3&&(!room||s.keys.includes(room.id)||p.stars>=4)
-    while(search.units.length<RULES.officers[p.stars]){
+    const canEnter=(!residence&&!guestRoom)||stars>=3&&(!room||s.keys.includes(room.id)||stars>=4)
+    while(search.units.length<RULES.officers[stars]){
       const i=search.units.length
       search.units.push({id:'patrol-'+search.id+'-'+i,label:'Patrol '+(i+1),kind:'officer',x:me.x+10+i*1.5,z:me.z+4-i,zone:canEnter?me.zone:'city'})
     }
-    if(p.stars>=3&&now-search.raidAt>=RULES.raidDelay){
-      this.store.transaction(tx=>this.sweep(tx,s,p.stars,search!,now))
+    if(stars>=3&&now-search.raidAt>=RULES.raidDelay){
+      this.store.transaction(tx=>this.sweep(tx,s,stars,search!,now))
       search.raidAt=now
     }
     let caught=false,tracking=false
     const health=this.store.metadataValue('npc:'+s.shard) as Record<string,NpcHealth>|undefined
     for(const [i,o] of search.units.entries()){
       if(!canEnter||(health?.[o.id]?.returns??0)>now)continue
-      if(p.stars>=3&&i===search.units.length-1&&search.searched.length&&now-search.raidAt<5000)continue
+      if(stars>=3&&i===search.units.length-1&&search.searched.length&&now-search.raidAt<5000)continue
       if(o.zone!==me.zone){
         if(now-search.arrived<5000)continue
         Object.assign(o,{x:me.x+12,z:me.z+2,zone:me.zone})
       }
       if(now-search.arrived<RULES.notice)continue
       const distance=Math.hypot(o.x-me.x,o.z-me.z)
-      const spotted=distance<=RULES.sight[p.stars]||p.stars===5&&me.zone==='city'
+      const spotted=distance<=RULES.sight[stars]||stars===5&&me.zone==='city'
       if(spotted){search.lastKnown={x:me.x,z:me.z,zone:me.zone};tracking=true}
       const phase=(now-search.arrived)/4500+i
       const goal=spotted?me:{x:search.lastKnown.x+4*Math.cos(phase),z:search.lastKnown.z+4*Math.sin(phase)}
-      const d=Math.hypot(goal.x-o.x,goal.z-o.z),step=Math.min(d,RULES.speed[p.stars]*dt)
+      const d=Math.hypot(goal.x-o.x,goal.z-o.z),step=Math.min(d,RULES.speed[stars]*dt)
       if(d){o.x+=(goal.x-o.x)*step/d;o.z+=(goal.z-o.z)*step/d}
       if(distance<1.15)caught=true
     }
     if(!search.searched.length||now-search.raidAt>5000)search.warning=tracking?'Meridian patrol in pursuit':'Meridian patrol is searching'
-    if(p.stars===5){
+    if(stars===5){
       const lead=search.units[0],d=Math.hypot(lead.x-me.x,lead.z-me.z)
       if(d<=RULES.dogRange&&lead.zone===me.zone&&now-search.dogAt>=RULES.dogCooldown){
         search.dogAt=now;search.dogWarningUntil=now+RULES.dogNotice
@@ -160,7 +168,7 @@ export class CityArcade {
       }
     }
     if(caught){
-      const b=this.store.transaction(tx=>book(tx,me.name,p.stars,now))
+      const b=this.store.transaction(tx=>book(tx,me.name,stars,now))
       if(b){this.searches.delete(me.name);return b}
       search.warning='Booking full — patrol holding back'
     }
@@ -239,7 +247,12 @@ export class CityArcade {
       }
       return {p,drops,health}
     })
-    const booked=this.pursue(s,p,now)
+    // Install or update the suspect when a command changes the wanted tier. Ordinary
+    // snapshots only observe patrols. The occupied shard clock moves every pursuit.
+    const previous=this.tracked.get(me.name)
+    const booked=previous?.stars!==p.stars&&p.stars?this.pursue(s,p.stars,now):undefined
+    if(p.stars&&!booked)this.tracked.set(me.name,{scene:s,stars:p.stars})
+    else {this.tracked.delete(me.name);this.searches.delete(me.name)}
     const search=this.searches.get(me.name)
     // A raid has its own write transaction after the encounter.
     if(search?.raidAt===now&&search.cursor)Object.assign(p,this.store.cityPack(me.name))
