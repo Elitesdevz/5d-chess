@@ -22,6 +22,8 @@ test('ordinary City entry loads the compiled map, reads the square board and sit
   await observeCity(page)
   page.on('response',r=>{if(r.url().includes('/chess/maps/'))files.push([r.url().split('/').at(-1),r.status()])})
   page.on('request',r=>{if(r.url().endsWith('/world/teleport'))teleports.push(r.postDataJSON().to)})
+  await page.goto(base+'/chess/?local=1&players=4')
+  await page.locator('#scene').waitFor()
   await page.goto(base+'/chess/lobby.html')
   assert.deepEqual(files,[])
   await page.getByRole('link',{name:'City',exact:true}).first().click()
