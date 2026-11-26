@@ -1,10 +1,12 @@
 import {railwayGround,urbanGround} from './city-plan.ts'
 import * as T from 'three'
+import {RoundedBoxGeometry} from 'three/examples/jsm/geometries/RoundedBoxGeometry.js'
 import {passages,CAVE_MOUTH,CAVE_X,OASIS_X,TERRAIN_EXTENT,TERRAIN_STEP,VALLEY_TREES,trailDistance,terrainVertex,terrainHeight,ridgeDistance} from './terrain.ts'
 
 const profile=new T.Shape()
 profile.moveTo(-.5,-.5);profile.lineTo(.5,-.5);profile.lineTo(0,.5);profile.closePath()
 const shapes={
+  cushion:new RoundedBoxGeometry(1,1,1,2,.14),
   gable:new T.ExtrudeGeometry(profile,{depth:1,bevelEnabled:false}).translate(0,0,-.5),
   box:new T.BoxGeometry(1,1,1),stone:new T.IcosahedronGeometry(.5,0),
   crown:new T.IcosahedronGeometry(.5,1),pine:new T.ConeGeometry(.5,1,8),post:new T.CylinderGeometry(.5,.5,1,12),
