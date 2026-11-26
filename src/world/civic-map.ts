@@ -101,7 +101,8 @@ export function civicMap(ctx:CanvasRenderingContext2D,w:number,h:number,view:Wor
     }
     if(zone==='gunshop'){
       block(0,.72,2.5,5.1,'#845c65','#d5b87e');block(shopCounter.x,shopCounter.z,shopCounter.w,shopCounter.d,'#65473b','#f5d3a4')
-      caption('BLASTER COUNTER',0,shopCounter.z)
+      caption('ARMORY COUNTER',0,shopCounter.z)
+      for(let i=0;i<5;i++)block((i-2)*1.49,-f.d/2+.33,1.38,.19,'#627775','#dfc18d')
       for(const r of shopCases){block(r.x,r.z,r.w,r.d,'#80a4a8','#ecddbd');for(const dz of [-.8,.65])block(r.x,r.z+dz,.46,.22,'#bf8f56')}
       caption('DISPLAY',-3.86,.4,9);caption('DISPLAY',3.86,.4,9)
     }else{

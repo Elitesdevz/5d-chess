@@ -10,7 +10,7 @@ import {createApplication} from '../server/application.ts'
 import {book,roster} from '../server/custody.ts'
 import {pack,carry} from '../server/city-inventory.ts'
 import {RULES} from '../server/city-arcade.ts'
-import {CLEAR_MINUTES,JAIL_MINUTES} from '../src/world/arcade.ts'
+import {CLEAR_MINUTES,JAIL_MINUTES,WEAPONS,weaponIds} from '../src/world/arcade.ts'
 import {visitorRoute} from './civic-route.mjs'
 import {cells,cellPosition,insideDoor,at} from '../src/world/civic-venues.ts'
 import {entrances} from '../src/world/arcade.ts'
@@ -47,6 +47,30 @@ async function fixture(t){
   return {dir,request,ok,world,signup,counter,route,get store(){return store},tick:ms=>now+=ms,
     restart:async()=>{await stop();await open()},operator:(...args)=>execFileSync(process.execPath,['scripts/city-custody.mjs',...args],{env:{...process.env,DATA_DIR:dir}})}
 }
+test('the armory sells five weapons, validates cash and preserves magazine state across reloads and restart',async t=>{
+  const f=await fixture(t),name='Armory Guest'
+  await f.signup(name)
+  const total=weaponIds.reduce((sum,id)=>sum+WEAPONS[id].price,0)
+  f.store.transaction(tx=>carry(pack(tx.users.get(name)),'cash',total))
+  let v=await f.counter(name,'gunshop','counter',0,-1.2)
+  const trade=(operation,extra)=>f.world(name,'arcade',{operation,sequence:v.arcade.sequence,...extra})
+  for(const item of weaponIds)v=await trade('buy',{item})
+  assert.equal(count(v,'cash'),0)
+  assert.deepEqual(weaponIds.map(item=>count(v,item)),[1,1,1,1,1])
+  const slot=v.arcade.slots.findIndex(s=>s?.item==='shotgun')
+  v=await trade('fire',{slot})
+  assert.equal(v.arcade.magazines.shotgun.rounds,WEAPONS.shotgun.magazine-1)
+  assert.equal(v.you.equipped,'shotgun')
+  const reject=async(operation,extra)=>assert.equal((await f.request(name,'world/arcade',{operation,scene:true,sequence:v.arcade.sequence,...extra})).status,409)
+  await reject('fire',{slot});await reject('buy',{item:'smg'})
+  await f.restart()
+  v=await f.world(name,'presence')
+  assert.equal(v.arcade.magazines.shotgun.rounds,4)
+  v=await trade('reload',{slot});await reject('fire',{slot})
+  f.tick(WEAPONS.shotgun.reload)
+  v=await trade('fire',{slot});assert.equal(v.arcade.magazines.shotgun.rounds,4)
+})
+
 const slots=v=>v.arcade.slots
 const count=(v,item)=>slots(v).reduce((n,s)=>n+(s?.item===item?s.count:0),0)
 
@@ -236,6 +260,7 @@ test('each wanted tier counts authenticated active time, resets on escalation an
   for(let tier=1;tier<=5;tier++){
     let v=await f.world(name,'presence')
     for(let i=0;i<tier;i++){
+      if(v.arcade.magazines?.blaster?.rounds===0)v=await f.world(name,'arcade',{operation:'reload',sequence:v.arcade.sequence,slot:0})
       f.tick(1200)
       v=await f.world(name,'arcade',{operation:'fire',sequence:v.arcade.sequence,slot:0})
       assert.equal(v.arcade.remaining,CLEAR_MINUTES[i+1]*60000)

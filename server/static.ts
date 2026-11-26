@@ -5,7 +5,7 @@ import {fail} from './http.ts'
 
 const staticRoot = resolve('dist/chess')
 const types: Record<string, string> = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml'}
+  '.glb':'model/gltf-binary','.webp':'image/webp','.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml'}
 export async function staticFile(req: IncomingMessage, res: ServerResponse, path: string) {
   if (req.method !== 'GET' && req.method !== 'HEAD') fail(405, 'Method not allowed')
   if (path === '/') { res.writeHead(302, {location: '/chess/'}).end(); return }

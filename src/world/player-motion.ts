@@ -1,4 +1,4 @@
-import {riderHeight,WORLD_SPEED,type WorldPlayer} from './model.ts'
+import {riderHeight,SPRINT_SPEED,type WorldPlayer} from './model.ts'
 import type {Position} from '../roulette-hall-model.ts'
 
 const clamp=(n:number,lo:number,hi:number)=>Math.max(lo,Math.min(hi,n))
@@ -30,7 +30,7 @@ export class PlayerMotion {
       const seconds=Math.max(.07,(at-previous.at)/1000)
       const distance=Math.hypot(player.x-previous.player.x,player.z-previous.player.z)
       const stepHeight=Math.abs(riderHeight(player,at)-riderHeight(previous.player,at))
-      if(stance(player)!==stance(previous.player)||stepHeight>2.4||distance>Math.min(3,WORLD_SPEED*seconds+.55)){
+      if(stance(player)!==stance(previous.player)||stepHeight>2.4||distance>Math.min(3,SPRINT_SPEED*seconds+.55)){
         this.snapshots.length=0
         this.sampledAt=-Infinity
       }else if(at===previous.at){

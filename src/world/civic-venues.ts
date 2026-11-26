@@ -77,7 +77,7 @@ export function civicActions(zone:CivicRoom){
     actions.push({...p,id:'exit-venue',label:'Exit to Civic Avenue',range:.85})
   }
   if(zone==='gunshop'){
-    actions.push({id:'counter',label:'Visit the blaster counter',x:shopCounter.x,z:shopCounter.z+1,range:1.22})
+    actions.push({id:'counter',label:'Visit the armory counter',x:shopCounter.x,z:shopCounter.z+1,range:1.22})
   }else{
     if(!n)for(const d of deskFurniture)actions.push({id:d.id,label:d.label,x:d.x,z:d.z-.97,range:1.22})
     if(n<5)actions.push({id:'gallery-up',label:'Enter jail level '+(n+1),x:stair.down,z:stair.start+.12,range:.32})

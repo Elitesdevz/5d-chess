@@ -1,7 +1,7 @@
 import {deskFurniture,at,insideDoor,venue} from '../src/world/civic-venues.ts'
 import {randomUUID} from 'node:crypto'
 import type {ChessStore,UnitOfWork} from './storage.ts'
-import {CLEAR_MINUTES,MAX_HP,type ArcadeView,type Contact,type Stack,type Item} from '../src/world/arcade.ts'
+import {CLEAR_MINUTES,MAX_HP,WEAPONS,isWeapon,type ArcadeView,type Contact,type Stack,type Item} from '../src/world/arcade.ts'
 import {near,localSite,site,type WorldPlayer} from '../src/world/model.ts'
 import {UNITS,type Deeds} from '../src/world/housing.ts'
 import {buildingById,homeZone,residentialSite,residentialAt,contains} from '../src/world/residential.ts'
@@ -28,7 +28,7 @@ const searchSites=[
       inside:(me:WorldPlayer)=>{const p=localSite(me.zone,me.x,me.z);return roomAt(me.zone,p.x,p.z)?.id===room.id}}
   }),
 ]
-export const RULES={range:8,damage:35,shotDelay:900,notice:4500,sight:[0,12,15,18,22,30],officers:[0,1,2,3,4,5],speed:[0,1.6,1.9,2.2,2.5,2.7],dogRange:7,dogCooldown:18000,dogNotice:2400,raidDelay:12000}
+export const RULES={notice:4500,sight:[0,12,15,18,22,30],officers:[0,1,2,3,4,5],speed:[0,1.6,1.9,2.2,2.5,2.7],dogRange:7,dogCooldown:18000,dogNotice:2400,raidDelay:12000}
 function advance(p:Pack,by:number){
   if(p.stars===5)return
   p.stars=Math.min(5,p.stars+by)
@@ -93,9 +93,9 @@ export class CityArcade {
     if(!owned.includes(unit))return
     const a=tx.users.get(s.me.name)!,p=pack(a)
     const drawer=p.drawers[unit.id]
-    if(drawer?.some(i=>i.item==='blaster')){p.drawers[unit.id]=drawer.filter(i=>i.item!=='blaster');p.sequence++}
+    if(drawer?.some(i=>isWeapon(i.item))){p.drawers[unit.id]=drawer.filter(i=>!isWeapon(i.item));p.sequence++}
     if(s.me.zone===unit.target.zone&&unit.inside(s.me)){
-      if(p.slots.some(i=>i?.item==='blaster')){p.slots=p.slots.map(i=>i?.item==='blaster'?null:i);p.sequence++}
+      if(p.slots.some(i=>isWeapon(i?.item))){p.slots=p.slots.map(i=>isWeapon(i?.item)?null:i);p.sequence++}
     }
   }
   private pursue(s:Scene,p:Pack,now:number){
@@ -181,15 +181,27 @@ export class CityArcade {
       if(data){
         if(data.sequence!==p.sequence)fail(409,'Inventory changed. Review your hotbar.')
         const op=data.operation
-        if(op==='fire'){
-          if(typeof data.slot!=='number'||!Number.isInteger(data.slot)||p.slots[data.slot]?.item!=='blaster')fail(409,'Select a carried blaster')
-          if(now-(p.lastShot??-Infinity)<RULES.shotDelay)fail(409,'Blaster recharging')
-          const t=targets.find(c=>c.id===data.target&&c.zone===me.zone&&near(me,c.x,c.z,RULES.range))
+        if(op==='fire'||op==='reload'){
+          const id=typeof data.slot==='number'&&Number.isInteger(data.slot)?p.slots[data.slot]?.item:undefined
+          if(!isWeapon(id))fail(409,'Select a carried weapon')
+          const weapon=WEAPONS[id],magazines=p.magazines??={}
+          const magazine=magazines[id]??={rounds:weapon.magazine,readyAt:0}
+          if(now<magazine.readyAt)fail(409,'Reloading')
+          if(op==='reload'){
+            if(magazine.rounds===weapon.magazine)fail(409,'Magazine is full')
+            magazine.rounds=weapon.magazine;magazine.readyAt=now+weapon.reload
+            p.sequence++
+            return {p,drops,health}
+          }
+          if(now<(p.nextShot??(p.lastShot??-Infinity)+WEAPONS.blaster.delay))fail(409,'Weapon recharging')
+          if(!magazine.rounds)fail(409,'Reload your weapon')
+          const t=targets.find(c=>c.id===data.target&&c.zone===me.zone&&near(me,c.x,c.z,weapon.range))
           if(data.target&&!t)fail(409,'Target moved out of range')
-          p.lastShot=now;advance(p,1)
+          magazine.rounds--;p.nextShot=now+weapon.delay
+          p.lastShot=now;p.lastHit=!!t;advance(p,1)
           if(t?.kind==='player'){
             const victim=tx.users.get(t.label)!,vp=pack(victim)
-            vp.hp=Math.max(0,vp.hp-RULES.damage)
+            vp.hp=Math.max(0,vp.hp-weapon.damage)
             if(!vp.hp){
               const items=vp.slots.filter((i):i is Stack=>!!i)
               if(items.length){
@@ -204,7 +216,7 @@ export class CityArcade {
             const n=health[t.id]??={hp:MAX_HP,returns:0}
             if(n.returns>now)fail(409,'Target is recovering')
             if(!n.hp)n.hp=MAX_HP
-            n.hp=Math.max(0,n.hp-RULES.damage)
+            n.hp=Math.max(0,n.hp-weapon.damage)
             if(!n.hp){n.returns=now+30000;advance(p,1)}
             tx.putMetadata(npcKey,health)
           }
@@ -224,7 +236,7 @@ export class CityArcade {
     if(search?.raidAt===now&&search.cursor)Object.assign(p,this.store.cityPack(me.name))
     const contacts=[...this.staff(now),...patrols(),...civilians].filter(t=>t.zone===me.zone&&near(me,t.x,t.z,36)&&!(health[t.id]?.returns>now)).map(t=>({...t,hp:t.kind==='player'?this.store.cityStats(t.label)?.hp??MAX_HP:health[t.id]?.hp||MAX_HP}))
     if(p.stars===5&&search){const lead=search.units[0];contacts.push({...lead,id:'heli',label:'Police helicopter',kind:'helicopter',hp:100},{...lead,x:lead.x+.8,id:'dog',label:'Dog team',kind:'dog',hp:100})}
-    const view:ArcadeView={sequence:p.sequence,slots:p.slots,hp:p.hp,stars:p.stars,remaining:p.remaining,contacts,
+    const view:ArcadeView={magazines:p.magazines,lastShot:p.lastShot,lastHit:p.lastHit,sequence:p.sequence,slots:p.slots,hp:p.hp,stars:p.stars,remaining:p.remaining,contacts,
       drops:drops.filter(d=>d.zone===me.zone&&near(me,d.x,d.z,28)).map(({id,x,z})=>({id,x,z})),
       recoveringStaff:Object.keys(health).filter(id=>id.startsWith('staff:')&&health[id].returns>now),
       drawer:s.drawer?p.drawers[s.drawer]??[]:undefined,recovery:s.bank?p.recovery:undefined,warning:search?.warning,searches:search?.searched.slice(-4),custody:booked&&custodyView(booked)}

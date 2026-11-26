@@ -1,5 +1,7 @@
 import type {HomePose} from '../world/residential.ts'
 import * as T from 'three'
+import {OverrunPlayer} from '../world/overrun-models.ts'
+import type {WeaponId} from '../world/arcade.ts'
 import {ROULETTE_ORDER,pocketColor,type RouletteChoice} from '../casino-model.ts'
 import {LOUNGES,SEAT_OFFSETS,SPAWN,TABLES,WALK_SPEED,walk,type HallPlayer,type HallView,type Position} from '../roulette-hall-model.ts'
 import {buildHall,buildHallTables,WHEEL_X,WHEEL_Z} from './hall-decor.ts'
@@ -22,6 +24,20 @@ function contactTexture(){
   return new T.CanvasTexture(c)
 }
 export class Figure {
+  private rig?:OverrunPlayer
+  private released=false
+  private firstPerson=false
+  private lastX?:number
+  private lastZ?:number
+  private strideSpeed=0
+  equipped?:WeaponId
+  usePlayerModel(){
+    const seed=[...this.target.name].reduce((n,c)=>(31*n+c.charCodeAt(0))>>>0,0)
+    void OverrunPlayer.load(seed).then(rig=>{
+      if(this.released){rig.dispose();return}
+      this.rig=rig;this.root.add(rig.root);this.body.visible=false;rig.root.visible=!this.firstPerson
+    }).catch(()=>{})
+  }
   root=new T.Group()
   target:HallPlayer
   private body=new T.Group()
@@ -82,7 +98,10 @@ export class Figure {
     this.root.add(this.shadow);this.shadow.position.y=.026
     this.shadow.rotation.x=-Math.PI/2
   }
-  hideHead(){this.head.visible=false}
+  setFirstPerson(value:boolean){
+    this.firstPerson=value;this.head.visible=!value
+    if(this.rig)this.rig.root.visible=!value
+  }
   pose(dt:number,now:number,local?:Position,serving=false,eating=false,homePose?:HomePose){
     const target=local??this.target,chair=this.target.chair||this.target.lounge
     const speed=Math.hypot(target.x-this.root.position.x,target.z-this.root.position.z)
@@ -90,6 +109,14 @@ export class Figure {
     this.root.position.x=T.MathUtils.lerp(this.root.position.x,target.x,f)
     this.root.position.z=T.MathUtils.lerp(this.root.position.z,target.z,f)
     this.root.rotation.y+=angleBetween(this.root.rotation.y,target.yaw)*f
+    if(this.rig){
+      const distance=Math.hypot(this.root.position.x-(this.lastX??this.root.position.x),this.root.position.z-(this.lastZ??this.root.position.z))
+      this.lastX=this.root.position.x;this.lastZ=this.root.position.z
+      this.strideSpeed=T.MathUtils.damp(this.strideSpeed,dt?Math.min(8,distance/dt):0,12,dt)
+      this.shadow.visible=!homePose
+      if(!this.firstPerson)this.rig.pose(dt,this.strideSpeed,!!chair,homePose,serving,eating,this.equipped)
+      return
+    }
     this.motion=T.MathUtils.damp(this.motion,!chair&&speed>.018?1:0,9,dt)
     this.gait+=dt*(this.motion*8+1)
     const swing=Math.sin(this.gait)*this.motion,breathe=Math.sin(now*.002+target.x)
@@ -112,6 +139,7 @@ export class Figure {
     if(eating)this.arms[0].rotation.x=1.18+Math.max(0,breathe)*.66
   }
   dispose(){
+    this.released=true;this.rig?.dispose()
     this.root.traverse(o=>{if(o instanceof T.Mesh)o.geometry.dispose()})
     for(const m of this.ownedMaterials)m.dispose()
     this.shadow.material.dispose()
@@ -227,7 +255,7 @@ export class HallStage {
       if(!entry){
         const label=document.createElement('span');label.className='hall-nameplate';label.textContent=p.name;label.hidden=true;this.labels.append(label)
         entry={figure:new Figure(this.scene,p,this.floorShadow),label}
-        this.figures.set(p.name,entry)
+        entry.figure.usePlayerModel();this.figures.set(p.name,entry)
       }
       entry.figure.target=p
       entry.label.classList.toggle('is-offline',!p.online)
@@ -315,7 +343,7 @@ export class HallStage {
     const now=Date.now()+this.clockDelta,chair=this.view?.you.chair,couch=this.view?.you.lounge,active=chair===undefined?undefined:this.view?.tables[chair.table]
     for(const [name,{figure}] of this.figures){
       const me=name===this.view?.you.name
-      figure.root.visible=!(me&&chair)
+      figure.setFirstPerson(!!me);figure.root.visible=!(me&&chair)
       figure.pose(dt,time,me&&!chair?this.position:undefined)
     }
     this.staff.forEach((figure,i)=>figure.pose(dt,time,undefined,this.view?.tables[i].phase==='spin'))

@@ -2,16 +2,17 @@ import type {Account} from './accounts.ts'
 import {wallet} from './economy.ts'
 import {requireSpending} from './credit.ts'
 import {blankOrder,MENU,type OrderItems} from '../src/world/restaurant-model.ts'
-import {MAX_HP,PRICE,SLOT_COUNT,type Item,type Stack} from '../src/world/arcade.ts'
+import {MAX_HP,isWeapon,WEAPONS,type Magazine,type WeaponId,SLOT_COUNT,type Item,type Stack} from '../src/world/arcade.ts'
 import {toStockUnits,fromStockUnits} from '../src/stock-model.ts'
 import {fail} from './http.ts'
 
 export interface Pack {
   slots:(Stack|null)[]; hp:number; drawers:Record<string,Stack[]>; recovery:Stack[]
-  sequence:number;lastShot?:number;stars:number;remaining:number
+  magazines?:Partial<Record<WeaponId,Magazine>>;nextShot?:number
+  sequence:number;lastShot?:number;lastHit?:boolean;stars:number;remaining:number
 }
-export const foodItem=(item:Item):item is keyof OrderItems=>item!=='cash'&&item!=='blaster'
-const limit=(item:Item)=>item==='cash'?Number.MAX_SAFE_INTEGER:item==='blaster'?1:9
+export const foodItem=(item:Item):item is keyof OrderItems=>MENU.some(entry=>entry.id===item)
+const limit=(item:Item)=>item==='cash'?Number.MAX_SAFE_INTEGER:isWeapon(item)?1:9
 export function quantity(value:unknown):number {
   if(typeof value!=='number'||!Number.isSafeInteger(value)||value<=0)fail(400,'Choose a positive whole quantity')
   return value
@@ -106,7 +107,9 @@ export function transfer(a:Account,operation:unknown,item:Item,amount:number,atB
   }else if(operation==='buy'){
     if(!atShop)fail(409,'Visit the arcade gun shop')
     requireSpending(a,now)
-    remove(p,'cash',PRICE);carry(p,'blaster',1)
+    const id=item===undefined?'blaster':item
+    if(!isWeapon(id))fail(400,'Choose a weapon on the rack')
+    remove(p,'cash',WEAPONS[id].price);carry(p,id,1)
   }else if(operation==='recover'||operation==='take'||operation==='store'){
     if(operation==='recover'?!atBank:!drawer)fail(403,'Open the appropriate storage first')
     if(operation!=='recover'&&foodItem(item))fail(409,'Food belongs in the refrigerator')

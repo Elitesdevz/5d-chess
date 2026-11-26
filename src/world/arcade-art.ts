@@ -1,7 +1,8 @@
 import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import type {Letter} from './residential-art.ts'
-import type {Contact} from './arcade.ts'
+import {weaponIds,WEAPONS,type WeaponId,type Contact} from './arcade.ts'
+import {HeldModel} from './overrun-models.ts'
 import {origins,footprint,front,doorLeaves,cells,stair,rise,levelOf,deskFurniture,shopCounter,shopCases,type Venue} from './civic-venues.ts'
 
 const ivory=0xe4d8bb,brass=0xbb8c49,steel=0x617c85,ink=0x192c39,navy=0x294a5e,stone=0xa9afa7,walnut=0x624438,oak=0x94674d,glass=0x60939c,burgundy=0x69394b
@@ -212,11 +213,13 @@ function galleryFloor(k:Kit,n:number){
   }
   if(n<5)stairs(k)
 }
-function blaster(k:Kit,x:number,y:number,z:number,color:number){
-  k.body.add('crown',x,y,z,.77,.24,.21,color);k.trim(x+.41,y,z,.32,.12,.16,steel)
-  k.box(x-.13,y-.14,z,.15,.23,.13,ink);k.lit(x+.05,y+.045,z+.12,.35,.048,.034,0x7affee)
-}
-function shop(k:Kit){
+function shop(k:Kit,room:T.Group){
+  const displays:{model:HeldModel;id:WeaponId}[]=[]
+  function display(id:WeaponId,x:number,y:number,z:number,rotation:number){
+    const model=new HeldModel()
+    model.position.set(x,y,z);model.rotation.y=rotation
+    room.add(model);displays.push({model,id})
+  }
   const {w,d}=footprint.gunshop,z=front.gunshop.z
   shell(k,'gunshop',3.95)
   k.box(0,3.31,z+.20,w-.28,.92,.40,ink)
@@ -234,19 +237,24 @@ function shop(k:Kit){
   for(const x of [-1.18,1.18])k.trim(x,.084,.75,.036,.012,5.31)
   k.counter(shopCounter.x,shopCounter.z,shopCounter.w,1,walnut)
   k.box(0,2.04,-d/2+.14,7.69,3.28,.20,ink)
-  k.sign('PULSE WORKS',0,3.05,-d/2+.26,5.56,.61,0,'#b4ffed','#1e343d')
-  for(let i=0;i<3;i++){
-    const x=(i-1)*2.27;k.box(x,1.95,-d/2+.26,2.12,1.42,.09,burgundy)
-    k.trim(x,1.19,-d/2+.29,2.18,.10,.24);blaster(k,x,1.99,-d/2+.42,[0xdf865e,0x76bbb1,0xccac66][i])
-  }
-  for(const r of shopCases){
+  k.sign('OVERRUN  /  ARMORY',0,3.05,-d/2+.26,5.56,.61,0,'#b4ffed','#1e343d')
+  weaponIds.forEach((id,i)=>{
+    const x=(i-2)*1.49
+    k.box(x,1.98,-d/2+.26,1.44,1.34,.09,0x627775)
+    k.trim(x,1.27,-d/2+.29,1.44,.06,.20)
+    display(id,x-.21,2.10,-d/2+.46,-Math.PI/2)
+    k.sign(WEAPONS[id].name+'  ·  '+WEAPONS[id].price,x,1.46,-d/2+.34,1.39,.21,0,'#ffead4','#273a42')
+  })
+  for(const [i,r] of shopCases.entries()){
     k.box(r.x,.38,r.z,r.w,.69,r.d,walnut);k.trim(r.x,.77,r.z,r.w+.07,.1,r.d+.07)
     for(const dx of [-.36,.36])for(const dz of [-1.5,1.5])k.trim(r.x+dx,1.06,r.z+dz,.037,.57,.037)
-    for(const dz of [-.85,.74])blaster(k,r.x,.93,r.z+dz,0xc49262)
+    display(weaponIds[i*2],r.x,1.06,r.z+.79,.12)
+    display(weaponIds[i*2+1],r.x,1.06,r.z-.66,-.16)
     k.pane(r.x,1.36,r.z,r.w+.08,.04,r.d+.04);k.lit(r.x+r.w*.45,1.31,r.z,.045,.026,r.d-.12,0x8cebd8)
   }
   for(const x of [-3.15,0,3.15]){k.trim(x,3.82,0,.065,.11,d);k.pendant(x,.42,3.38)}
   for(const z of [-2.8,2.7])k.trim(0,3.82,z,w,.11,.08)
+  return ()=>displays.forEach(({model,id})=>model.setWeapon(id))
 }
 export function arcadeBuildings(scene:T.Scene,label:Letter){
   function group(id:Venue,y=0){const g=new T.Group();g.position.set(origins[id].x,y,origins[id].z);scene.add(g);return g}
@@ -255,7 +263,9 @@ export function arcadeBuildings(scene:T.Scene,label:Letter){
   }
   const exterior=group('station'),outside=builder(exterior,label);precinctExterior(outside);outside.finish()
   const base=group('station'),reception=builder(base,label);shell(reception,'station',rise);lobby(reception);stairs(reception);reception.finish()
-  const retail=group('gunshop'),rk=builder(retail,label);shop(rk);rk.finish()
+  const retail=group('gunshop'),rk=builder(retail,label)
+  const showModels=shop(rk,retail)
+  rk.finish()
   // CityLighting retains each source's original parent for its visibility checks.
   const lobbyLights=new T.Group(),shopLights=new T.Group()
   base.add(lobbyLights);retail.add(shopLights)
@@ -267,6 +277,7 @@ export function arcadeBuildings(scene:T.Scene,label:Letter){
     exterior.visible=street
     base.visible=street||zone==='station'||n===1
     retail.visible=street||zone==='gunshop'
+    if(retail.visible&&Math.hypot(x-origins.gunshop.x,z-origins.gunshop.z)<16)showModels()
     lobbyLights.visible=zone==='station'||street&&Math.hypot(x-origins.station.x,z-origins.station.z)<13
     shopLights.visible=zone==='gunshop'||street&&Math.hypot(x-origins.gunshop.x,z-origins.gunshop.z)<13
     floors.forEach((g,i)=>g.visible=n>0&&Math.abs(i+1-n)<=1||zone==='station'&&i===0)
