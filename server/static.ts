@@ -5,7 +5,7 @@ import {fail} from './http.ts'
 
 const staticRoot = resolve('dist/chess')
 const types: Record<string, string> = {'.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
-  '.glb':'model/gltf-binary','.webp':'image/webp','.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml'}
+  '.json':'application/json; charset=utf-8','.glb':'model/gltf-binary','.webp':'image/webp','.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml'}
 export async function staticFile(req: IncomingMessage, res: ServerResponse, path: string) {
   if (req.method !== 'GET' && req.method !== 'HEAD') fail(405, 'Method not allowed')
   if (path === '/') { res.writeHead(302, {location: '/chess/'}).end(); return }
@@ -21,7 +21,7 @@ export async function staticFile(req: IncomingMessage, res: ServerResponse, path
   try {
     const data = await readFile(absolute)
     res.writeHead(200, {'content-type': types[extname(name)] || 'application/octet-stream',
-      'cache-control': 'no-store', 'x-content-type-options': 'nosniff',
+      'cache-control': /^maps\/meridian\/(shared|visual)-[0-9a-f]{64}\.json$/.test(name)?'public, max-age=31536000, immutable':name==='maps/meridian/manifest.json'?'no-cache':'no-store', 'x-content-type-options': 'nosniff',
       'content-security-policy': "default-src 'self'; connect-src 'self'; img-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"})
     res.end(req.method === 'HEAD' ? undefined : data)
   } catch (error) {

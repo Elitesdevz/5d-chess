@@ -1,7 +1,10 @@
+import {FLOOR_LIST} from './exchange-floors.ts'
+export {FLOOR_LIST} from './exchange-floors.ts'
+import {shared} from './map-data.ts'
 import {HOTEL_LIFT,guestFloor,resortPoints,resortWalkable,poolDepth,type GuestFloor,type ResortView} from './resort.ts'
 import {civicRoom,civicActions,civicHeight,groundVenue,openDoorway,nextCivicFloor,levelOf,rise,originOf,footprint,insideDoor,type Gallery} from './civic-venues.ts'
 import {origins,venueWalk,type ArcadeView,type Venue} from './arcade.ts'
-import {PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
+import {DIRECTORY,PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
 import {vehicleContains,type TrafficView,type Vehicle} from './traffic.ts'
 import type {ResidentView} from './city-residents.ts'
 import {residentialAt,residentialHeight,residentialStep,type HomeZone,type HomePose,type ResidentialView} from './residential.ts'
@@ -9,23 +12,21 @@ import {propertyPoints,officeObstacle,type HousingView} from './housing.ts'
 import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
 import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type KitchenMotion,type OrderItems} from './restaurant-model.ts'
 import {basinBed,tunnelBed,inPool,poolLevel,OASIS_MOUTH,CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,passableLand,terrainHeight} from './terrain.ts'
-import {STOCKS,STOCK_SYMBOLS} from '../stock-catalog.ts'
+import {STOCK_SYMBOLS} from '../stock-catalog.ts'
 import {TABLES,LOUNGES,type HallPlayer,type HallTable,type HallView,type Position} from '../roulette-hall-model.ts'
 export const WORLD_CAPACITY=50
 export const WORLD_SPEED=4.7
 export const SPRINT_SPEED=WORLD_SPEED*1.45
-export const CITY={x:0,z:8,yaw:0}
-export const FLOOR_LIST:{symbol:string;name:string}[]=[...STOCKS].sort((a,b)=>a.symbol.localeCompare(b.symbol))
-FLOOR_LIST.push({symbol:'CAS',name:'The Casino'},{symbol:'BNK',name:'Fifth Dimension Bank'},{symbol:'LOT',name:'Royal Weekly Lottery'})
+export const CITY=shared.spawn
 export const stockFloor=(symbol:string)=>symbol==='CAS'||symbol==='BNK'||symbol==='LOT'||STOCK_SYMBOLS.has(symbol)
 export type PublicZone=GuestFloor|Gallery|Venue|'city'|'hotel'|'casino'|'bank'|'exchange'|'kfc'|'cave'|'oasis'|`floor:${string}`|HomeZone
 export type WorldZone=PublicZone|'private'
 export const DESTINATIONS={city:'city',casino:'hotel',bank:'bank',stocks:'exchange',kfc:'kfc',gunshop:'gunshop',prison:'station'} as const
 export type Destination=keyof typeof DESTINATIONS
 export const CITY_PORTALS=[
-  {to:'hotel',x:0,z:-7,label:'Royal Hotel & Casino'},
-  {to:'bank',x:-24,z:5,label:'Fifth Dimension Bank'},
-  {to:'exchange',x:24,z:5,label:'Exchange Tower'},
+  {to:'hotel',x:shared.rooms.hotel.x,z:shared.rooms.hotel.z+shared.rooms.hotel.front,label:'Royal Hotel & Casino'},
+  {to:'bank',x:shared.rooms.bank.x,z:shared.rooms.bank.z+shared.rooms.bank.front,label:'Fifth Dimension Bank'},
+  {to:'exchange',x:shared.rooms.exchange.x,z:shared.rooms.exchange.z+shared.rooms.exchange.front,label:'Exchange Tower'},
   {to:'kfc',x:RESTAURANT.x,z:RESTAURANT.z+RESTAURANT.front,label:RESTAURANT_NAME},
   {to:'cave',x:CAVE_X,z:CAVE_MOUTH,label:''},
   {to:'oasis',x:OASIS_X,z:OASIS_MOUTH,label:''},
@@ -34,10 +35,7 @@ export const PUBLIC_DICE={name:'Ivory Dice',x:6.1,z:3.0,color:'#e5bd86'} as cons
 export const WORLD_TABLES=[...TABLES,PUBLIC_DICE]
 export const DICE_TABLE_INDEX=TABLES.length
 export const ZONE_ARRIVAL:Record<Exclude<WorldZone,GuestFloor|Gallery|HomeZone|`floor:${string}`>,Position>={
-  station:insideDoor('station'),gunshop:insideDoor('gunshop'),city:CITY,hotel:{x:0,z:5.7,yaw:0},casino:{x:0,z:7.1,yaw:0},
-  bank:{x:0,z:6.6,yaw:0},exchange:{x:0,z:6.6,yaw:0},
-  kfc:{x:0,z:5.6,yaw:0},
-  cave:{x:0,z:6.7,yaw:0},oasis:{x:.45,z:-6.2,yaw:Math.PI-.09},private:{x:0,z:0,yaw:0},
+  station:insideDoor('station'),gunshop:insideDoor('gunshop'),city:CITY,...shared.arrivals,
 }
 export const FLOOR_ARRIVAL={x:0,z:6,yaw:0}
 export const FLOOR_HEIGHT=6
@@ -55,14 +53,7 @@ export function boardPoints(zone:WorldZone,taken:readonly number[]=[]):WorldActi
   return BOARD_SEATS.flatMap((seat,i)=>full||!taken.includes(i)?[{id:full?'board':'board:'+i,label:full?'Open shareholder voting':'Sit at the board table',...site(zone,seat.x,seat.z),range:1.13}]:[])
 }
 export const LIFT={x:0,z:-5.48}
-export const PLAN={
-  hotel:{x:0,z:-14.78,width:9.5,back:-7.9,front:7.78},
-  casino:{x:0,z:-31.58,width:11.25,back:-6.7,front:8.9},
-  bank:{x:-24,z:-3.05,width:10.2,back:-6.57,front:8.05},
-  exchange:{x:24,z:-2.48,width:8,back:-7.45,front:7.48},
-  kfc:RESTAURANT,
-  cave:{x:CAVE_X,z:CAVE_MOUTH+7.7},oasis:{x:OASIS_X,z:OASIS_MOUTH+7.7},
-} as const
+export const PLAN=shared.rooms
 type Building=keyof typeof PLAN
 const building=(zone:WorldZone)=>guestFloor(zone)?'hotel':zone.startsWith('floor:')?'exchange':Object.hasOwn(PLAN,zone)?zone as Building:undefined
 const reverse=(zone:WorldZone)=>zone==='cave'||zone==='oasis'?-1:1
@@ -102,7 +93,7 @@ export function walkingHeight(zone:WorldZone,x:number,z:number){
   }
   return zone==='city'?terrainHeight(x,z):floorHeight(zone)
 }
-export type WorldUse=`resort:${string}`|'cash'|'counter'|'booking'|'desk'|`drawer:${string}`|'loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
+export type WorldUse=`directory:${string}`|`resort:${string}`|'cash'|'counter'|'booking'|'desk'|`drawer:${string}`|'loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
 export type WorldChat={id:number;name:string;text:string;at:number}
 export interface WorldView{
@@ -112,7 +103,7 @@ export interface WorldView{
 function localInteractions(zone:WorldZone,keys:readonly string[]):WorldAction[]{
   if(zone==='hotel'||guestFloor(zone))return resortPoints(zone,keys)
   if(civicRoom(zone))return civicActions(zone)
-  if(zone==='city')return [...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
+  if(zone==='city')return [...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS,...DIRECTORY]
   const home=residentialAt(zone)
   if(home?.building.block!==undefined&&home.level===0&&!home.stairs)return propertyPoints().filter(p=>p.id==='property:desk-'+home.building.block)
   if(zone==='casino')return [
@@ -174,7 +165,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
   }
   if(openDoorway(x,z))return true
   if(Object.entries(footprint).some(([key,b])=>{const o=origins[key as Venue];return box(x,z,o.x,o.z,b.w/2+.15,b.d/2+.15)}))return false
-  if(urbanObstacle(x,z)||officeObstacle(x,z)||!passableLand(x,z)||Math.hypot(x,z)<2.88||treeObstacle(x,z)||townFixture(x,z))return false
+  if(urbanObstacle(x,z)||officeObstacle(x,z)||!passableLand(x,z)||Math.hypot(x-shared.fountain.x,z-shared.fountain.z)<shared.fountain.radius||treeObstacle(x,z)||townFixture(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x)
     if(publicWall(room,p.x,p.z,.28))return false

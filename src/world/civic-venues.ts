@@ -1,7 +1,7 @@
 // Dimensions are in city metres. Every floor sits over the Civic Avenue parcel.
-import {LANDMARKS} from './city-plan.ts'
+import {shared} from './map-data.ts'
 
-const precinct=LANDMARKS.find(b=>b.id==='police')!
+
 export type Venue='station'|'gunshop'
 export type Gallery='precinct:1'|'precinct:2'|'precinct:3'|'precinct:4'|'precinct:5'
 export type CivicRoom=Venue|Gallery
@@ -10,13 +10,10 @@ export const gallery=(z:string):z is Gallery=>/^precinct:[1-5]$/.test(z)
 export const civicRoom=(z:string):z is CivicRoom=>venue(z)||gallery(z)
 export const levelOf=(z:string)=>gallery(z)?Number(z.slice(-1)):0
 export const levelZone=(n:number):Gallery|'station'=>n===0?'station':('precinct:'+n) as Gallery
-export const rise=3.4
-export const origins={station:{x:precinct.x+2.9,z:precinct.z-.55},gunshop:{x:-55.65,z:-74.25}}
-export const footprint={station:{w:18.6,d:precinct.d},gunshop:{w:9.8,d:8.4}}
+export const {rise,origins,footprint,front,deskFurniture,shopCounter,shopCases,stair,cells}=shared.civic
 export const design=(z:CivicRoom)=>z==='gunshop'?'gunshop':'station'
 export const originOf=(z:CivicRoom)=>origins[design(z)]
 export const at=(z:CivicRoom,x:number,zLocal:number)=>({x:originOf(z).x+x,z:originOf(z).z+zLocal})
-export const front={station:{x:-.35,z:-footprint.station.d/2,sign:-1},gunshop:{x:0,z:footprint.gunshop.d/2,sign:1}}
 // Paired glazed leaves stand open against the door reveals on the interior side.
 export function doorLeaves(id:Venue){
   const f=front[id]
@@ -25,19 +22,7 @@ export function doorLeaves(id:Venue){
 export function threshold(id:Venue,offset:number){const d=front[id];return at(id,d.x,d.z+offset*d.sign)}
 export const entrances={station:threshold('station',.75),gunshop:threshold('gunshop',.75)}
 export const insideDoor=(id:Venue)=>({x:front[id].x,z:front[id].z-.72*front[id].sign,yaw:id==='station'?Math.PI:0})
-export const deskFurniture=[
-  {id:'desk',x:-4.45,z:1.65,w:4.3,d:1.04,label:'Speak to the desk officer'},
-  {id:'booking',x:4.65,z:1.65,w:3.55,d:1.04,label:'View booking register'},
-] as const
-export const shopCounter={x:0,z:-2.38,w:6.15,d:1.04}
-export const shopCases=[{x:-3.92,z:.35,w:.82,d:3.3},{x:3.92,z:.35,w:.82,d:3.3}]
-export const stair={start:.79,end:2.66,split:0,half:1.19,up:-.62,down:.62}
 export const galleryZone=(cell:number)=>levelZone(1+Math.floor((cell-1)%25/5))
-export const cells=Array.from({length:50},(_,i)=>{
-  const wing=i<25?-1:1,slot=i%5,row=slot<3?-1:1,column=slot%3
-  const x=wing*(2.63+column*2.55),z=row*2.08
-  return {number:i+1,level:1+Math.floor(i%25/5),wing,row,x,z,w:2.55,d:2.45}
-})
 export function cellPosition(n:number){
   const c=cells[n-1];return {...at('station',c.x,c.z),yaw:c.row<0?Math.PI:0}
 }

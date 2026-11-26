@@ -1,0 +1,207 @@
+// Stable Meridian placements in world metres. Floor fixtures use local metres.
+export const meridian = {
+  area: "meridian",
+  seed: 6821,
+  spawn: {across:0,along:8,yaw:0},
+  streets: [
+    {"id":"boulevard","name":"Crown Boulevard","a":{"x":-62.5,"z":11},"b":{"x":74,"z":11},"width":6.1,"walk":1.75,"limit":7.4,"traffic":true},
+    {"id":"garden","name":"Garden Avenue","a":{"x":-62.5,"z":31},"b":{"x":74,"z":31},"width":4.5,"walk":1.35,"limit":5.1,"traffic":true},
+    {"id":"west","name":"Linden Avenue","a":{"x":-62.5,"z":31},"b":{"x":-62.5,"z":-65},"width":3.6,"walk":1.35,"limit":6.4,"traffic":true},
+    {"id":"east","name":"Eastbank Avenue","a":{"x":74,"z":31},"b":{"x":74,"z":-65},"width":4.7,"walk":1.35,"limit":6.4,"traffic":true},
+    {"id":"court","name":"Court Street","a":{"x":-62.5,"z":-49},"b":{"x":74,"z":-49},"width":4.35,"walk":1.35,"limit":5.5,"traffic":true},
+    {"id":"linden","name":"Linden Street","a":{"x":-62.5,"z":-11.9},"b":{"x":-13,"z":-11.9},"width":3.95,"walk":1.35,"limit":4.65,"traffic":true},
+    {"id":"glass","name":"Glass Street","a":{"x":13,"z":-11.9},"b":{"x":74,"z":-11.9},"width":3.95,"walk":1.35,"limit":4.65,"traffic":true},
+    {"id":"westbank","name":"Westbank Road","a":{"x":-62.5,"z":-30},"b":{"x":-12,"z":-30},"width":3.75,"walk":1.35,"limit":4.65,"traffic":true},
+    {"id":"eastbank","name":"Eastbank Road","a":{"x":12,"z":-30},"b":{"x":74,"z":-30},"width":3.75,"walk":1.35,"limit":4.65,"traffic":true},
+    {"id":"civic","name":"Civic Avenue","a":{"x":-62.5,"z":-65},"b":{"x":-8,"z":-65},"width":5.65,"walk":1.7,"limit":6.9,"traffic":true},
+    {"id":"market","name":"Market Avenue","a":{"x":8,"z":-65},"b":{"x":74,"z":-65},"width":5.65,"walk":1.7,"limit":6.9,"traffic":true},
+    {"id":"station","name":"Station Approach","a":{"x":0,"z":-73},"b":{"x":0,"z":-77.8},"width":4.9,"walk":1.65,"limit":4.4,"traffic":true},
+    {"id":"meridian","name":"Meridian Road","a":{"x":0,"z":-57},"b":{"x":0,"z":-49},"width":4.9,"walk":1.35,"limit":5.5,"traffic":true},
+    {"id":"square","name":"Clock Walk","a":{"x":0,"z":8},"b":{"x":0,"z":45},"width":2.9,"walk":0,"limit":0,"traffic":false},
+    {"id":"mill","name":"Mill Lane","a":{"x":-24,"z":45},"b":{"x":24,"z":45},"width":1.9,"walk":0,"limit":0,"traffic":false},
+    {"id":"green-west","name":"West Garden Walk","a":{"x":-10.4,"z":13},"b":{"x":-10.4,"z":31},"width":1.8,"walk":0,"limit":0,"traffic":false},
+    {"id":"green-east","name":"East Garden Walk","a":{"x":10.4,"z":13},"b":{"x":10.4,"z":31},"width":1.8,"walk":0,"limit":0,"traffic":false}
+  ],
+  landmarks: [
+    {"id":"hall","name":"Meridian Town Hall","district":"centre","w":10.4,"d":8.8,"h":5.6,"facing":-1,"frontage":{"street":"boulevard","along":54.8,"side":"right","setback":10.0}},
+    {"id":"police","name":"Meridian Police","district":"civic","w":13,"d":6.8,"h":4.8,"facing":-1,"frontage":{"street":"civic","along":10.5,"side":"right","setback":9.5}},
+    {"id":"fire","name":"Civic Fire Station","district":"civic","w":14,"d":7.8,"h":4.35,"facing":-1,"frontage":{"street":"civic","along":30.5,"side":"right","setback":10.0}},
+    {"id":"hospital","name":"Northbank Hospital","district":"civic","w":20,"d":8,"h":7.7,"facing":-1,"frontage":{"street":"market","along":7.7,"side":"right","setback":9.9}},
+    {"id":"market","name":"Harvest Market","district":"outskirts","w":15.6,"d":7.6,"h":4.45,"facing":-1,"frontage":{"street":"market","along":34.0,"side":"right","setback":10.1}},
+    {"id":"petrol","name":"Meridian Petrol","district":"outskirts","w":10,"d":4,"h":3.25,"facing":-1,"frontage":{"street":"market","along":55.0,"side":"right","setback":11.1}},
+    {"id":"school","name":"Eastbank School","district":"civic","w":20,"d":9.4,"h":6.1,"facing":1,"frontage":{"street":"market","along":52.5,"side":"left","setback":11.0}},
+    {"id":"station","name":"Meridian Central","district":"outskirts","w":16,"d":4,"h":5.1,"facing":1,"frontage":{"street":"station","along":8.8,"side":"right","setback":0.0}},
+    {"id":"bakery","name":"Linden Bread & Butter","district":"centre","w":3.6,"d":4.2,"h":3.85,"facing":1,"frontage":{"street":"linden","along":35.5,"side":"left","setback":4.85}},
+    {"id":"cafe","name":"Clockwork Café","district":"centre","w":3.5,"d":4.1,"h":3.4,"facing":1,"frontage":{"street":"glass","along":14.0,"side":"left","setback":4.8}},
+    {"id":"books","name":"Fable Books","district":"entertainment","w":4.55,"d":6.3,"h":4.35,"facing":1,"frontage":{"street":"linden","along":47.7,"side":"left","setback":5.4}},
+    {"id":"florist","name":"The Foxglove","district":"entertainment","w":4.4,"d":4.2,"h":3.25,"facing":1,"frontage":{"street":"glass","along":2.0,"side":"left","setback":5.4}},
+    {"id":"pharmacy","name":"Northbank Pharmacy","district":"civic","w":4.7,"d":5.8,"h":4.1,"facing":-1,"frontage":{"street":"market","along":20.65,"side":"right","setback":10.2}},
+    {"id":"barber","name":"Linden Barber","district":"entertainment","w":4,"d":5.3,"h":3.65,"facing":1,"frontage":{"street":"westbank","along":49.0,"side":"left","setback":5.9}},
+    {"id":"office","name":"Meridian Assurance","district":"finance","w":6,"d":7.25,"h":8.9,"facing":1,"frontage":{"street":"boulevard","along":99.75,"side":"left","setback":17.0}},
+    {"id":"restaurant","name":"The Blue Lantern","district":"entertainment","w":4.4,"d":5.7,"h":4.05,"facing":1,"frontage":{"street":"eastbank","along":1.95,"side":"left","setback":5.4}}
+  ],
+  circle: {"x":0,"z":-65,"radius":8,"width":3.5},
+  parks: [
+    {"id":"central","name":"Meridian Gardens","x":29,"z":-75,"w":34,"d":13,"sport":true},
+    {"id":"south","name":"Mill Green","x":23,"z":39,"w":13,"d":8,"sport":false},
+    {"id":"west","name":"Linden Green","x":-20,"z":-55.6,"w":9,"d":7,"sport":false}
+  ],
+  parkFeatures: {"picnic":[{"x":30.9,"z":-77.9},{"x":31.4,"z":-72.6}],"gardensPlay":{"x":41,"z":-79.07},"schoolPlay":{"x":48.3,"z":-76},"fuel":{"x":63,"z":-58.8}},
+  pond: {"x":24,"z":-75.7,"w":9.4,"d":4.3,"bridge":24},
+  rail: {"north":-91,"south":-86,"stationEdge":10,"z":-88.5},
+  crossings: [
+    {"signal":true,"street":"boulevard","along":54.8},
+    {"signal":true,"street":"boulevard","along":87.5},
+    {"signal":false,"street":"boulevard","along":121.5},
+    {"signal":false,"street":"westbank","along":11.5},
+    {"signal":false,"street":"eastbank","along":42.0},
+    {"signal":false,"street":"court","along":62.5},
+    {"signal":false,"street":"civic","along":13.5},
+    {"signal":false,"street":"civic","along":40.5},
+    {"signal":true,"street":"market","along":20.0},
+    {"signal":false,"street":"market","along":51.0},
+    {"signal":true,"street":"west","along":24.0},
+    {"signal":true,"street":"east","along":24.0},
+    {"signal":false,"street":"west","along":78.0},
+    {"signal":false,"street":"east","along":78.0},
+    {"signal":false,"street":"station","along":2.6},
+    {"signal":false,"street":"garden","along":62.5}
+  ],
+  parking: [
+    {"id":"police-1","kind":"police","yaw":1.5707963267948966,"use":"Police","frontage":{"street":"civic","along":4.8,"side":"right","setback":4.3}},
+    {"id":"police-2","kind":"police","yaw":1.5707963267948966,"use":"Police","frontage":{"street":"civic","along":9.7,"side":"right","setback":4.3}},
+    {"id":"fire-1","kind":"fire","yaw":1.5707963267948966,"use":"Fire service","frontage":{"street":"civic","along":25.5,"side":"right","setback":4.0}},
+    {"id":"fire-2","kind":"fire","yaw":1.5707963267948966,"use":"Fire service","frontage":{"street":"civic","along":35.6,"side":"right","setback":4.0}},
+    {"id":"ambulance","kind":"ambulance","yaw":1.5707963267948966,"use":"Emergency","frontage":{"street":"market","along":14.0,"side":"right","setback":4.5}},
+    {"id":"ambulance-2","kind":"ambulance","yaw":1.5707963267948966,"use":"Emergency","frontage":{"street":"market","along":18.8,"side":"right","setback":4.5}},
+    {"id":"hospital","yaw":-1.5707963267948966,"use":"Hospital","frontage":{"street":"market","along":7.0,"side":"left","setback":5.25},"accessOffset":6.7},
+    {"id":"grocer","yaw":1.5707963267948966,"use":"Customer","frontage":{"street":"market","along":36.0,"side":"right","setback":4.3},"accessOffset":6.5},
+    {"id":"loading","kind":"van","yaw":1.5707963267948966,"use":"Loading","frontage":{"street":"market","along":41.8,"side":"right","setback":11.4}},
+    {"id":"fuel","yaw":1.5707963267948966,"use":"Fuel","frontage":{"street":"market","along":58.1,"side":"right","setback":4.55},"accessOffset":5.1},
+    {"id":"station-1","kind":"taxi","yaw":0,"use":"Taxi","frontage":{"street":"station","along":3.25,"side":"left","setback":4.15}},
+    {"id":"station-2","yaw":3.141592653589793,"use":"Station","frontage":{"street":"station","along":3.25,"side":"right","setback":4.15},"accessOffset":-4.15},
+    {"id":"bank","yaw":1.5707963267948966,"use":"Bank","frontage":{"street":"boulevard","along":35.5,"side":"left","setback":5.1},"accessOffset":-5},
+    {"id":"hotel","kind":"taxi","yaw":1.5707963267948966,"use":"Taxi","frontage":{"street":"boulevard","along":72.5,"side":"left","setback":4.4}},
+    {"id":"linden","yaw":1.5707963267948966,"use":"Residents","frontage":{"street":"westbank","along":15.5,"side":"right","setback":4.0},"accessOffset":-4},
+    {"id":"eastbank","yaw":1.5707963267948966,"use":"Visitors","frontage":{"street":"eastbank","along":46.0,"side":"right","setback":4.2},"accessOffset":5},
+    {"id":"court-west","kind":"wagon","yaw":1.5707963267948966,"use":"Visitors","frontage":{"street":"westbank","along":7.5,"side":"right","setback":4.2}},
+    {"id":"court-east","kind":"hatch","yaw":1.5707963267948966,"use":"Visitors","frontage":{"street":"eastbank","along":39.0,"side":"right","setback":4.2}},
+    {"id":"garden","kind":"suv","yaw":1.5707963267948966,"use":"Residents","frontage":{"street":"garden","along":29.1,"side":"right","setback":3.6}},
+    {"id":"driveway","kind":"sedan","yaw":1.5707963267948966,"use":"Private","frontage":{"street":"linden","along":18.1,"side":"left","setback":3.45}}
+  ],
+  rooms: {
+    hotel: {"width":9.5,"back":-7.9,"front":7.78,"frontage":{"street":"boulevard","along":62.5,"side":"left","setback":25.78}},
+    casino: {"width":11.25,"back":-6.7,"front":8.9,"parent":"hotel","offset":-16.8},
+    bank: {"width":10.2,"back":-6.57,"front":8.05,"frontage":{"street":"boulevard","along":38.5,"side":"left","setback":14.05}},
+    exchange: {"width":8,"back":-7.45,"front":7.48,"frontage":{"street":"boulevard","along":86.5,"side":"left","setback":13.48}},
+    kfc: {"width":6.3,"back":-7,"front":6.5,"frontage":{"street":"boulevard","along":125.5,"side":"left","setback":11.65}},
+    cave: {"x":-40,"z":81.7},
+    oasis: {"x":40,"z":63.7}
+  },
+  arrivals: {"hotel":{"x":0,"z":5.7,"yaw":0},"casino":{"x":0,"z":7.1,"yaw":0},"bank":{"x":0,"z":6.6,"yaw":0},"exchange":{"x":0,"z":6.6,"yaw":0},"kfc":{"x":0,"z":5.6,"yaw":0},"cave":{"x":0,"z":6.7,"yaw":0},"oasis":{"x":0.45,"z":-6.2,"yaw":3.0515926535897933},"private":{"x":0,"z":0,"yaw":0}},
+  precinct: {"landmark":"police","dx":2.9,"dz":-0.55,"width":18.6,"doorX":-0.35,"storeys":5,"rise":3.4},
+  shop: {"frontage":{"street":"civic","along":6.85,"side":"left","setback":9.25},"w":9.8,"d":8.4,"doorX":0},
+  furnitureGroups: [
+    {"area":"square","across":-5.5,"along":13.7,"reverse":false},
+    {"area":"square","across":6.8,"along":16.8,"reverse":true,"seat":"bench-78"},
+    {"area":"square","across":-9.4,"along":25.4,"reverse":false},
+    {"area":"central","across":-7.1,"along":2.6,"reverse":false},
+    {"area":"central","across":0.7,"along":2.7,"reverse":false,"seat":"bench-79"},
+    {"area":"central","across":2.8,"along":-4.8,"reverse":true},
+    {"area":"central","across":-9.9,"along":-4.5,"reverse":true},
+    {"area":"central","across":11.8,"along":1.1,"reverse":true},
+    {"area":"south","across":-1.3,"along":-1,"reverse":false},
+    {"area":"west","across":-0.9,"along":-0.7,"reverse":false},
+    {"area":"block-0","across":-3.3,"along":0.2,"reverse":true},
+    {"area":"block-1","across":0,"along":-1.7,"reverse":false},
+    {"area":"station","across":-8.5,"along":2.7,"reverse":false}
+  ],
+  // Mirrored candidates are tried along the frontage until both the route and prop are clear.
+  frontageDetails: [
+    {parcel:'gunshop',kind:'lamp',side:-1},
+    {parcel:'police',kind:'lamp',side:1},{parcel:'books',kind:'lamp',side:-1},
+    {parcel:'hotel',kind:'bench',side:1,doorOffset:2.2},{parcel:'cafe',kind:'bench',side:-1},
+  ],
+  desks: [
+    {"id":"desk","x":-4.45,"z":1.65,"w":4.3,"d":1.04,"label":"Speak to the desk officer"},
+    {"id":"booking","x":4.65,"z":1.65,"w":3.55,"d":1.04,"label":"View booking register"}
+  ],
+  counter: {"x":0,"z":-2.38,"w":6.15,"d":1.04},
+  cases: [
+    {"x":-3.92,"z":0.35,"w":0.82,"d":3.3},
+    {"x":3.92,"z":0.35,"w":0.82,"d":3.3}
+  ],
+  stair: {"start":0.79,"end":2.66,"split":0,"half":1.19,"up":-0.62,"down":0.62},
+  houses: [
+    {"id":"house-0","facing":1,"levels":1,"frontage":{"street":"linden","along":22.5,"side":"left","setback":5.1}},
+    {"id":"house-1","facing":1,"levels":1,"frontage":{"street":"linden","along":30.5,"side":"left","setback":8.1}},
+    {"id":"house-2","facing":1,"levels":1,"frontage":{"street":"linden","along":40.5,"side":"left","setback":9.1}},
+    {"id":"house-3","facing":1,"levels":1,"frontage":{"street":"glass","along":9.0,"side":"left","setback":10.1}},
+    {"id":"house-4","facing":1,"levels":2,"frontage":{"street":"glass","along":19.0,"side":"left","setback":7.1}},
+    {"id":"house-5","facing":1,"levels":2,"frontage":{"street":"glass","along":29.0,"side":"left","setback":5.1}},
+    {"id":"house-6","facing":1,"levels":1,"frontage":{"street":"boulevard","along":20.5,"side":"left","setback":9.0}},
+    {"id":"house-7","facing":-1,"levels":1,"frontage":{"street":"boulevard","along":35.5,"side":"right","setback":8.0}},
+    {"id":"house-8","facing":-1,"levels":1,"frontage":{"street":"boulevard","along":45.5,"side":"right","setback":12.0}},
+    {"id":"house-9","facing":-1,"levels":1,"frontage":{"street":"boulevard","along":78.5,"side":"right","setback":14.0}},
+    {"id":"house-10","facing":-1,"levels":1,"frontage":{"street":"boulevard","along":89.5,"side":"right","setback":8.0}},
+    {"id":"house-11","facing":1,"levels":1,"frontage":{"street":"boulevard","along":104.5,"side":"left","setback":9.0}},
+    {"id":"house-12","facing":1,"levels":2,"frontage":{"street":"linden","along":10.5,"side":"left","setback":5.1}},
+    {"id":"house-13","facing":-1,"levels":2,"frontage":{"street":"boulevard","along":7.5,"side":"right","setback":8.0}},
+    {"id":"house-14","facing":-1,"levels":1,"frontage":{"street":"boulevard","along":17.5,"side":"right","setback":15.0}},
+    {"id":"house-15","facing":-1,"levels":1,"frontage":{"street":"boulevard","along":108.5,"side":"right","setback":14.0}},
+    {"id":"house-16","facing":-1,"levels":1,"frontage":{"street":"boulevard","along":117.5,"side":"right","setback":7.0}},
+    {"id":"house-17","facing":1,"levels":1,"frontage":{"street":"glass","along":42.0,"side":"left","setback":5.1}},
+    {"id":"house-18","facing":1,"levels":1,"frontage":{"street":"westbank","along":37.5,"side":"left","setback":6.0}},
+    {"id":"house-19","facing":1,"levels":1,"frontage":{"street":"westbank","along":26.5,"side":"left","setback":7.0}},
+    {"id":"house-20","facing":1,"levels":2,"frontage":{"street":"court","along":86.5,"side":"right","setback":11.0}},
+    {"id":"house-21","facing":1,"levels":2,"frontage":{"street":"eastbank","along":24.0,"side":"left","setback":6.0}},
+    {"id":"house-22","facing":1,"levels":1,"frontage":{"street":"mill","along":11.0,"side":"left","setback":5.0}},
+    {"id":"house-23","facing":1,"levels":1,"frontage":{"street":"mill","along":37.0,"side":"left","setback":5.0}}
+  ],
+  apartments: [
+    {"id":"block-0","name":"Linden Court","levels":5,"frontage":{"street":"westbank","along":12.3,"side":"left","setback":9.0}},
+    {"id":"block-1","name":"Eastbank Flats","levels":5,"frontage":{"street":"eastbank","along":42.0,"side":"left","setback":9.0}},
+    {"id":"block-2","name":"Meridian House","levels":5,"frontage":{"street":"civic","along":23.5,"side":"left","setback":10.65}}
+  ],
+  offices: [
+    {"x":-68,"z":-22,"w":8,"d":11,"h":19},
+    {"x":-70,"z":0,"w":10,"d":12,"h":29},
+    {"x":-68,"z":24,"w":9,"d":8,"h":13},
+    {"x":66,"z":-20,"w":9,"d":10,"h":17}
+  ],
+  market: [
+    [-15.5,16.75],
+    [14,18]
+  ],
+  boulevardTrees: [
+    19,
+    30,
+    39,
+    54
+  ],
+  paths: [
+    {"id":"square","points":[{"x":0,"z":4},{"x":0,"z":11},{"x":0,"z":15.4}],"width":3.3,"purpose":"walk"},
+    {"id":"hall-court","points":[{"x":-7.7,"z":15.3},{"x":0,"z":15.3}],"width":2.04,"purpose":"walk"},
+    {"id":"park-high","points":[{"x":25,"z":-68.5},{"x":23,"z":-71.5},{"x":18,"z":-73.5},{"x":17,"z":-77.8},{"x":23,"z":-80.1},{"x":30,"z":-79.8},{"x":36,"z":-78.2},{"x":42.5,"z":-73.4},{"x":43,"z":-68.5}],"width":1.7,"purpose":"park"},
+    {"id":"park-bridge","points":[{"x":24,"z":-70.9},{"x":24,"z":-73.6},{"x":24,"z":-78},{"x":24,"z":-80.1}],"width":1.6,"purpose":"park"},
+    {"id":"park-sport","points":[{"x":38,"z":-67.9},{"x":38,"z":-71},{"x":42.5,"z":-73.4}],"width":1.72,"purpose":"park"},
+    {"id":"park-west","points":[{"x":17,"z":-77.8},{"x":13,"z":-76.5},{"x":7.6,"z":-77.85}],"width":1.8,"purpose":"park"},
+    {"id":"station-plaza","points":[{"x":-7.3,"z":-78.5},{"x":7.8,"z":-78.5}],"width":3,"purpose":"walk"},
+    {"id":"station-platform","points":[{"x":8.9,"z":-78.4},{"x":9.3,"z":-83},{"x":9.3,"z":-85.4},{"x":-16.7,"z":-85.4}],"width":1.75,"purpose":"walk"},
+    {"id":"mill-garden","points":[{"x":13,"z":34.4},{"x":19,"z":37.1},{"x":25.3,"z":39.2},{"x":27.2,"z":37.8},{"x":30,"z":34.5}],"width":1.4,"purpose":"park"},
+    {"id":"west-garden","points":[{"x":-19,"z":-62},{"x":-19,"z":-57},{"x":-22,"z":-54.2}],"width":1.25,"purpose":"park"},
+    {"id":"school-entrance","points":[{"x":60.5,"z":-71.3},{"x":58.5,"z":-69.6},{"x":58.5,"z":-67.6}],"width":1.8,"purpose":"walk"}
+  ],
+  places: [
+    {"id":"square","name":"Clock Square","x":1.8,"z":7.8},
+    {"id":"gardens","name":"Meridian Gardens","x":30,"z":-72.5},
+    {"id":"mill-green","name":"Mill Green","x":21,"z":39},
+    {"id":"station-plaza","name":"Station Plaza","x":5.4,"z":-78.7}
+  ],
+  // Clock Square's hand-built fountain, board and twin promenades share the square anchor.
+  square: {x:0,z:0,directory:{across:-4.65,along:1.72,yaw:.24},fountain:{across:0,along:0,radius:2.88}},
+  keepClear: [{id:'clock-square',anchor:'square',across:0,along:8,w:2.5,d:2.5}],
+  // Local art direction for generated details, keyed by street or park ID.
+  overrides: {civic:{lampStyle:1}, central:{treeStyle:1}} as Record<string,{lampStyle?:number;treeStyle?:number}>,
+}
+export type MeridianSource=typeof meridian

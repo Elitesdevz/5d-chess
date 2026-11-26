@@ -1,3 +1,4 @@
+import {shared as map} from './map-data.ts'
 import {royalResort} from './resort-art.ts'
 import {armoryClerk,bankStaff,hotelStaff,exchangeStaff,casinoStaff,floorStaff} from './service-staff.ts'
 import {arcadeBuildings} from './arcade-art.ts'
@@ -235,11 +236,11 @@ function street(){
   avenues(group)
   plane(group,23.6,14.8,0,-.016,.52,paving())
   landmarks(group)
-  const guide=new T.Group();guide.position.set(-4.65,0,1.72);guide.rotation.y=.24;group.add(guide)
+  const guide=new T.Group();guide.position.set(map.guide.x,0,map.guide.z);guide.rotation.y=map.guide.yaw;group.add(guide)
   box(guide,[2.53,1.31,.17],[0,1.43,0],ink,.06)
-  banner(guide,'CITY SQUARE',[2.24,.28],[0,1.81,.093])
-  banner(guide,'‹  BANK     CASINO  ↑',[2.18,.28],[0,1.42,.093])
-  banner(guide,'EXCHANGE   KFC  ›',[2.03,.27],[0,1.11,.093])
+  banner(guide,'CLOCK SQUARE',[2.24,.28],[0,1.81,.093])
+  banner(guide,'LOCAL DIRECTORY',[2.18,.28],[0,1.42,.093])
+  banner(guide,'STREETS   /   VENUES',[2.03,.27],[0,1.11,.093])
   for(const x of [-.98,.98])block(guide,.10,.81,.15,x,.43,0,brass)
   const trailSign=new T.Group();trailSign.position.set(1.8,0,44);trailSign.rotation.y=Math.PI;group.add(trailSign)
   block(trailSign,.14,1.85,.16,0,.92,0,oak)

@@ -1,23 +1,17 @@
+import {shared} from './map-data.ts'
+import {ridgeDistance,trailOffset} from './geo.ts'
+export {ridgeDistance} from './geo.ts'
 import {railwayGround,urbanGround} from './city-plan.ts'
 // Shared by the terrain mesh and the authoritative movement simulation.
 export const TERRAIN_STEP=2
 export const TERRAIN_EXTENT=170
-export const HOMES=[
-  [-40,-17],[-32,-20],[-22,-21],[22,-22],[32,-19],[42,-17],
-  [-42,2],[-27,19],[-17,23],[16,25],[27,19],[42,2],
-  [-52,-17],[-55,19],[-45,26],[46,25],[55,18],[55,-17],
-  [-25,-36],[-36,-37],[24,-38],[36,-36],[-13,40],[13,40],
-] as const
-export const CAVE_X=-40,OASIS_X=40,CAVE_MOUTH=74,OASIS_MOUTH=56
+export const HOMES=shared.houses.map(h=>[h.x,h.z] as const)
+export const CAVE_X=shared.rooms.cave.x,OASIS_X=shared.rooms.oasis.x,CAVE_MOUTH=shared.rooms.cave.z-7.7,OASIS_MOUTH=shared.rooms.oasis.z-7.7
 export const passages=[{x:CAVE_X,z:CAVE_MOUTH},{x:OASIS_X,z:OASIS_MOUTH}]
 export const tunnelBed=(z:number)=>-Math.min(5.8,Math.max(0,7.7-z)*.56)
 export const basinBed=(z:number)=>tunnelBed(z)-Math.min(1.6,Math.max(0,-1.6-z)*.42)
 export const poolLevel=-5.05
 export const inPool=(x:number,z:number)=>Math.abs(x)<2.2&&z< -1.6
-export function ridgeDistance(x:number,z:number){
-  const theta=Math.atan2(z,x)
-  return Math.hypot(x,z*.97)-(89+6*Math.sin(theta*3+.8)+4*Math.cos(theta*5))
-}
 export function terrainVertex(x:number,z:number){
   if(urbanGround(x,z))return 0
   const radius=Math.hypot(x,z),d=ridgeDistance(x,z)
@@ -41,9 +35,8 @@ export function passableLand(x:number,z:number){
   const height=terrainHeight(x,z)
   return ridgeDistance(x,z)<30&&height<22&&Math.hypot(terrainHeight(x+.5,z)-terrainHeight(x-.5,z),terrainHeight(x,z+.5)-terrainHeight(x,z-.5))<.91
 }
-export const homeFacing=(z:number)=>z===19||z===25||z===26||z===23||z===18?-1:1
-export const MARKET=[[-15.5,16.75],[14,18]] as const
-export const BOULEVARD_TREES=[19,30,39,54] as const
+export const MARKET=shared.market
+export const BOULEVARD_TREES=shared.boulevardTrees
 export function townFixture(x:number,z:number){
   if(MARKET.some(([a,b])=>Math.abs(z-b)<.87&&Math.abs(x-a)<1.52))return true
   if(Math.abs(z-14.85)<.34&&BOULEVARD_TREES.some(dx=>Math.abs(Math.abs(x)-dx)<.34))return true
@@ -52,21 +45,10 @@ export function townFixture(x:number,z:number){
   return Math.hypot(x+18,z-55)<1.67
 }
 
-export function trailDistance(x:number,z:number){
-  const mouth=x<0?CAVE_MOUTH:OASIS_MOUTH
-  const t=Math.max(0,Math.min(1,(z-36)/(mouth-36)))
-  const route=16+24*t+2*Math.sin(t*Math.PI*2)
-  return z>32&&z<mouth+1?Math.abs(Math.abs(x)-route):100
-}
-// Both the renderer and walking simulation use these positions for the tree trunks.
-export const VALLEY_TREES:{x:number;z:number;size:number}[]=[]
+export const trailDistance=(x:number,z:number)=>trailOffset(x,z,CAVE_MOUTH,OASIS_MOUTH)
+export const VALLEY_TREES=shared.woodland
 const treeCells=new Map<string,{x:number;z:number}[]>()
-let woodlandSeed=6821
-function woodlandRandom(){woodlandSeed=(Math.imul(woodlandSeed,1664525)+1013904223)>>>0;return woodlandSeed/4294967296}
-for(let i=0;i<730;i++){
-  const x=(woodlandRandom()-.5)*220,z=(woodlandRandom()-.5)*220,size=2.2+woodlandRandom()*3.1
-  if(urbanGround(x,z)||railwayGround(x,z)>.18||Math.abs(x)<24&&z<64&&z>46||passages.some(p=>Math.abs(x-p.x)<7&&z>p.z-4&&z<p.z+21)||trailDistance(x,z)<2||ridgeDistance(x,z)>8)continue
-  VALLEY_TREES.push({x,z,size})
+for(const {x,z} of VALLEY_TREES){
   for(let a=Math.floor((x-.32)/6);a<=Math.floor((x+.32)/6);a++)for(let b=Math.floor((z-.32)/6);b<=Math.floor((z+.32)/6);b++){
     const key=a+','+b
     if(!treeCells.has(key))treeCells.set(key,[])
