@@ -5,29 +5,35 @@ import type {UnitOfWork} from './storage.ts'
 import {income,inDefault,requireSpending,updateCredit,DAY} from './credit.ts'
 import {wallet} from './economy.ts'
 import {portfolio} from './cas-shares.ts'
-import {BUYBACK,INVENTORY,PE,type Companies,type Company,type Order,sharesOf,equityPosition,setHolding,journal,cashForDistribution} from './corporate.ts'
+import {BUYBACK,INVENTORY,PE,holderLabel,residentHolder,type Companies,type ListedCompany,type Order,sharesOf,equityPosition,setHolding,journal,cashForDistribution} from './corporate.ts'
 import {fail} from './http.ts'
 
 const priceTime=(side:StockSide)=>(a:Order,b:Order)=>(side==='buy'?b.price-a.price:a.price-b.price)||a.seq-b.seq
-export const book=(c:Company,side:StockSide)=>c.orders.filter(o=>o.side===side&&o.shares>0).sort(priceTime(side))
+export const book=(c:ListedCompany,side:StockSide)=>c.orders.filter(o=>o.side===side&&o.shares>0).sort(priceTime(side))
+export const displayOrder=({id,holder,side,price,shares,at}:Order)=>({id,holder:holderLabel(holder),side,price:fromStockUnits(price),shares,at})
+export function orderBookView(c:ListedCompany,name:string){
+  return {bids:book(c,'buy').slice(0,20).map(displayOrder),asks:book(c,'sell').slice(0,20).map(displayOrder),
+    orders:c.orders.filter(o=>o.holder===name&&o.shares).map(displayOrder)}
+}
 const total=(order:Order)=>order.price*order.shares
-export const inventoryAvailable=(c:Company)=>c.inventory-book(c,'sell').filter(o=>o.holder===INVENTORY).reduce((n,o)=>n+o.shares,0)
-const institution=(name:string)=>name===INVENTORY||name===BUYBACK||name===PE
-const reservedShares=(c:Company,holder:string)=>book(c,'sell').filter(o=>o.holder===holder).reduce((n,o)=>n+o.shares,0)
+export const inventoryAvailable=(c:ListedCompany)=>c.inventory-book(c,'sell').filter(o=>o.holder===INVENTORY).reduce((n,o)=>n+o.shares,0)
+const institution=(name:string)=>name===INVENTORY||name===BUYBACK||name===PE||residentHolder(name)
+const reservedShares=(c:ListedCompany,holder:string)=>book(c,'sell').filter(o=>o.holder===holder).reduce((n,o)=>n+o.shares,0)
 
-function receive(unit:UnitOfWork,e:Companies,c:Company,holder:string,units:number,now:number,sale=false){
+function receive(unit:UnitOfWork,e:Companies,c:ListedCompany,holder:string,units:number,now:number,sale=false){
   if(!units)return
   if(holder===INVENTORY||holder===BUYBACK){
     c.cash+=units
     if(sale)journal(c,'Inventory sold',units,now)
-  }else if(holder===PE)e.peCash+=units
+  }else if(residentHolder(holder))e.residents[holder]+=units
+  else if(holder===PE)e.peCash+=units
   else {
     const account=unit.users.get(holder)??fail(409,'Order owner unavailable')
     if(sale)income(account,units,now)
     else wallet(account).coins=fromStockUnits(toStockUnits(wallet(account).coins)+units)
   }
 }
-function unlock(unit:UnitOfWork,e:Companies,c:Company,o:Order,now:number){
+function unlock(unit:UnitOfWork,e:Companies,c:ListedCompany,o:Order,now:number){
   if(o.side==='buy'){
     const units=total(o)
     if(o.holder===BUYBACK)c.buybackCash-=units
@@ -35,15 +41,18 @@ function unlock(unit:UnitOfWork,e:Companies,c:Company,o:Order,now:number){
   }
   o.shares=0
 }
-export function cancelOrders(unit:UnitOfWork,e:Companies,c:Company,predicate:(o:Order)=>boolean,now:number){
+export function cancelOrders(unit:UnitOfWork,e:Companies,c:ListedCompany,predicate:(o:Order)=>boolean,now:number){
+  let changed=false
   for(const o of c.orders)if(o.shares&&predicate(o)){
+    changed=true
     if(o.holder!==INVENTORY)unit.economyUsage(institution(o.holder)?undefined:o.holder,'/api/stocks/cancel',
       {action:'order_canceled',reference:o.id,symbol:c.symbol,side:o.side,shares:o.shares,price:fromStockUnits(o.price)},now)
     unlock(unit,e,c,o,now)
   }
+  return changed
 }
 
-export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:string;side:StockSide;price:number;shares:number;id:string},now:number){
+export function submit(unit:UnitOfWork,e:Companies,c:ListedCompany,input:{holder:string;side:StockSide;price:number;shares:number;id:string},now:number,sellAll=false){
   const {holder,side,price,shares,id}=input
   const old=c.orders.find(o=>o.id===id&&o.holder===holder)
   if(old){
@@ -52,15 +61,18 @@ export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:strin
   }
   const order:Order={...input,initial:shares,at:now,seq:++c.nextOrder}
   const units=total(order)
-  if(!Number.isSafeInteger(shares)||shares<1||shares>EQUITY_ORDER_LIMIT||!Number.isSafeInteger(price)||price<1||!Number.isSafeInteger(units))fail(400,'Enter a valid limit price and 1–100,000 shares')
+  if(!Number.isSafeInteger(shares)||shares<1||shares>EQUITY_ORDER_LIMIT&&!(sellAll&&side==='sell'&&shares===sharesOf(c,holder))||!Number.isSafeInteger(price)||price<1||!Number.isSafeInteger(units))fail(400,'Enter a valid limit price and 1–100,000 shares')
   if(side==='sell'){
     const held=holder===INVENTORY?c.inventory:sharesOf(c,holder)
     if(held-reservedShares(c,holder)<shares)fail(409,'Not enough unreserved shares')
+  }else if(residentHolder(holder)){
+    if(!(holder in e.residents)||e.residents[holder]<units)fail(409,'Insufficient resident funds')
+    e.residents[holder]-=units
   }else if(holder===PE){
     if(e.peCash<units)fail(409,'Insufficient private equity funds')
     e.peCash-=units
   }else if(holder===BUYBACK){
-    if(c.bankruptcy||cashForDistribution(c,now)<units)fail(409,'Insufficient free cash for buyback')
+    if((c.symbol==='LOT'?c.cash:c.bankruptcy?0:cashForDistribution(c,now))<units)fail(409,'Insufficient free cash for buyback')
     c.cash-=units;c.buybackCash+=units
   }else{
     const owner=unit.users.get(holder)??fail(409,'Order owner unavailable')
@@ -123,13 +135,24 @@ export function submit(unit:UnitOfWork,e:Companies,c:Company,input:{holder:strin
   }
   return order
 }
-export function offerInventory(unit:UnitOfWork,e:Companies,c:Company,now:number){
+export function offerInventory(unit:UnitOfWork,e:Companies,c:ListedCompany,now:number,price=c.price){
   let quantity=inventoryAvailable(c)
   while(quantity>0){
-    const shares=Math.min(quantity,EQUITY_ORDER_LIMIT,Math.floor(Number.MAX_SAFE_INTEGER/c.price))
-    submit(unit,e,c,{holder:INVENTORY,side:'sell',price:c.price,shares,id:randomUUID()},now)
+    const shares=Math.min(quantity,EQUITY_ORDER_LIMIT,Math.floor(Number.MAX_SAFE_INTEGER/price))
+    submit(unit,e,c,{holder:INVENTORY,side:'sell',price,shares,id:randomUUID()},now)
     quantity-=shares
   }
+}
+// Only share-sale proceeds back the standing bid. Ticket receipts fund the draw.
+export function maintainLotteryMarket(unit:UnitOfWork,e:Companies,now:number){
+  const c=e.LOT,before=c.nextOrder
+  const canceled=cancelOrders(unit,e,c,o=>o.side==='buy'&&!institution(o.holder)&&inDefault(unit.users.get(o.holder)?.bank),now)
+  offerInventory(unit,e,c,now)
+  const bid=Math.max(1,Math.floor(c.price*99/100))
+  const reserved=book(c,'buy').filter(o=>o.holder===BUYBACK).reduce((n,o)=>n+o.shares,0)
+  const shares=Math.min(c.issued-c.inventory-reserved,Math.floor(c.cash/bid))
+  if(shares>0)submit(unit,e,c,{id:randomUUID(),holder:BUYBACK,side:'buy',price:bid,shares},now)
+  return canceled||before!==c.nextOrder
 }
 export function maintainOrders(unit:UnitOfWork,e:Companies,now:number){
   for(const [key,value] of Object.entries(e.reversals))if(now-value.at>=DAY)delete e.reversals[key]

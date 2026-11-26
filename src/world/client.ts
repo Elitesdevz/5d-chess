@@ -5,7 +5,7 @@ import {jigsaw} from '../jigsaw.ts'
 import {RestaurantUI} from './restaurant-ui.ts'
 import {api,ApiError,getSession,initShell,updateWalletBalance} from '../shell.ts'
 import {casinoCoins,grossMultiplier,pocketColor,MAX_CASINO_STAKE,type CasinoView,type RouletteChoice} from '../casino-model.ts'
-import {BNK,CAS,isEquity,type StockView,type PricePoint} from '../stock-model.ts'
+import {cityQuote,isEquity,type StockView,type PricePoint} from '../stock-model.ts'
 import {DICE_TABLE_INDEX,DESTINATIONS,WORLD_TABLES,type Destination,type WorldAction,type WorldView} from './model.ts'
 import {CityServices,coins,safeText} from './services.ts'
 import type {CityStage} from './stage.ts'
@@ -152,11 +152,11 @@ async function floorScreens(zone:string){
   if(!zone.startsWith('floor:'))return
   const symbol=zone.slice(6)
   try{
-    const data=await api<StockView>('/stocks'),issue=symbol===CAS?data.cas:symbol===BNK?data.bank:undefined
+    const data=await api<StockView>('/stocks'),issue=cityQuote(data,symbol)
     if(view?.you.zone!==zone)return
     stage?.quote(symbol,issue?.history??data.quotes[symbol]?.history??[],issue?.price??data.quotes[symbol]?.price)
     if(isEquity(symbol))stage?.ownership(symbol,data.companies[symbol])
-    else {
+    else if(symbol!=='LOT'){
       const {points}=await api<{points:PricePoint[]}>('/stocks/history?symbol='+encodeURIComponent(symbol))
       if(view?.you.zone===zone)stage?.quote(symbol,points.slice(-60),data.quotes[symbol]?.price)
     }
@@ -374,7 +374,7 @@ async function start(){
   }
   document.addEventListener('visibilitychange',wakePresence)
   void beat();window.setInterval(tableStatus,160)
-  window.setInterval(()=>{if(!closed&&!document.hidden&&view&&/^floor:(CAS|BNK)$/.test(view.you.zone))void floorScreens(view.you.zone)},12_000)
+  window.setInterval(()=>{if(!closed&&!document.hidden&&view&&/^floor:(CAS|BNK|LOT)$/.test(view.you.zone))void floorScreens(view.you.zone)},12_000)
 }
 document.addEventListener('click',event=>{
   const link=(event.target as Element).closest<HTMLAnchorElement>('a')

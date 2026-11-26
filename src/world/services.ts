@@ -1,3 +1,4 @@
+import {portfolioPerformance} from './portfolio-performance.ts'
 import {MENU} from './restaurant-model.ts'
 import type {FoodView} from './food.ts'
 import {residentialAt} from './residential.ts'
@@ -9,7 +10,7 @@ import {api,ApiError} from '../shell.ts'
 import {casinoCoins} from '../casino-model.ts'
 import {BANK_MIN_LOAN,BANK_TERMS,type BankReceipt,type BankView} from '../bank-model.ts'
 import {EQUITY_ORDER_LIMIT} from '../equity-v2.ts'
-import {bookQuote,BNK,CAS,MAX_STOCK_ORDER,QUOTE_MAX_AGE,isEquity,type EquityPublic,type EquitySymbol,type PricePoint,type StockOrder,type StockTrade,type StockView} from '../stock-model.ts'
+import {bookQuote,cityQuote,fromStockUnits,CAS,MAX_STOCK_ORDER,QUOTE_MAX_AGE,isExchangeStock,isEquity,type EquitySymbol,type PricePoint,type StockOrder,type StockTrade,type StockView} from '../stock-model.ts'
 import {StockChart} from '../stock-chart.ts'
 import {FLOOR_LIST,type WorldUse} from './model.ts'
 
@@ -238,8 +239,7 @@ export class CityServices {
       if(token===this.token)this.bank(view,latest,token,note)
     }
   }
-  private equity(symbol:string,data:StockView):EquityPublic|undefined{return symbol===CAS?data.cas:symbol===BNK?data.bank:undefined}
-  private marketPrice(symbol:string,data:StockView){return this.equity(symbol,data)?.price??data.quotes[symbol]?.price}
+  private marketPrice(symbol:string,data:StockView){return cityQuote(data,symbol)?.price??data.quotes[symbol]?.price}
   private async stockHistory(symbol:string,token:number,seed:PricePoint[],color:string,chart:StockChart){
     let points=this.history.get(symbol)??seed,range=30
     const buttons=this.host.querySelectorAll<HTMLButtonElement>('[data-range]')
@@ -250,7 +250,7 @@ export class CityServices {
     }
     buttons.forEach(button=>button.onclick=()=>{range=Number(button.dataset.range);update()})
     update()
-    if(isEquity(symbol)||this.history.has(symbol))return
+    if(isExchangeStock(symbol)||this.history.has(symbol))return
     try{
       const result=await api<{points:PricePoint[]}>('/stocks/history?symbol='+encodeURIComponent(symbol))
       this.history.set(symbol,result.points)
@@ -262,31 +262,62 @@ export class CityServices {
       <article><span>FLOOR DIRECTORY</span><h3>Trade with a broker</h3><p>Enter the elevator, pick a company, and speak to a broker on its floor. Use coins to buy and sell shares.</p></article>
       <article><span>FINANCIAL ADVISOR</span><h3>Follow your investments</h3><p>Visit the desk to your left for your holdings, daily performance and available cash.</p></article>
       <article><span>CAS AND BNK</span><h3>Own a piece of the city</h3><p>Prices follow completed trades. Shareholders can earn dividends and vote on company policy at the board table.</p></article>
-      <article><span>LOT</span><h3>Royal Weekly Lottery</h3><p>Visit the hotel lottery stand to trade shares and collect a share of ticket sales each week.</p></article>
+      <article><span>LOT</span><h3>Royal Weekly Lottery</h3><p>Buy tickets at the hotel. LOT brokers trade shares upstairs. Shareholders split 1% of weekly ticket sales.</p></article>
       <article><span>REFERENCE STOCKS</span><h3>Explore real-world companies</h3><p>These virtual shares track external prices. Your holdings stay in the game and are traded with coins.</p></article>
       </div>`)
   }
-  private advisor(data:StockView){
+  private advisor(data:StockView,notice=''){
     this.balance(data.coins)
-    const day=new Date(data.now).toISOString().slice(0,10)
-    const boundary=Date.parse(day),positions=Object.entries(data.portfolio.positions).map(([symbol,holding])=>{
-      const mark=this.marketPrice(symbol,data),issue=this.equity(symbol,data),quote=data.quotes[symbol]
-      const prior=issue?.history.findLast(p=>p.at<boundary)?.price??(quote&&quote.updated>=boundary?quote.price-quote.change:undefined)
-      return {symbol,holding,value:mark===undefined?undefined:mark*holding.shares,prior:prior&&prior>0?prior*holding.shares:undefined}
-    }).sort((a,b)=>(b.value??0)-(a.value??0))
-    const worth=positions.reduce((n,p)=>n+(p.value??0),0)
-    const priced=positions.filter(p=>p.prior!==undefined&&p.value!==undefined)
-    const previous=priced.reduce((n,p)=>n+p.prior!,0)
-    const change=(n:number)=>`<span class="${n>=0?'world-gain':'world-loss'}">${n>0?'+':''}${n.toFixed(2)}%</span>`
-    const open=Object.values(data.companies).flatMap(c=>c.orders.map(o=>({...o,symbol:c.symbol})))
-    this.render('FINANCIAL ADVISOR','Your portfolio',`<div class="world-portfolio-mast"><div><small>Marked holdings</small><b>${coins(worth)}</b><span>Daily move ${previous?change(100*(priced.reduce((n,p)=>n+p.value!,0)/previous-1)):'—'}</span></div><div><small>Cash available</small><b>${coins(data.coins)}</b><span>${positions.length} ${positions.length===1?'holding':'holdings'}</span></div></div><h3>Holdings</h3>
-      <ul class="world-ledger world-portfolio-ledger">${positions.map(p=>`<li><span><strong>${safeText(p.symbol)}</strong> · ${safeText(stockName(p.symbol))}<small>${casinoCoins(p.holding.shares)} shares · ${p.symbol==='LOT'?'Hotel lottery stand':'Floor '+(FLOOR_LIST.findIndex(s=>s.symbol===p.symbol)+1)}</small><meter min="0" max="1" value="${worth?(p.value??0)/worth:0}" aria-label="Portfolio weight"></meter></span><b>${p.value===undefined?'—':coins(p.value)}<small>${p.prior!==undefined&&p.value!==undefined?change(100*(p.value/p.prior-1)):'—'}</small></b></li>`).join('')||'<li>No holdings yet</li>'}</ul>
-      ${open.length?`<details><summary>Open orders (${open.length})</summary><ul class="world-ledger">${open.map(o=>`<li><span>${o.symbol} · ${o.side==='buy'?'Buy':'Sell'} ${casinoCoins(o.shares)} at ${casinoCoins(o.price)}</span><button type="button" data-portfolio-cancel="${safeText(o.id)}" data-symbol="${o.symbol}">Cancel</button></li>`).join('')}</ul></details>`:''}`)
+    const report=portfolioPerformance(data),holdings=report.rows.filter(row=>row.shares>0)
+    const signed=(n:number|undefined)=>n===undefined?'—':`<span class="${n<0?'world-loss':'world-gain'}">${n>0?'+':''}${casinoCoins(n)}</span>`
+    const amount=(units:number|undefined)=>units===undefined?'—':signed(fromStockUnits(units))
+    const orders=[...Object.values(data.companies).flatMap(c=>c.orders.map(o=>({...o,symbol:c.symbol}))),...data.lottery.orders.map(o=>({...o,symbol:'LOT'}))]
+    const cards=holdings.map(row=>{
+      const ticker=safeText(row.symbol),sale=data.saleQuotes[row.symbol]
+      const reason=orders.some(o=>o.symbol===row.symbol&&o.side==='sell')?'Cancel open sell orders to sell this holding.':isExchangeStock(row.symbol)?'Waiting for enough bids to fill the holding.':'Waiting for a current quote.'
+      return `<li><div class="advisor-stock-title"><div><strong>${ticker}</strong><span>${safeText(stockName(row.symbol))}</span></div><b>${row.value===undefined?'—':coins(fromStockUnits(row.value))}</b></div>
+        <div class="advisor-position">${casinoCoins(row.shares)} shares · ${row.mark===undefined?'Price unavailable':coins(row.mark)+' each'} · Cost ${coins(row.cost)}</div>
+        <div class="advisor-actions"><div><small>Today</small>${amount(row.daily)}</div><div><small>All time</small>${amount(row.lifetime)}</div>
+        <button type="button" data-sell="${ticker}" aria-label="Sell all ${ticker} shares" ${sale===undefined?'disabled':''}>Sell all</button></div>
+        ${sale===undefined?`<small>${reason}</small>`:''}<div data-confirm hidden></div></li>`
+    }).join('')
+    this.render('FINANCIAL ADVISOR','Your portfolio',`<section class="advisor-summary" aria-label="Portfolio summary">
+      <div><small>Holdings value</small><strong>${report.value===undefined?'—':coins(report.value)}</strong></div><div><small>Cash available</small><b>${coins(data.coins)}</b></div></section>
+      <div class="advisor-returns"><div><small>Today’s gain</small><b>${signed(report.daily)}</b></div><div><small>All-time gain</small><b>${signed(report.lifetime)}</b></div><div><small>Dividends paid</small><b>${casinoCoins(report.dividends)}</b></div></div>
+      <p class="advisor-note">Gains in coins include sales, dividends and changes in share value. Today starts at midnight in Amsterdam.${report.daily===undefined||report.lifetime===undefined?' A dash means price or trade history is incomplete.':''}</p>
+      <div class="advisor-list-head"><h3>Holdings (${holdings.length})</h3><button type="button" data-refresh>Refresh</button></div>
+      ${cards?`<ul class="advisor-holdings">${cards}</ul>`:'<p class="advisor-note">You hold no shares. Visit a broker upstairs to buy your first stock.</p>'}
+      ${orders.length?`<details><summary>Open orders (${orders.length})</summary><ul class="world-ledger">${orders.map(o=>`<li><span>${safeText(o.symbol)} · ${o.side==='buy'?'Buy':'Sell'} ${casinoCoins(o.shares)} at ${casinoCoins(o.price)}</span><button type="button" data-cancel="${safeText(o.id)}" data-symbol="${safeText(o.symbol)}">Cancel</button></li>`).join('')}</ul></details>`:''}`)
+    this.message(notice)
     const token=this.token
-    this.host.querySelectorAll<HTMLButtonElement>('[data-portfolio-cancel]').forEach(b=>b.onclick=async()=>{
-      b.disabled=true
-      try{const next=await api<StockView>('/stocks/cancel',{symbol:b.dataset.symbol,id:b.dataset.portfolioCancel});if(token===this.token)this.advisor(next)}
-      catch(error){b.disabled=false;this.message(error instanceof Error?error.message:'Unable to cancel order')}
+    const request=async(path:string,body?:StockOrder|{symbol:string;id:string},success='')=>{
+      if(this.busy)return
+      this.busy=true
+      const buttons=this.host.querySelectorAll<HTMLButtonElement>('button:enabled:not([aria-label="Close"])')
+      buttons.forEach(b=>b.disabled=true)
+      try{
+        const next=await api<StockView>(path,body)
+        if(token===this.token)this.advisor(next,success)
+      }catch(error){
+        const message=error instanceof Error?error.message:'Unable to complete the request'
+        try{
+          const latest=await api<StockView>('/stocks')
+          if(token===this.token)this.advisor(latest,message)
+        }catch{if(token===this.token)this.message(message)}
+      }finally{this.busy=false;buttons.forEach(b=>b.disabled=false)}
+    }
+    this.host.querySelector<HTMLButtonElement>('[data-refresh]')!.onclick=()=>void request('/stocks')
+    this.host.querySelectorAll<HTMLButtonElement>('[data-cancel]').forEach(b=>b.onclick=()=>void request('/stocks/cancel',{symbol:b.dataset.symbol!,id:b.dataset.cancel!},'Order canceled.'))
+    this.host.querySelectorAll<HTMLButtonElement>('[data-sell]').forEach(b=>b.onclick=()=>{
+      const symbol=b.dataset.sell!,shares=data.portfolio.positions[symbol].shares,total=data.saleQuotes[symbol]
+      const box=b.closest('li')!.querySelector<HTMLElement>('[data-confirm]')!
+      if(!box.hidden)return
+      const order:StockOrder={symbol,shares,total,side:'sell',sellAll:true,sequence:data.portfolio.sequence+1,id:crypto.randomUUID()}
+      box.hidden=false
+      box.innerHTML=`<p>Sell all <strong>${casinoCoins(shares)} ${safeText(symbol)}</strong> shares for ${coins(total)}?</p><button type="button" data-back>Keep shares</button> <button type="button" class="world-primary" data-execute>Confirm sale</button>`
+      const back=box.querySelector<HTMLButtonElement>('[data-back]')!
+      back.onclick=()=>{box.hidden=true;box.replaceChildren();b.focus()};back.focus()
+      box.querySelector<HTMLButtonElement>('[data-execute]')!.onclick=()=>void request(isExchangeStock(symbol)?'/stocks/market':'/stocks/trade',order,`Sold ${casinoCoins(shares)} ${symbol} for ${coins(total)}.`)
     })
   }
   private company(symbol:EquitySymbol,data:StockView,token:number,notice=''){
@@ -315,13 +346,13 @@ export class CityServices {
   }
   private stock(symbol:string,data:StockView,token:number,notice=''){
     this.balance(data.coins)
-    const holding=data.portfolio.positions[symbol],price=this.marketPrice(symbol,data),issue=this.equity(symbol,data),saved=this.get<StockOrder>('stock')
-    const company=isEquity(symbol)?data.companies[symbol]:undefined,cap=company?EQUITY_ORDER_LIMIT:MAX_STOCK_ORDER
+    const holding=data.portfolio.positions[symbol],price=this.marketPrice(symbol,data),issue=cityQuote(data,symbol),saved=this.get<StockOrder>('stock')
+    const company=isEquity(symbol)?data.companies[symbol]:symbol==='LOT'?data.lottery:undefined,cap=company?EQUITY_ORDER_LIMIT:MAX_STOCK_ORDER
     const available=(holding?.shares??0)-(company?.orders.filter(o=>o.side==='sell').reduce((n,o)=>n+o.shares,0)??0)
     const pending=saved?.symbol===symbol?saved:undefined
     if(pending)this.orderSide=pending.side
     this.chart?.dispose();this.chart=undefined
-    this.render(symbol,stockName(symbol),`<div class="world-trade-grid"><section><div class="world-price"><strong>${price===undefined?'Price unavailable':coins(price)}</strong><small>${issue?'Last traded price':'Nasdaq reference price'}</small></div><div class="world-range" role="group" aria-label="Chart range"><button type="button" data-range="30">1M</button><button type="button" data-range="90">3M</button><button type="button" data-range="365">1Y</button></div><canvas data-chart tabindex="0" aria-label="Stock price history"></canvas><p data-readout class="world-muted"></p></section>
+    this.render(symbol,stockName(symbol),`<div class="world-trade-grid"><section><div class="world-price"><strong>${price===undefined?'Price unavailable':coins(price)}</strong><small>${issue?'Last traded price':'Nasdaq reference price'}</small>${issue?`<small>Best bid ${issue.bid?casinoCoins(issue.bid):'—'} · Best ask ${issue.ask?casinoCoins(issue.ask):'—'}</small>`:''}</div><div class="world-range" role="group" aria-label="Chart range"><button type="button" data-range="30">1M</button><button type="button" data-range="90">3M</button><button type="button" data-range="365">1Y</button></div><canvas data-chart tabindex="0" aria-label="Stock price history"></canvas><p data-readout class="world-muted"></p></section>
     <form class="world-service-form"><div class="world-button-row"><button type="button" data-side="buy" aria-pressed="${this.orderSide==='buy'}">Buy</button><button type="button" data-side="sell" aria-pressed="${this.orderSide==='sell'}">Sell</button></div><label>Shares<input name="shares" type="number" inputmode="numeric" min="1" max="${cap}" value="${pending?.shares??1}" required></label>${company?`<details ${pending?.price?'open':''}><summary>Set a limit price</summary><label>Price per share<input name="limit" type="number" inputmode="decimal" min=".0001" step=".0001" value="${pending?.price??''}" ${pending?'disabled':''}></label></details>`:''}<small>${coins(data.coins)} available · ${casinoCoins(available)} shares available</small><strong data-total></strong><button type="submit" class="world-primary" data-order></button></form></div>
     <details><summary>Portfolio</summary><ul class="world-ledger">${Object.entries(data.portfolio.positions).map(([ticker,h])=>`<li><span>${safeText(ticker)} · ${h.shares}</span><b>${coins((this.marketPrice(ticker,data)??0)*h.shares)}</b></li>`).join('')||'<li>No shares yet</li>'}</ul></details>
     <details><summary>Trade and dividend history</summary><ul class="world-ledger">${[...data.portfolio.trades.map(t=>({at:t.at,label:`${t.side==='buy'?'Bought':'Sold'} ${t.shares} ${t.symbol}`,amount:t.total})),...data.portfolio.dividends.map(d=>({at:Date.parse(d.day),label:(d.symbol??CAS)+' dividend',amount:d.amount}))].sort((a,b)=>b.at-a.at).slice(0,15).map(r=>`<li><span>${safeText(r.label)} · ${date.format(r.at)}</span><b>${coins(r.amount)}</b></li>`).join('')||'<li>No activity yet</li>'}</ul></details>`)
@@ -368,7 +399,7 @@ export class CityServices {
     this.save('stock',order);this.busy=true;renderOrder()
     let latest=data,note=''
     try{
-      const result=await api<StockView&{trade?:StockTrade}>(order.price?'/stocks/order':isEquity(symbol)?'/stocks/market':'/stocks/trade',order)
+      const result=await api<StockView&{trade?:StockTrade}>(order.price?'/stocks/order':isExchangeStock(symbol)?'/stocks/market':'/stocks/trade',order)
       latest=result;this.save('stock');this.balance(result.coins);this.refreshFloor()
       note=result.trade?(result.trade.side==='buy'?'Bought ':'Sold ')+result.trade.shares+' '+symbol+'.':'Limit order received.'
     }catch(error){

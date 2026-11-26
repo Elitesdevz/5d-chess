@@ -1,3 +1,4 @@
+import {advanceResidentStocks} from './resident-stocks.ts'
 import {advanceLottery} from './weekly-lottery.ts'
 import {advanceTable} from './card-salon.ts'
 import {roster,custodyView,puzzleAction,publicView} from './custody.ts'
@@ -34,6 +35,7 @@ export function createApplication(store: ChessStore) {
   const settleResort=()=>store.transaction(unit=>{
     const now=Date.now()
     advanceLottery(unit,now)
+    advanceResidentStocks(unit,now)
     for(const game of ['poker','blackjack'] as const)advanceTable(unit,game,now)
   })
   settleResort()
@@ -130,7 +132,10 @@ export function createApplication(store: ChessStore) {
           if (auth){const named=(auth.value as {user?:unknown}).user;if(typeof named==='string')actor=named;return auth}
           const me = user(unit,req) ?? fail(401,'Log in first')
           const account = ensureAccount(unit.users.get(me) ?? fail(401,'Log in first'));actor=me;beforeUsage={coins:account.wallet?.coins,elo:account.rating?.value}
-          if(method==='POST'&&(path==='/api/stocks/trade'||path==='/api/stocks/market'||path==='/api/stocks/order')&&!city.canTrade(me,data.symbol))fail(403,'Talk to the trader on that stock floor')
+          if(method==='POST'&&['/api/stocks/trade','/api/stocks/market','/api/stocks/order'].includes(path)){
+            const advisorSale=path!=='/api/stocks/order'&&data.side==='sell'&&data.sellAll===true&&city.atFinancialAdvisor(me)
+            if(!advisorSale&&!city.canTrade(me,data.symbol))fail(403,'Talk to the trader on that stock floor')
+          }
           if(method==='POST'&&['support','rescue','vote'].some(action=>path==='/api/stocks/'+action)&&!city.canVote(me,data.symbol))fail(403,'Visit the company board table')
           if(method==='POST'&&(path==='/api/bank/borrow'||path==='/api/bank/repay')&&!city.canBank(me,path.split('/').at(-1)!))fail(403,'Visit the appropriate bank counter')
           return usageApi(usage,store,me,path,method,data)

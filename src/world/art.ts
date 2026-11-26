@@ -326,7 +326,7 @@ function makeScreen(scene:T.Object3D,symbol:string,x:number){
   mesh(new T.PlaneGeometry(3.96,2.16),new T.MeshBasicMaterial({map:tex}),scene,[x,2.59,-4.16])
   return (points:{price:number}[],current?:number)=>{
     const w=704,h=368
-    ctx.fillStyle=symbol==='CAS'?'#221c25':'#12282e';ctx.fillRect(0,0,w,h)
+    ctx.fillStyle=symbol==='LOT'?'#352538':symbol==='CAS'?'#221c25':'#12282e';ctx.fillRect(0,0,w,h)
     ctx.font='600 35px Georgia';ctx.fillStyle='#cae7e0';ctx.fillText(symbol,30,53)
     if(current!==undefined){ctx.font='600 26px system-ui';ctx.textAlign='right';ctx.fillText(current.toLocaleString('en',{maximumFractionDigits:2})+' coins',670,53);ctx.textAlign='left'}
     for(let i=0;i<5;i++){ctx.beginPath();ctx.moveTo(32,85+i*53);ctx.lineTo(671,85+i*53);ctx.strokeStyle='#c7e5e241';ctx.stroke()}
@@ -334,7 +334,7 @@ function makeScreen(scene:T.Object3D,symbol:string,x:number){
       const values=points.map(p=>p.price),lo=Math.min(...values),hi=Math.max(...values),range=Math.max(.01,hi-lo)
       const display=points.length===1?[points[0],points[0]]:points
       ctx.beginPath();display.forEach((p,i)=>{const a=32+639*i/(display.length-1),b=285-(p.price-lo)/range*174;i?ctx.lineTo(a,b):ctx.moveTo(a,b)})
-      ctx.strokeStyle=symbol==='CAS'?'#e9bd73':'#89dfbf';ctx.lineWidth=5;ctx.stroke()
+      ctx.strokeStyle=symbol==='CAS'||symbol==='LOT'?'#e9bd73':'#89dfbf';ctx.lineWidth=5;ctx.stroke()
       ctx.lineTo(671,307);ctx.lineTo(32,307);ctx.closePath();ctx.fillStyle='#76cfa522';ctx.fill()
     }
     ctx.fillStyle='#a4bfb8';ctx.font='20px system-ui';ctx.fillText(points.length?'Price history':'Waiting for market data',32,344)
@@ -564,7 +564,7 @@ function elevator(scene:T.Object3D){
   return shaft
 }
 function tower(shaft:T.Object3D){
-  const tile=paving(),standardWall=std(0x234653),casinoWall=std(0x51333c),bankWall=std(0x375560),trim=std(0x90adb2,.28,.48)
+  const tile=paving(),standardWall=std(0x234653),casinoWall=std(0x51333c),bankWall=std(0x375560),lotteryWall=std(0x453356),trim=std(0x90adb2,.28,.48)
   const sections:T.Group[]=[]
   for(const [i,{symbol}] of FLOOR_LIST.entries()){
     const height=floorHeight(`floor:${symbol}`)
@@ -573,7 +573,7 @@ function tower(shaft:T.Object3D){
     }
     const section=sections.at(-1)!
     const room=new T.Group();room.position.y=height-section.position.y;section.add(room)
-    const wall=symbol==='CAS'?casinoWall:symbol==='BNK'?bankWall:standardWall
+    const wall=symbol==='CAS'?casinoWall:symbol==='BNK'?bankWall:symbol==='LOT'?lotteryWall:standardWall
     liftDeck(room,tile);liftDoorway(room,wall)
     for(const side of [-1,1]){
       const x=side*7.96
@@ -594,8 +594,8 @@ function tower(shaft:T.Object3D){
     const pane=mesh(new T.PlaneGeometry(15.8,4.32),glass,room,[0,3.31,7.47],false);pane.renderOrder=2
     for(const x of [-7.9,-5.26,-2.63,0,2.63,5.26,7.9])block(room,.082,4.56,.092,x,3.31,7.446,trim)
     for(const x of [-2.7,2.7]){
-      block(room,2.33,.98,.70,x,.49,-1.77,symbol==='CAS'?oak:blue)
-      block(room,2.45,.06,.74,x,1.015,-1.77,symbol==='CAS'?brass:ivory)
+      block(room,2.33,.98,.70,x,.49,-1.77,symbol==='CAS'?oak:symbol==='LOT'?lotteryWall:blue)
+      block(room,2.45,.06,.74,x,1.015,-1.77,symbol==='CAS'||symbol==='LOT'?brass:ivory)
     }
     for(const x of [-3.8,3.8])block(room,2.6,.055,.37,x,5.77,1.07,gold)
   }
@@ -608,9 +608,40 @@ function tower(shaft:T.Object3D){
       const room=new T.Group();room.position.y=floorHeight(`floor:${symbol}`);shaft.add(room)
       venueDetail(room,'floor',symbol)
       const name=FLOOR_LIST.find(stock=>stock.symbol===symbol)!.name
-      banner(room,name,[6,.39],[0,4.17,-4.08],symbol==='CAS'?'#ffdca1':'#ccecee')
+      if(symbol==='LOT')banner(room,name,[5.9,.58],[0,4.28,-4.08],'#ffe8b7','#453356',true)
+      else banner(room,name,[6,.39],[0,4.17,-4.08],symbol==='CAS'?'#ffdca1':'#ccecee')
       const actors=floorStaff.map((p,i)=>new CityGuest(room,p.x,p.z,i?0xd2a17d:0xaa7c61,i?(symbol==='CAS'?0x674451:0x374d5d):0x365263,true,i))
       const screens=[makeScreen(room,symbol,-4.53),makeScreen(room,symbol,4.53)]
+      if(symbol==='LOT'){
+        // The gilded draw cage is suspended above the brokers, clear of the aisle.
+        const carpet=texture(512,512,ctx=>{
+          ctx.fillStyle='#432a48';ctx.fillRect(0,0,512,512)
+          for(const inset of [8,15]){
+            ctx.strokeStyle='#c99c62';ctx.lineWidth=2;ctx.strokeRect(inset,inset,512-2*inset,512-2*inset)
+          }
+          ctx.translate(256,256);ctx.strokeStyle='#986b57'
+          for(let n=0;n<12;n++){
+            ctx.rotate(Math.PI/6);ctx.beginPath();ctx.ellipse(0,-41,28,66,0,0,Math.PI*2);ctx.stroke()
+          }
+        })
+        plane(room,6,4.1,0,.018,2.15,new T.MeshStandardMaterial({map:carpet,roughness:1}))
+        const center=new T.Group();center.position.set(0,2.65,-2.3);room.add(center)
+        const hoop=new T.TorusGeometry(.84,.024,8,48)
+        for(let n=0;n<8;n++)mesh(hoop,brass,center,[0,0,0]).rotation.y=n*Math.PI/8
+        const ball=new T.SphereGeometry(.19,16,12)
+        for(let n=0;n<7;n++){
+          const a=n*Math.PI*2/7
+          mesh(ball,[ivory,gold,lotteryWall][n%3],center,[.49*Math.cos(a),-.3+.13*(n%3),.43*Math.sin(a)])
+        }
+        const rim=mesh(new T.TorusGeometry(.84,.035,8,48),gold,center,[0,0,0]);rim.rotation.x=Math.PI/2
+        for(const [x,number] of [[-2.7,'07'],[2.7,'49']] as const){
+          mesh(new T.CylinderGeometry(.27,.27,.065,32),brass,room,[x,.57,-1.39]).rotation.x=Math.PI/2
+          banner(room,number,[.43,.24],[x,.57,-1.35],'#fff3cb','transparent',true)
+        }
+        block(room,.045,2.5,.045,0,4.64,-2.3,brass)
+        for(const x of [-.5,.5])block(room,.018,.44,.018,x,1.57,-2.3,brass)
+        banner(room,'WEEKLY DRAW   /   SHARE DEALING',[4.1,.27],[0,1.27,-2.28],'#f9df9b','#453356',true)
+      }
       const ownership=symbol==='CAS'||symbol==='BNK'?boardroom(room,symbol):undefined
       entry={actors,screens,doors:slidingDoors(room),ownership};decor.set(symbol,entry)
     }

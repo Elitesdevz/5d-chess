@@ -38,8 +38,7 @@ export class ResortUI {
         <p>${l.tickets} tickets in the drum · ${l.npc} from city residents · ${l.mine} yours</p>
         <p>Each ticket costs ${coins(TICKET_PRICE)}. One ticket wins 99% of sales. Shareholders divide the remaining 1% at the draw.</p>
         <div class="royal-order">${count('Tickets',100)}${button('ticket','Buy tickets',v.coins<TICKET_PRICE)}</div>
-        <section class="royal-room"><header><h3>LOT shares</h3><b>${coins(SHARE_PRICE)} each</b></header><p>${l.shares} owned · ${l.available} available · ${coins(l.dividends)} lifetime dividends</p>
-        <div class="royal-order">${count('Shares',100)}${button('buy','Buy shares',!l.available||v.coins<SHARE_PRICE)}${button('sell','Sell shares',!l.shares)}</div></section>
+        <section class="royal-room"><h3>LOT shares</h3><p>Trade at the Royal Weekly Lottery floor in Exchange Tower. You own ${l.shares} shares and have earned ${coins(l.dividends)} in dividends.</p></section>
         ${l.last?`<p>Last draw · ${safeText(l.last.winner)} won ${coins(l.last.prize)}. Dividend per share: ${coins(l.last.dividend)}.</p>`:''}`
     }
     if(station==='slots'){

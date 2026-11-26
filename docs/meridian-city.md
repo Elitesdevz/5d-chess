@@ -24,6 +24,16 @@ In the 3D view, click to capture the mouse, then click to fire at the reticle. H
 
 At KFC, move the spatula, scoop and soda cup with the mouse, touch or arrow keys. The gloved hand follows the utensil, and nearby players see the cook move their arm. [Grill screenshot](review/overrun/kitchen.webp)
 
+## Exchange Tower and the weekly lottery
+
+Buy weekly draw tickets at the Royal’s lobby stand. To trade shares, use the Exchange Tower elevator and search for LOT. The two brokers on floor 103 accept market and limit orders through the city exchange. The weekly jackpot receives 99% of ticket sales. LOT shareholders split the other 1% according to shares held at the draw. Existing lottery holdings and accrued dividends carry over.
+
+Three city residents trade CAS, BNK and LOT with their own coin balances. Across the entire exchange they attempt one ordinary order of up to two shares every half hour. They leave the last listed share for players. When a stock has no offers, a resident who owns shares lists up to three immediately.
+
+Visit the financial advisor in reception to see your holdings, cash, daily and lifetime gains, dividends and open orders. Gains include closed positions. Select **Sell all** beside a stock to review the proceeds for the entire holding before confirming. Reserved shares, an expired external quote or insufficient bids can prevent a full sale.
+
+[LOT trading floor](review/lottery-exchange/lottery-floor.jpg) · [Financial advisor](review/lottery-exchange/financial-advisor.jpg) · [Mobile sale confirmation](review/lottery-exchange/advisor-sale-mobile.jpg)
+
 ## Meridian Police
 
 Enter Meridian Police from the south sidewalk on Civic Avenue, between the signed front columns near the patrol cars. Public enquiries and booking face the lobby. The central staircase leads to five visitor galleries. Walk both flights and turn on the landing to reach each gallery. The GUNS and PRISON header links take you directly to the showroom and the public police lobby. Take the staircase back down to leave through the lobby. West Wing holds cells 01–25 and East Wing holds 26–50, five on each side of each gallery. Cell 50 faces the public corridor on level five. Bars separate visitors from the cell interiors. Occupied cells show their inmate even after logout or a server restart. [Lobby and stairs](review/overrun/prison.webp)
