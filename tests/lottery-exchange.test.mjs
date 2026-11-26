@@ -107,6 +107,9 @@ test('advisor gains include closed positions, intraday trades and dividends and 
   assert.equal(report.daily,31) // LOT 58 - 75 + 27 + 1; AAPL 120 - 100
   assert.equal(report.lifetime,47) // LOT 58 - 72 + 27 + 4; closed AAPL +30
   assert.equal(report.rows.find(r=>r.symbol==='LOT').daily,toStockUnits(11))
+  p.positions.BNK={shares:1,cost:16}
+  assert.equal(portfolioPerformance(view).lifetime,undefined)
+  delete p.positions.BNK
   p.sequence++
   assert.equal(portfolioPerformance(view).lifetime,undefined)
   view.lottery.history=[]
