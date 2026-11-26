@@ -1,5 +1,7 @@
 import {ResortUI} from './resort-ui.ts'
 import {openArmory} from './armory-ui.ts'
+import {streetCounter} from './street-counter.ts'
+import {storefront} from './storefronts.ts'
 import {ArcadeControls,counterUI} from './arcade-ui.ts'
 import {jigsaw} from '../jigsaw.ts'
 import {RestaurantUI} from './restaurant-ui.ts'
@@ -234,6 +236,24 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
       stage?.lock(true)
       const render=()=>{if(view?.food)services?.food(view.food,async data=>{await action('food',data);render()})}
       render()
+      return
+    }
+    if(service.startsWith('front:')){
+      stage?.lock(true)
+      const front=storefront(service)!
+      if(front.id==='hall'){
+        const render=()=>{if(view)services?.property('property:registry',view,async unit=>{await action('housing',{unit});render()})}
+        render()
+      }else if(front.id==='office')void services?.open('advisor')
+      else {
+        const render=(receipt='')=>{
+          if(view?.interaction===service)streetCounter(dialog,front,view,receipt,async(op,item)=>{
+            await action('arcade',{operation:op,item,sequence:view!.arcade!.sequence})
+            render(op==='treatment'?'Treatment complete.':'Added to your inventory.')
+          },to=>action('teleport',{to}))
+        }
+        render()
+      }
       return
     }
     if(service.startsWith('property:')){

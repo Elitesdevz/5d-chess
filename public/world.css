@@ -378,3 +378,10 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 }
 .royal-reels[data-spinning] b{color:transparent;background:repeating-linear-gradient(0deg,#eee0bd 0 5px,#af9a76 7px,#fff6d7 10px);background-size:100% 150%;animation:reel-motion .15s linear infinite}
 @keyframes reel-motion{to{background-position:0 100%}}
+.street-counter{display:grid;gap:.4rem}
+.street-row{display:flex;justify-content:space-between;align-items:center;gap:1rem;text-align:left;padding:.8rem;border:1px solid #9a886455;border-radius:5px;background:#31463d;color:#fff1d5}
+.street-row strong,.street-row small{display:block}
+.street-row small{font-size:.78rem;color:#cbd6c8;margin-top:.15rem}
+.street-row button{border:1px solid #b4976e;background:#ecd4a9;color:#302f27;padding:.45rem .7rem;border-radius:4px}
+.street-reading{padding:.65rem .85rem;border:1px solid #9a886455;border-left:4px solid #b58e60;background:#2e4139;border-radius:4px}
+.street-reading .street-row{margin-top:.6rem}

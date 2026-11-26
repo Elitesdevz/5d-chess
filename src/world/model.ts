@@ -1,6 +1,7 @@
 import {HOTEL_LIFT,guestFloor,resortPoints,resortWalkable,poolDepth,type GuestFloor,type ResortView} from './resort.ts'
 import {civicRoom,civicActions,civicHeight,groundVenue,openDoorway,nextCivicFloor,levelOf,rise,originOf,footprint,insideDoor,type Gallery} from './civic-venues.ts'
 import {origins,venueWalk,type ArcadeView,type Venue} from './arcade.ts'
+import {storefrontPoints} from './storefronts.ts'
 import {PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
 import {vehicleContains,type TrafficView,type Vehicle} from './traffic.ts'
 import type {ResidentView} from './city-residents.ts'
@@ -102,7 +103,7 @@ export function walkingHeight(zone:WorldZone,x:number,z:number){
   }
   return zone==='city'?terrainHeight(x,z):floorHeight(zone)
 }
-export type WorldUse=`resort:${string}`|'cash'|'counter'|'booking'|'desk'|`drawer:${string}`|'loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
+export type WorldUse=`front:${string}`|`resort:${string}`|'cash'|'counter'|'booking'|'desk'|`drawer:${string}`|'loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
 export type WorldChat={id:number;name:string;text:string;at:number}
 export interface WorldView{
@@ -112,7 +113,7 @@ export interface WorldView{
 function localInteractions(zone:WorldZone,keys:readonly string[]):WorldAction[]{
   if(zone==='hotel'||guestFloor(zone))return resortPoints(zone,keys)
   if(civicRoom(zone))return civicActions(zone)
-  if(zone==='city')return [...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
+  if(zone==='city')return [...storefrontPoints,...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS]
   const home=residentialAt(zone)
   if(home?.building.block!==undefined&&home.level===0&&!home.stairs)return propertyPoints().filter(p=>p.id==='property:desk-'+home.building.block)
   if(zone==='casino')return [

@@ -103,9 +103,9 @@ export function foodVisual(item:Exclude<KitchenHand,'tray'>|import('./food.ts').
     const fruit=mesh(new T.SphereGeometry(.065,16,12),redTrim,food,[0,.071,0]);fruit.scale.y=.90
     block(food,.009,.035,.009,0,.138,0,wood)
     const leaf=mesh(new T.SphereGeometry(.02,8,6),teal,food,[.014,.145,0]);leaf.scale.set(1,.18,.49)
-  }else if(item==='coffee'){
+  }else if(item==='coffee'||item==='tea'){
     mesh(new T.CylinderGeometry(.050,.034,.13,18),birch,food,[0,.066,0])
-    mesh(new T.CylinderGeometry(.045,.039,.05,18),teal,food,[0,.070,0])
+    mesh(new T.CylinderGeometry(.045,.039,.05,18),item==='tea'?birch:teal,food,[0,.070,0])
     cylinder(food,.053,.013,[0,.135,0],cream,18)
   }else if(item==='burger'||item==='bun'){
     const top=mesh(new T.SphereGeometry(.096,14,8),chip,food,[0,.071,0]);top.scale.y=.43

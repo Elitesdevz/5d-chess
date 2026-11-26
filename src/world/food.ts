@@ -4,6 +4,7 @@ export const GROCERIES=[
   ...MENU,
   {id:'bread',name:'Sourdough roll',price:6},
   {id:'apple',name:'Orchard apple',price:4},
+  {id:'tea',name:'Garden mint tea',price:5},
   {id:'coffee',name:'House coffee',price:7},
 ] as const
 export type Grocery=typeof GROCERIES[number]['id']

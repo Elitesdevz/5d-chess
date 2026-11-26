@@ -10,14 +10,17 @@ import {UNITS,type Deeds} from '../src/world/housing.ts'
 import {buildingById,homeZone,residentialSite,residentialAt,contains} from '../src/world/residential.ts'
 import {ROOMS,center,guestFloor,roomAt} from '../src/world/resort.ts'
 import {migratePrecinct,book,roster,custodyView} from './custody.ts'
-import {BITE_MS,isGrocery} from '../src/world/food.ts'
+import type {STOREFRONTS} from '../src/world/storefronts.ts'
+import {wallet} from './economy.ts'
+import {requireSpending} from './credit.ts'
+import {BITE_MS,GROCERIES,isGrocery} from '../src/world/food.ts'
 import {heal,carry,mirrorFood,pack,quantity,releaseDrawer,transfer,type Pack} from './city-inventory.ts'
 import {fail} from './http.ts'
 
 type Located={x:number;z:number;zone:string}
 type Drop=Located&{id:string;items:Stack[]}
 type NpcHealth={hp:number;returns:number}
-type Scene={residential?:ResidentialView;vehicles?:readonly Vehicle[];caveOpen?:boolean;world:string;shard:number;me:WorldPlayer;players:WorldPlayer[];residents:(Located&{id:string;name:string})[];keys:string[];drawer?:string;bank:boolean;shop:boolean}
+type Scene={front?:typeof STOREFRONTS[number];residential?:ResidentialView;vehicles?:readonly Vehicle[];caveOpen?:boolean;world:string;shard:number;me:WorldPlayer;players:WorldPlayer[];residents:(Located&{id:string;name:string})[];keys:string[];drawer?:string;bank:boolean;shop:boolean}
 type Search={id:string;world:string;units:Contact[];cursor:number;lastKnown:Located;last:number;arrived:number;raidAt:number;dogAt:number;dogWarningUntil?:number;searched:string[];warning:string}
 const longestRange=Math.max(...Object.values(WEAPONS).map(w=>w.range))
 const searchSites=[
@@ -192,7 +195,23 @@ export class CityArcade {
       if(data){
         if(data.sequence!==p.sequence)fail(409,'Inventory changed. Review your hotbar.')
         const op=data.operation
-        if(op==='eat'){
+        if(op==='groceries'||op==='treatment'){
+          const counter=s.front
+          if(!counter)fail(409,'Visit the counter first')
+          const grocery=GROCERIES.find(i=>i.id===data.item&&counter.stock?.includes(i.id))
+          const care=counter.care
+          if(op==='groceries'&&!grocery||op==='treatment'&&!care)fail(400,'Choose an available service')
+          const cost=op==='groceries'?grocery!.price:care!.cost
+          const purse=wallet(a)
+          if(cost){requireSpending(a,now);if(purse.coins<cost)fail(409,'Insufficient coins')}
+          if(op==='groceries'){carry(p,grocery!.id,1);mirrorFood(a)}
+          else{
+            if(p.hp>=MAX_HP)fail(409,'Already at full health')
+            heal(a,care!.hp)
+          }
+          purse.coins-=cost
+          tx.economyUsage(me.name,'/api/world/arcade',{action:'restaurant_action',service:counter.id,reference:grocery?.id??'care',coins:cost},now)
+        }else if(op==='eat'){
           const slot=typeof data.slot==='number'&&Number.isInteger(data.slot)?data.slot:-1
           const stack=p.slots[slot]
           if(!stack||!isGrocery(stack.item)||stack.item!==data.item)fail(409,'Select food from your inventory')

@@ -90,5 +90,6 @@ async function init(){
  const name=new URLSearchParams(location.search).get('user')??session.user;card=await api<PlayerCard>('/profile?user='+encodeURIComponent(name));renderCard();el('profile-loading').hidden=true;el('profile-content').hidden=false
  el('history-more').onclick=()=>void loadHistory(cursor===null);window.addEventListener('hashchange',routeHistory);routeHistory()
  const dialog=el<HTMLDialogElement>('profile-editor');for(const id of ['editor-close','editor-cancel'])el(id).onclick=()=>{if(!saving)dialog.close()};dialog.oncancel=e=>{if(saving)e.preventDefault()};dialog.onclose=()=>{editing=false;editorReady=false;editorRequest++};el('editor-reload').onclick=()=>void openEditor();el<HTMLFormElement>('profile-form').onsubmit=e=>void saveProfile(e)
+ if(location.hash==='#dressing-mirror'&&card.owner)void openEditor()
 }
 void init().catch(cause=>{el('profile-loading').hidden=true;message('profile-error',cause instanceof Error?cause.message:'This player card could not load.')})

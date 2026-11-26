@@ -1,4 +1,5 @@
 import {civicRoom,galleryZone} from '../src/world/civic-venues.ts'
+import {storefront} from '../src/world/storefronts.ts'
 import {resortService} from './resort.ts'
 import {HOTEL_LIFT,bathSeats,gameStations,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
 import {randomUUID} from 'node:crypto'
@@ -247,7 +248,7 @@ export class CityWorlds {
     }else if(action==='housing'){
       const unit=UNITS.find(u=>u.id===data.unit)??fail(400,'Unknown address')
       const counter='property:'+(unit.block===undefined?unit.id:'desk-'+unit.block)
-      if(!this.points(world,me,now).some(p=>p.id===counter&&near(me,p.x,p.z,p.range)))fail(409,'Visit the listing or clerk first')
+      if(!this.points(world,me,now).some(p=>(p.id===counter||p.id==='front:hall'&&me.interaction===p.id)&&near(me,p.x,p.z,p.range)))fail(409,'Visit the listing or clerk first')
       this.store.transaction(u=>{
         const deeds=u.metadata<Deeds>('cityDeeds')??{},old=deeds[unit.id]
         if(old&&(!old.until||old.until>now)){
@@ -421,7 +422,7 @@ export class CityWorlds {
     if(me.zone.startsWith('floor:'))residents.push(...serviceStaff(me.zone))
     for(const a of restaurant?.actors??[])residents.push({id:'kfc:'+a.id,name:a.name,zone:'kfc',...site('kfc',a.x,a.z)})
     const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents,
-      residential:world.residential,vehicles:world.life.traffic.vehicles,caveOpen:open||me.zone==='cave',keys:housing.keys,drawer,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
+      residential:world.residential,vehicles:world.life.traffic.vehicles,caveOpen:open||me.zone==='cave',keys:housing.keys,drawer,front:me.interaction?.startsWith('front:')&&at(me.interaction)?storefront(me.interaction):undefined,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
     if((action==='presence'||action==='arcade')&&typeof data.slot==='number'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<SLOT_COUNT)me.slot=data.slot
     if(simulation.view.bite)me.eatingUntil=simulation.view.bite.ends
     const item=simulation.view.slots[me.slot??0]?.item

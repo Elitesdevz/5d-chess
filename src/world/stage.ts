@@ -605,7 +605,7 @@ export class CityStage {
       const raised=Math.sin(Math.PI*t)**.7
       snack.visible=true
       snack.position.set(.17-.12*raised,-.36+.22*raised,-.53+.21*raised)
-      snack.rotation.set(raised*(bite.item==='cola'||bite.item==='coffee'?.69:.23),-.3,.09*Math.sin(t*Math.PI*4))
+      snack.rotation.set(raised*(bite.item==='cola'||bite.item==='coffee'||bite.item==='tea'?.69:.23),-.3,.09*Math.sin(t*Math.PI*4))
       snack.scale.setScalar(1.35-.35*t)
     }
     const free=!eating&&!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody

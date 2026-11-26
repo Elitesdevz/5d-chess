@@ -2,6 +2,7 @@ import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import {circle,FLEET,LANDMARKS,PARK_FEATURES,PARKING,PARKS,pond,railZ,STREETS,type Landmark, type VehicleKind} from './city-plan.ts'
 import {JUNCTIONS,SIGNAL_HEADS,type TrafficView,type Vehicle} from './traffic.ts'
+import {STOREFRONTS} from './storefronts.ts'
 import {STREET_PROPS} from './urban-layout.ts'
 import type {Letter} from './residential-art.ts'
 import {TERRAIN_EXTENT,terrainHeight} from './terrain.ts'
@@ -225,6 +226,28 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
     if(b.id==='barber'){
       p.post(w*.41,1.43,front+.28,.19,.74,.19,cream)
       for(let i=0;i<4;i++)p.box(w*.41,1.16+i*.15,front+.384,.165,.055,.041,i%2?0xaf5050:accent,0,-.33)
+    }
+  }
+  const service=STOREFRONTS.find(f=>f.id===b.id)
+  if(service){
+    const x=w*.34
+    // Perpendicular blade and sconce remain legible walking along the shopfront.
+    p.box(x,2.88,front+.31,.06,.07,.67,coal)
+    p.box(x,2.59,front+.52,.12,.53,.65,accent)
+    const emblem=service.care?'✚':b.id==='station'?'↔':b.id==='school'||b.id==='books'?'♞':b.id==='bakery'?'B':b.name[0]
+    for(const side of [-1,1])sign(emblem,x+side*.068,2.59,front+.52,.58,.42).rotation.y=side*Math.PI/2
+    p.box(-x,1.87,front+.19,.22,.36,.16,coal)
+    p.box(-x,1.87,front+.28,.15,.25,.07,light)
+    if(service.stock){
+      p.box(x,.80,front+.27,w*.27,.09,.48,wood)
+      p.box(x,.72,front+.45,w*.28,.10,.06,trim)
+      for(let j=0;j<3;j++){
+        const xx=x+(j-1)*w*.073
+        p.box(xx,.89,front+.28,w*.07,.11,.26,0xbd926b)
+        if(service.stock.includes('apple'))for(let k=0;k<3;k++)p.orb(xx+(k-1)*.061,1.00,front+.27+(k%2)*.06,.11,.11,.11,j%2?0xad5941:0x9ca95e)
+        else if(b.id==='bakery')p.orb(xx,.99,front+.29,.22,.12,.13,0xd6a665)
+        else p.post(xx,1.01,front+.27,.11,.18,.11,j%2?accent:trim)
+      }
     }
   }
   for(const side of [-1,1]){
