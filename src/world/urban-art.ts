@@ -2,6 +2,8 @@ import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import {circle,FLEET,LANDMARKS,PARK_FEATURES,PARKING,PARKS,pond,railZ,STREETS,type Landmark, type VehicleKind} from './city-plan.ts'
 import {JUNCTIONS,SIGNAL_HEADS,type TrafficView,type Vehicle} from './traffic.ts'
+import {coachwork} from './coachwork.ts'
+import {batchOpaque} from '../casino/scene/static-batch.ts'
 import {STOREFRONTS} from './storefronts.ts'
 import {STREET_PROPS} from './urban-layout.ts'
 import type {Letter} from './residential-art.ts'
@@ -432,7 +434,8 @@ function car(v:Vehicle,parent:T.Object3D){
   const dispatch=v.kind==='fire'||v.kind==='police'||v.kind==='ambulance'
   const commercial=['van','truck','ambulance','fire'].includes(v.kind)
   const wheels:T.Mesh[]=[],brakes:T.Mesh[]=[]
-  p.box(0,.52,0,w,.52,l*.972,paint)
+  coachwork(g,v.kind,paint,commercial)
+  p.box(0,.39,0,w*.82,.19,l*.83,coal)
   p.box(0,.40,l*.475,w*.96,.13,.15,coal);p.box(0,.42,-l*.48,w*.95,.14,.126,coal)
   p.box(0,.563,l*.485,w*.39,.13,.039,coal)
   if(commercial){
@@ -442,10 +445,13 @@ function car(v:Vehicle,parent:T.Object3D){
     for(const side of [-1,1])p.box(side*w*.468,h*.75,l*.31,.044,h*.21,l*.24,glass)
     if(v.kind==='fire')for(const side of [-1,1])for(let i=0;i<6;i++)p.box(side*w*.49,.89+i*.126,-l*.19,.045,.036,l*.42,metal)
   }else{
-    const cabin=v.kind==='wagon'||v.kind==='suv'?.64:.53
-    p.box(0,h*.713,-l*.08,w*.85,h*.45,l*cabin,glass)
-    p.box(0,h*.938,-l*.11,w*.86,h*.10,l*cabin*.96,paint)
-    for(const side of [-1,1])for(const dz of [-.28,-.03,.19])p.box(side*w*.439,h*.705,l*dz,.050,h*.405,.09,paint)
+    // Hood creases, rear deck and paired grille bars catch the sky at street level.
+    for(const side of [-1,1]){
+      p.box(side*w*.275,.732,l*.35,.021,.017,l*.12,paint)
+      p.box(side*w*.49,.62,-l*.08,.024,.035,.15,metal)
+    }
+    for(let j=0;j<3;j++)p.box(0,.51+j*.044,l*.492,w*(.42-j*.025),.019,.024,metal)
+    if(v.kind==='suv'||v.kind==='wagon')for(const side of [-1,1])p.box(side*w*.28,h+.032,-l*.1,.045,.058,l*.36,coal)
   }
   for(const side of [-1,1]){
     p.box(side*w*.49,.67,l*.25,.15,.115,.18,paint)
@@ -460,9 +466,27 @@ function car(v:Vehicle,parent:T.Object3D){
     const rear=new T.Mesh(new T.BoxGeometry(.255,.11,.049),darkBrake);rear.position.set(side*w*.342,.648,-l*.487);g.add(rear);brakes.push(rear)
     if(dispatch)p.box(side*w*.507,.66,0,.016,.11,l*.87,v.kind==='fire'?0xefcf9e:0x467b99)
   }
+  if(commercial){
+    for(const side of [-1,1]){
+      p.box(side*w*.245,h*.59,-l*.489,w*.462,h*.64,.038,paint)
+      p.box(side*w*.06,h*.50,-l*.514,.039,.18,.027,coal)
+      p.box(side*w*.49,h*.51,-l*.15,.030,.081,l*.65,v.kind==='ambulance'?0xca624d:metal)
+      if(v.kind==='ambulance'){
+        p.box(side*w*.498,h*.72,-l*.20,.032,.39,.111,0xab4d45)
+        p.box(side*w*.498,h*.72,-l*.20,.032,.11,.39,0xab4d45)
+      }
+    }
+    if(v.kind==='fire'){
+      for(const x of [-.19,.19])p.box(x,h+.078,-l*.12,.052,.072,l*.65,metal)
+      for(let i=0;i<9;i++)p.box(0,h+.089,l*(-.41+i*.074),.38,.043,.033,metal)
+    }
+  }
+  if(v.kind==='taxi')for(const side of [-1,1])for(let j=0;j<8;j++)
+    p.box(side*w*.495,.65,l*(j-3.5)*.053,.021,.075,.11,j%2?coal:cream)
   if(dispatch||v.kind==='taxi')p.box(0,h+.049,l*.10,w*.49,.096,.21,v.kind==='taxi'?0xf2db78:v.kind==='fire'?0xdb5b44:0x5297b8)
   for(const side of [-1,1])p.box(0,.447,l*.493*side,.26,.104,.022,daylight)
   p.finish(g)
+  batchOpaque(g,new Set<T.Object3D>([...wheels,...brakes]))
   return {g,wheels,brakes}
 }
 export function urbanArt(scene:T.Scene,label:Letter){

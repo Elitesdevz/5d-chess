@@ -524,7 +524,7 @@ export class CityStage {
       let figure=this.npc.get(member.id)
       const height=riderHeight(member,now)
       if(!figure){
-        figure=new Figure(this.art.scene,member,this.shadow!,'kind' in member?'officer':false)
+        figure=new Figure(this.art.scene,member,this.shadow!,'kind' in member?'officer':false,'style' in member?member.style:undefined)
         figure.root.position.y=height;this.npc.set(member.id,figure)
       }
       const visible=height<21&&this.camera.position.distanceTo(figure.root.position)<49
