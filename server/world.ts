@@ -1,6 +1,6 @@
 import {civicRoom,galleryZone} from '../src/world/civic-venues.ts'
 import {resortService} from './resort.ts'
-import {HOTEL_LIFT,gameStations,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
+import {HOTEL_LIFT,bathSeats,gameStations,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
 import {randomUUID} from 'node:crypto'
 import {CityArcade} from './city-arcade.ts'
 import {roster,cellMove,custodyView} from './custody.ts'
@@ -313,6 +313,11 @@ export class CityWorlds {
         }else if(target.id.startsWith('resort:bath:')){
           me.shower={room:r.number,until:now+12_000};me.interaction=undefined
         }else me.interaction=target.id as WorldUse
+      }else if(target.id.startsWith('bath-seat:')){
+        const z=bathSeats[Number(target.id.slice(10))]
+        const pose={...site(me.zone,2.35,z),yaw:-Math.PI/2,id:target.id,kind:'sit' as const,height:.50}
+        if(me.homePose||!occupy(me,{...target,range:.82,pose,exit:{x:target.x,z:target.z}},[...world.members.values()]))fail(409,'This bench is occupied')
+        me.interaction=undefined
       }else if(['resort:poker','resort:blackjack','resort:slots'].includes(target.id)){
         if(me.homePose)fail(409,'Stand up first')
         const game=target.id.slice(7),local=localSite(me.zone,target.x,target.z)

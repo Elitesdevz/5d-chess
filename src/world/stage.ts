@@ -1,3 +1,4 @@
+import {poolDepth} from './resort.ts'
 import {staffId,bankStaff} from './service-staff.ts'
 import {civicRoom,confined,tablePosition} from './civic-venues.ts'
 import {HeldModel} from './overrun-models.ts'
@@ -634,7 +635,10 @@ export class CityStage {
   }
   private motion(now:number,dt:number){
     if(!this.art)return
-    if(this.zone==='hotel:2')this.art.resort.tick(this.reduced)
+    if(this.zone==='hotel:2'||this.zone==='hotel:3'){
+      const {x,z}=this.position,local=localSite(this.zone,x,z)
+      this.art.resort.tick(this.zone,now,x,z,poolDepth(local.x,local.z)>.04,this.reduced)
+    }
     this.art.lightZone(this.zone,dt)
     this.art.urban(this.view?.traffic,dt,this.reduced)
     this.art.homes.update(this.view?.residential,this.view?.housing?.occupied,now,dt,this.position.x,this.position.z)
