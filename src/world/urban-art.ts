@@ -2,6 +2,7 @@ import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import {circle,FLEET,LANDMARKS,PARK_FEATURES,PARKING,PARKS,pond,railZ,STREETS,type Landmark, type VehicleKind} from './city-plan.ts'
 import {JUNCTIONS,SIGNAL_HEADS,type TrafficView,type Vehicle} from './traffic.ts'
+import {groundShadow} from './shade.ts'
 import {finishFloor} from './hotel-finishes.ts'
 import {coachwork} from './coachwork.ts'
 import {batchOpaque} from '../casino/scene/static-batch.ts'
@@ -507,15 +508,31 @@ function streetFurniture(parent:T.Object3D,label:Letter){
   }
   p.finish(parent)
 }
-const tire=new T.CylinderGeometry(.285,.285,.16,12),rim=new T.CylinderGeometry(.15,.15,.17,12)
+const tire=new T.CylinderGeometry(.285,.285,.16,24),rim=new T.CylinderGeometry(.164,.164,.17,24),wheelFace=new T.CircleGeometry(.16,24)
+function hubcap(){
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=96
+  const c=canvas.getContext('2d')!
+  c.translate(48,48)
+  c.fillStyle='#b3b7ad';c.fillRect(-48,-48,96,96);c.fillStyle='#3a454a'
+  c.beginPath();c.arc(0,0,40,0,2*Math.PI);c.fill()
+  for(let i=0;i<7;i++){
+    c.rotate(2*Math.PI/7);c.fillStyle='#a9b4ad';c.beginPath()
+    c.moveTo(-4,1);c.lineTo(-7,-38);c.lineTo(-1,-40);c.lineTo(5,-13);c.lineTo(12,-38);c.lineTo(16,-35);c.lineTo(7,0);c.fill()
+  }
+  c.fillStyle='#d3d3bf';c.beginPath();c.arc(0,0,11,0,2*Math.PI);c.fill()
+  const map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4
+  return new T.MeshStandardMaterial({map,roughness:.44})
+}
 const tireMat=color(0x283136),rimMat=color(0xa0a4a1),headMat=color(0xffe3a7),brakeMat=new T.MeshBasicMaterial({color:0xfe4c37})
 const darkBrake=color(0x803b3b)
-function car(v:Vehicle,parent:T.Object3D){
+function car(v:Vehicle,parent:T.Object3D,alloy:T.Material,shade:T.Material,label:Letter){
   const g=new T.Group(),p=new Props();parent.add(g)
   const {w,length:l,height:h}=FLEET[v.kind],paint=v.paint??(v.kind==='fire'?0xbb3f3e:v.kind==='taxi'?0xcfa652:v.kind==='police'?0xe2e4d5:0xe8dfcf)
   const dispatch=v.kind==='fire'||v.kind==='police'||v.kind==='ambulance'
   const commercial=['van','truck','ambulance','fire'].includes(v.kind)
   const wheels:T.Mesh[]=[],brakes:T.Mesh[]=[]
+  const shadow=new T.Mesh(new T.PlaneGeometry(w*1.74,l*1.27),shade)
+  shadow.rotation.x=-Math.PI/2;shadow.position.set(.065,.019,.045);g.add(shadow)
   coachwork(g,v.kind,paint,commercial)
   p.box(0,.39,0,w*.82,.19,l*.83,coal)
   p.box(0,.40,l*.475,w*.96,.13,.15,coal);p.box(0,.42,-l*.48,w*.95,.14,.126,coal)
@@ -536,15 +553,25 @@ function car(v:Vehicle,parent:T.Object3D){
     if(v.kind==='suv'||v.kind==='wagon')for(const side of [-1,1])p.box(side*w*.28,h+.032,-l*.1,.045,.058,l*.36,coal)
   }
   for(const side of [-1,1]){
-    p.box(side*w*.49,.67,l*.25,.15,.115,.18,paint)
+    p.box(side*w*.493,.775,l*.184,.15,.047,.065,coal)
+    p.box(side*w*.54,.807,l*.181,.12,.088,.137,paint)
     p.box(side*w*.508,.701,.04,.038,.039,.16,darkBrake.color.getHex())
     p.box(side*w*.467,.405,0,.055,.06,l*.58,coal)
     for(const z of [-l*.30,l*.30]){
       const a=new T.Group();a.position.set(side*w*.449,.266,z);g.add(a)
       const tyre=new T.Mesh(tire,tireMat);tyre.rotation.z=Math.PI/2;a.add(tyre)
-      const hub=new T.Mesh(rim,rimMat);hub.rotation.z=Math.PI/2;hub.position.x=.022*side;hub.add(new T.Mesh(new T.BoxGeometry(.13,.024,.028),darkBrake));a.add(hub);wheels.push(hub)
+      const hub=new T.Mesh(rim,rimMat);hub.rotation.z=Math.PI/2;hub.position.x=.022*side;const face=new T.Mesh(wheelFace,alloy)
+      face.rotation.x=side*Math.PI/2;face.position.y=-side*.087;hub.add(face);a.add(hub);wheels.push(hub)
     }
-    const head=new T.Mesh(new T.BoxGeometry(.27,.135,.047),headMat);head.position.set(side*w*.336,.641,l*.487);g.add(head)
+    if(!commercial){
+      for(const z of [-.094,.164]){
+        p.box(side*w*.492,.586,l*z,.012,.245,.014,coal)
+        p.box(side*w*.496,.679,l*(z+.037),.025,.021,.109,metal)
+      }
+    }
+    p.box(side*w*.337,.636,l*.484,.34,.174,.064,coal)
+    p.box(side*w*.425,.634,l*.487,.073,.12,.071,0xd5a45e)
+    const head=new T.Mesh(new T.BoxGeometry(.27,.135,.047),headMat);head.position.set(side*w*.323,.641,l*.499);g.add(head)
     const rear=new T.Mesh(new T.BoxGeometry(.255,.11,.049),darkBrake);rear.position.set(side*w*.342,.648,-l*.487);g.add(rear);brakes.push(rear)
     if(dispatch)p.box(side*w*.507,.66,0,.016,.11,l*.87,v.kind==='fire'?0xefcf9e:0x467b99)
   }
@@ -566,6 +593,10 @@ function car(v:Vehicle,parent:T.Object3D){
   if(v.kind==='taxi')for(const side of [-1,1])for(let j=0;j<8;j++)
     p.box(side*w*.495,.65,l*(j-3.5)*.053,.021,.075,.11,j%2?coal:cream)
   if(dispatch||v.kind==='taxi')p.box(0,h+.049,l*.10,w*.49,.096,.21,v.kind==='taxi'?0xf2db78:v.kind==='fire'?0xdb5b44:0x5297b8)
+  if(v.kind==='taxi'){
+    const sign=label(g,'TAXI',[.45,.11],[0,h+.058,l*.10+.108],'#313434','#e7c065')
+    const rear=sign.clone();rear.position.z-=.216;rear.rotation.y=Math.PI;g.add(rear)
+  }
   for(const side of [-1,1])p.box(0,.447,l*.493*side,.26,.104,.022,daylight)
   p.finish(g)
   batchOpaque(g,new Set<T.Object3D>([...wheels,...brakes]))
@@ -586,6 +617,7 @@ export function urbanArt(scene:T.Scene,label:Letter){
     lamps.set(p.id,{x,z});props.finish(scene)
   }
   const green=new T.MeshBasicMaterial({color:0x83e3ac})
+  const alloy=hubcap(),shade=groundShadow()
   const models=new Map<string,ReturnType<typeof car>>(),clock=new Map<string,number>()
   return (t:TrafficView|undefined,dt:number,reduced:boolean)=>{
     if(!t)return
@@ -593,7 +625,7 @@ export function urbanArt(scene:T.Scene,label:Letter){
     for(const v of t.vehicles){
       active.add(v.id)
       let view=models.get(v.id)
-      if(!view){view=car(v,scene);models.set(v.id,view);view.g.position.set(v.x,terrainHeight(v.x,v.z),v.z);view.g.rotation.y=v.yaw}
+      if(!view){view=car(v,scene,alloy,shade,label);models.set(v.id,view);view.g.position.set(v.x,terrainHeight(v.x,v.z),v.z);view.g.rotation.y=v.yaw}
       const {g}=view,weight=reduced?1:1-Math.exp(-dt*10)
       g.visible=true
       g.position.x+=(v.x-g.position.x)*weight

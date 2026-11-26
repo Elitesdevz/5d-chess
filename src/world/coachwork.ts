@@ -6,10 +6,13 @@ const sheetMetal=new T.MeshStandardMaterial({vertexColors:true,roughness:.37,met
 /** Sweep body panels through cross sections, narrowing the nose and lifting the sills over each wheel. */
 function panels(parent:T.Group,sections:Section[],paint:number,window=false){
   const vertices:number[]=[],colors:number[]=[],indices:number[]=[]
-  const tint=new T.Color(paint),shade=new T.Color()
+  const tint=new T.Color(paint),shade=new T.Color(),sky=new T.Color(0xa7ccce)
+  const roof=Math.max(...sections.map(s=>s[4])),sill=Math.min(...sections.map(s=>s[2]))
   for(const [z,w,b,shoulder,top,r] of sections){
     for(const [x,y,lum] of [[-w*.94,b,.64],[-w,shoulder,.90],[-r,top,1.12],[r,top,1.12],[w,shoulder,.90],[w*.94,b,.64]]){
-      vertices.push(x,y,z);shade.copy(tint).multiplyScalar(lum);colors.push(shade.r,shade.g,shade.b)
+      vertices.push(x,y,z);shade.copy(tint).multiplyScalar(lum)
+      if(window)shade.lerp(sky,.58*((y-sill)/(roof-sill))**1.5)
+      colors.push(shade.r,shade.g,shade.b)
     }
   }
   for(let i=0;i<sections.length-1;i++)for(let j=0;j<6;j++){
@@ -60,6 +63,7 @@ export function coachwork(g:T.Group,kind:VehicleKind,paint:number,commercial:boo
   }
   for(const s of [-1,1]){
     const at=(width:number,y:number,z:number)=>new T.Vector3(s*w*width,y,l*z)
+    beam(at(.335,shoulder+.10,.250),at(.03,shoulder+.126,.243),.014,0x354246)
     beam(at(.427,shoulder+.026,.263),at(.377,h-.051,roofFront),.048,paint)
     beam(at(.444,shoulder+.018,rear),at(.389,h-.056,roofRear),.066,paint)
     beam(at(.46,shoulder+.012,-.075),at(.392,h-.065,-.085),.061,0x303b3c)

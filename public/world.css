@@ -291,6 +291,7 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .arcade-counter h3,.arcade-counter p{width:100%}
 .arcade-counter input{width:6em}
 @media(max-width:700px){#city-pack{bottom:5px;font-size:10px}.arcade-slots button{min-width:0}.arcade-slots .kfc-food{transform:scale(.85)}.world-chat{bottom:106px}}
+@media(max-width:1080px){#city-world:has(#city-pack:not([hidden])) .world-chat{top:.72rem;left:.72rem;bottom:auto;width:min(260px,45vw)}}
 .city-ammo{font:600 .78rem monospace;white-space:nowrap}.arcade-actions{flex-wrap:wrap}
 .world-camera{position:absolute;right:3.8rem;top:.72rem;z-index:3;padding:.48rem .68rem;border:1px solid #a7b3a54d;border-radius:.55rem;background:#182c29;color:#f5ead4;font-weight:650}
 .city-reticle{display:none;pointer-events:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #333}
