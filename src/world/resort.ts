@@ -37,11 +37,12 @@ export const gameStations=[
   {id:'blackjack',label:'Blackjack',x:-4.65,z:-20.4},
   ...[-15.3,-18,-20.7].map(z=>({id:'slots',label:'Play Starlight Slots',x:7.45,z})),
 ]
+export const bathSeats=[-14.36,-19.46]
 export function resortPoints(zone:string,keys:readonly string[]=[]){
   if(zone==='hotel')return [liftPoint,{id:'resort:desk',label:'Book a room',x:-6.25,z:-4.96},
     {id:'resort:lottery',label:'Weekly lottery tickets',x:5.8,z:-4.85}]
   if(!guestFloor(zone))return []
-  return [liftPoint,...(zone==='hotel:3'?[{id:'resort:billiards',label:'Play three-ball pool',x:-5.6,z:4.76,range:.95}]:[]),...(zone==='hotel:2'?gameStations.map(s=>({...s,id:'resort:'+s.id,range:1.28})):[]),
+  return [liftPoint,...(zone==='hotel:3'?[...bathSeats.map((z,i)=>({id:'bath-seat:'+i,label:'Sit by the pool',x:2.98,z,range:.82})),{id:'resort:billiards',label:'Play three-ball pool',x:-5.6,z:4.76,range:.95}]:[]),...(zone==='hotel:2'?gameStations.map(s=>({...s,id:'resort:'+s.id,range:1.28})):[]),
     ...ROOMS.filter(r=>r.floor===zone&&keys.includes(r.id)).flatMap(roomPoints)]
 }
 export function roomPoints(r:HotelRoom){
@@ -59,6 +60,7 @@ export function poolDepth(x:number,z:number){
 export function resortWalkable(zone:GuestFloor,x:number,z:number,keys:readonly string[]){
   const side=Math.abs(x)
   if(side>9.21||z< -22.74||z>7.48)return false
+  if(zone==='hotel:3'&&bathSeats.some(seat=>Math.abs(z-seat)<.78&&Math.abs(x-2.35)<.43))return false
   if(zone==='hotel:3'&&Math.abs(x+5.6)<1.92&&Math.abs(z-6.05)<.91)return false
   if(side<1.44||z>4.28)return true
   for(const bay of bays){

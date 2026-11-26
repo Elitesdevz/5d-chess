@@ -690,6 +690,10 @@
 <polyline points="-50.2,-31.03 -61.2,-31.03 -61.2,-32.55" fill="none" stroke="#ebdaba" stroke-width="2.1"/>
 <polyline points="54,-31.03 43,-31.03 43,-32.55" fill="none" stroke="#ebdaba" stroke-width="2.1"/>
 <polyline points="-39,-67.68 -50,-67.68 -50,-68.675" fill="none" stroke="#ebdaba" stroke-width="2.1"/>
+<polyline points="-68,-15.630000000000003 -64.975,-15.630000000000003" fill="none" stroke="#ebdaba" stroke-width="2.1"/>
+<polyline points="-70,6.87 -64.975,6.87" fill="none" stroke="#ebdaba" stroke-width="2.1"/>
+<polyline points="-68,28.869999999999997 -64.975,28.869999999999997" fill="none" stroke="#ebdaba" stroke-width="2.1"/>
+<polyline points="66,-14.130000000000003 66,-14.55" fill="none" stroke="#ebdaba" stroke-width="2.1"/>
 <polyline points="-40,-12.780000000000001 -44,-12.780000000000001 -44,-14.55" fill="none" stroke="#ebdaba" stroke-width="1.45"/>
 <polyline points="-32,-15.780000000000001 -32,-14.55" fill="none" stroke="#ebdaba" stroke-width="1.45"/>
 <polyline points="-22,-16.78 -22,-14.55" fill="none" stroke="#ebdaba" stroke-width="1.45"/>
@@ -1090,15 +1094,15 @@
 <rect x="-15.5" y="-38.55" width="4" height="5.3" fill="#9bb4bb"/>
 <rect x="34.25" y="-9.625" width="6" height="7.25" fill="#9bb4bb"/>
 <rect x="11.75" y="-38.25" width="4.4" height="5.7" fill="#9bb4bb"/>
-<rect x="-72" y="-27.5" width="8" height="11" fill="#9bb4bb"/>
-<rect x="-75" y="-6" width="10" height="12" fill="#9bb4bb"/>
-<rect x="-72.5" y="20" width="9" height="8" fill="#9bb4bb"/>
-<rect x="61.5" y="-25" width="9" height="10" fill="#9bb4bb"/>
 <rect x="-60.55" y="-78.45" width="9.8" height="8.4" fill="#9bb4bb"/>
 <rect x="-58.400000000000006" y="-59.449999999999996" width="18.6" height="6.8" fill="#9bb4bb"/>
 <rect x="-60.6" y="-47.5" width="20.8" height="15.6" fill="#ac9481"/>
 <rect x="43.6" y="-47.5" width="20.8" height="15.6" fill="#ac9481"/>
 <rect x="-49.4" y="-84.15" width="20.8" height="15.6" fill="#ac9481"/>
+<rect x="-72" y="-27.5" width="8" height="11" fill="#ac9481"/>
+<rect x="-75" y="-6" width="10" height="12" fill="#ac9481"/>
+<rect x="-72.5" y="20" width="9" height="8" fill="#ac9481"/>
+<rect x="61.5" y="-25" width="9" height="10" fill="#ac9481"/>
 <rect x="-42.94" y="-20.85" width="5.88" height="7.2" fill="#ac9481"/>
 <rect x="-34.94" y="-23.85" width="5.88" height="7.2" fill="#ac9481"/>
 <rect x="-24.94" y="-24.85" width="5.88" height="7.2" fill="#ac9481"/>
@@ -1157,92 +1161,91 @@
 <circle cx="-66.12" cy="10" r="0.28" fill="#b87a23"><title>lamp-20</title></circle>
 <circle cx="-66.12" cy="12.1" r="0.28" fill="#795543"><title>hydrant-21</title></circle>
 <circle cx="-58.88" cy="-3" r="0.28" fill="#b87a23"><title>lamp-22</title></circle>
-<circle cx="-66.12" cy="-16" r="0.28" fill="#b87a23"><title>lamp-23</title></circle>
-<circle cx="-58.88" cy="-26.9" r="0.28" fill="#795543"><title>hydrant-24</title></circle>
-<circle cx="-66.12" cy="-42" r="0.28" fill="#b87a23"><title>lamp-25</title></circle>
-<circle cx="-58.88" cy="-55" r="0.28" fill="#b87a23"><title>lamp-26</title></circle>
-<circle cx="69.83" cy="23" r="0.28" fill="#b87a23"><title>lamp-27</title></circle>
-<circle cx="69.83" cy="21.6" r="0.28" fill="#795543"><title>sign-28</title></circle>
-<circle cx="78.17" cy="10" r="0.28" fill="#b87a23"><title>lamp-29</title></circle>
-<circle cx="78.17" cy="12.1" r="0.28" fill="#795543"><title>hydrant-30</title></circle>
-<circle cx="69.83" cy="-3" r="0.28" fill="#b87a23"><title>lamp-31</title></circle>
-<circle cx="78.17" cy="-16" r="0.28" fill="#b87a23"><title>lamp-32</title></circle>
-<circle cx="69.83" cy="-26.9" r="0.28" fill="#795543"><title>hydrant-33</title></circle>
-<circle cx="78.17" cy="-42" r="0.28" fill="#b87a23"><title>lamp-34</title></circle>
-<circle cx="69.83" cy="-55" r="0.28" fill="#b87a23"><title>lamp-35</title></circle>
-<circle cx="-28.5" cy="-45.005" r="0.28" fill="#b87a23"><title>lamp-36</title></circle>
-<circle cx="-15.5" cy="-52.995" r="0.28" fill="#b87a23"><title>lamp-37</title></circle>
-<circle cx="-2.5" cy="-45.005" r="0.28" fill="#b87a23"><title>lamp-38</title></circle>
-<circle cx="-4.6" cy="-45.005" r="0.28" fill="#795543"><title>hydrant-39</title></circle>
-<circle cx="-41.5" cy="-8.105" r="0.28" fill="#b87a23"><title>lamp-40</title></circle>
-<circle cx="-43.6" cy="-8.105" r="0.28" fill="#795543"><title>hydrant-41</title></circle>
-<circle cx="47" cy="-8.105" r="0.28" fill="#b87a23"><title>lamp-42</title></circle>
-<circle cx="60" cy="-15.695" r="0.28" fill="#b87a23"><title>lamp-43</title></circle>
-<circle cx="-41.5" cy="-26.305" r="0.28" fill="#b87a23"><title>lamp-44</title></circle>
-<circle cx="-43.6" cy="-26.305" r="0.28" fill="#795543"><title>hydrant-45</title></circle>
-<circle cx="-28.5" cy="-33.695" r="0.28" fill="#b87a23"><title>lamp-46</title></circle>
-<circle cx="20" cy="-26.305" r="0.28" fill="#b87a23"><title>lamp-47</title></circle>
-<circle cx="21.4" cy="-26.305" r="0.28" fill="#795543"><title>sign-48</title></circle>
-<circle cx="30.9" cy="-33.695" r="0.28" fill="#795543"><title>hydrant-49</title></circle>
-<circle cx="46" cy="-26.305" r="0.28" fill="#b87a23"><title>lamp-50</title></circle>
-<circle cx="-41.5" cy="-60.005" r="0.28" fill="#b87a23"><title>lamp-51</title></circle>
-<circle cx="-43.6" cy="-60.005" r="0.28" fill="#795543"><title>hydrant-52</title></circle>
-<circle cx="-15.5" cy="-60.005" r="0.28" fill="#b87a23"><title>lamp-53</title></circle>
-<circle cx="29" cy="-69.995" r="0.28" fill="#b87a23"><title>lamp-54</title></circle>
-<circle cx="26.9" cy="-69.995" r="0.28" fill="#795543"><title>hydrant-55</title></circle>
-<circle cx="55" cy="-69.995" r="0.28" fill="#b87a23"><title>lamp-56</title></circle>
-<circle cx="-29.65" cy="-15.809999999999999" r="0.28" fill="#795543"><title>mail-57</title></circle>
-<circle cx="-19.65" cy="-16.81" r="0.28" fill="#795543"><title>mail-58</title></circle>
-<circle cx="24.35" cy="-17.81" r="0.28" fill="#795543"><title>mail-59</title></circle>
-<circle cx="34.35" cy="-14.809999999999999" r="0.28" fill="#795543"><title>mail-60</title></circle>
-<circle cx="-39.65" cy="6.19" r="0.28" fill="#795543"><title>mail-61</title></circle>
-<circle cx="-24.28" cy="14.65" r="0.28" fill="#508a53"><title>tree-62</title></circle>
-<circle cx="-19.35" cy="18.81" r="0.28" fill="#795543"><title>mail-63</title></circle>
-<circle cx="13.65" cy="20.81" r="0.28" fill="#795543"><title>mail-64</title></circle>
-<circle cx="24.65" cy="14.809999999999999" r="0.28" fill="#795543"><title>mail-65</title></circle>
-<circle cx="44.35" cy="6.19" r="0.28" fill="#795543"><title>mail-66</title></circle>
-<circle cx="-57.35" cy="14.809999999999999" r="0.28" fill="#795543"><title>mail-67</title></circle>
-<circle cx="-52.28" cy="14.65" r="0.28" fill="#508a53"><title>tree-68</title></circle>
-<circle cx="-47.35" cy="21.81" r="0.28" fill="#795543"><title>mail-69</title></circle>
-<circle cx="-42.28" cy="21.65" r="0.28" fill="#508a53"><title>tree-70</title></circle>
-<circle cx="43.65" cy="20.81" r="0.28" fill="#795543"><title>mail-71</title></circle>
-<circle cx="-33.65" cy="-32.81" r="0.28" fill="#795543"><title>mail-72</title></circle>
-<circle cx="26.35" cy="-33.81" r="0.28" fill="#795543"><title>mail-73</title></circle>
-<circle cx="-10.65" cy="44.19" r="0.28" fill="#795543"><title>mail-74</title></circle>
-<circle cx="-15.72" cy="44.35" r="0.28" fill="#508a53"><title>tree-75</title></circle>
-<circle cx="15.35" cy="44.19" r="0.28" fill="#795543"><title>mail-76</title></circle>
-<circle cx="10.28" cy="44.35" r="0.28" fill="#508a53"><title>tree-77</title></circle>
+<circle cx="-58.88" cy="-26.9" r="0.28" fill="#795543"><title>hydrant-23</title></circle>
+<circle cx="-66.12" cy="-42" r="0.28" fill="#b87a23"><title>lamp-24</title></circle>
+<circle cx="-58.88" cy="-55" r="0.28" fill="#b87a23"><title>lamp-25</title></circle>
+<circle cx="69.83" cy="23" r="0.28" fill="#b87a23"><title>lamp-26</title></circle>
+<circle cx="69.83" cy="21.6" r="0.28" fill="#795543"><title>sign-27</title></circle>
+<circle cx="78.17" cy="10" r="0.28" fill="#b87a23"><title>lamp-28</title></circle>
+<circle cx="78.17" cy="12.1" r="0.28" fill="#795543"><title>hydrant-29</title></circle>
+<circle cx="69.83" cy="-3" r="0.28" fill="#b87a23"><title>lamp-30</title></circle>
+<circle cx="78.17" cy="-16" r="0.28" fill="#b87a23"><title>lamp-31</title></circle>
+<circle cx="69.83" cy="-26.9" r="0.28" fill="#795543"><title>hydrant-32</title></circle>
+<circle cx="78.17" cy="-42" r="0.28" fill="#b87a23"><title>lamp-33</title></circle>
+<circle cx="69.83" cy="-55" r="0.28" fill="#b87a23"><title>lamp-34</title></circle>
+<circle cx="-28.5" cy="-45.005" r="0.28" fill="#b87a23"><title>lamp-35</title></circle>
+<circle cx="-15.5" cy="-52.995" r="0.28" fill="#b87a23"><title>lamp-36</title></circle>
+<circle cx="-2.5" cy="-45.005" r="0.28" fill="#b87a23"><title>lamp-37</title></circle>
+<circle cx="-4.6" cy="-45.005" r="0.28" fill="#795543"><title>hydrant-38</title></circle>
+<circle cx="-41.5" cy="-8.105" r="0.28" fill="#b87a23"><title>lamp-39</title></circle>
+<circle cx="-43.6" cy="-8.105" r="0.28" fill="#795543"><title>hydrant-40</title></circle>
+<circle cx="47" cy="-8.105" r="0.28" fill="#b87a23"><title>lamp-41</title></circle>
+<circle cx="60" cy="-15.695" r="0.28" fill="#b87a23"><title>lamp-42</title></circle>
+<circle cx="-41.5" cy="-26.305" r="0.28" fill="#b87a23"><title>lamp-43</title></circle>
+<circle cx="-43.6" cy="-26.305" r="0.28" fill="#795543"><title>hydrant-44</title></circle>
+<circle cx="-28.5" cy="-33.695" r="0.28" fill="#b87a23"><title>lamp-45</title></circle>
+<circle cx="20" cy="-26.305" r="0.28" fill="#b87a23"><title>lamp-46</title></circle>
+<circle cx="21.4" cy="-26.305" r="0.28" fill="#795543"><title>sign-47</title></circle>
+<circle cx="30.9" cy="-33.695" r="0.28" fill="#795543"><title>hydrant-48</title></circle>
+<circle cx="46" cy="-26.305" r="0.28" fill="#b87a23"><title>lamp-49</title></circle>
+<circle cx="-41.5" cy="-60.005" r="0.28" fill="#b87a23"><title>lamp-50</title></circle>
+<circle cx="-43.6" cy="-60.005" r="0.28" fill="#795543"><title>hydrant-51</title></circle>
+<circle cx="-15.5" cy="-60.005" r="0.28" fill="#b87a23"><title>lamp-52</title></circle>
+<circle cx="29" cy="-69.995" r="0.28" fill="#b87a23"><title>lamp-53</title></circle>
+<circle cx="26.9" cy="-69.995" r="0.28" fill="#795543"><title>hydrant-54</title></circle>
+<circle cx="55" cy="-69.995" r="0.28" fill="#b87a23"><title>lamp-55</title></circle>
+<circle cx="-29.65" cy="-15.809999999999999" r="0.28" fill="#795543"><title>mail-56</title></circle>
+<circle cx="-19.65" cy="-16.81" r="0.28" fill="#795543"><title>mail-57</title></circle>
+<circle cx="24.35" cy="-17.81" r="0.28" fill="#795543"><title>mail-58</title></circle>
+<circle cx="34.35" cy="-14.809999999999999" r="0.28" fill="#795543"><title>mail-59</title></circle>
+<circle cx="-39.65" cy="6.19" r="0.28" fill="#795543"><title>mail-60</title></circle>
+<circle cx="-24.28" cy="14.65" r="0.28" fill="#508a53"><title>tree-61</title></circle>
+<circle cx="-19.35" cy="18.81" r="0.28" fill="#795543"><title>mail-62</title></circle>
+<circle cx="13.65" cy="20.81" r="0.28" fill="#795543"><title>mail-63</title></circle>
+<circle cx="24.65" cy="14.809999999999999" r="0.28" fill="#795543"><title>mail-64</title></circle>
+<circle cx="44.35" cy="6.19" r="0.28" fill="#795543"><title>mail-65</title></circle>
+<circle cx="-57.35" cy="14.809999999999999" r="0.28" fill="#795543"><title>mail-66</title></circle>
+<circle cx="-52.28" cy="14.65" r="0.28" fill="#508a53"><title>tree-67</title></circle>
+<circle cx="-47.35" cy="21.81" r="0.28" fill="#795543"><title>mail-68</title></circle>
+<circle cx="-42.28" cy="21.65" r="0.28" fill="#508a53"><title>tree-69</title></circle>
+<circle cx="43.65" cy="20.81" r="0.28" fill="#795543"><title>mail-70</title></circle>
+<circle cx="-33.65" cy="-32.81" r="0.28" fill="#795543"><title>mail-71</title></circle>
+<circle cx="26.35" cy="-33.81" r="0.28" fill="#795543"><title>mail-72</title></circle>
+<circle cx="-10.65" cy="44.19" r="0.28" fill="#795543"><title>mail-73</title></circle>
+<circle cx="-15.72" cy="44.35" r="0.28" fill="#508a53"><title>tree-74</title></circle>
+<circle cx="15.35" cy="44.19" r="0.28" fill="#795543"><title>mail-75</title></circle>
+<circle cx="10.28" cy="44.35" r="0.28" fill="#508a53"><title>tree-76</title></circle>
 <circle cx="6.8" cy="16.8" r="0.7575000000000001" fill="#795543"><title>bench-78</title></circle>
 <circle cx="29.7" cy="-72.3" r="0.7575000000000001" fill="#795543"><title>bench-79</title></circle>
-<circle cx="36.7" cy="-60.4" r="0.7575000000000001" fill="#795543"><title>bike-80</title></circle>
-<circle cx="2.05" cy="16.3" r="0.28" fill="#795543"><title>bollard-81</title></circle>
-<circle cx="17.666666666666664" cy="-80.95" r="0.28" fill="#508a53"><title>tree-82</title></circle>
-<circle cx="34.666666666666664" cy="-80.95" r="0.28" fill="#508a53"><title>tree-83</title></circle>
-<circle cx="40.333333333333336" cy="-80.95" r="0.28" fill="#508a53"><title>tree-84</title></circle>
-<circle cx="29" cy="-69.05" r="0.28" fill="#508a53"><title>tree-85</title></circle>
-<circle cx="30.15" cy="-69.05" r="0.28" fill="#b87a23"><title>lamp-86</title></circle>
-<circle cx="34.666666666666664" cy="-69.05" r="0.28" fill="#508a53"><title>tree-87</title></circle>
-<circle cx="40.333333333333336" cy="-69.05" r="0.28" fill="#508a53"><title>tree-88</title></circle>
-<circle cx="18.666666666666668" cy="35.55" r="0.28" fill="#508a53"><title>tree-89</title></circle>
-<circle cx="20.833333333333332" cy="35.55" r="0.28" fill="#508a53"><title>tree-90</title></circle>
-<circle cx="23" cy="35.55" r="0.28" fill="#508a53"><title>tree-91</title></circle>
-<circle cx="24.15" cy="35.55" r="0.28" fill="#b87a23"><title>lamp-92</title></circle>
-<circle cx="25.166666666666668" cy="35.55" r="0.28" fill="#508a53"><title>tree-93</title></circle>
-<circle cx="27.333333333333332" cy="35.55" r="0.28" fill="#508a53"><title>tree-94</title></circle>
-<circle cx="18.666666666666668" cy="42.45" r="0.28" fill="#508a53"><title>tree-95</title></circle>
-<circle cx="20.833333333333332" cy="42.45" r="0.28" fill="#508a53"><title>tree-96</title></circle>
-<circle cx="23" cy="42.45" r="0.28" fill="#508a53"><title>tree-97</title></circle>
-<circle cx="24.15" cy="42.45" r="0.28" fill="#b87a23"><title>lamp-98</title></circle>
-<circle cx="25.166666666666668" cy="42.45" r="0.28" fill="#508a53"><title>tree-99</title></circle>
-<circle cx="27.333333333333332" cy="42.45" r="0.28" fill="#508a53"><title>tree-100</title></circle>
-<circle cx="-23" cy="-58.550000000000004" r="0.28" fill="#508a53"><title>tree-101</title></circle>
-<circle cx="-21.5" cy="-58.550000000000004" r="0.28" fill="#508a53"><title>tree-102</title></circle>
-<circle cx="-17" cy="-58.550000000000004" r="0.28" fill="#508a53"><title>tree-103</title></circle>
-<circle cx="-23" cy="-52.65" r="0.28" fill="#508a53"><title>tree-104</title></circle>
-<circle cx="-21.5" cy="-52.65" r="0.28" fill="#508a53"><title>tree-105</title></circle>
-<circle cx="-20" cy="-52.65" r="0.28" fill="#508a53"><title>tree-106</title></circle>
-<circle cx="-18.85" cy="-52.65" r="0.28" fill="#b87a23"><title>lamp-107</title></circle>
-<circle cx="-17" cy="-52.65" r="0.28" fill="#508a53"><title>tree-108</title></circle>
+<circle cx="36.7" cy="-60.4" r="0.7575000000000001" fill="#795543"><title>bike-79</title></circle>
+<circle cx="2.05" cy="16.3" r="0.28" fill="#795543"><title>bollard-80</title></circle>
+<circle cx="17.666666666666664" cy="-80.95" r="0.28" fill="#508a53"><title>tree-81</title></circle>
+<circle cx="34.666666666666664" cy="-80.95" r="0.28" fill="#508a53"><title>tree-82</title></circle>
+<circle cx="40.333333333333336" cy="-80.95" r="0.28" fill="#508a53"><title>tree-83</title></circle>
+<circle cx="29" cy="-69.05" r="0.28" fill="#508a53"><title>tree-84</title></circle>
+<circle cx="30.15" cy="-69.05" r="0.28" fill="#b87a23"><title>lamp-85</title></circle>
+<circle cx="34.666666666666664" cy="-69.05" r="0.28" fill="#508a53"><title>tree-86</title></circle>
+<circle cx="40.333333333333336" cy="-69.05" r="0.28" fill="#508a53"><title>tree-87</title></circle>
+<circle cx="18.666666666666668" cy="35.55" r="0.28" fill="#508a53"><title>tree-88</title></circle>
+<circle cx="20.833333333333332" cy="35.55" r="0.28" fill="#508a53"><title>tree-89</title></circle>
+<circle cx="23" cy="35.55" r="0.28" fill="#508a53"><title>tree-90</title></circle>
+<circle cx="24.15" cy="35.55" r="0.28" fill="#b87a23"><title>lamp-91</title></circle>
+<circle cx="25.166666666666668" cy="35.55" r="0.28" fill="#508a53"><title>tree-92</title></circle>
+<circle cx="27.333333333333332" cy="35.55" r="0.28" fill="#508a53"><title>tree-93</title></circle>
+<circle cx="18.666666666666668" cy="42.45" r="0.28" fill="#508a53"><title>tree-94</title></circle>
+<circle cx="20.833333333333332" cy="42.45" r="0.28" fill="#508a53"><title>tree-95</title></circle>
+<circle cx="23" cy="42.45" r="0.28" fill="#508a53"><title>tree-96</title></circle>
+<circle cx="24.15" cy="42.45" r="0.28" fill="#b87a23"><title>lamp-97</title></circle>
+<circle cx="25.166666666666668" cy="42.45" r="0.28" fill="#508a53"><title>tree-98</title></circle>
+<circle cx="27.333333333333332" cy="42.45" r="0.28" fill="#508a53"><title>tree-99</title></circle>
+<circle cx="-23" cy="-58.550000000000004" r="0.28" fill="#508a53"><title>tree-100</title></circle>
+<circle cx="-21.5" cy="-58.550000000000004" r="0.28" fill="#508a53"><title>tree-101</title></circle>
+<circle cx="-17" cy="-58.550000000000004" r="0.28" fill="#508a53"><title>tree-102</title></circle>
+<circle cx="-23" cy="-52.65" r="0.28" fill="#508a53"><title>tree-103</title></circle>
+<circle cx="-21.5" cy="-52.65" r="0.28" fill="#508a53"><title>tree-104</title></circle>
+<circle cx="-20" cy="-52.65" r="0.28" fill="#508a53"><title>tree-105</title></circle>
+<circle cx="-18.85" cy="-52.65" r="0.28" fill="#b87a23"><title>lamp-106</title></circle>
+<circle cx="-17" cy="-52.65" r="0.28" fill="#508a53"><title>tree-107</title></circle>
 <circle cx="-62.15" cy="-70.065" r="0.28" fill="#b87a23"><title>frontage-gunshop-lamp</title></circle>
 <circle cx="-47.050000000000004" cy="-59.935" r="0.28" fill="#b87a23"><title>frontage-police-lamp</title></circle>
 <circle cx="-18.6" cy="-15.765" r="0.28" fill="#b87a23"><title>frontage-books-lamp</title></circle>
@@ -1252,6 +1255,10 @@
 <circle cx="-50.2" cy="-31.9" r=".37" fill="#a2372c"><title>block-0 entrance</title></circle>
 <circle cx="54" cy="-31.9" r=".37" fill="#a2372c"><title>block-1 entrance</title></circle>
 <circle cx="-39" cy="-68.55000000000001" r=".37" fill="#a2372c"><title>block-2 entrance</title></circle>
+<circle cx="-68" cy="-16.5" r=".37" fill="#a2372c"><title>block-3 entrance</title></circle>
+<circle cx="-70" cy="6" r=".37" fill="#a2372c"><title>block-4 entrance</title></circle>
+<circle cx="-68" cy="28" r=".37" fill="#a2372c"><title>block-5 entrance</title></circle>
+<circle cx="66" cy="-15.000000000000002" r=".37" fill="#a2372c"><title>block-6 entrance</title></circle>
 <circle cx="-40" cy="-13.65" r=".37" fill="#a2372c"><title>house-0 entrance</title></circle>
 <circle cx="-32" cy="-16.65" r=".37" fill="#a2372c"><title>house-1 entrance</title></circle>
 <circle cx="-22" cy="-17.65" r=".37" fill="#a2372c"><title>house-2 entrance</title></circle>

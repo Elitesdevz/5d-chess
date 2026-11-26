@@ -1,3 +1,4 @@
+import {EXCHANGE_STOREY,FLOOR_LIST} from '../../src/world/exchange-floors.ts'
 import {distance,type Landmark} from '../../src/world/geo.ts'
 import type {MeridianSource} from './source.ts'
 import type {Parking} from '../../src/world/city-plan.ts'
@@ -14,7 +15,7 @@ type Placement={street:string;along:number;side:string;setback:number;beyondEnd?
 export function resolveParcels(s:MeridianSource){
   if(!Number.isSafeInteger(s.seed))throw Error('seed: expected an integer')
   unique(s.streets,'streets')
-  unique([...s.landmarks,...s.houses,...s.apartments,{id:'gunshop'}],'parcels')
+  unique([...s.landmarks,...s.houses,...s.apartments,...s.towers,{id:'gunshop'}],'parcels')
   const roads=new Map(s.streets.map(r=>[r.id,r]))
   for(const r of s.streets){
     if(![r.a.x,r.a.z,r.b.x,r.b.z,r.width,r.walk,r.limit].every(Number.isFinite)||!(r.width>0&&r.walk>=0&&distance(r.a,r.b)>0)||(r.a.x!==r.b.x&&r.a.z!==r.b.z))throw Error(r.id+': expected a nonempty axis-aligned street with positive width')
@@ -67,7 +68,12 @@ export function resolveParcels(s:MeridianSource){
     if(!anchor)throw Error(k.id+': unknown keep-clear anchor '+k.anchor)
     return {id:k.id,x:anchor.x+k.across,z:anchor.z+k.along,w:k.w,d:k.d}
   })
-  return {...s,landmarks,keepClear,spawn:{x:s.square.x+s.spawn.across,z:s.square.z+s.spawn.along,yaw:s.spawn.yaw},houses:residencesById(s.houses,'house-'),apartments:residencesById(s.apartments,'block-'),
+  const towers=[...residencesById(s.towers,'tower-').map(b=>({...b,baseY:0})),{
+    ...s.exchangeApartments,id:'exchange-crown',x:rooms.exchange.x,z:rooms.exchange.z,street:rooms.exchange.street,
+    baseY:(FLOOR_LIST.length+1)*EXCHANGE_STOREY,
+  }]
+  for(const t of towers)if(!Number.isInteger(t.levels)||t.levels<2||t.w<8||t.d<8)throw Error(t.id+': tower requires a lobby and usable residential floor')
+  return {...s,towers,landmarks,keepClear,spawn:{x:s.square.x+s.spawn.across,z:s.square.z+s.spawn.along,yaw:s.spawn.yaw},houses:residencesById(s.houses,'house-'),apartments:residencesById(s.apartments,'block-'),
     rooms,crossings,parking,shop}
 }
 export type Resolved=ReturnType<typeof resolveParcels>

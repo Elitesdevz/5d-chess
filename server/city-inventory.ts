@@ -1,17 +1,19 @@
 import type {Account} from './accounts.ts'
 import {wallet} from './economy.ts'
 import {requireSpending} from './credit.ts'
-import {blankOrder,MENU,type OrderItems} from '../src/world/restaurant-model.ts'
+import {GROCERIES,isGrocery,type Bite,type Pantry} from '../src/world/food.ts'
+import {blankOrder} from '../src/world/restaurant-model.ts'
 import {armoryQuote,MAX_HP,isWeapon,WEAPONS,type Magazine,type WeaponId,SLOT_COUNT,type Item,type Stack} from '../src/world/arcade.ts'
 import {toStockUnits,fromStockUnits} from '../src/stock-model.ts'
 import {fail} from './http.ts'
 
 export interface Pack {
+  bite?:Bite
   slots:(Stack|null)[]; hp:number; drawers:Record<string,Stack[]>; recovery:Stack[]
   magazines?:Partial<Record<WeaponId,Magazine>>;nextShot?:number
   sequence:number;lastShot?:number;lastHit?:boolean;stars:number;remaining:number
 }
-export const foodItem=(item:Item):item is keyof OrderItems=>MENU.some(entry=>entry.id===item)
+export const foodItem=isGrocery
 const limit=(item:Item)=>item==='cash'?Number.MAX_SAFE_INTEGER:isWeapon(item)?1:9
 export function quantity(value:unknown):number {
   if(typeof value!=='number'||!Number.isSafeInteger(value)||value<=0)fail(400,'Choose a positive whole quantity')
@@ -41,7 +43,7 @@ export function pack(a:Account):Pack {
   if(a.cityPack)return a.cityPack
   const p:Pack={slots:Array(SLOT_COUNT).fill(null),hp:MAX_HP,drawers:{},recovery:[],stars:0,remaining:0,sequence:0}
   a.cityPack=p
-  for(const {id} of MENU){
+  for(const {id} of GROCERIES){
     const amount=a.food?.[id]??0
     if(amount)recover(p,id,amount)
   }
@@ -63,7 +65,7 @@ export function releaseFridge(a:Account,id:string){
   const contents=a.fridges?.[id]
   if(!contents)return
   const p=pack(a)
-  for(const {id:item} of MENU)if(contents[item])recover(p,item,contents[item])
+  for(const {id:item} of GROCERIES)if(contents[item])recover(p,item,contents[item]!)
   delete a.fridges![id]
   mirrorFood(a)
   p.sequence++
@@ -84,8 +86,8 @@ export function remove(p:Pack,item:Item,count:number){
 }
 // Compatibility projection for pre-expansion readers. Gameplay always reads the slots.
 export function mirrorFood(a:Account){
-  const food=blankOrder()
-  for(const s of pack(a).slots)if(s&&foodItem(s.item))food[s.item]+=s.count
+  const food:Pantry=blankOrder()
+  for(const s of pack(a).slots)if(s&&foodItem(s.item))food[s.item]=(food[s.item]??0)+s.count
   a.food=food
   return food
 }

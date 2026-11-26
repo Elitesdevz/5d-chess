@@ -407,17 +407,23 @@ export class Restaurant {
     else if(command==='collect'){
       this.store.transaction(u=>{
         const account=u.users.get(member.name)??fail(401,'Log in first')
-        if(typeof data.id!=='string')fail(400,'Choose a takeaway order')
+        if(typeof data.id!=='string')fail(400,'Choose an order to collect')
         if(account.foodReceipts?.['takeaway:'+data.id])return
         const meal=account.restaurant
-        if(!meal||meal.id!==data.id||!meal.takeaway||meal.status!=='served')fail(409,'Your takeaway is not ready')
-        this.requirePoint(member,'kfc:collect',now)
+        if(!meal||meal.id!==data.id||meal.status!=='served')fail(409,'Your order is not ready')
+        if(meal.takeaway)this.requirePoint(member,'kfc:collect',now)
+        else if(member.dining===undefined||this.seats.get(member.name)!==member.dining)fail(409,'Sit at your table to collect the tray')
         const p=pack(account),items=orderItems(meal)
-        for(const item of MENU)if(items[item.id])carry(p,item.id,items[item.id])
+        const total=orderSize(items)
+        let eaten=Math.floor(total*meal.bites/Math.max(3,total))
+        for(const {id} of MENU){
+          const used=Math.min(eaten,items[id]);eaten-=used
+          if(items[id]>used)carry(p,id,items[id]-used)
+        }
         p.sequence++;mirrorFood(account)
         ;(account.foodReceipts??={})['takeaway:'+meal.id]='collected'
         delete account.restaurant
-        u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:'takeaway_collected',reference:meal.id},now)
+        u.economyUsage(member.name,'/api/world/restaurant',{action:'restaurant_action',service:meal.takeaway?'takeaway_collected':'meal_finished',reference:meal.id},now)
       })
     }
     else if(command==='hire')this.hire(member,data.role,now)

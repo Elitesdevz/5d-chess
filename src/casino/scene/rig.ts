@@ -2,7 +2,7 @@ import * as T from 'three'
 import type {Materials} from './materials.ts'
 import {box,mesh,limb,segment,v} from './geometry.ts'
 
-class Hand {
+export class Hand {
  readonly root=new T.Group()
  readonly grip=new T.Group()
  private fingers:T.Group[][]=[]

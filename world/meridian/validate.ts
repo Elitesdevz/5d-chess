@@ -4,9 +4,9 @@ import type {streetDetails} from './details.ts'
 type Lot={id:string;x:number;z:number;w:number;d:number}
 export function validateLots(s:Resolved,civic:ReturnType<typeof civicParcels>,homes:ReturnType<typeof residences>,detail:ReturnType<typeof streetDetails>){
   const lots:Lot[]=[
-    ...s.landmarks.filter(b=>b.id!==s.precinct.landmark),...s.offices.map((b,i)=>({...b,id:'office-'+i})),
+    ...s.landmarks.filter(b=>b.id!==s.precinct.landmark),
     ...(['gunshop','station'] as const).map(id=>({id:id==='station'?'police':id,...civic.origins[id],...civic.footprint[id]})),
-    ...homes.buildings.map(b=>({id:b.id,x:b.x+(b.rect.l+b.rect.r)/2*b.facing,z:b.z+(b.rect.b+b.rect.f)/2*b.facing,w:b.rect.r-b.rect.l,d:b.rect.f-b.rect.b})),
+    ...homes.buildings.filter(b=>!b.baseY).map(b=>({id:b.id,x:b.x+(b.rect.l+b.rect.r)/2*b.facing,z:b.z+(b.rect.b+b.rect.f)/2*b.facing,w:b.rect.r-b.rect.l,d:b.rect.f-b.rect.b})),
     ...Object.entries(s.rooms).flatMap(([id,b])=>'width' in b?[{id,x:b.x,z:b.z+(b.back+b.front)/2,w:b.width*2,d:b.front-b.back}]:[])
   ]
   const inside=(x:number,z:number,lot:Lot)=>Math.abs(x-lot.x)<lot.w/2-.001&&Math.abs(z-lot.z)<lot.d/2-.001

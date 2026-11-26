@@ -6,7 +6,7 @@ import {RouletteHall} from '../server/roulette-hall.ts'
 import {ChessStore} from '../server/storage.ts'
 import {area,baselineUrban,distance,extension,LANDMARKS,onRoad,PARKING,PLACES,point,railZ} from '../src/world/city-plan.ts'
 import {assignResidents,routine} from '../src/world/city-residents.ts'
-import {OFFICES,UNITS} from '../src/world/housing.ts'
+import {UNITS} from '../src/world/housing.ts'
 import {outdoorWalkable,PLAN,worldMove} from '../src/world/model.ts'
 import {BUILDINGS,residentialAt,residentialStep} from '../src/world/residential.ts'
 import {TERRAIN_EXTENT,terrainHeight} from '../src/world/terrain.ts'
@@ -24,11 +24,11 @@ test('the larger city has accessible approaches, clear sidewalks and continuous 
     assert.ok(cityRoute(point(0,9),e.front).length>0,e.id)
   }
   const lots=[
-    ...[...LANDMARKS,...OFFICES.map((b,i)=>({...b,id:'existing-office-'+i}))].map(b=>
+    ...LANDMARKS.map(b=>
       ({id:b.id,minX:b.x-b.w/2,maxX:b.x+b.w/2,minZ:b.z-b.d/2,maxZ:b.z+b.d/2})),
     ...Object.entries(PLAN).flatMap(([id,b])=>'width' in b?
       [{id,minX:b.x-b.width,maxX:b.x+b.width,minZ:b.z+b.back,maxZ:b.z+b.front}]:[]),
-    ...BUILDINGS.map(b=>{
+    ...BUILDINGS.filter(b=>!b.baseY).map(b=>{
       const {l,r,b:n,f}=b.rect
       return {id:b.id,minX:b.x+Math.min(l*b.facing,r*b.facing),maxX:b.x+Math.max(l*b.facing,r*b.facing),
         minZ:b.z+Math.min(n*b.facing,f*b.facing),maxZ:b.z+Math.max(n*b.facing,f*b.facing)}

@@ -4,11 +4,12 @@ import {shared} from './map-data.ts'
 import {HOTEL_LIFT,guestFloor,resortPoints,resortWalkable,poolDepth,type GuestFloor,type ResortView} from './resort.ts'
 import {civicRoom,civicActions,civicHeight,groundVenue,openDoorway,nextCivicFloor,levelOf,rise,originOf,footprint,insideDoor,type Gallery} from './civic-venues.ts'
 import {origins,venueWalk,type ArcadeView,type Venue} from './arcade.ts'
+import {counterSeats,storefrontPoints} from './storefronts.ts'
 import {DIRECTORY,PUBLIC_SEATS,urbanObstacle} from './urban-layout.ts'
 import {vehicleContains,type TrafficView,type Vehicle} from './traffic.ts'
 import type {ResidentView} from './city-residents.ts'
 import {residentialAt,residentialHeight,residentialStep,type HomeZone,type HomePose,type ResidentialView} from './residential.ts'
-import {propertyPoints,officeObstacle,type HousingView} from './housing.ts'
+import {EXCHANGE_STOREY,propertyPoints,type HousingView} from './housing.ts'
 import {BAR,BAR_COUNTER,BAR_STOOLS,type BarService} from './bar-menu.ts'
 import {RESTAURANT,RESTAURANT_NAME,restaurantObstacle,type RestaurantView,type WorkKind,type KfcRole,type KitchenHand,type KitchenMotion,type OrderItems} from './restaurant-model.ts'
 import {basinBed,tunnelBed,inPool,poolLevel,OASIS_MOUTH,CAVE_MOUTH,CAVE_X,OASIS_X,treeObstacle,townFixture,passableLand,terrainHeight} from './terrain.ts'
@@ -38,7 +39,7 @@ export const ZONE_ARRIVAL:Record<Exclude<WorldZone,GuestFloor|Gallery|HomeZone|`
   station:insideDoor('station'),gunshop:insideDoor('gunshop'),city:CITY,...shared.arrivals,
 }
 export const FLOOR_ARRIVAL={x:0,z:6,yaw:0}
-export const FLOOR_HEIGHT=6
+export const FLOOR_HEIGHT=EXCHANGE_STOREY
 export const CREDIT_ADVISOR={x:-6.86,z:3.56}
 export const FINANCIAL_ADVISOR={x:-5.47,z:2.42}
 export const BOARD_TABLE={x:0,z:3.39}
@@ -93,7 +94,7 @@ export function walkingHeight(zone:WorldZone,x:number,z:number){
   }
   return zone==='city'?terrainHeight(x,z):floorHeight(zone)
 }
-export type WorldUse=`directory:${string}`|`resort:${string}`|'cash'|'counter'|'booking'|'desk'|`drawer:${string}`|'loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
+export type WorldUse=`front:${string}`|`directory:${string}`|`resort:${string}`|'cash'|'counter'|'booking'|'desk'|`drawer:${string}`|'loans'|'payments'|'reserve'|'elevator'|'reception'|'banker'|'trader'|'credit'|'bar'|'board'|'advisor'|`property:${string}`|`kfc:${string}`|`lift:${string}`|`fridge:${string}`|'food'
 export type WorldAction={id:string;label:string;x:number;z:number;range?:number}
 export type WorldChat={id:number;name:string;text:string;at:number}
 export interface WorldView{
@@ -103,7 +104,7 @@ export interface WorldView{
 function localInteractions(zone:WorldZone,keys:readonly string[]):WorldAction[]{
   if(zone==='hotel'||guestFloor(zone))return resortPoints(zone,keys)
   if(civicRoom(zone))return civicActions(zone)
-  if(zone==='city')return [...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS,...DIRECTORY]
+  if(zone==='city')return [...storefrontPoints,...counterSeats,...propertyPoints().filter(p=>!p.id.startsWith('property:desk-')),...PUBLIC_SEATS,...DIRECTORY]
   const home=residentialAt(zone)
   if(home?.building.block!==undefined&&home.level===0&&!home.stairs)return propertyPoints().filter(p=>p.id==='property:desk-'+home.building.block)
   if(zone==='casino')return [
@@ -165,7 +166,7 @@ function walkable(zone:WorldZone,x:number,z:number,caveOpen:boolean){
   }
   if(openDoorway(x,z))return true
   if(Object.entries(footprint).some(([key,b])=>{const o=origins[key as Venue];return box(x,z,o.x,o.z,b.w/2+.15,b.d/2+.15)}))return false
-  if(urbanObstacle(x,z)||officeObstacle(x,z)||!passableLand(x,z)||Math.hypot(x-shared.fountain.x,z-shared.fountain.z)<shared.fountain.radius||treeObstacle(x,z)||townFixture(x,z))return false
+  if(urbanObstacle(x,z)||!passableLand(x,z)||Math.hypot(x-shared.fountain.x,z-shared.fountain.z)<shared.fountain.radius||treeObstacle(x,z)||townFixture(x,z))return false
   for(const room of buildings){
     const {width,back,front}=PLAN[room],p=localSite(room,x,z),side=Math.abs(p.x)
     if(publicWall(room,p.x,p.z,.28))return false

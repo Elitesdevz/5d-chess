@@ -2,7 +2,7 @@ import type {Resolved} from './parcels.ts'
 import type {Unit,Tenure} from '../../src/world/housing.ts'
 import type {Building,Door,Rect,Wall,Opening,Floor,Stair,Fixture,HomePose} from '../../src/world/residential.ts'
 import {along} from '../../src/world/geo.ts'
-import {layouts,houseStyles,houseDesign,flatEdges} from '../../src/world/house-styles.ts'
+import {layouts,houseStyles,houseDesign,flatEdges,towerClerk} from '../../src/world/house-styles.ts'
 export function residences(s:Resolved){
   const {streets:STREETS,houses,apartments:RESIDENCES}=s
   const HOMES=houses.map(h=>[h.x,h.z])
@@ -16,6 +16,12 @@ export function residences(s:Resolved){
       bedrooms:i===2?2:1,layout,tenure:(floor===1&&i===block||block===2?'resident':(i+block+floor-1)%2?'rent':'buy') as Tenure,
       price:((i+block+floor-1)%2?60+(4+i)*18:800+(4+i)*280)+(floor-1)*((i+block+floor-1)%2?18:180),
     })))),
+    ...s.towers.flatMap((t,i)=>Array.from({length:t.levels-1},(_,j):Unit=>{
+      const floor=j+1,block=RESIDENCES.length+i
+      return {id:'loft-'+i+'-'+floor,name:t.name+' · '+floor+'01',x:t.x-1.43,z:t.z,facing:1,width:t.w-2.86,block,floor,
+        bedrooms:1,layout:floor===t.levels-1?'Top-floor apartment':'Full-floor apartment',
+        tenure:floor%2?'rent':'buy',price:floor%2?90+floor*16:1000+floor*240}
+    })),
   ]
   const floor=():Floor=>({walls:[],fixtures:[],doors:[],points:[],units:[],tiles:[]})
   const all:Building[]=[]
@@ -48,7 +54,7 @@ export function residences(s:Resolved){
     if(kind==='counter'&&unit)f.points.push({...along(item,0,-d/2-.4,yaw),id:'drawer:'+id,label:'Open storage drawer',range:1.08,unit})
     if(kind==='fridge')f.points.push({...along(item,0,-d/2-.4,yaw),id:'fridge:'+id,label:'Open fridge',range:1.08,unit})
   }
-  function plan(f:Floor,r:Rect,id:string,template:number,upper=false){
+  function plan(f:Floor,r:Rect,id:string,template:number,upper=false,sideEntry=false){
     const {l,r:right,b,f:front}=r,w=right-l,row=b+(upper?3:3.18),family=template===2
     const split=l+w*(family?.5:.57)
     const interior=(label:string,at:number,reverse?:boolean)=>door(at,id+'-'+label,undefined,reverse)
@@ -87,7 +93,8 @@ export function residences(s:Resolved){
     if(family&&w>7)fixture('media',l+2.32,front-.27,1.25,.39,Math.PI)
     const kitchenFront=family?row+2.25:row
     const run=Math.min(1.72,front-kitchenFront-1.04)
-    fixture('counter',right-.34,kitchenFront+run/2+.09,run,.58,Math.PI/2)
+    if(sideEntry)fixture('counter',right-1.75,front-.36,run,.58)
+    else fixture('counter',right-.34,kitchenFront+run/2+.09,run,.58,Math.PI/2)
     fixture('fridge',right-.4,front-.52,.67,.7,Math.PI/2)
     if(!family&&w>=5.7&&depth>=3.52){
       const tx=template===1?k+.62:right-1.83,tz=front-(template===1?.39:1.6)
@@ -162,6 +169,36 @@ export function residences(s:Resolved){
     }
     all.push({id,x:place.x,z:place.z,facing:1,rect,levels,style:block,block,stairs:stair,lift})
   }
+  for(const [i,t] of s.towers.entries()){
+    const block=RESIDENCES.length+i,id='block-'+block,rect=bounds(-t.w/2,t.w/2,4.6-t.d,4.6)
+    const lift={x:rect.r-1.35,z:3.02},levels=Array.from({length:t.levels},floor)
+    const split=rect.r-2.87
+    for(const [level,f] of levels.entries()){
+      const front=level||t.baseY?[win(-t.w*.25),win(t.w*.14,1.08)]:[door(0,id+'-street'),win(-t.w*.31,1.38)]
+      shell(f,rect,front,[win(-t.w*.26,1.52),win(t.w*.22,1.36)],true)
+      for(const x of [lift.x-1.12,lift.x+1.12])wall(f,'z',x,2.03,4.42)
+      wall(f,'x',4.42,lift.x-1.12,lift.x+1.12)
+      wall(f,'x',2.03,lift.x-1.12,lift.x+1.12,[{kind:'lift',at:lift.x,width:1.53}])
+      f.points.push({id:'call:'+id,x:lift.x-1.03,z:1.61,label:'Call elevator',range:1.03},
+        {id:'lift:'+id,...lift,label:'Use elevator',range:.99})
+      if(level===0){
+        furnish(f,'desk',towerClerk.x,towerClerk.z+.84,2.26,.76,Math.PI)
+        furnish(f,'sofa',rect.l+.54,1.37,1.75,.80,-Math.PI/2)
+        furnish(f,'mail',rect.r-.26,-.86,1.15,.41,Math.PI/2)
+        furnish(f,'plant',rect.l+.53,rect.b+.61,.62,.62)
+        if(t.baseY)f.points.push({id:'exchange-lobby',label:'Take the express lift to reception',x:0,z:rect.b+.85,range:1.30})
+      }else{
+        const u=UNITS.find(u=>u.block===block&&u.floor===level)!
+        const unit=bounds(rect.l,split,rect.b,rect.f),entry=1.02
+        wall(f,'z',split,rect.b,rect.f,[door(entry,u.id,u.id)])
+        f.units.push({id:u.id,rect:unit,exit:{x:split+.66,z:entry}})
+        plan(f,unit,u.id,0,false,true)
+        furnish(f,'plant',rect.r-.49,rect.b+.58,.53,.53)
+      }
+    }
+    all.push({id,x:t.x,z:t.z+t.d/2-rect.f,facing:1,rect,levels,style:t.style,block,lift,tower:true,baseY:t.baseY})
+  }
+
   for(const [i,[x,z]] of HOMES.entries()){
     const u=UNITS[i],style=houseDesign(i),levels=Array.from({length:houses[i].levels},floor)
     const rect=style===3?bounds(-3.14,3.14,-4.1,3.35):bounds(-2.94,2.94,-3.85,3.35),id=u.id

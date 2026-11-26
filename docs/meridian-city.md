@@ -2,17 +2,21 @@
 
 Open the City from the signed-in header. Walk with WASD or the joystick and press E or the interaction button at a counter or a closed residential door. The city requires WebGL 2. If graphics are unavailable, the city entrance offers Retry and Back home.
 
+[View the hotel, tower apartments, bakery and taxi rank in game](review/visualupgrade/meridian.webp)
+
 ## Bank, hotbar and homes
 
 The middle counter at Fifth Dimension Bank exchanges whole coins between the existing wallet and carried cash. Loans, repayments, rewards and existing shops continue to use the wallet. A withdrawal leaves fractional bank balances intact.
 
-Click a hotbar slot or press 1–9 to select it. Cash stacks in one slot. Each food stack holds nine of one menu item. Each weapon occupies a separate slot. The existing Food and fridge menus work with these same slots. Takeaway collection waits if an order will not fit. Eating a carried portion restores 20 HP, and a dine-in bite restores 10, up to 100.
+Click a food slot to eat or drink. With the mouse captured, press 1–9 to select a slot and click in the city to use it. The item rises into view for 2.4 seconds and restores 20 HP when the animation finishes, up to 100 HP. A slot holds nine portions of the same food, one weapon, or a stack of cash. Collect takeaway at the till or a served tray at your restaurant table. If the order will not fit, it waits for you.
 
 At the Royal, each motel key opens a private room for one hour. Store carried cash and weapons in its dresser and food in its minibar. At checkout, drawer contents go to the bank recovery counter. Minibar contents return to available inventory slots, with overflow available at the same counter.
 
 [Backstage Single](images/royal-single.webp) · [Aureate Penthouse](images/royal-penthouse.webp)
 
 Existing SQLite accounts acquire the hotbar on first use. Older food quantities fill available slots in menu order. The cash counter holds excess for collection after space opens. Contents of an expired drawer also go to the recovery counter. Expired fridge contents fill available slots and excess goes to recovery. The legacy food field remains a projection of carried food.
+
+Visit Town Hall for the searchable housing register. The four residential towers have private full-floor apartments. For Exchange Crown, choose **PH** in the Exchange lift and speak to the housing clerk above the LOT floor. Clerks sell or lease available units using the existing deed system.
 
 The kitchen counter has a storage drawer in each house and apartment. An active deed or lease allows its resident to put away and retrieve cash and weapons. Walk up to the drawer to use it. Food goes in the existing fridge.
 

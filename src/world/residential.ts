@@ -14,7 +14,7 @@ export type HomePoint=Point&{id:string;label:string;range:number;unit?:string;do
 export type HomePose=Position&{id:string;kind:'sit'|'rest';height:number}
 export type Floor={walls:Wall[];fixtures:Fixture[];doors:Door[];points:HomePoint[];units:{id:string;rect:Rect;exit:Point}[];tiles:{rect:Rect;kind:'bath'|'kitchen'|'balcony'}[]}
 export type Stair={x:number;front:number;back:number;width:number}
-export type Building={id:string;x:number;z:number;facing:number;rect:Rect;levels:Floor[];style:number;block?:number;stairs?:Stair;lift?:Point}
+export type Building={id:string;x:number;z:number;facing:number;rect:Rect;levels:Floor[];style:number;block?:number;tower?:boolean;baseY?:number;stairs?:Stair;lift?:Point}
 
 export const contains=(r:Rect,x:number,z:number,pad=0)=>x>r.l-pad&&x<r.r+pad&&z>r.b-pad&&z<r.f+pad
 export const BUILDINGS:Building[]=shared.buildings
@@ -29,7 +29,7 @@ export function residentialAt(zone:string){
   if(building&&f)return {building,level,f,stairs:kind==='stairs'}
 }
 export function streetBuilding(x:number,z:number,pad=0){
-  return BUILDINGS.find(b=>Math.abs(x-b.x)<12&&Math.abs(z-b.z)<10&&contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad))
+  return BUILDINGS.find(b=>!b.baseY&&Math.abs(x-b.x)<12&&Math.abs(z-b.z)<10&&contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad))
 }
 export function stairHeight(b:Building,z:number,side:number){
   const s=b.stairs!,t=Math.max(0,Math.min(1,((z-s.front)/(s.back-s.front)-.045)/.74))
@@ -39,7 +39,7 @@ export function residentialHeight(zone:string,x:number,z:number){
   const a=residentialAt(zone)
   if(!a)return
   const {building:b,level,stairs}=a
-  return level*STOREY+(stairs?stairHeight(b,(z-b.z)*b.facing,(x-b.x)*b.facing-b.stairs!.x):0)
+  return (b.baseY??0)+level*STOREY+(stairs?stairHeight(b,(z-b.z)*b.facing,(x-b.x)*b.facing-b.stairs!.x):0)
 }
 export interface LiftState {level:number;to?:number;started?:number;ends?:number;opened:number}
 export interface ResidentialView {doors:Record<string,number>;lifts:Record<string,LiftState>;fridge?:string;fridges?:string[]}
@@ -77,6 +77,7 @@ function doorHit(d:Door,x:number,z:number,angle:number,radius=.205){
   return end>-radius&&end<d.width+radius&&Math.abs(normal)<.047+radius
 }
 export function residentialOccludes(b:Building,x:number,y:number,z:number,state:ResidentialView|undefined,now:number){
+  y-=b.baseY??0
   const level=Math.floor((y+.10)/STOREY),f=b.levels[level]
   if(!contains(b.rect,x,z,.14)||y<0||level>b.levels.length)return false
   const s=b.stairs,inStairwell=s&&Math.abs(x-s.x)<s.width&&z>=Math.min(s.front,s.back)&&z<=Math.max(s.front,s.back)
@@ -130,7 +131,7 @@ export function residentialStep(zone:string,x:number,z:number,keys:readonly stri
     return Math.abs(p.x)<item.w/2+radius*.83&&Math.abs(p.z)<item.d/2+radius*.83
   }))return false
   if(contains(b.rect,dx,dz)||f.tiles.some(t=>t.kind==='balcony'&&contains({...t.rect,b:t.rect.b+.22,l:t.rect.l+.22,r:t.rect.r-.22,f:t.rect.f+.25},dx,dz)))return homeZone(b.id,level)
-  return previous&&level>0?false:'city'
+  return previous&&(level>0||b.baseY)?false:'city'
 }
 export function residentialPoints(zone:string,position:Point,keys:readonly string[],state?:ResidentialView):HomePoint[]{
   const found=residentialAt(zone)

@@ -2,6 +2,8 @@ import {mapVersion} from './load-map.ts'
 import {DIRECTORY} from './urban-layout.ts'
 import {ResortUI} from './resort-ui.ts'
 import {openArmory} from './armory-ui.ts'
+import {streetCounter} from './street-counter.ts'
+import {storefront} from './storefronts.ts'
 import {ArcadeControls,counterUI} from './arcade-ui.ts'
 import {jigsaw} from '../jigsaw.ts'
 import {RestaurantUI} from './restaurant-ui.ts'
@@ -54,10 +56,11 @@ chatForm.onsubmit=async e=>{
 }
 let resortUI:ResortUI|undefined
 const packUI=new ArcadeControls(cast('city-pack'),action,syncLoadout)
-function syncLoadout(){stage?.setLoadout(packUI.weapon,(op,target)=>packUI.trigger(op,target))}
+function syncLoadout(){stage?.setLoadout(packUI.weapon,(op,target)=>packUI.trigger(op,target),()=>packUI.eat())}
 let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:ResidentialServices|undefined,view:WorldView|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
+let closeWhenIdle:{action:string;station:string}|undefined
 let updateArmory:((next:WorldView)=>void)|undefined
 let viewKey='',shownService='',lastFloor='';let closeAfterFloor=false
 let stake=25,choice:RouletteChoice='white',activeTable=-1,tableKey=''
@@ -246,6 +249,24 @@ function accepted(next:WorldView & {mapVersion?:string},start:number,reposition=
       render()
       return
     }
+    if(service.startsWith('front:')){
+      stage?.lock(true)
+      const front=storefront(service)!
+      if(front.id==='hall'){
+        const render=()=>{if(view)services?.property('property:registry',view,async unit=>{await action('housing',{unit});render()})}
+        render()
+      }else if(front.id==='office')void services?.open('advisor')
+      else {
+        const render=(receipt='')=>{
+          if(view?.interaction===service)streetCounter(dialog,front,view,receipt,async(op,item)=>{
+            await action('arcade',{operation:op,item,sequence:view!.arcade!.sequence})
+            render(op==='treatment'?'Treatment complete.':'Added to your inventory.')
+          },to=>action('teleport',{to}))
+        }
+        render()
+      }
+      return
+    }
     if(service.startsWith('property:')){
       stage?.lock(true)
       const render=()=>{if(view)services?.property(service,view,async unit=>{await action('housing',{unit});render()})}
@@ -280,14 +301,18 @@ async function action(name:string,data:object){
     if(name==='use')await presence()
     if(closed)return
     const t=Date.now()
-    accepted(await api<WorldView>('/world/'+name,{...data,mapVersion,scene:true}),t,name==='resort-floor'||name==='teleport'||name==='exit-cave')
+    accepted(await api<WorldView>('/world/'+name,{...data,mapVersion,scene:true}),t,name==='floor'&&(data as {symbol?:string}).symbol==='residences'||name==='use'&&(data as {target?:string}).target==='exchange-lobby'||name==='resort-floor'||name==='teleport'||name==='exit-cave')
     if(name==='stand'||name==='stand-scenery'||name==='teleport')stage?.resumeMouse()
   }catch(error){
     if(error instanceof ApiError&&error.status===412)unavailable('Meridian has a new map. Retry to load it.')
     else showError(error instanceof Error?error.message:'City action failed')
     throw error
   }
-  finally{performing=false;updateSelection()}
+  finally{
+    performing=false;updateSelection()
+    const pending=closeWhenIdle;closeWhenIdle=undefined
+    if(pending&&!dialog.open&&view?.interaction===pending.station)void action(pending.action,{station:pending.station}).catch(()=>{})
+  }
 }
 function use(point?:WorldAction){
   if(view?.arcade?.custody){
@@ -327,11 +352,14 @@ host.querySelector<HTMLButtonElement>('[data-world-use]')!.onclick=()=>stage?.ac
 dialog.addEventListener('close',()=>{
   updateArmory=undefined
   syncControls();if(!paused)stage?.resumeMouse()
-  if(view?.interaction?.startsWith('resort:'))void action('close-resort',{station:view.interaction}).catch(()=>{})
-  if(view?.interaction==='food'||view?.interaction?.startsWith('fridge:'))void action('close-fridge',{}).catch(()=>{})
+  const station=view?.interaction
+  if(!station||dialog.open)return
+  const close=station.startsWith('resort:')?'close-resort':station==='food'||station.startsWith('fridge:')?'close-fridge':undefined
+  if(!close)return
+  if(performing)closeWhenIdle={action:close,station}
+  else void action(close,{station}).catch(()=>{})
 })
 host.querySelector<HTMLButtonElement>('[data-city-camera]')!.onclick=()=>stage?.toggleCamera()
-host.querySelector<HTMLButtonElement>('[data-world-food]')!.onclick=()=>{shownService='';void action('food',{}).catch(()=>{})}
 document.addEventListener('keydown',event=>{
   if(closed||puzzleDialog.open)return
   if(event.key==='Escape'){

@@ -1,3 +1,4 @@
+import {counterInterior} from './storefronts.ts'
 import {shared} from './map-data.ts'
 import {circle,distance,LANDMARKS,PLACES,point,pond,railZ,STREETS,distSegment,type Point} from './city-plan.ts'
 import {SIGNAL_HEADS} from './traffic.ts'
@@ -20,7 +21,7 @@ export function pathClearance(p:Point,pad=0){
   return PATHS.some(path=>path.purpose!=='drive'&&path.points.slice(1).some((b,i)=>distSegment(p,path.points[i],b)<path.width/2+pad))
 }
 export function urbanObstacle(x:number,z:number){
-  if(LANDMARKS.some(b=>Math.abs(x-b.x)<b.w/2+.20&&Math.abs(z-b.z)<b.d/2+.20))return true
+  if(LANDMARKS.some(b=>b.id!=='police'&&counterInterior(b,x,z,.42,.20)))return true
   if(Math.hypot(x-circle.x,z-circle.z)<circle.radius-circle.width/2-.25)return true
   const p=point(x,z)
   if(hardscape.some(b=>Math.abs(x-b.x)<b.w+.16&&Math.abs(z-b.z)<b.d+.16))return true

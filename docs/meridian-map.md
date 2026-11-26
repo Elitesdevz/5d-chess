@@ -12,6 +12,8 @@ Use Node 24 and install dependencies with `npm ci`. Run `npm run world:build` to
 
 ## Build contract
 
+Ground-level residential towers use the same frontage coordinates as houses. The Exchange Crown lobby follows the Exchange parcel and sits one storey above the highest trading floor.
+
 The compiler resolves parcels and floor templates, validates lots and entrances, lays sidewalks and crossing ramps, selects street furniture, and bakes the traffic graph and pedestrian preferences. Where an older parcel occupies part of a sidewalk band, a lateral approach meets the next clear section. The tests sample every entry path against all building footprints. The shared section carries the physical data used by Node and the renderer. The visual section adds paving rectangles, inlays and keyed facade finishes. The seed governs fine variation. Door states, traffic, people, seats, custody, purchases and puzzle progress still come from the authoritative city. A route search can account for moving vehicles at play time.
 
 The manifest contains the area ID, schema, SHA-256 release version and two content-addressed sections. Hashes cover the exact serialized JSON bytes. The version covers schema, area and both section descriptors. There are no timestamps in the output. Changing the serialization or section contract requires reviewing the schema and its readers. The build currently ships Meridian.
@@ -26,7 +28,7 @@ Stage both packages before switching traffic. Compare the static manifest versio
 
 ## Local verification
 
-The default sections measure 470,849 and 38,838 bytes for shared and visual data respectively. Node gzip measured 38,308 and 6,228 bytes. The manifest is 495 bytes. Local Wrangler returned `application/json`, respected the cache headers and returned 304 for matching ETags on all three files. A missing section returned 404. Login and City HTML, legacy venue redirects, and the separate API route were checked locally. Chromium observed zero map requests on the lobby and exactly three on first City entry. A separate altered build moved the shop by one metre, loaded its matching version in Chromium, and accepted a front-door walk and counter interaction at its new location.
+The default sections measure 620,394 and 38,838 bytes for shared and visual data respectively. Node gzip measured 46,683 and 6,228 bytes. The manifest is 495 bytes. Local Wrangler returned `application/json`, respected the cache headers and returned 304 for matching ETags on all three files. A missing section returned 404. Login and City HTML, legacy venue redirects, and the separate API route were checked locally. Chromium observed zero map requests on the lobby and exactly three on first City entry. A separate altered build moved the shop by one metre, loaded its matching version in Chromium, and accepted a front-door walk and counter interaction at its new location.
 
 The map preview is a plan projection. Artist-authored meshes, fixture animation, terrain shading and dynamic actors remain in the game renderer. Use the in-game captures to judge the street-level result.
 

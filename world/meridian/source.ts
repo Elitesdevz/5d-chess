@@ -163,12 +163,13 @@ export const meridian = {
     {"id":"block-1","name":"Eastbank Flats","levels":5,"frontage":{"street":"eastbank","along":42.0,"side":"left","setback":9.0}},
     {"id":"block-2","name":"Meridian House","levels":5,"frontage":{"street":"civic","along":23.5,"side":"left","setback":10.65}}
   ],
-  offices: [
-    {"x":-68,"z":-22,"w":8,"d":11,"h":19},
-    {"x":-70,"z":0,"w":10,"d":12,"h":29},
-    {"x":-68,"z":24,"w":9,"d":8,"h":13},
-    {"x":66,"z":-20,"w":9,"d":10,"h":17}
+  towers: [
+    {id:'tower-0',name:'Copperline Lofts',w:8,d:11,levels:6,style:0,frontage:{street:'west',along:53,side:'left',setback:5.5}},
+    {id:'tower-1',name:'Atlas House',w:10,d:12,levels:9,style:1,frontage:{street:'west',along:31,side:'left',setback:7.5}},
+    {id:'tower-2',name:'Garden Terrace',w:9,d:8,levels:4,style:3,frontage:{street:'west',along:7,side:'left',setback:5.5}},
+    {id:'tower-3',name:'Glassworks',w:9,d:10,levels:5,style:4,frontage:{street:'glass',along:53,side:'left',setback:8.1}},
   ],
+  exchangeApartments:{name:'Exchange Crown',w:15.7,d:14.8,levels:4,style:1},
   market: [
     [-15.5,16.75],
     [14,18]

@@ -97,9 +97,10 @@ export class CityServices {
     const render=()=>{
       const q=search.value.trim().toLowerCase()
       const matches=FLOOR_LIST.map((stock,i)=>({...stock,floor:i+1})).filter(s=>!q||s.symbol.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)||String(s.floor)===q)
-      list.innerHTML=(q?'':'<button type="button" data-floor=""><b>G</b><span>Reception</span></button>')+
+      const sky='exchange crown apartments'.includes(q)?'<button type="button" data-floor="residences"><b>PH</b><span><strong>Exchange Crown</strong><small>Apartment reception</small></span></button>':''
+      list.innerHTML=sky+(q?'':'<button type="button" data-floor=""><b>G</b><span>Reception</span></button>')+
         matches.map(s=>`<button type="button" data-floor="${s.symbol}"><b>${s.floor}</b><span><strong>${s.symbol}</strong> ${safeText(s.name)}</span><span aria-hidden="true">›</span></button>`).join('')
-      if(!matches.length)list.innerHTML='<p class="world-muted">No matching floors.</p>'
+      if(!matches.length&&!sky)list.innerHTML='<p class="world-muted">No matching floors.</p>'
     }
     search.oninput=render
     list.onclick=e=>{

@@ -1,8 +1,10 @@
 import {housingClerk} from './service-staff.ts'
 import * as T from 'three'
+import {travelPrint} from './hotel-finishes.ts'
+import {parquet,wovenRug} from './domestic-finishes.ts'
 import {Scenery} from './landscape.ts'
 import {batchOpaque} from '../casino/scene/static-batch.ts'
-import {RESIDENCES,UNITS} from './housing.ts'
+import {RESIDENCES,UNITS,towerClerk} from './housing.ts'
 import {BUILDINGS,STOREY,doorSwing,liftHeight,liftOpening,stairHeight,type Building,type Fixture,type Rect,type ResidentialView} from './residential.ts'
 import {CityGuest} from './guest.ts'
 
@@ -22,7 +24,7 @@ const palette=[
 ]
 function modelFurniture(f:Fixture,p:Scenery,y:number,tone:number){
   const c=Math.cos(f.yaw),s=Math.sin(f.yaw),{w,d}=f
-  const add=(kind:'box'|'post'|'crown',x:number,h:number,z:number,a:number,b:number,e:number,color:number)=>p.add(kind,f.x+c*x+s*z,y+h,f.z+c*z-s*x,a,b,e,color,f.yaw)
+  const add=(kind:'box'|'post'|'crown'|'cushion',x:number,h:number,z:number,a:number,b:number,e:number,color:number)=>p.add(kind,f.x+c*x+s*z,y+h,f.z+c*z-s*x,a,b,e,color,f.yaw)
   const box=(x:number,h:number,z:number,a:number,b:number,e:number,color:number)=>add('box',x,h,z,a,b,e,color)
   const legs=(h:number,shade=walnut)=>{for(const x of [-w*.39,w*.39])for(const z of [-d*.35,d*.35])box(x,h/2,z,.075,h,.075,shade)}
   const top=(height:number,color=oak)=>box(0,height,0,w,.075,d,color)
@@ -33,21 +35,23 @@ function modelFurniture(f:Fixture,p:Scenery,y:number,tone:number){
     const seats=f.kind==='sofa'?Math.round(w/.77):1
     for(let n=0;n<seats;n++){
       const x=((n+.5)/seats-.5)*w*.83
-      box(x,.445,-d*.055,w*.81/seats,.12,d*.76,tone)
-      box(x,.72,d*.245,w*.77/seats,.38,.105,tone)
+      add('cushion',x,.445,-d*.055,w*.81/seats,.12,d*.76,tone)
+      add('cushion',x,.72,d*.245,w*.77/seats,.38,.105,tone)
     }
     for(const side of [-1,1])box(side*w*.452,.57,-.02,.11,.25,d*.89, f.kind==='chair'?oak:tone)
     if(f.kind==='sofa'){
-      box(-w*.29,.574,d*.16,.30,.25,.15,0xd8bb91)
-      box(w*.31,.57,d*.16,.29,.235,.15,0xa5a485)
+      add('cushion',-w*.29,.574,d*.16,.30,.25,.15,0xd8bb91)
+      add('cushion',w*.31,.57,d*.16,.29,.235,.15,0xa5a485)
     }
   }else if(f.kind==='bed'){
     legs(.18);box(0,.28,0,w,.22,d,walnut)
-    box(0,.46,0,w*.96,.18,d*.965,chalk)
-    box(0,.55,.24,w*.99,.13,d*.74,tone)
+    add('cushion',0,.46,0,w*.96,.18,d*.965,chalk)
+    add('cushion',0,.55,.24,w*.99,.13,d*.74,tone)
     box(0,.62,.3,w*.98,.026,.86,0xdabda5)
     box(0,.76,-d*.46,w,.72,.12,walnut)
-    for(const x of [-w*.23,w*.23])box(x,.57,-d*.35,w*.43,.115,.4,porcelain)
+    for(let i=-2;i<=2;i++)add('cushion',i*w*.185,.83,-d*.423,w*.175,.47,.07,tone)
+    for(const dz of [-.28,-.21,.20,.28])box(0,.641,.3+dz,w*.97,.013,.024,tone)
+    for(const x of [-w*.23,w*.23])add('cushion',x,.57,-d*.35,w*.43,.115,.4,porcelain)
     box(-w*.625,.38,-d*.37,.35,.56,.42,oak)
     add('post',-w*.625,.72,-d*.37,.078,.22,.078,brass)
     add('post',-w*.625,.88,-d*.37,.24,.19,.24,0xeed6ad)
@@ -68,6 +72,12 @@ function modelFurniture(f:Fixture,p:Scenery,y:number,tone:number){
       box(x,.68,-d*.545,.17,.026,.043,brass)
       box(x,.56,-d*.535,w/sections-.036,.018,.022,walnut)
     }
+    // Open shelves sit above the existing kitchen run, within its footprint.
+    box(0,1.54,d*.30,w*.94,.065,d*.42,oak)
+    for(const dx of [-.32,.32])box(w*dx,1.43,d*.39,.058,.17,.09,brass)
+    for(let i=0;i<4;i++)add('post',w*(-.33+i*.14),1.66,d*.30,.105,.16,.105,i%2?porcelain:0x658981)
+    add('post',w*.28,1.64,d*.31,.19,.12,.19,0xb98156)
+    for(let i=0;i<4;i++)add('crown',w*.28+(i%2-.5)*.09,1.75+i*.025,d*.32,.14,.13,.11,i%2?0x708e62:0x55775c)
     const x=-w*.26
     box(x,.945,0,.42,.022,.43,0x758b8e)
     box(x,.953,0,.31,.016,.32,iron)
@@ -85,6 +95,10 @@ function modelFurniture(f:Fixture,p:Scenery,y:number,tone:number){
       box(.49,h+.055,-.20,.4,.02,.13,iron)
       box(-.39,h+.054,.07,.3,.014,.24,chalk)
       box(-.49,h+.068,.09,.15,.01,.2,0xe1ad84)
+    }else if(f.kind==='coffee'){
+      for(let i=0;i<3;i++)box(-w*.20,h+.064+i*.035,.01,.30-i*.013,.032,.205,[tone,porcelain,0xb37051][i])
+      add('post',w*.25,h+.111,-d*.10,.105,.13,.105,porcelain)
+      add('post',w*.25,h+.179,-d*.10,.078,.008,.078,walnut)
     }else{
       add('post',0,h+.085,0,.28,.075,.28,porcelain)
       add('crown',.08,h+.156,.02,.16,.16,.17,0xbc7854)
@@ -158,7 +172,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
   const lifts:{id:string;x:number;group:T.Group;leaves:T.Mesh[];landings:T.Mesh[][];indicator:HTMLCanvasElement;texture:T.CanvasTexture;shown:number}[]=[]
   const floors:{group:T.Group;x:number;z:number}[]=[]
   for(const b of BUILDINGS){
-    const root=new T.Group();root.position.set(b.x,0,b.z);root.rotation.y=b.facing<0?Math.PI:0;parent.add(root)
+    const root=new T.Group();root.position.set(b.x,b.baseY??0,b.z);root.rotation.y=b.facing<0?Math.PI:0;parent.add(root)
     const tone=palette[b.style],r=b.rect
     const label=(text:string,x:number,y:number,z:number,width:number)=>letter(root,text,[width,.26],[x,y,z],'#f7ebd3','#34474b')
     const width=r.r-r.l,length=r.f-r.b,cz=(r.b+r.f)/2
@@ -190,9 +204,10 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       const hole=s&&level>0?{l:s.x-s.width,r:s.x+s.width,b:Math.min(s.back,s.front),f:Math.max(s.back,s.front)}:undefined
       for(const a of slabs(r,hole).flatMap(part=>shaft&&part.l<shaft.l&&part.r>shaft.r?slabs(part,shaft).filter(q=>q.f>q.b):[part])){
         tile(a,-.097,.194,level?tone.floor:0xb9a98d)
+        if((level||b.block===undefined)&&a.r>a.l&&a.f>a.b)parquet(inside,a,tone.floor)
         if(level)tile(a,-.205,.016,0xf0e3cb)
       }
-      if(b.block!==undefined){
+      if(b.block!==undefined&&!b.tower){
         box(0,.013,.315,width-.13,.012,2.62,level?0x9b8165:0xcbbcad)
         for(const z of [-.81,1.42])box(0,.022,z,width-.28,.007,.054,tone.trim)
         for(const x of [-5.2,-1.8,1.8,5.2]){
@@ -206,7 +221,7 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
           for(const x of [-6.28,-2.30])box(x,.022,-5.71,.062,.007,2.91,0xc1a57d)
         }
       }
-      if(b.block!==undefined){
+      if(b.block!==undefined&&!b.tower){
         box(0,-.014,0.315,width-.13,.018,2.62,level?0x9b8165:0xcbbcad)
         if(level===0)box(0,.017,6.17,2.44,.03,1.51,0x4e625e)
       }
@@ -282,7 +297,8 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
         stamp.scale.set(item.w+.72,item.d+.67,1)
         stamp.updateMatrix()
         contacts.setMatrixAt(i,stamp.matrix)
-        modelFurniture(item,furniture,0,tone.fabric)
+        const variant=(b.style+level+(item.unit?.charCodeAt(item.unit.length-1)??0))%5
+        modelFurniture(item,furniture,0,item.unit?palette[variant].fabric:tone.fabric)
         if(item.kind==='fridge'){
           const fridge=new T.Group();fridge.position.set(item.x,0,item.z);fridge.rotation.y=item.yaw;inside.add(fridge)
           moving.add(fridge)
@@ -292,18 +308,16 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
           smallBox(door,item.w/2,1.37,-.04,item.w*.98,.046,.029,liftWall)
           fridges.set('fridge:'+item.id,door)
         }
-        if(item.kind==='sofa'&&item.unit){
-          const x=item.x-.397,z=item.z+.26
-          if(Math.abs(item.yaw)>.1){
-            box(x,1.84,z,.059,.51,.78,walnut)
-            box(x+.036,1.84,z,.021,.43,.69,chalk)
-            box(x+.052,1.77,z+.11,.021,.20,.32,tone.fabric)
-          }
-        }
         if(item.kind==='sofa'){
-          const x=item.x+Math.sin(item.yaw)*-.89,z=item.z+Math.cos(item.yaw)*-.89
-          box(x,.022,z,1.32,.017,1.52,i%2?0xb99881:0xb3aa8f)
-          for(const side of [-1,1])box(x+side*.59,.033,z,.026,.009,1.42,0xe4cbb0)
+          const reach=item.unit?.86:1.12
+          const x=item.x-Math.sin(item.yaw)*reach,z=item.z-Math.cos(item.yaw)*reach
+          wovenRug(inside,variant,x,z,item.w+.26,item.unit?1.12:1.52,item.yaw)
+          if(item.unit&&Math.abs(item.yaw+Math.PI/2)<.01){
+            const frame=new T.Group();inside.add(frame)
+            frame.position.set(item.x-.37,1.83,item.z);frame.rotation.y=Math.PI/2
+            smallBox(frame,0,0,0,.98,.66,.044,leaf)
+            travelPrint(frame,variant,0,0,.029,.90,.58)
+          }
         }
       }
       if(s){
@@ -347,21 +361,31 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
       }
       if(b.block!==undefined){
         if(level===0){
-          label('RECEPTION',4.63,1.21,.33,2.2)
-          for(let i=1;i<5;i++)label('FLOOR '+i+'   '+i+'01 – '+i+'03',-.38,2.68-i*.31,r.b+.14,2.56)
-          clerks.push(new CityGuest(root,housingClerk.x,housingClerk.z,0xb58366,b.style===0?0x42625c:0x3a4b65,true))
+          const clerk=b.tower?towerClerk:housingClerk
+          label('RECEPTION',clerk.x,1.21,clerk.z+1.17,1.62)
+          if(b.tower){
+            if(!b.baseY)label(RESIDENCES[b.block].name.toUpperCase(),0,2.53,r.b+.15,3.82)
+            if(b.baseY){
+              box(0,1.16,r.b+.13,1.64,2.32,.13,iron)
+              for(const x of [-.40,.40])box(x,1.15,r.b+.21,.75,2.22,.06,0x927b57)
+              label('EXPRESS  •  RECEPTION',0,2.68,r.b+.24,1.74)
+            }
+          }else for(let i=1;i<5;i++)label('FLOOR '+i+'   '+i+'01 – '+i+'03',-.38,2.68-i*.31,r.b+.14,2.56)
+          clerks.push(new CityGuest(root,clerk.x,clerk.z,0xb58366,b.style===0?0x42625c:0x3a4b65,true))
         }else for(const [,u] of f.units.entries()){
           const d=f.doors.find(d=>d.id===u.id)!
           const info=UNITS.find(entry=>entry.id===u.id)!
-          label(info.name.split(' · ')[1],d.x+.81,level*STOREY+1.67,d.z+.14,.50)
+          const number=info.name.split(' · ')[1]
+          if(b.tower)label(number,d.x+.14,level*STOREY+1.64,d.z-.75,.48).rotation.y=Math.PI/2
+          else label(number,d.x+.81,level*STOREY+1.67,d.z+.14,.50)
         }
       }
-      const lamps=b.block!==undefined?(level===0?[[-4.3,-4],[3.6,-3.2],[0,3.9]]:[[-7.3,.27],[-2.95,.27],[2.15,.27],[6.89,.27],...f.units.map(u=>[(u.rect.l+u.rect.r)/2,-4.38])]):[[0,1.99],[-1.12,-2.61]]
+      const lamps=b.tower?[[0,0],[b.lift!.x,.43],[-1.4,r.b+1.6]]:b.block!==undefined?(level===0?[[-4.3,-4],[3.6,-3.2],[0,3.9]]:[[-7.3,.27],[-2.95,.27],[2.15,.27],[6.89,.27],...f.units.map(u=>[(u.rect.l+u.rect.r)/2,-4.38])]):[[0,1.99],[-1.12,-2.61]]
       for(const [x,z] of lamps){
         box(x,STOREY-.11,z,.78,.098,.5,iron)
         smallBox(inside,x,STOREY-.166,z,.65,.039,.40,luminaire)
       }
-      if(b.block!==undefined&&level===0){
+      if(b.block!==undefined&&!b.tower&&level===0){
         for(const x of [-6.84,-1.55,2.44]){
           box(x,2.18,-8.32,.54,.38,.034,walnut)
           box(x,2.18,-8.294,.46,.30,.019,tone.fabric)
@@ -390,7 +414,27 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
     }
     const top=b.levels.length*STOREY,p=new Scenery()
     const box=(x:number,y:number,z:number,w:number,h:number,d:number,c:number)=>p.add('box',x,y,z,w,h,d,c)
-    if(b.block!==undefined){
+    if(b.tower&&b.block!==undefined){
+      const facade=r.f+.14
+      if(!b.baseY){
+        box(0,2.62,facade+.42,3.60,.16,1.15,iron)
+        label(RESIDENCES[b.block].name.toUpperCase(),0,2.86,facade+.12,3.55)
+      }
+      // Warm stone spandrels and recessed vertical fins keep the city silhouette.
+      for(let i=0;i<b.levels.length;i++){
+        const y=i*STOREY
+        box(0,y+.17,facade,width+.14,.23,.17,tone.trim)
+        box(0,y+2.83,facade,width+.15,.24,.16,tone.trim)
+        for(const side of [-1,1]){
+          box(side*(width*.5-.12),y+1.54,facade,.21,3.0,.27,brass)
+          box(side*width*.5,y+.17,cz,.20,.24,length+.21,tone.trim)
+        }
+      }
+      box(0,top+.11,cz,width+.5,.24,length+.56,tone.trim)
+      box(0,top+.37,cz,width-.42,.38,length-.4,tone.roof)
+      box(width*.22,top+.91,cz-.82,width*.38,.83,length*.39,iron)
+      for(const side of [-1,1])box(side*(width*.5-.21),top+.72,facade,.28,1.35,.30,brass)
+    }else if(b.block!==undefined){
       label(RESIDENCES[b.block].name,0,2.64,r.f+.20,4.85)
       for(const x of [-10.27,-7.04,-5.65,-1.57,1.57,7.06,10.27]){
         if(b.style===0){
@@ -448,6 +492,11 @@ export function residentialArt(parent:T.Object3D,letter:Letter){
           for(const x of [-2.45,-1.61])box(x,.216,r.f+.38,.075,.432,.28,walnut)
         }
       }
+      // Porch lights and louvred shutters give each house a readable street entrance.
+      box(-.76,1.70,r.f+.15,.16,.31,.11,iron)
+      smallBox(root,-.76,1.70,r.f+.221,.098,.21,.047,luminaire)
+      for(const wx of [-1.89,1.89])for(const side of [-1,1])for(let j=0;j<9;j++)
+        box(wx+side*.726,1.00+j*.145,r.f+.155,.28,.043,.044,tone.roof)
       const x=b.style===3?2.53:1.98
       box(x,.19,r.f+.13,.85,.34,.46,b.style===3?iron:0x9c744f)
       for(let i=0;i<4;i++){

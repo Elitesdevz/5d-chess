@@ -3,6 +3,11 @@ import * as T from 'three'
 import {Scenery} from './landscape.ts'
 import {circle,FLEET,LANDMARKS,PARK_FEATURES,PARKING,PARKS,pond,railZ,STREETS,type Landmark, type VehicleKind} from './city-plan.ts'
 import {JUNCTIONS,SIGNAL_HEADS,type TrafficView,type Vehicle} from './traffic.ts'
+import {groundShadow} from './shade.ts'
+import {finishFloor} from './hotel-finishes.ts'
+import {coachwork} from './coachwork.ts'
+import {batchOpaque} from '../casino/scene/static-batch.ts'
+import {counterLayout,STOREFRONTS} from './storefronts.ts'
 import {STREET_PROPS} from './urban-layout.ts'
 import type {Letter} from './residential-art.ts'
 import {TERRAIN_EXTENT,terrainHeight} from './terrain.ts'
@@ -71,12 +76,21 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
     p.box(x,y,z+.062,.034,height,.046,edge)
     p.box(x,y-height/2,z+.137,width+.18,.078,.25,edge)
   }
-  const door=(x=0,width=1.7)=>{
-    reveal(x,1.18,front+.015,width,2.24,accent,0x40585a)
-    for(const dx of [-.17,.17])p.box(x+dx,1.09,front+.12,.045,.22,.05,0xbfa779)
-  }
-  p.box(0,.10,0,w+.15,.20,d+.16,trim)
-  p.box(0,h*.5,0,w,h,d,wall)
+  const publicRoom=b.id!=='police'
+  if(publicRoom){
+    const entry=b.id==='fire'?1.38:.77
+    p.box(0,-.018,0,w,.085,d,trim)
+    p.box(0,h*.5,-front,w,h,.15,wall)
+    for(const side of [-1,1]){
+      p.box(side*(w/2-.062),h*.5,0,.125,h,d,wall)
+      const wing=w/2-entry
+      p.box(side*(entry+wing/2),h*.5,front,wing,h,.15,wall)
+      p.box(side*(entry+.02),1.15,front+.025,.085,2.3,.22,accent)
+    }
+    p.box(0,(h+2.29)/2,front,entry*2,h-2.29,.15,wall)
+    p.box(0,2.31,front+.03,2*entry+.12,.11,.23,accent)
+    counterRoom(g,p,b,label,accent)
+  }else p.box(0,h/2,0,w,h,d,wall)
   p.box(0,h-.06,0,w+.22,.20,d+.25,accent)
   p.box(0,h+.12,0,w+.38,.14,d+.42,trim)
   const upper=Math.max(0,Math.floor((h-3.3)/2.2))
@@ -96,7 +110,6 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
       p.box(side*(w/2+.104),y-.67,z,.19,.085,1.37,trim)
     }
   }
-  if(b.id!=='fire')door(0,b.id==='hall'?2.57:b.id==='market'?2.8:1.8)
   if(b.id!=='station')p.slab(0,front+.48,w,.98,0xad9f87,-.008)
   const entranceSignWidth=Math.min(w-.4,w*.84,b.id==='hall'?7:8.2)
   const entranceSignHeight=w>8?.55:.42
@@ -129,6 +142,7 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
   }else if(b.id==='fire'){
     for(const x of [-4.55,-.69,3.22]){
       const z=front+.065
+      if(x===-.69){p.box(0,2.94,z,3.37,.69,.13,metal);continue}
       p.box(x,1.65,z,3.35,3.23,.11,0xc1bfb0)
       for(let i=0;i<13;i++)p.box(x,.15+i*.245,z+.071,3.20,.017,.043,coal)
       p.box(x,2.34,z+.102,2.4,.38,.037,0x6d9199)
@@ -229,12 +243,106 @@ function building(parent:T.Object3D,b:Landmark,label:Letter){
       for(let i=0;i<4;i++)p.box(w*.41,1.16+i*.15,front+.384,.165,.055,.041,i%2?0xaf5050:accent,0,-.33)
     }
   }
+  const service=STOREFRONTS.find(f=>f.id===b.id)
+  if(service){
+    const x=w*.34
+    // Perpendicular blade and sconce remain legible walking along the shopfront.
+    p.box(x,2.88,front+.31,.06,.07,.67,coal)
+    p.box(x,2.59,front+.52,.12,.53,.65,accent)
+    const emblem=service.care?'✚':b.id==='station'?'↔':b.id==='school'||b.id==='books'?'♞':b.id==='bakery'?'B':b.name[0]
+    for(const side of [-1,1])sign(emblem,x+side*.068,2.59,front+.52,.58,.42).rotation.y=side*Math.PI/2
+    p.box(-x,1.87,front+.19,.22,.36,.16,coal)
+    p.box(-x,1.87,front+.28,.15,.25,.07,light)
+    if(service.stock){
+      p.box(x,.80,front+.27,w*.27,.09,.48,wood)
+      p.box(x,.72,front+.45,w*.28,.10,.06,trim)
+      for(let j=0;j<3;j++){
+        const xx=x+(j-1)*w*.073
+        p.box(xx,.89,front+.28,w*.07,.11,.26,0xbd926b)
+        if(service.stock.includes('apple'))for(let k=0;k<3;k++)p.orb(xx+(k-1)*.061,1.00,front+.27+(k%2)*.06,.11,.11,.11,j%2?0xad5941:0x9ca95e)
+        else if(b.id==='bakery')p.orb(xx,.99,front+.29,.22,.12,.13,0xd6a665)
+        else p.post(xx,1.01,front+.27,.11,.18,.11,j%2?accent:trim)
+      }
+    }
+  }
   for(const side of [-1,1]){
     const x=side*(w*.26)
     p.box(x,h+.21,-d*.24,.57,.27,.58,coal)
     for(let i=0;i<3;i++)p.box(x,h+.358,-d*.25+(i-1)*.12,.45,.035,.045,metal)
   }
   p.finish(g)
+}
+function counterRoom(g:T.Group,p:Props,b:Landmark,label:Letter,accent:number){
+  const {w,d,h}=b,back=-d/2,ceiling=Math.min(3.1,h-.19)
+  const {counterW,counterZ,shelfX,benchX,benchZ,bench}=counterLayout(b)
+  const care=['hospital','fire','pharmacy'].includes(b.id),food=['bakery','market','petrol','restaurant','cafe'].includes(b.id)
+  const floor=care?0xdce2d7:food?0xc6ac88:0xaf9477
+  p.box(0,.006,0,w-.13,.052,d-.13,floor)
+  p.box(0,ceiling,0,w-.08,.09,d-.09,0xe5dcc9)
+  finishFloor(g,care||b.id==='bakery'||b.id==='station'?'terrazzo':'parquet',0,.036,0,w-.13,d-.13,care?1.12:2.1)
+  for(const side of [-1,1]){
+    p.box(side*(w/2-.10),.46,0,.07,.90,d-.15,accent)
+    p.box(side*(w/2-.14),.94,0,.07,.055,d-.15,wood)
+  }
+  p.box(0,.47,counterZ,counterW,.86,.57,accent)
+  p.box(0,.93,counterZ,counterW+.06,.10,.65,care?cream:wood)
+  const panels=Math.max(3,Math.round(counterW/.45))
+  for(let i=0;i<panels;i++)p.box((i+.5-panels/2)*counterW/panels,.45,counterZ+.298,counterW/panels-.045,.68,.045,wood)
+  p.box(-counterW*.28,1.029,counterZ,.29,.085,.24,coal)
+  p.box(-counterW*.28,1.172,counterZ-.04,.26,.21,.04,coal)
+  p.box(-counterW*.28,1.17,counterZ-.012,.20,.145,.012,0x87b4ac)
+  const boardW=Math.min(2.25,w*.53)
+  p.box(0,2.13,back+.12,boardW+.13,.81,.062,wood)
+  label(g,b.name,[boardW,.69],[0,2.13,back+.159],'#ffefd0','#344d49')
+  for(const y of [.69,1.25,1.81]){
+    p.box(shelfX,y,0,.39,.052,d*.52,wood)
+    for(let j=0;j<6;j++){
+      const z=(j-2.5)*d*.078,col=[cream,accent,0xb77e59,0x748e85][(j+Math.round(y*4))%4]
+      if(b.id==='bakery'){
+        p.orb(shelfX+.04,y+.097,z,.23,.14,.21,0xe0ae6d)
+        for(const dz of [-.05,.04])p.box(shelfX+.04,y+.154,z+dz,.12,.013,.018,cream,.2)
+      }else if(b.id==='florist'){
+        p.post(shelfX,y+.10,z,.13,.16,.13,0xb97b59)
+        p.orb(shelfX+.03,y+.23,z,.22,.16,.22,leaf);p.orb(shelfX+.055,y+.32,z,.11,.12,.11,col)
+      }else if(b.id==='books'||b.id==='hall'||b.id==='school'||b.id==='office'){
+        p.box(shelfX,y+.17,z,.22,.28+(j%3)*.037,.096,col)
+        p.box(shelfX+.115,y+.22,z,.011,.033,.072,cream)
+      }else if(care||b.id==='barber'){
+        p.post(shelfX,y+.13,z,.114,.21,.114,col);p.post(shelfX,y+.257,z,.078,.042,.078,coal)
+      }else {
+        p.box(shelfX,y+.14,z,.18,.23,.16,col);p.box(shelfX+.094,y+.14,z,.014,.083,.125,cream)
+      }
+    }
+  }
+  if(bench){
+    p.box(benchX,.23,benchZ,.43,.37,1.22,wood)
+    p.box(benchX,.45,benchZ,.58,.13,1.41,accent)
+    p.box(benchX+.255,.70,benchZ,.095,.49,1.4,accent)
+    for(const z of [-.63,.63])p.box(benchX,.55,benchZ+z,.52,.073,.065,wood)
+  }
+  for(const x of (w>7?[-w*.28,0,w*.28]:[0])){
+    p.post(x,ceiling-.20,.34,.034,.35,.034,coal)
+    p.post(x,ceiling-.39,.34,.47,.13,.47,accent)
+    p.post(x,ceiling-.465,.34,.40,.026,.40,light)
+  }
+  const cx=counterW*.23
+  if(b.id==='cafe'||b.id==='restaurant'){
+    p.box(cx,1.23,counterZ-.12,.51,.43,.31,metal)
+    p.box(cx,1.21,counterZ+.047,.42,.18,.038,coal)
+    for(const x of [-.12,.12]){p.post(cx+x,1.033,counterZ+.10,.101,.11,.101,cream);p.post(cx+x,1.16,counterZ+.075,.033,.09,.033,metal)}
+  }else if(b.id==='school'){
+    for(let i=0;i<8;i++)for(let j=0;j<8;j++)p.box(cx+(i-3.5)*.061,.989,counterZ+(j-3.5)*.061,.06,.013,.06,(i+j)%2?coal:cream)
+    for(let i=0;i<6;i++)p.post(cx+(i-2.5)*.061,1.046,counterZ+(i%2?.15:-.15),.038,.10,.038,i%2?coal:cream)
+  }else if(care){
+    p.box(cx,1.14,counterZ,.41,.32,.23,cream)
+    p.box(cx,1.14,counterZ+.12,.066,.19,.018,0xa8554d);p.box(cx,1.14,counterZ+.13,.19,.059,.018,0xa8554d)
+  }else if(b.id==='barber'){
+    p.box(cx,1.58,back+.11,.73,1.18,.09,wood)
+    p.box(cx,1.58,back+.173,.65,1.10,.045,0xa8c1bf)
+  }else if(b.id==='bakery'||b.id==='market'){
+    p.box(cx,1.0,counterZ,.62,.045,.37,cream)
+    for(let i=0;i<6;i++)p.orb(cx+((i%3)-1)*.17,1.078,counterZ+(Math.floor(i/3)-.5)*.14,.16,.12,.14,b.id==='bakery'?0xc99a61:i%2?0xb96849:0x92a165)
+  }
 }
 function railway(parent:T.Object3D,label:Letter){
   const trackside=new T.Group();trackside.name='Railway';parent.add(trackside)
@@ -402,16 +510,33 @@ function streetFurniture(parent:T.Object3D,label:Letter){
   }
   p.finish(parent)
 }
-const tire=new T.CylinderGeometry(.285,.285,.16,12),rim=new T.CylinderGeometry(.15,.15,.17,12)
+const tire=new T.CylinderGeometry(.285,.285,.16,24),rim=new T.CylinderGeometry(.164,.164,.17,24),wheelFace=new T.CircleGeometry(.16,24)
+function hubcap(){
+  const canvas=document.createElement('canvas');canvas.width=canvas.height=96
+  const c=canvas.getContext('2d')!
+  c.translate(48,48)
+  c.fillStyle='#b3b7ad';c.fillRect(-48,-48,96,96);c.fillStyle='#3a454a'
+  c.beginPath();c.arc(0,0,40,0,2*Math.PI);c.fill()
+  for(let i=0;i<7;i++){
+    c.rotate(2*Math.PI/7);c.fillStyle='#a9b4ad';c.beginPath()
+    c.moveTo(-4,1);c.lineTo(-7,-38);c.lineTo(-1,-40);c.lineTo(5,-13);c.lineTo(12,-38);c.lineTo(16,-35);c.lineTo(7,0);c.fill()
+  }
+  c.fillStyle='#d3d3bf';c.beginPath();c.arc(0,0,11,0,2*Math.PI);c.fill()
+  const map=new T.CanvasTexture(canvas);map.colorSpace=T.SRGBColorSpace;map.anisotropy=4
+  return new T.MeshStandardMaterial({map,roughness:.44})
+}
 const tireMat=color(0x283136),rimMat=color(0xa0a4a1),headMat=color(0xffe3a7),brakeMat=new T.MeshBasicMaterial({color:0xfe4c37})
 const darkBrake=color(0x803b3b)
-function car(v:Vehicle,parent:T.Object3D){
+function car(v:Vehicle,parent:T.Object3D,alloy:T.Material,shade:T.Material,label:Letter){
   const g=new T.Group(),p=new Props();parent.add(g)
   const {w,length:l,height:h}=FLEET[v.kind],paint=v.paint??(v.kind==='fire'?0xbb3f3e:v.kind==='taxi'?0xcfa652:v.kind==='police'?0xe2e4d5:0xe8dfcf)
   const dispatch=v.kind==='fire'||v.kind==='police'||v.kind==='ambulance'
   const commercial=['van','truck','ambulance','fire'].includes(v.kind)
   const wheels:T.Mesh[]=[],brakes:T.Mesh[]=[]
-  p.box(0,.52,0,w,.52,l*.972,paint)
+  const shadow=new T.Mesh(new T.PlaneGeometry(w*1.74,l*1.27),shade)
+  shadow.rotation.x=-Math.PI/2;shadow.position.set(.065,.019,.045);g.add(shadow)
+  coachwork(g,v.kind,paint,commercial)
+  p.box(0,.39,0,w*.82,.19,l*.83,coal)
   p.box(0,.40,l*.475,w*.96,.13,.15,coal);p.box(0,.42,-l*.48,w*.95,.14,.126,coal)
   p.box(0,.563,l*.485,w*.39,.13,.039,coal)
   if(commercial){
@@ -421,27 +546,62 @@ function car(v:Vehicle,parent:T.Object3D){
     for(const side of [-1,1])p.box(side*w*.468,h*.75,l*.31,.044,h*.21,l*.24,glass)
     if(v.kind==='fire')for(const side of [-1,1])for(let i=0;i<6;i++)p.box(side*w*.49,.89+i*.126,-l*.19,.045,.036,l*.42,metal)
   }else{
-    const cabin=v.kind==='wagon'||v.kind==='suv'?.64:.53
-    p.box(0,h*.713,-l*.08,w*.85,h*.45,l*cabin,glass)
-    p.box(0,h*.938,-l*.11,w*.86,h*.10,l*cabin*.96,paint)
-    for(const side of [-1,1])for(const dz of [-.28,-.03,.19])p.box(side*w*.439,h*.705,l*dz,.050,h*.405,.09,paint)
+    // Hood creases, rear deck and paired grille bars catch the sky at street level.
+    for(const side of [-1,1]){
+      p.box(side*w*.275,.732,l*.35,.021,.017,l*.12,paint)
+      p.box(side*w*.49,.62,-l*.08,.024,.035,.15,metal)
+    }
+    for(let j=0;j<3;j++)p.box(0,.51+j*.044,l*.492,w*(.42-j*.025),.019,.024,metal)
+    if(v.kind==='suv'||v.kind==='wagon')for(const side of [-1,1])p.box(side*w*.28,h+.032,-l*.1,.045,.058,l*.36,coal)
   }
   for(const side of [-1,1]){
-    p.box(side*w*.49,.67,l*.25,.15,.115,.18,paint)
+    p.box(side*w*.493,.775,l*.184,.15,.047,.065,coal)
+    p.box(side*w*.54,.807,l*.181,.12,.088,.137,paint)
     p.box(side*w*.508,.701,.04,.038,.039,.16,darkBrake.color.getHex())
     p.box(side*w*.467,.405,0,.055,.06,l*.58,coal)
     for(const z of [-l*.30,l*.30]){
       const a=new T.Group();a.position.set(side*w*.449,.266,z);g.add(a)
       const tyre=new T.Mesh(tire,tireMat);tyre.rotation.z=Math.PI/2;a.add(tyre)
-      const hub=new T.Mesh(rim,rimMat);hub.rotation.z=Math.PI/2;hub.position.x=.022*side;hub.add(new T.Mesh(new T.BoxGeometry(.13,.024,.028),darkBrake));a.add(hub);wheels.push(hub)
+      const hub=new T.Mesh(rim,rimMat);hub.rotation.z=Math.PI/2;hub.position.x=.022*side;const face=new T.Mesh(wheelFace,alloy)
+      face.rotation.x=side*Math.PI/2;face.position.y=-side*.087;hub.add(face);a.add(hub);wheels.push(hub)
     }
-    const head=new T.Mesh(new T.BoxGeometry(.27,.135,.047),headMat);head.position.set(side*w*.336,.641,l*.487);g.add(head)
+    if(!commercial){
+      for(const z of [-.094,.164]){
+        p.box(side*w*.492,.586,l*z,.012,.245,.014,coal)
+        p.box(side*w*.496,.679,l*(z+.037),.025,.021,.109,metal)
+      }
+    }
+    p.box(side*w*.337,.636,l*.484,.34,.174,.064,coal)
+    p.box(side*w*.425,.634,l*.487,.073,.12,.071,0xd5a45e)
+    const head=new T.Mesh(new T.BoxGeometry(.27,.135,.047),headMat);head.position.set(side*w*.323,.641,l*.499);g.add(head)
     const rear=new T.Mesh(new T.BoxGeometry(.255,.11,.049),darkBrake);rear.position.set(side*w*.342,.648,-l*.487);g.add(rear);brakes.push(rear)
     if(dispatch)p.box(side*w*.507,.66,0,.016,.11,l*.87,v.kind==='fire'?0xefcf9e:0x467b99)
   }
+  if(commercial){
+    for(const side of [-1,1]){
+      p.box(side*w*.245,h*.59,-l*.489,w*.462,h*.64,.038,paint)
+      p.box(side*w*.06,h*.50,-l*.514,.039,.18,.027,coal)
+      p.box(side*w*.49,h*.51,-l*.15,.030,.081,l*.65,v.kind==='ambulance'?0xca624d:metal)
+      if(v.kind==='ambulance'){
+        p.box(side*w*.498,h*.72,-l*.20,.032,.39,.111,0xab4d45)
+        p.box(side*w*.498,h*.72,-l*.20,.032,.11,.39,0xab4d45)
+      }
+    }
+    if(v.kind==='fire'){
+      for(const x of [-.19,.19])p.box(x,h+.078,-l*.12,.052,.072,l*.65,metal)
+      for(let i=0;i<9;i++)p.box(0,h+.089,l*(-.41+i*.074),.38,.043,.033,metal)
+    }
+  }
+  if(v.kind==='taxi')for(const side of [-1,1])for(let j=0;j<8;j++)
+    p.box(side*w*.495,.65,l*(j-3.5)*.053,.021,.075,.11,j%2?coal:cream)
   if(dispatch||v.kind==='taxi')p.box(0,h+.049,l*.10,w*.49,.096,.21,v.kind==='taxi'?0xf2db78:v.kind==='fire'?0xdb5b44:0x5297b8)
+  if(v.kind==='taxi'){
+    const sign=label(g,'TAXI',[.45,.11],[0,h+.058,l*.10+.108],'#313434','#e7c065')
+    const rear=sign.clone();rear.position.z-=.216;rear.rotation.y=Math.PI;g.add(rear)
+  }
   for(const side of [-1,1])p.box(0,.447,l*.493*side,.26,.104,.022,daylight)
   p.finish(g)
+  batchOpaque(g,new Set<T.Object3D>([...wheels,...brakes]))
   return {g,wheels,brakes}
 }
 export function urbanArt(scene:T.Scene,label:Letter){
@@ -459,6 +619,7 @@ export function urbanArt(scene:T.Scene,label:Letter){
     lamps.set(p.id,{x,z});props.finish(scene)
   }
   const green=new T.MeshBasicMaterial({color:0x83e3ac})
+  const alloy=hubcap(),shade=groundShadow()
   const models=new Map<string,ReturnType<typeof car>>(),clock=new Map<string,number>()
   return (t:TrafficView|undefined,dt:number,reduced:boolean)=>{
     if(!t)return
@@ -466,7 +627,7 @@ export function urbanArt(scene:T.Scene,label:Letter){
     for(const v of t.vehicles){
       active.add(v.id)
       let view=models.get(v.id)
-      if(!view){view=car(v,scene);models.set(v.id,view);view.g.position.set(v.x,terrainHeight(v.x,v.z),v.z);view.g.rotation.y=v.yaw}
+      if(!view){view=car(v,scene,alloy,shade,label);models.set(v.id,view);view.g.position.set(v.x,terrainHeight(v.x,v.z),v.z);view.g.rotation.y=v.yaw}
       const {g}=view,weight=reduced?1:1-Math.exp(-dt*10)
       g.visible=true
       g.position.x+=(v.x-g.position.x)*weight
