@@ -142,14 +142,11 @@ export class RestaurantUI{
       <p>Drag the filled ticket into the box.</p>`
   }
   private dining(r:RestaurantView){
-    const meal=r.meal,ready=meal?.status==='served',items=meal&&orderItems(meal)
-    const portions=items?Math.max(3,orderSize(items)):3
-    const sip=items&&!items.burger&&!items.fries
-    return `<div class="kfc-dine"><div aria-hidden="true">${foodSymbol(items?.burger?'burger':items?.fries?'fries':'cola')}</div>
-      <div><h3>${items?orderText(items):'Take a seat'}</h3><p>${meal?(ready?'Enjoy your meal.':'The kitchen is preparing your order.'):'Order at any register when you’re ready.'}</p>
-        ${ready?`<div class="kfc-bites" aria-label="${portions-meal.bites} portions left">${Array.from({length:portions},(_,i)=>`<i class="${i<meal.bites?'finished':''}"></i>`).join('')}</div>`:''}
-      </div></div>
-      <div class="kfc-choice">${ready?button('eat',sip?'Take a sip':'Take a bite',(this.current?.you.eatingUntil??0)>this.current!.now?'disabled':'','kfc-primary'):''}${button('stand','Stand up')}</div>`
+    const meal=r.meal,ready=meal?.status==='served'&&!meal.takeaway
+    const status=ready?'Your tray has arrived. Collect it, then choose an item from your inventory.':
+      meal?'The kitchen is preparing your order.':'Order at any register when you’re ready.'
+    return `<h3>${meal?orderText(orderItems(meal)):'Your table'}</h3><p>${status}</p>
+      <div class="kfc-choice">${ready?button('collect','Collect tray','','kfc-primary'):''}${button('stand','Stand up')}</div>`
   }
   private drag(control:HTMLButtonElement){
     const kind=control.dataset.drag!
@@ -225,7 +222,7 @@ export class RestaurantUI{
       await this.send(command,{...data,point:this.point})
       if(command==='buy')this.bought=undefined
       if(command==='collect'||command==='stand'||command==='pickup'||command==='hire'||command==='deliver'||command==='kitchen'&&'gesture' in data&&data.gesture!=='flip')this.dialog.close()
-      this.notice=command==='eat'&&!this.current?.restaurant?.meal?'Meal finished.':command==='take'?'Ticket sent to the kitchen.':command==='step'&&!this.current?.restaurant?.work?'Task complete. Payment sent.':''
+      this.notice=command==='take'?'Ticket sent to the kitchen.':command==='step'&&!this.current?.restaurant?.work?'Task complete. Payment sent.':''
     }catch(error){this.notice=error instanceof Error?error.message:'Please try again.'}
     finally{
       this.pending=false;controls.forEach(control=>control.disabled=false)

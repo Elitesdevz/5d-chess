@@ -9,7 +9,7 @@ import type {CompanyView} from '../equity-v2.ts'
 import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
 import {BITE_MS,type Grocery} from './food.ts'
-import {foodVisual,staffProps} from './restaurant-art.ts'
+import {eatingHand,foodVisual,staffProps} from './restaurant-art.ts'
 import {WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts'
 import {terrainHeight,inPool} from './terrain.ts'
 import * as T from 'three'
@@ -59,6 +59,7 @@ export class CityStage {
   private held=new HeldModel(true)
   private chase=false
   private chaseVisible=false
+  private snackHand?:T.Group
   private snacks=new Map<Grocery,T.Group>()
   private eat?:()=>boolean
   private weapon?:WeaponId
@@ -597,16 +598,20 @@ export class CityStage {
     }
     this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt,!!s?.phase)
     const bite=this.view?.arcade?.bite,eating=!!bite&&now<bite.ends
-    for(const snack of this.snacks.values())snack.visible=false
+    this.parent.toggleAttribute('data-eating',eating)
+    if(this.snackHand)this.snackHand.visible=eating
     if(bite&&eating){
+      if(!this.snackHand){this.snackHand=eatingHand();this.camera.add(this.snackHand)}
+      const hand=this.snackHand
+      for(const [id,snack] of this.snacks)snack.visible=id===bite.item
       let snack=this.snacks.get(bite.item)
-      if(!snack){snack=foodVisual(bite.item);this.camera.add(snack);this.snacks.set(bite.item,snack)}
+      if(!snack){snack=foodVisual(bite.item);hand.add(snack);this.snacks.set(bite.item,snack)}
       const t=T.MathUtils.clamp(1-(bite.ends-now)/BITE_MS,0,1)
       const raised=Math.sin(Math.PI*t)**.7
       snack.visible=true
-      snack.position.set(.17-.12*raised,-.36+.22*raised,-.53+.21*raised)
-      snack.rotation.set(raised*(bite.item==='cola'||bite.item==='coffee'||bite.item==='tea'?.69:.23),-.3,.09*Math.sin(t*Math.PI*4))
-      snack.scale.setScalar(1.35-.35*t)
+      hand.position.set(.17-.12*raised,-.36+.22*raised,-.53+.21*raised)
+      hand.rotation.set(raised*(bite.item==='cola'||bite.item==='coffee'||bite.item==='tea'?.69:.23),-.3,.09*Math.sin(t*Math.PI*4))
+      hand.scale.setScalar(1.35-.35*t)
     }
     const free=!eating&&!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
     this.chaseVisible=false

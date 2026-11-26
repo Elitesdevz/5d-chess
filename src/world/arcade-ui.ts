@@ -2,9 +2,16 @@ import {WEAPONS,isWeapon,type Item,type Stack} from './arcade.ts'
 import {safeText} from './services.ts'
 import type {WorldView} from './model.ts'
 
+import {foodSymbol} from './restaurant-ui-icons.ts'
 import {GROCERIES,isGrocery} from './food.ts'
 const groceries=Object.fromEntries(GROCERIES.map(i=>[i.id,i.name]))
 const itemName=(item:Item)=>isWeapon(item)?WEAPONS[item].name:item==='cash'?'Cash':groceries[item]
+function slotButton(s:Stack|null,i:number,selected:number){
+  const name=s?itemName(s.item):'Empty',label=`Slot ${i+1} · ${name}`+(s&&s.count>1?' ×'+s.count:'')
+  const icon=!s?'':isWeapon(s.item)?`<img alt="" src="/chess/overrun/catalog-${WEAPONS[s.item].model}.webp">`:foodSymbol(s.item)
+  const title=s&&isGrocery(s.item)?'Consume '+name:label
+  return `<button data-slot="${i}" aria-pressed="${selected===i}" aria-label="${label}" title="${title}"><small aria-hidden="true">${i+1}</small>${icon}<span class="slot-name">${name}</span>${s&&s.count>1?`<b aria-hidden="true">${s.count}</b>`:''}</button>`
+}
 export class ArcadeControls {
   private view?:WorldView
   private selected=0
@@ -51,9 +58,9 @@ export class ArcadeControls {
     const key=JSON.stringify([mag?.rounds,reloading,a.slots,this.selected,targets.map(t=>[t.id,t.hp]),drops.map(d=>d.id)])
     if(key===this.key)return
     this.key=key
-    this.host.querySelector('.arcade-slots')!.innerHTML=a.slots.map((s,i)=>`<button data-slot="${i}" aria-pressed="${this.selected===i}" title="${s&&isGrocery(s.item)?'Consume '+itemName(s.item):'Slot '+(i+1)}"><small>${i+1}</small>${s?itemName(s.item)+' ×'+s.count:'—'}</button>`).join('')
+    this.host.querySelector('.arcade-slots')!.innerHTML=a.slots.map((s,i)=>slotButton(s,i,this.selected)).join('')
     const priorTarget=this.host.querySelector<HTMLSelectElement>('select')?.value
-    const s=a.slots[this.selected],actions=this.host.querySelector('.arcade-actions')!
+    const actions=this.host.querySelector('.arcade-actions')!
     actions.innerHTML=(weapon?`<span class="city-ammo">${reloading?'Reloading…':(mag?.rounds??WEAPONS[weapon].magazine)+' / '+WEAPONS[weapon].magazine}</span><select aria-label="Weapon target"><option value="">Open air</option>${targets.map(t=>`<option value="${safeText(t.id)}">${safeText(t.label)} · ${t.hp} HP</option>`).join('')}</select><button data-op="fire" ${reloading?'disabled':''}>Fire</button><button data-op="reload" ${reloading?'disabled':''}>Reload</button>`:'')+
       drops.map(d=>`<button data-op="pickup" data-target="${safeText(d.id)}">Pick up items</button>`).join('')
     const select=actions.querySelector('select')

@@ -1,4 +1,5 @@
 import * as T from 'three'
+import {Hand} from '../casino/scene/rig.ts'
 import {batchOpaque} from '../casino/scene/static-batch.ts'
 import {box,mesh,cylinder} from '../casino/scene/geometry.ts'
 import {COUNTERS,GRILLS,RESTAURANT,RESTAURANT_NAME,MENU,SEATS,TABLES,SUPPLIES,restaurantPoints,type KfcMess,type KitchenHand,type Patty,type OrderItems,type RestaurantView} from './restaurant-model.ts'
@@ -127,6 +128,15 @@ export function foodVisual(item:Exclude<KitchenHand,'tray'>|import('./food.ts').
     if(item==='fries')for(let k=0;k<7;k++)box(food,[.013,.062+(k%2)*.027,.014],[.013*(k%4-1.5),.105,.022*(Math.floor(k/4)-.5)],chip,.003)
   }else cylinder(food,.089,.029,[0,.024,0],rawMeat,14)
   return food
+}
+export function eatingHand(){
+  const root=new T.Group(),skin=metal(0xaa7b5c)
+  const hand=new Hand(root,skin)
+  hand.pose(.98);hand.root.rotation.set(-.28,-.18,-.55);hand.root.position.set(.046,.013,.044)
+  const sleeve=mesh(new T.CylinderGeometry(.048,.066,.24,16),ink,root,[.091,-.034,.175])
+  sleeve.rotation.set(1.12,.13,-.34)
+  batchOpaque(root)
+  return root
 }
 function tray(items:OrderItems={burger:1,fries:1,cola:1}){
   const t=new T.Group()

@@ -265,20 +265,34 @@ body[data-page="world"]{height:100svh;display:flex;flex-direction:column;margin:
 .royal-service summary { cursor:pointer; padding:.4rem 0 }
 .royal-pay { padding:.22rem 0; border-bottom:1px solid #484d47 }
 #city-world:has(#city-pack:not([hidden])) .world-use{bottom:102px}
-#city-pack{position:absolute;z-index:4;left:50%;bottom:12px;transform:translateX(-50%);max-width:min(600px,94%);border:1px solid #b5c3ac55;border-radius:9px;background:#172a30ed;color:#f4eed9;padding:6px 10px;font:600 12px/1.4 system-ui}
-.arcade-meter{color:#b3e8d6;margin-bottom:4px}
-.arcade-slots{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:3px}
-.arcade-slots button{background:#254044;color:#fff2d8;min-width:32px;border:1px solid #627774;border-radius:4px;padding:2px;font-size:11px}
-.arcade-slots small{display:block;color:#b6c9b8}
-.arcade-slots [aria-pressed=true]{outline:2px solid #edc17c}
+#city-pack{box-sizing:border-box;position:absolute;z-index:4;left:50%;bottom:12px;transform:translateX(-50%);width:min(410px,94%);border:1px solid #b5c3ac66;border-radius:10px;background:linear-gradient(155deg,#203c3bf4,#152a30f5);box-shadow:0 5px 22px #0b15194f;color:#f4eed9;padding:5px 8px 7px;font:600 11px/1.4 system-ui}
+.world[data-eating] :is(#city-pack,.world-use,.city-reticle,.kfc-hud,.world-camera,.world-chat,.world-names,.world-stick,.world-pause-toggle){visibility:hidden}
+.arcade-meter{color:#c0ead9;margin-bottom:4px;font-variant-numeric:tabular-nums}
+.arcade-slots{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
+.arcade-slots button{display:grid;place-items:center;position:relative;cursor:pointer;min-width:0;aspect-ratio:1;background:linear-gradient(145deg,#344d4c,#22373a);color:#fff2d8;border:1px solid #66817b;border-radius:5px;padding:0}
+.arcade-slots img{width:90%;height:82%;object-fit:contain}
+.arcade-slots small,.arcade-slots b{position:absolute;z-index:1;font:600 9px/1 system-ui;text-shadow:0 1px 2px #172423}
+.arcade-slots small{top:3px;left:4px;color:#ccdbd3}.arcade-slots b{right:2px;bottom:2px;background:#1b2e30d9;border-radius:2px;padding:2px}
+.arcade-slots .slot-name{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.arcade-slots [aria-pressed=true]{border-color:#ffe0a8;box-shadow:inset 0 -3px #dfb578}
+.arcade-slots :focus-visible{outline:2px solid #f7d18e;outline-offset:2px}
+.arcade-actions:empty{display:none}
+.kfc-food-bread i:first-child{inset:10px 2px 5px;border-radius:65% 55% 42% 45%;background:radial-gradient(ellipse at 36% 20%,#f2ce87,#bd8049 75%);transform:rotate(-15deg)}
+.kfc-food-bread i:nth-child(2){width:3px;height:8px;top:13px;left:9px;border-radius:80%;background:#fce5ac;transform:rotate(20deg);box-shadow:6px -3px #fce5ac,12px -6px #fce5ac}
+.kfc-food-apple i:first-child{inset:10px 6px 3px;border-radius:48% 50% 58% 54%;background:radial-gradient(at 31% 24%,#fb946b,#c8433f 51%,#843637)}
+.kfc-food-apple i:nth-child(2){width:5px;height:9px;left:18px;top:5px;border-radius:80% 0;background:#86ac72;transform:rotate(24deg)}
+.kfc-food-coffee i:first-child,.kfc-food-tea i:first-child{inset:10px 8px 2px;background:linear-gradient(#efe0bd 27%,#42746f 28% 70%,#d9b58d 71%);clip-path:polygon(0 0,100% 0,84% 100%,15% 100%)}
+.kfc-food-tea i:first-child{background:linear-gradient(#f0dfbf 27%,#7b915f 28% 70%,#d7b48b 71%)}
+.kfc-food-coffee i:nth-child(2),.kfc-food-tea i:nth-child(2){inset:7px 6px 23px;border-radius:50%;background:#fbefd7;box-shadow:0 2px #c6a983}
+.kfc-food-cash i:first-child{inset:10px 2px 8px;border-radius:2px;background:linear-gradient(90deg,#6d9b83 42%,#ead796 43% 59%,#7aa78d 60%);border:1px solid #b2cba7;box-shadow:0 2px #365c4f,0 4px #819d7f;transform:rotate(-12deg)}
 .arcade-actions{display:flex;align-items:center;gap:6px;margin-top:4px}
 .arcade-actions button,.arcade-counter button{cursor:pointer}
 .arcade-counter{display:flex;flex-wrap:wrap;gap:10px;padding:10px}
 .arcade-counter h3,.arcade-counter p{width:100%}
 .arcade-counter input{width:6em}
-@media(max-width:700px){#city-pack{bottom:5px;font-size:10px}.arcade-slots button{min-width:26px;font-size:9px}.world-chat{bottom:106px}}
+@media(max-width:700px){#city-pack{bottom:5px;font-size:10px}.arcade-slots button{min-width:0}.arcade-slots .kfc-food{transform:scale(.85)}.world-chat{bottom:106px}}
 .city-ammo{font:600 .78rem monospace;white-space:nowrap}.arcade-actions{flex-wrap:wrap}
-.world-camera{position:absolute;right:7.4rem;top:.72rem;z-index:3;padding:.48rem .68rem;border:1px solid #a7b3a54d;border-radius:.55rem;background:#182c29;color:#f5ead4;font-weight:650}
+.world-camera{position:absolute;right:3.8rem;top:.72rem;z-index:3;padding:.48rem .68rem;border:1px solid #a7b3a54d;border-radius:.55rem;background:#182c29;color:#f5ead4;font-weight:650}
 .city-reticle{display:none;pointer-events:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #333}
 [data-armed] .city-reticle{display:block}
 [data-hit] .city-reticle{width:12px;height:12px;border:2px solid #ffdf86;background:transparent;transform:translate(-50%,-50%) rotate(45deg);border-radius:1px}
