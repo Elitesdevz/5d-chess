@@ -19,5 +19,6 @@ The five weapon meshes and first-person gloves in public/overrun were baked
 from the pistol, smg, ar, shotgun and sniper builders in src/gunmodels.js.
 The city groups meshes by material, simplifies their geometry and shares each
 model between the shop rack, first-person view and multiplayer characters.
+The catalog WebP product images are renders of these same five meshes.
 Overrun inspired the sprint, aim, firing feedback and magazine/reload controls.
 City movement limits, prices, hit points, timings and custody rules are local.

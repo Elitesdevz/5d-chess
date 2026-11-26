@@ -205,6 +205,7 @@ export class CityStage {
       this.art.civic(next.zone,next.x,next.z)
       const hidden=view.arcade?.recoveringStaff??[]
       this.art.staff.forEach((a,i)=>a.root.visible=!hidden.includes(i<bankStaff.length?staffId('bank',i):staffId('exchange',i-bankStaff.length)))
+      this.art.shopClerk.root.visible=!hidden.includes(staffId('gunshop',0))
       this.art.hotelClerks.forEach((a,i)=>a.root.visible=!hidden.includes(staffId('hotel',i)))
       this.art.actors.forEach((a,i)=>a.root.visible=!hidden.includes(staffId('casino',i)))
       this.art.bar.bartender.root.visible=!hidden.includes(staffId('casino',4))
@@ -615,6 +616,7 @@ export class CityStage {
     this.art.urban(this.view?.traffic,dt,this.reduced)
     this.art.homes.update(this.view?.residential,this.view?.housing?.occupied,now,dt,this.position.x,this.position.z)
     if(!this.reduced){this.art.ambient?.(now);this.art.restaurant.tick(now)}
+    if(this.zone==='gunshop')this.art.shopClerk.pose(now,this.view?.interaction==='counter'?.16:0)
     if(this.zone==='hotel')this.art.hotelClerks.forEach(actor=>actor.pose(now))
     if(this.zone==='bank'||this.zone==='exchange')this.art.staff.forEach(actor=>actor.pose(now))
     const zones=[this.view?.you.zone,this.view?.you.lift?.to].filter((z):z is WorldZone=>!!z)

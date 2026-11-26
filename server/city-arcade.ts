@@ -234,7 +234,7 @@ export class CityArcade {
           if(i<0)fail(409,'Move closer to an available drop')
           for(const item of drops[i].items)carry(p,item.item,item.count)
           drops.splice(i,1);tx.putMetadata(dropKey,drops);mirrorFood(a)
-        }else transfer(a,op,data.item as Item,quantity(data.amount??1),s.bank,s.shop,s.drawer,now)
+        }else transfer(a,op,data.item as Item,quantity(data.amount??1),s.bank,s.shop,s.drawer,now,data.payment)
         p.sequence++
       }
       return {p,drops,health}

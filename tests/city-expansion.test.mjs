@@ -74,6 +74,32 @@ test('the armory sells five weapons, validates cash and preserves magazine state
 const slots=v=>v.arcade.slots
 const count=(v,item)=>slots(v).reduce((n,s)=>n+(s?.item===item?s.count:0),0)
 
+test('armory checkout uses the chosen balance, respects capacity and charges each purchase once',async t=>{
+  const f=await fixture(t),name='Counter shopper'
+  await f.signup(name)
+  f.store.transaction(tx=>{const a=tx.users.get(name);a.wallet.coins=95.375;carry(pack(a),'cash',25)})
+  const shop=await f.counter(name,'gunshop','counter',0,-1.2)
+  const checkout=(payment,sequence=shop.arcade.sequence,item='ar')=>f.request(name,'world/arcade',{scene:true,operation:'buy',item,payment,sequence})
+  assert.match((await checkout('cash')).value.error,/Not enough carried cash/)
+  assert.equal((await checkout('unknown')).status,400)
+  const bought=await checkout('bank')
+  assert.equal(bought.status,200)
+  assert.equal(bought.value.coins,.375)
+  assert.equal(count(bought.value,'cash'),25)
+  assert.equal(count(bought.value,'ar'),1)
+  assert.equal((await checkout('bank')).status,409)
+  assert.match((await checkout('bank',bought.value.arcade.sequence,'blaster')).value.error,/Not enough banked coins/)
+  f.store.transaction(tx=>{const a=tx.users.get(name);a.wallet.coins=100;carry(pack(a),'smg',7)})
+  const full=await f.world(name,'presence')
+  assert.ok(full.arcade.slots.every(Boolean))
+  assert.match((await checkout('bank',full.arcade.sequence,'blaster')).value.error,/Free a hotbar slot/)
+  const exact=await checkout('cash',full.arcade.sequence,'blaster')
+  assert.equal(exact.status,200)
+  assert.equal(exact.value.coins,100)
+  assert.deepEqual(exact.value.arcade.slots[0],{item:'blaster',count:1})
+  assert.equal(count(exact.value,'cash'),0)
+})
+
 test('local HTTP migration, full hotbar, recovery, bank and arcade-counter transfers survive restart',async t=>{
   const f=await fixture(t),name='Mira'
   await f.signup(name)

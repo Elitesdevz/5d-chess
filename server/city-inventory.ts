@@ -2,7 +2,7 @@ import type {Account} from './accounts.ts'
 import {wallet} from './economy.ts'
 import {requireSpending} from './credit.ts'
 import {blankOrder,MENU,type OrderItems} from '../src/world/restaurant-model.ts'
-import {MAX_HP,isWeapon,WEAPONS,type Magazine,type WeaponId,SLOT_COUNT,type Item,type Stack} from '../src/world/arcade.ts'
+import {armoryQuote,MAX_HP,isWeapon,WEAPONS,type Magazine,type WeaponId,SLOT_COUNT,type Item,type Stack} from '../src/world/arcade.ts'
 import {toStockUnits,fromStockUnits} from '../src/stock-model.ts'
 import {fail} from './http.ts'
 
@@ -90,7 +90,7 @@ export function mirrorFood(a:Account){
   return food
 }
 export function heal(a:Account,amount:number){const p=pack(a);p.hp=Math.min(MAX_HP,p.hp+amount)}
-export function transfer(a:Account,operation:unknown,item:Item,amount:number,atBank:boolean,atShop:boolean,drawer:string|undefined,now:number){
+export function transfer(a:Account,operation:unknown,item:Item,amount:number,atBank:boolean,atShop:boolean,drawer:string|undefined,now:number,payment:unknown='cash'){
   const p=pack(a)
   if(operation==='withdraw'||operation==='deposit'){
     if(!atBank)fail(409,'Visit the city cash counter')
@@ -109,7 +109,15 @@ export function transfer(a:Account,operation:unknown,item:Item,amount:number,atB
     requireSpending(a,now)
     const id=item===undefined?'blaster':item
     if(!isWeapon(id))fail(400,'Choose a weapon on the rack')
-    remove(p,'cash',WEAPONS[id].price);carry(p,id,1)
+    if(payment!=='cash'&&payment!=='bank')fail(400,'Choose carried cash or banked coins')
+    if(amount!==1)fail(400,'Choose one item per purchase')
+    const w=wallet(a),price=WEAPONS[id].price
+    const quote=armoryQuote(p.slots,w.coins,id,payment)
+    if(quote.shortfall)fail(409,payment==='cash'?'Not enough carried cash. Choose banked coins or withdraw cash at the bank.':'Not enough banked coins for this purchase.')
+    if(quote.slot<0)fail(409,'Free a hotbar slot before buying this item.')
+    if(payment==='cash')remove(p,'cash',price)
+    else w.coins=fromStockUnits(toStockUnits(w.coins)-toStockUnits(price))
+    carry(p,id,1)
   }else if(operation==='recover'||operation==='take'||operation==='store'){
     if(operation==='recover'?!atBank:!drawer)fail(403,'Open the appropriate storage first')
     if(operation!=='recover'&&foodItem(item))fail(409,'Food belongs in the refrigerator')

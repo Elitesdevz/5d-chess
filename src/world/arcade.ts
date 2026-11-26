@@ -14,6 +14,21 @@ export function isWeapon(value:unknown):value is WeaponId{return typeof value===
 export type Magazine={rounds:number;readyAt:number}
 export type Item = MenuItem | 'cash' | WeaponId
 export type Stack = {item:Item; count:number}
+export type ArmoryPayment='cash'|'bank'
+export function armoryQuote(slots:readonly (Stack|null)[],coins:number,id:WeaponId,payment:ArmoryPayment){
+  const price=WEAPONS[id].price
+  const cash=slots.reduce((sum,s)=>sum+(s?.item==='cash'?s.count:0),0)
+  // Spending the last cash in an occupied slot makes it available for the item.
+  let remaining=payment==='cash'?price:0
+  const slot=slots.findIndex(s=>{
+    if(!s)return true
+    if(s.item!=='cash'||!remaining)return false
+    const used=Math.min(remaining,s.count);remaining-=used
+    return used===s.count
+  })
+  const balance=payment==='cash'?cash:coins
+  return {cash,slot,shortfall:Math.max(0,price-balance)}
+}
 export const SLOT_COUNT=9
 export const MAX_HP=100
 export const CLEAR_MINUTES=[0,10,20,40,60,90]

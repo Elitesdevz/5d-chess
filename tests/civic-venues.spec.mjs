@@ -45,7 +45,7 @@ for(const keyboard of [true,false])test('walk from Clock Square through both Civ
       if(id==='gunshop'){
         await outside(entrances.gunshop);await walk(at(id,insideDoor(id).x,insideDoor(id).z));await zone('gunshop')
         await walk(at(id,0,-1.22));await use('counter')
-        await page.getByRole('button',{name:/Buy Pistol for 25 cash/}).waitFor()
+        await page.getByRole('button',{name:/Buy Pistol for 25 banked coins/}).waitFor()
         await page.getByRole('button',{name:'Close',exact:true}).click()
       }
       const p=insideDoor(id);await walk(at(id,p.x,p.z));await walk(entrances[id]);await zone('city')

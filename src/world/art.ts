@@ -1,5 +1,5 @@
 import {royalResort} from './resort-art.ts'
-import {bankStaff,hotelStaff,exchangeStaff,casinoStaff,floorStaff} from './service-staff.ts'
+import {armoryClerk,bankStaff,hotelStaff,exchangeStaff,casinoStaff,floorStaff} from './service-staff.ts'
 import {arcadeBuildings} from './arcade-art.ts'
 import {urbanArt} from './urban-art.ts'
 import {basinBed,tunnelBed,poolLevel} from './terrain.ts'
@@ -21,7 +21,7 @@ import {buildHall,buildHallTables,WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts
 import {CityGuest} from './guest.ts'
 import {ROULETTE_ORDER} from '../casino-model.ts'
 import {SEAT_OFFSETS,type HallTable} from '../roulette-hall-model.ts'
-import {FLOOR_HEIGHT,FLOOR_LIST,CREDIT_ADVISOR,FINANCIAL_ADVISOR,BOARD_TABLE,BOARD_SEATS,PLAN,PUBLIC_DICE,floorHeight,stockFloor,type WorldZone} from './model.ts'
+import {FLOOR_HEIGHT,FLOOR_LIST,CREDIT_ADVISOR,FINANCIAL_ADVISOR,BOARD_TABLE,BOARD_SEATS,PLAN,PUBLIC_DICE,site,floorHeight,stockFloor,type WorldZone} from './model.ts'
 
 const std=(color:number,metalness=0,roughness=.74)=>new T.MeshStandardMaterial({color,metalness,roughness})
 const brass=std(0xb78b57,.65,.35),oak=std(0x372725,.15,.48),ink=std(0x182930,.28,.57)
@@ -698,6 +698,9 @@ export function makeWorldArt(open:boolean){
   gallery(exchange,'exchange');venueDetail(exchange,'exchange');batchOpaque(exchange)
   const uniforms=[[0xb38469,0x284557,1],[0xd5ad86,0x313c59,2],[0x946344,0x213344,0],[0xbc8b68,0x49676c,2],[0xc89b79,0x4b3d58,1],[0xa57556,0x304550,2]]
   const staff=[...bankStaff,...exchangeStaff].map((p,i)=>new CityGuest(i<bankStaff.length?bank:exchange,p.x,p.z,uniforms[i][0],uniforms[i][1],true,uniforms[i][2]))
+  const shopPoint=site('gunshop',armoryClerk.x,armoryClerk.z)
+  const shopClerk=new CityGuest(scene,shopPoint.x,shopPoint.z,0x95694e,0x286963,true,1)
+  shopClerk.pose(0)
   const hotelClerks=hotelStaff.map((p,i)=>new CityGuest(hotel,p.x,p.z,i?0xbb9473:0xab8069,i?0x684458:0x384a45,true,i+1))
   const lobbyDoors=slidingDoors(exchange),floor=tower(elevator(scene))
   rooms.cave.rotation.y=rooms.oasis.rotation.y=Math.PI
@@ -709,7 +712,7 @@ export function makeWorldArt(open:boolean){
     const target=zone==='cave'?.38:zone==='oasis'?.84:zone==='casino'?1.24:zone==='city'?1.95:1.62
     skylight.intensity=T.MathUtils.damp(skylight.intensity,target,3,dt)
   }
-  return {scene,civic,resort,lightZone,homes,urban,actors,staff,hotelClerks,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
+  return {scene,civic,resort,lightZone,homes,urban,actors,staff,shopClerk,hotelClerks,wheels,wagerTokens,publicDie,floor,ambient,seal,grotto,restaurant,bar,lobbyDoors}
 }
 function rouletteWagers(table:T.Group){
   const tones=[0xe9c186,0x72bcbc,0xcf8799,0xc2a8e5]

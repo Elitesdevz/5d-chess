@@ -1,4 +1,5 @@
 import {ResortUI} from './resort-ui.ts'
+import {openArmory} from './armory-ui.ts'
 import {ArcadeControls,counterUI} from './arcade-ui.ts'
 import {jigsaw} from '../jigsaw.ts'
 import {RestaurantUI} from './restaurant-ui.ts'
@@ -54,6 +55,7 @@ function syncLoadout(){stage?.setLoadout(packUI.weapon,(op,target)=>packUI.trigg
 let restaurant:RestaurantUI|undefined
 let stage:CityStage|undefined,services:CityServices|undefined,view:WorldView|undefined
 let offset=0,refreshing:Promise<void>|undefined,performing=false,closed=false,errorTimer=0
+let updateArmory:((next:WorldView)=>void)|undefined
 let viewKey='',shownService='',lastFloor='';let closeAfterFloor=false
 let stake=25,choice:RouletteChoice='white',activeTable=-1,tableKey=''
 let pending:{round:string;requestId:string;stake:number;choice:RouletteChoice}|undefined
@@ -204,11 +206,21 @@ function accepted(next:WorldView,start:number,reposition=false,sent?:Position){
     shownService=service
     return
   }
+  if(!paused&&service==='counter'){
+    if(shownService!==service){
+      stage?.lock(true)
+      updateArmory=openArmory(dialog,next,async(item,payment,sequence)=>{
+        if(performing||closed)throw Error('Counter busy. Try again.')
+        await action('arcade',{operation:'buy',item,payment,sequence})
+      })
+    }else if(dialog.open)updateArmory?.(next)
+    shownService=service;return
+  }
   if(!service&&shownService.startsWith('resort:')&&dialog.open)services?.close()
   if(!paused&&service&&shownService!==service){
     shownService=service
     if(station)return
-    if(['cash','counter','desk','booking'].includes(service)||service.startsWith('drawer:')){
+    if(['cash','desk','booking'].includes(service)||service.startsWith('drawer:')){
       stage?.lock(true)
       const render=()=>{if(view&&view.interaction===service)counterUI(dialog,view,async data=>{await action('arcade',data);render()})}
       render();return
@@ -298,6 +310,7 @@ puzzleDialog.onclose=()=>{
 }
 host.querySelector<HTMLButtonElement>('[data-world-use]')!.onclick=()=>stage?.act()
 dialog.addEventListener('close',()=>{
+  updateArmory=undefined
   syncControls();if(!paused)stage?.resumeMouse()
   if(view?.interaction?.startsWith('resort:'))void action('close-resort',{station:view.interaction}).catch(()=>{})
   if(view?.interaction==='food'||view?.interaction?.startsWith('fridge:'))void action('close-fridge',{}).catch(()=>{})

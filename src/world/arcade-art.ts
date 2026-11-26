@@ -238,6 +238,7 @@ function shop(k:Kit,room:T.Group){
   k.box(0,.06,.75,2.53,.04,5.35,burgundy)
   for(const x of [-1.18,1.18])k.trim(x,.084,.75,.036,.012,5.31)
   k.counter(shopCounter.x,shopCounter.z,shopCounter.w,1,walnut)
+  k.sign('MARA   /   SALES',shopCounter.x+.42,.73,shopCounter.z+.55,1.04,.20,0,'#b4ffed','#233c40')
   k.box(0,2.04,-d/2+.14,7.69,3.28,.20,ink)
   k.sign('OVERRUN  /  ARMORY',0,3.05,-d/2+.26,5.56,.61,0,'#b4ffed','#1e343d')
   weaponIds.forEach((id,i)=>{

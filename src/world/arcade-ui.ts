@@ -1,4 +1,4 @@
-import {WEAPONS,isWeapon,weaponIds,type Item,type Stack} from './arcade.ts'
+import {WEAPONS,isWeapon,type Item,type Stack} from './arcade.ts'
 import {safeText} from './services.ts'
 import type {WorldView} from './model.ts'
 
@@ -65,11 +65,6 @@ export function counterUI(dialog:HTMLDialogElement,view:WorldView,send:(data:obj
     title='Cash counter';content=`<p>Banked ${view.coins.toLocaleString()} · Carried cash ${carried.find(s=>s.item==='cash')?.count??0}</p>`+amount+
       '<button data-op="withdraw">Withdraw</button><button data-op="deposit">Deposit</button>'+
       (a.recovery?.length?'<h3>Recovered belongings</h3>'+transfer(a.recovery,'recover','Collect'):'')
-  }else if(service==='counter'){
-    title='Pulse & Pixel';content='<p>Pay with carried cash. Select a hotbar slot to equip. Firing alerts Meridian Police.</p><div class="city-armory">'+weaponIds.map(id=>{
-      const w=WEAPONS[id]
-      return `<article><h3>${w.name}</h3><small>${w.damage} damage · ${w.magazine} rounds</small><button data-op="buy" data-item="${id}" aria-label="Buy ${w.name} for ${w.price} cash">Buy · ${w.price} cash</button></article>`
-    }).join('')+'</div>'
   }else if(service.startsWith('drawer:')){
     title='Storage drawer';content=amount+'<h3>Carried</h3>'+transfer(carried.filter(s=>s.item==='cash'||isWeapon(s.item)),'store','Put away')+'<h3>In drawer</h3>'+(transfer(a.drawer??[],'take','Take')||'Empty')
   }else{
