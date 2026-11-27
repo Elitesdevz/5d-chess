@@ -1,3 +1,4 @@
+import {STEP_MS} from './world/clock.ts'
 import {patrolSpawn,walkPatrol} from './world/patrol-motion.ts'
 import {deskFurniture,at,insideDoor,venue} from '../src/world/civic-venues.ts'
 import {randomUUID} from 'node:crypto'
@@ -141,7 +142,7 @@ export class CityArcade {
       this.searches.set(me.name,search)
     }
     search.world=s.world
-    const dt=Math.max(0,Math.min(1.25,(now-search.last)/1000));search.last=now
+    const dt=Math.max(0,Math.min(STEP_MS/1000,(now-search.last)/1000));search.last=now
     const residence=residentialAt(me.zone)
     const local=guestFloor(me.zone)?localSite(me.zone,me.x,me.z):undefined
     const guestRoom=local&&roomAt(me.zone,local.x,local.z)
@@ -175,14 +176,14 @@ export class CityArcade {
     if(!search.searched.length||now-search.raidAt>5000)search.warning=tracking?'Meridian patrol in pursuit':'Meridian patrol is searching'
     if(stars===5){
       const lead=search.units[0],d=Math.hypot(lead.x-me.x,lead.z-me.z)
-      if(d<=RULES.dogRange&&lead.zone===me.zone&&clearSight(lead,me,s,now)&&now-search.dogAt>=RULES.dogCooldown){
+      if(d<=RULES.dogRange&&clearSight(lead,me,s,now)&&now-search.dogAt>=RULES.dogCooldown){
         search.dogAt=now;search.dogWarningUntil=now+RULES.dogNotice
       }
       if(search.dogWarningUntil!==undefined){
         if(now<search.dogWarningUntil){
           search.warning='Dog team approaching — move away!';caught=false
         }else{
-          if(now-search.dogWarningUntil<1500&&d<2.8&&lead.zone===me.zone&&clearSight(lead,me,s,now))caught=true
+          if(now-search.dogWarningUntil<1500&&d<2.8&&clearSight(lead,me,s,now))caught=true
           search.warning='Helicopter tracking the area';delete search.dogWarningUntil
         }
       }

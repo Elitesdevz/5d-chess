@@ -1,7 +1,7 @@
 import {at,civicRoom,design,entrances,levelOf,stair,threshold} from '../../src/world/civic-venues.ts'
 import {CITY_PORTALS,groundZone,walkable,worldMove,type WorldZone} from '../../src/world/model.ts'
 import {findPath} from '../../src/world/city-navigation.ts'
-import {cityRoute} from '../city-life.ts'
+import {cityRoute} from './navigation.ts'
 import type {ResidentialView} from '../../src/world/residential.ts'
 import type {Vehicle} from '../../src/world/traffic.ts'
 

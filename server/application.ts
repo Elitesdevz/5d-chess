@@ -51,8 +51,10 @@ export function createApplication(store: ChessStore, updateFlag = store.path ===
   const roulette=new RouletteHall(store)
   const city=new CityWorlds(store,roulette)
   const live=new CityLive((name,action,data,req)=>{
+    const actionNeedsFreedom=action!=='observe'&&action!=='presence'
     const view=store.withWriteCheck(()=>{
       if(user(store,req)!==name)fail(401,'Session ended')
+      if(actionNeedsFreedom&&roster(store,Date.now()).some(b=>b.user===name))fail(423,'In custody at Meridian Police')
     },()=>city.update(name,action,data))
     if(action==='use'||action==='floor')worldEconomyUsage(usage,store,name,action,view)
     return publicView({...view,mapVersion:mapRelease.version},roster(store,Date.now())) as typeof view

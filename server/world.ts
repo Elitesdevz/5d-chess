@@ -1,4 +1,4 @@
-import {civicRoom,galleryZone} from '../src/world/civic-venues.ts'
+import {galleryZone} from '../src/world/civic-venues.ts'
 import {storefront} from '../src/world/storefronts.ts'
 import {resortService} from './resort.ts'
 import {HOTEL_LIFT,bathSeats,gameStations,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
@@ -9,29 +9,29 @@ import {SLOT_COUNT,isWeapon,MAX_HP} from '../src/world/arcade.ts'
 import {cityStaff,serviceStaff} from '../src/world/service-staff.ts'
 import {CityLife} from './city-life.ts'
 import {callResidentialLift,occupy,operateDoor,residentialRide,settleResidentialLifts,stand} from './residential-actions.ts'
-import {buildingById,homeZone,aboard,access,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
+import {buildingById,homeZone,aboard,access,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint} from '../src/world/residential.ts'
 import {residentialFood} from './residential-food.ts'
 import {crownBlock,UNITS,type Deeds,type HousingView} from '../src/world/housing.ts'
-import {BAR,BAR_STOOLS,DRINKS,type BarService} from '../src/world/bar-menu.ts'
+import {BAR,BAR_STOOLS,DRINKS} from '../src/world/bar-menu.ts'
 import {requireSpending} from './credit.ts'
 import {wallet} from './economy.ts'
 import {operating,companies,saveCompanies,cashUnits} from './corporate.ts'
 import {Restaurant} from './restaurant.ts'
 import {RESTAURANT,restaurantPoints} from '../src/world/restaurant-model.ts'
 import {dayKey} from '../src/collection.ts'
-import {BOARD_SEATS,BOARD_TABLE,boardPoints,DESTINATIONS,FLOOR_ARRIVAL,LIFT,WORLD_CAPACITY,WORLD_SPEED,SPRINT_SPEED,floorHeight,interactions,localSite,near,riderHeight,site,spawn,stockFloor,worldMove,type Destination,type WorldPlayer,type WorldUse,type WorldView,type WorldZone,type WorldChat} from '../src/world/model.ts'
+import {BOARD_SEATS,BOARD_TABLE,boardPoints,DESTINATIONS,FLOOR_ARRIVAL,LIFT,WORLD_CAPACITY,floorHeight,interactions,localSite,near,riderHeight,site,spawn,stockFloor,type Destination,type WorldUse,type WorldView,type WorldZone} from '../src/world/model.ts'
 import type {Position,HallView} from '../src/roulette-hall-model.ts'
 import type {ChessStore} from './storage.ts'
 import type {RouletteHall} from './roulette-hall.ts'
 import {fail} from './http.ts'
 
+import {publicMember,type World,type Member} from './world/shard.ts'
+import {moveMember} from './world/movement.ts'
 import {WorldClock} from './world/clock.ts'
 
 const TIMEOUT=27_000
-type Member=WorldPlayer&{slot?:number;seen:number;moved:number;interaction?:WorldUse;liftArrived?:boolean;homeExit?:Position;cell?:number}
-type World={clock:WorldClock;id:string;shard:number;members:Map<string,Member>;restaurant:Restaurant;chat:WorldChat[];nextChat:number;lastChat:Map<string,number>;bar?:BarService;barReceipts:Map<string,string>;residential:ResidentialView;life:CityLife}
 export interface CaveVisit {day:string;active:boolean}
-const publicMember=({name,avatar,zone,x,z,yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,kitchenMotion,carriedItems,barSeat,boardSeat,homePose,shower,equipped}:Member,shared:boolean):WorldPlayer=>({name,avatar,zone,...(shared?{x,z}:localSite(zone,x,z)),yaw,chair,lounge,online,lift,dining,eatingUntil,carrying,workingUntil,workKind,kfcRole,kitchenHand,kitchenMotion,carriedItems,barSeat,boardSeat,homePose,shower,equipped})
+
 
 export class CityWorlds {
   readonly arcade:CityArcade
@@ -62,12 +62,13 @@ export class CityWorlds {
   }
   step(now:number){
     this.clean(now)
-    for(const world of this.worlds.values())if(world.clock.advance(now,at=>{
+    for(const world of this.worlds.values())world.clock.advance(now,at=>{
       world.restaurant.tick(at)
       world.life.tick(at,world.residential,world.members.values())
       settleResidentialLifts(world.residential,[...world.members.values()],at)
       for(const me of world.members.values())this.finishLift(me,at)
-    }))this.arcade.step(world.id,now)
+      this.arcade.step(world.id,at)
+    },ms=>world.life.skip(ms))
   }
   private finishLift(me:Member,now:number){
     if(me.lift&&now>=me.lift.ends){me.zone=me.lift.to;me.lift=undefined;me.liftArrived=true;me.moved=now}
@@ -234,20 +235,8 @@ export class CityWorlds {
     let hall:HallView|undefined,food:ReturnType<typeof residentialFood>|undefined
     const movement=action==='presence'?data:data.movement as Record<string,unknown>|undefined
     if(movement){
-      const motion=movement.kitchenMotion as {x?:unknown;y?:unknown}|undefined
-      if(me.zone==='kfc'&&['kfc:kitchen:station','kfc:kitchen:soda','kfc:kitchen:fryer'].includes(me.interaction??'')&&motion&&
-        typeof motion.x==='number'&&Number.isFinite(motion.x)&&typeof motion.y==='number'&&Number.isFinite(motion.y)){
-        me.kitchenMotion={x:Math.max(-1,Math.min(1,motion.x)),y:Math.max(-1,Math.min(1,motion.y))}
-      }else delete me.kitchenMotion
-      const {x,z,yaw}=movement
-      const currentFloor=movement.zone===undefined||movement.zone===me.zone||!(civicRoom(me.zone)||typeof movement.zone==='string'&&civicRoom(movement.zone))
-      if(movement.world===world.id&&currentFloor&&(shared||movement.zone===me.zone)&&!me.chair&&!me.lounge&&me.barSeat===undefined&&me.boardSeat===undefined&&me.dining===undefined&&!me.lift&&!me.homePose&&me.zone!=='private'&&[x,z,yaw].every(n=>typeof n==='number'&&Number.isFinite(n))){
-        const limit=(movement.sprint===true?SPRINT_SPEED:WORLD_SPEED)*Math.min(1.25,Math.max(0,(now-me.moved)/1000)),goal=shared?{x:x as number,z:z as number}:site(me.zone,x as number,z as number)
-        const {zone,...pos}=worldMove(me.zone,me,goal.x,goal.z,limit,open||me.zone==='cave',housing.keys,world.residential,now,world.life.traffic.vehicles)
-        Object.assign(me,pos,{yaw:Math.atan2(Math.sin(yaw as number),Math.cos(yaw as number)),moved:now})
-        if(me.kitchenMotion)me.yaw=me.interaction==='kfc:kitchen:station'?0:-Math.PI/2
-        this.walkthrough(world,me,zone,open,now)
-      }
+      const zone=moveMember(world,me,movement,shared,open,housing.keys,now)
+      if(zone)this.walkthrough(world,me,zone,open,now)
     }
     if(action==='close-resort'){
       if(me.interaction===data.station&&me.interaction?.startsWith('resort:')){
@@ -443,7 +432,8 @@ export class CityWorlds {
     const drawer=me.interaction?.startsWith('drawer:')?this.homePoints(world,me,now).find(p=>p.id===me.interaction&&near(me,p.x,p.z,p.range)&&housing.keys.includes(p.unit!))?.unit:undefined
     const level=riderHeight(me,now)
     const restaurant=level<5&&(me.zone==='kfc'||near(me,RESTAURANT.x,RESTAURANT.z,26))?world.restaurant.view(name,now,me.zone==='kfc'):undefined
-    const residents=world.life.population.map(n=>({id:n.resident.id,name:n.name,x:n.x,z:n.z,zone:n.zone}))
+    const nearbyResidents=world.life.nearby(me)
+    const residents=nearbyResidents.map(n=>({id:n.id,name:n.name,x:n.x,z:n.z,zone:n.zone}))
     residents.push(...cityStaff)
     if(me.zone.startsWith('floor:'))residents.push(...serviceStaff(me.zone))
     for(const a of restaurant?.actors??[])residents.push({id:'kfc:'+a.id,name:a.name,zone:'kfc',...site('kfc',a.x,a.z)})
@@ -479,7 +469,7 @@ export class CityWorlds {
       const station=me.interaction
       resort=this.store.transaction(u=>resortService(u,name,station,now))
     }
-    const surroundings=shared&&level<22&&me.zone!=='private'?world.life.snapshot(me,now):undefined
+    const surroundings=shared&&level<22&&me.zone!=='private'?{traffic:world.life.traffic.view(now),residents:nearbyResidents}:undefined
     if(surroundings)surroundings.residents=surroundings.residents.filter(r=>!(simulation.health[r.id]?.returns>now))
     return {id:world.id,now,resort,housing,food,residential,arcade:simulation.view,...surroundings,boardTaken:me.zone==='floor:CAS'||me.zone==='floor:BNK'?this.boardTaken(world,me):undefined,chat:me.zone==='private'?undefined:world.chat,bar:world.bar&&now-world.bar.ready<6000?world.bar:undefined,you:publicMember(me,shared),players,coins:action==='bar'?coins??0:hall?.coins??coins??0,caveOpen:open&&me.zone!=='private',hall,tableMotion,restaurant,interaction:me.interaction}
   }
