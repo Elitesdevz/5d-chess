@@ -193,6 +193,12 @@ export class CityWorlds {
   }
 
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
+    return this.apply(name,action,data,now,false)!
+  }
+  move(name:string,data:Record<string,unknown>,now=Date.now()){
+    this.apply(name,'presence',data,now,true)
+  }
+  private apply(name:string,action:string,data:Record<string,unknown>,now:number,inputOnly:boolean):WorldView|undefined{
     this.step(now)
     this.arcade.active(name,now,action!=='presence'&&action!=='observe')
     const bookings=roster(this.store,now),booking=bookings.find(b=>b.user===name)
@@ -210,6 +216,7 @@ export class CityWorlds {
       if(me.cell!==booking.cell){this.arrive(world,me,galleryZone(booking.cell),now);me.cell=booking.cell}
       else if(data.world===world.id&&data.scene===true)this.store.transaction(tx=>cellMove(tx,booking,data.x,data.z,data.yaw))
       Object.assign(me,{x:booking.x,z:booking.z,yaw:booking.yaw,seen:now})
+      if(inputOnly)return
       return {id:world.id,now,you:{...publicMember(me,data.scene===true),name:booking.name},players:[],coins:account.coins??0,caveOpen:false,
         arcade:{hp:this.store.cityStats(name)?.hp??MAX_HP,slots:Array(SLOT_COUNT).fill(null),sequence:0,remaining:0,stars:0,contacts:[],drops:[],custody:custodyView(booking)}}
     }
@@ -238,6 +245,9 @@ export class CityWorlds {
       const zone=moveMember(world,me,movement,shared,open,housing.keys,now)
       if(zone)this.walkthrough(world,me,zone,open,now)
     }
+    const selected=movement?.slot
+    if(typeof selected==='number'&&Number.isInteger(selected)&&selected>=0&&selected<SLOT_COUNT)me.slot=selected
+    if(inputOnly)return
     if(action==='close-resort'){
       if(me.interaction===data.station&&me.interaction?.startsWith('resort:')){
         if(me.homePose?.id.startsWith('salon-'))stand(me)
@@ -439,7 +449,7 @@ export class CityWorlds {
     for(const a of restaurant?.actors??[])residents.push({id:'kfc:'+a.id,name:a.name,zone:'kfc',...site('kfc',a.x,a.z)})
     const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents,
       residential:world.residential,vehicles:world.life.traffic.vehicles,caveOpen:open||me.zone==='cave',keys:housing.keys,drawer,front:me.interaction?.startsWith('front:')&&at(me.interaction)?storefront(me.interaction):undefined,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
-    if((action==='presence'||action==='arcade')&&typeof data.slot==='number'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<SLOT_COUNT)me.slot=data.slot
+    if(action==='arcade'&&typeof data.slot==='number'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<SLOT_COUNT)me.slot=data.slot
     if(simulation.view.bite)me.eatingUntil=simulation.view.bite.ends
     const item=simulation.view.slots[me.slot??0]?.item
     me.equipped=isWeapon(item)?item:undefined

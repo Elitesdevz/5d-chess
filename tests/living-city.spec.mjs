@@ -30,16 +30,23 @@ test('two browser sessions can walk into the civic quarter and observe the same 
       return response.json()
     }
     let view=await presence(desktop)
-    const destination=point(23.25,-70.9),route=cityRoute(view.you,destination)
-    assert.ok(route.length>5)
-    for(const p of route){
-      for(let i=0;i<96&&distance(view.you,p)>.19;i++){
-        now+=680
-        view=await presence(desktop,{world:view.id,...p,yaw:0})
+    const destination=point(23.25,-70.9)
+    for(let attempt=0;attempt<12&&distance(view.you,destination)>.24;attempt++){
+      const route=cityRoute(view.you,destination,view.traffic.vehicles)
+      assert.ok(route.length)
+      let blocked=false
+      for(const p of route){
+        while(distance(view.you,p)>.16){
+          const before=view.you
+          // Advance a continuous clock while moving through real traffic.
+          now+=150
+          view=await presence(desktop,{world:view.id,...p,yaw:0})
+          if(distance(view.you,before)<.015){blocked=true;break}
+        }
+        if(blocked)break
       }
-      assert.ok(distance(view.you,p)<.48,JSON.stringify({p,at:view.you}))
     }
-    assert.ok(distance(view.you,destination)<.24)
+    assert.ok(distance(view.you,destination)<.24,JSON.stringify(view.you))
     assert.ok(view.traffic.vehicles.some(v=>v.speed>.1))
     const page=await desktop.newPage(),errors=[]
     page.on('pageerror',e=>errors.push(e.message))
@@ -98,6 +105,6 @@ test('two browser sessions can walk into the civic quarter and observe the same 
     Date.now=clock
     await browser?.close()
     server.closeAllConnections()
-    await new Promise(r=>server.close(r));app.close?.();store.close()
+    await new Promise(r=>server.close(r));app.drain();store.close()
   }
 })

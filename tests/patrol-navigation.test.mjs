@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {walkPatrol} from '../server/world/patrol-motion.ts'
-import {at,threshold,front,levelOf} from '../src/world/civic-venues.ts'
+import {at,threshold,levelOf} from '../src/world/civic-venues.ts'
 import {clearSight} from '../src/world/sight.ts'
 
 test('a pursuing officer enters through the public door, routes around the shop wall and ascends the station stairs',()=>{
@@ -26,6 +26,10 @@ test('a pursuing officer enters through the public door, routes around the shop 
       Object.assign(target,at('station',0,0),{zone:'precinct:1'})
       for(let i=0;i<320;i++)walkPatrol(actor,target,.13,state,8000+i*50)
       assert.equal(levelOf(actor.zone),1)
+      Object.assign(target,threshold('station',1.2),{zone:'city'})
+      for(let i=0;i<420;i++)walkPatrol(actor,target,.13,state,25000+i*50)
+      assert.equal(actor.zone,'city')
+      assert.ok(Math.hypot(actor.x-target.x,actor.z-target.z)<.2)
     }
   }
 })

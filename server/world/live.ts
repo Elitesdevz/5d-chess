@@ -16,9 +16,10 @@ export class CityLive {
   private stepMs=0
   private peers=new Set<Peer>()
   private streams=new Map<string,Stream>()
-  constructor(privateRun:Run,authenticate:(req:IncomingMessage)=>string|undefined,version:string){
-    this.run=privateRun;this.authenticate=authenticate;this.version=version
+  constructor(privateRun:Run,authenticate:(req:IncomingMessage)=>string|undefined,version:string,move:(name:string,data:Input)=>void){
+    this.run=privateRun;this.authenticate=authenticate;this.version=version;this.move=move
   }
+  private readonly move:(name:string,data:Input)=>void
   private readonly run:Run
   private readonly authenticate:(req:IncomingMessage)=>string|undefined
   private readonly version:string
@@ -52,7 +53,7 @@ export class CityLive {
   }
   private publish(p:Peer,view?:WorldView){
     const start=performance.now()
-    view??=this.run(p.name,p.pending?'presence':'observe',{...p.pending,scene:true},p.request)
+    view??=this.run(p.name,'observe',{scene:true},p.request)
     p.pending=undefined
     const frame=p.writer.frame(view,p.seq)
     frame.tickMs=this.stepMs
@@ -97,8 +98,13 @@ export class CityLive {
         if(!p.pong){p.ws.terminate();continue}
         p.pong=false;p.pingAt=time+15000;p.ws.ping()
       }
-      if(p.next>time)continue
+      if(p.next>time&&!p.pending)continue
       if(this.authenticate(p.request)!==p.name){p.ws.close(4401,'Session ended');continue}
+      if(p.pending){
+        try{this.move(p.name,{...p.pending,scene:true});p.pending=undefined}
+        catch{p.ws.close(1011,'City movement unavailable');continue}
+      }
+      if(p.next>time)continue
       if(p.ws.bufferedAmount>65536){
         if(p.ws.bufferedAmount>1048576)p.ws.terminate()
         continue

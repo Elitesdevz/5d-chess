@@ -166,7 +166,8 @@ export class CityStage {
     const changedVenue=prior?.zone!==next.zone&&(civicRoom(next.zone)||!!prior&&civicRoom(prior.zone))
     // The two flights are less than a metre apart. A wall or stair landing can
     // stop a server step sooner than prediction when the player turns a corner.
-    const correctionLimit=civicRoom(next.zone)?.27:1.35
+    const stoppedAtSample=!!sent&&!this.moving&&Math.hypot(this.position.x-sent.x,this.position.z-sent.z)<.025
+    const correctionLimit=stoppedAtSample?.025:civicRoom(next.zone)?.27:1.35
     if(changedWorld||reposition||seatChanged||changedVenue&&this.predictedZone!==next.zone||housingChanged||prior?.lift&&!next.lift||next.lift&&!prior?.lift||Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit){
       if(!changedWorld&&!reposition&&!seatChanged&&Math.hypot(next.x-reported.x,next.z-reported.z)>correctionLimit)this.diagnostics?.corrected()
       this.position={x:next.x,z:next.z,yaw:next.yaw}

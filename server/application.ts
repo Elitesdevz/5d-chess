@@ -58,7 +58,7 @@ export function createApplication(store: ChessStore, updateFlag = store.path ===
     },()=>city.update(name,action,data))
     if(action==='use'||action==='floor')worldEconomyUsage(usage,store,name,action,view)
     return publicView({...view,mapVersion:mapRelease.version},roster(store,Date.now())) as typeof view
-  },req=>user(store,req),mapRelease.version)
+  },req=>user(store,req),mapRelease.version,(name,data)=>city.move(name,data))
   const worldTimer=setInterval(()=>{try{const now=Date.now(),start=performance.now();city.step(now);live.tick(now,performance.now()-start)}catch(error){console.error('City tick failed',error)}},50)
   worldTimer.unref()
   const stockHistory=new StockHistory()

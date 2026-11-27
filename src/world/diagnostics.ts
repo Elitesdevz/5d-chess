@@ -10,12 +10,15 @@ export class CityDiagnostics {
     this.panel=document.createElement('output')
     this.panel.className='world-diagnostics'
     this.panel.setAttribute('aria-live','off')
+    this.panel.textContent='Measuring city frames…'
     host.append(this.panel)
+    document.addEventListener('visibilitychange',this.visibility)
   }
+  private visibility=()=>{this.lastFrame=0}
   network(rtt:number,tick:number,projection:number){this.net={rtt,tick,projection}}
   corrected(){this.corrections++}
   rendered(time:number,draws:number,actors:number){
-    if(this.lastFrame&&time-this.lastFrame<1500)this.frameTimes.push(time-this.lastFrame)
+    if(this.lastFrame)this.frameTimes.push(time-this.lastFrame)
     this.lastFrame=time
     if(time-this.updated<1000||!this.frameTimes.length)return
     const times=this.frameTimes.sort((a,b)=>a-b),p95=times[Math.ceil(times.length*.95)-1]
@@ -26,5 +29,5 @@ export class CityDiagnostics {
     ].join('\n')
     this.frameTimes=[];this.updated=time
   }
-  close(){this.panel.remove()}
+  close(){document.removeEventListener('visibilitychange',this.visibility);this.panel.remove()}
 }

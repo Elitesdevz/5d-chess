@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {once} from 'node:events'
 import WebSocket from 'ws'
 import {createApplication} from '../server/application.ts'
+import {book} from '../server/custody.ts'
 import {ChessStore} from '../server/storage.ts'
 import {SnapshotWriter,applyFrame} from '../shared/world/protocol.ts'
 import release from '../.meridian/manifest.json' with {type:'json'}
@@ -56,4 +57,17 @@ test('live movement reaches a second observer, commands survive lost acks, resum
   const other=await join(aCookie,'new-browser-stream')
   other.send(cmd)
   await other.until(()=>other.frames.some(m=>m.type==='ack'&&m.status===409))
+  b.send({type:'sleep',hidden:true})
+  db.transaction(tx=>book(tx,'First walker',3,Date.now()))
+  await again.until(()=>again.frames.some(m=>m.type==='frame'&&m.frame.full?.arcade?.custody))
+  b.send({type:'sleep',hidden:false})
+  await b.until(()=>b.view.chat.some(line=>line.name==='Inmate 01'))
+  assert.ok(!JSON.stringify(b.view).includes('First walker'))
+  assert.deepEqual(again.view.players,[])
+  again.send({...cmd,id:2,seq:3})
+  await again.until(()=>again.frames.some(m=>m.type==='ack'&&m.id===2&&m.status===423))
+  const closed=once(again.ws,'close')
+  const logout=await fetch(base+'/api/logout',{method:'POST',headers:{cookie:aCookie,'content-type':'application/json'},body:'{}'})
+  assert.ok(logout.ok)
+  assert.equal((await closed)[0],4401)
 })
