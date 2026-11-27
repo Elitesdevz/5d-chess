@@ -28,4 +28,4 @@ At 50 players, the crowd used 89% fewer bytes and the p95 batch took 56% less ti
 | 10 | 16/16 | 191.1 / 200.7 | 5,278 |
 | 50 | 16/16 | 99.1 / 103.1 | 8,617 |
 
-The four publication slots and the 400 ms input interval affect which phase the observer samples. The latency figures describe these runs and do not imply that increasing the player count improves latency.
+The four publication slots and the 400 ms input interval affect which phase the observer samples. Compare latency across repeated runs with different input phases.

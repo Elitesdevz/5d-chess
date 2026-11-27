@@ -22,6 +22,10 @@ export function browserWalker(page,touch=false){
       session??=await page.context().newCDPSession(page)
       const b=await page.locator('[data-joystick]').boundingBox()
       assert.ok(b&&b.width>15,'touch joystick visible')
+      assert.ok(await page.locator('[data-joystick]').evaluate(stick=>{
+        const area=stick.getBoundingClientRect()
+        return stick.contains(document.elementFromPoint(area.x+area.width/2,area.y+area.height/2))
+      }),'touch joystick is reachable above the inventory')
       await page.evaluate(()=>document.querySelector('[data-joystick]').addEventListener('pointerdown',e=>window.walkPointer=e.pointerId,{once:true,capture:true}))
       await session.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:b.x+b.width/2,y:b.y+b.height/2}]})
     }
