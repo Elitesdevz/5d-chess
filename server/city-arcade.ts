@@ -194,15 +194,17 @@ export class CityArcade {
       search.warning='Booking full — patrol holding back'
     }
   }
-  run(s:Scene,now:number,data?:Record<string,unknown>){
+  run(s:Scene,now:number,data?:Record<string,unknown>,reticleOnly=false){
     const {me,world}=s
     const dropKey='cityDrops:'+s.shard,npcKey='npc:'+s.shard
     const patrols=()=>[...this.searches.values()].filter(search=>search.world===world&&now-search.last<30000).flatMap(search=>search.units)
-    const staff=[...this.staff(now),...patrols()]
-    const bookings=roster(this.store,now)
-    const people:Contact[]=s.players.filter(o=>o.zone!=='private'&&o.name!==me.name&&!bookings.some(b=>b.user===o.name)).map(o=>({x:o.x,z:o.z,zone:o.zone,height:riderHeight(o,now),id:'player:'+o.name,label:o.name,kind:'player'}))
-    const civilians:Contact[]=[...people,...s.residents.map(o=>({...o,id:o.id,label:o.name,kind:'resident' as const}))]
-    const targets=[...staff,...civilians]
+    const desk=this.staff(now)
+    const civilianTargets=()=>{
+      const bookings=roster(this.store,now)
+      const people:Contact[]=s.players.filter(o=>o.zone!=='private'&&o.name!==me.name&&!bookings.some(b=>b.user===o.name))
+        .map(o=>({x:o.x,z:o.z,zone:o.zone,height:riderHeight(o,now),id:'player:'+o.name,label:o.name,kind:'player'}))
+      return [...people,...s.residents.map(o=>({...o,label:o.name,kind:'resident' as const}))]
+    }
     const observer={...me,height:riderHeight(me,now)},visibility=new Map<string,boolean>()
     const canTarget=(c:Contact)=>{
       if(!visibility.has(c.id))visibility.set(c.id,clearSight(observer,c,s,now))
@@ -258,7 +260,7 @@ export class CityArcade {
           }
           if(now<(p.nextShot??(p.lastShot??-Infinity)+WEAPONS.blaster.delay))fail(409,'Weapon recharging')
           if(!magazine.rounds)fail(409,'Reload your weapon')
-          const t=targets.find(c=>c.id===data.target&&actorDistance(observer,c)<=weapon.range&&canTarget(c))
+          const t=typeof data.target==='string'?[...desk,...patrols(),...civilianTargets()].find(c=>c.id===data.target&&actorDistance(observer,c)<=weapon.range&&canTarget(c)):undefined
           if(data.target&&!t)fail(409,'Target is out of sight or range')
           magazine.rounds--;p.nextShot=now+weapon.delay
           p.lastShot=now;p.lastHit=!!t;advance(p,1)
@@ -306,12 +308,17 @@ export class CityArcade {
     if(search?.raidAt===now&&search.cursor)Object.assign(p,this.store.cityPack(me.name))
     const armed=p.slots.some(slot=>isWeapon(slot?.item))
     const contacts:Contact[]=[]
-    for(const t of [...this.staff(now),...patrols(),...civilians]){
+    // Civilian models are already in the visible roster. Their extra reticle
+    // records only serve observers who can target them with a carried weapon.
+    const civilians=armed||!reticleOnly?civilianTargets():[]
+    for(const t of [...desk,...patrols(),...civilians]){
       if(me.zone==='private'||t.zone==='private'||health[t.id]?.returns>now||!near(me,t.x,t.z,36))continue
       const distance=actorDistance(observer,t)
       if(distance>36)continue
+      const inSight=armed&&distance<=longestRange&&canTarget(t)
+      if(reticleOnly&&t.kind!=='officer'&&!inSight)continue
       const hp=t.kind==='player'?this.hp(t.label,now):health[t.id]?.hp
-      contacts.push({...t,distance,inSight:armed&&distance<=longestRange&&canTarget(t),hp:hp??MAX_HP})
+      contacts.push({...t,distance,inSight,hp:hp??MAX_HP})
     }
     if(p.stars===5&&search){const lead=search.units[0];contacts.push({...lead,id:'heli',label:'Police helicopter',kind:'helicopter',hp:100},{...lead,x:lead.x+.8,id:'dog',label:'Dog team',kind:'dog',hp:100})}
     const view:ArcadeView={bite:p.bite,magazines:p.magazines,lastShot:p.lastShot,lastHit:p.lastHit,sequence:p.sequence,slots:p.slots,hp:p.hp,stars:p.stars,remaining:Math.max(0,p.remaining-(this.elapsed.get(me.name)??0)),contacts,

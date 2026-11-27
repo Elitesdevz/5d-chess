@@ -1,4 +1,5 @@
 import type {IncomingMessage,Server} from 'node:http'
+import {STEP_MS} from './clock.ts'
 import {randomUUID} from 'node:crypto'
 import {WebSocketServer,WebSocket} from 'ws'
 import {CITY_PROTOCOL,SnapshotWriter,type ClientMessage,type Input,type Message} from '../../shared/world/protocol.ts'
@@ -8,6 +9,8 @@ type Receipt={id:number;status:number;message?:string}
 type Peer={ws:WebSocket;request:IncomingMessage;name:string;stream:Stream;writer:SnapshotWriter;seq:number;pending?:Input;next:number;phase:number;pingAt:number;pong:boolean;hidden:boolean}
 type Stream={epoch:string;receipt?:Receipt;expires:number;peer?:Peer}
 type Run=(name:string,action:string,data:Input,request:IncomingMessage)=>WorldView
+const LANES=4
+const UPDATE_MS=STEP_MS*LANES
 const send=(ws:WebSocket,message:Message)=>ws.send(JSON.stringify(message))
 
 export class CityLive {
@@ -36,7 +39,7 @@ export class CityLive {
         if(url.searchParams.get('map')!==this.version||url.searchParams.get('v')!==String(CITY_PROTOCOL)){ws.close(4412,'City release changed');return}
         const key=JSON.stringify([name,client]),stream=this.streams.get(key)??{epoch:randomUUID(),expires:0}
         stream.peer?.ws.close(4001,'Connection replaced')
-        const p:Peer={ws,request:req,name,stream,writer:new SnapshotWriter(),seq:0,next:0,phase:50*(this.lane++%4),pingAt:performance.now()+15000,pong:true,hidden:false}
+        const p:Peer={ws,request:req,name,stream,writer:new SnapshotWriter(),seq:0,next:0,phase:STEP_MS*(this.lane++%LANES),pingAt:performance.now()+15000,pong:true,hidden:false}
         this.streams.set(key,stream);stream.peer=p;this.peers.add(p)
         ws.on('pong',()=>{p.pong=true})
         ws.on('error',()=>ws.terminate())
@@ -59,7 +62,7 @@ export class CityLive {
     frame.tickMs=this.stepMs
     frame.projectionMs=+(performance.now()-start).toFixed(2)
     send(p.ws,{type:'frame',frame})
-    const interval=p.hidden?2400:200
+    const interval=p.hidden?2400:UPDATE_MS
     p.next=(Math.floor((performance.now()-p.phase)/interval)+1)*interval+p.phase
   }
   private receive(p:Peer,m:ClientMessage){

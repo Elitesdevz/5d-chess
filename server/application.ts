@@ -19,6 +19,7 @@ import {accountApi} from './account-api.ts'
 import {economyApi} from './economy-api.ts'
 import {gameApi} from './game-api.ts'
 import {eloApi} from './elo-gambling.ts'
+import {STEP_MS} from './world/clock.ts'
 import {CityLive} from './world/live.ts'
 import {CityWorlds} from './world.ts'
 import {RouletteHall} from './roulette-hall.ts'
@@ -55,11 +56,17 @@ export function createApplication(store: ChessStore, updateFlag = store.path ===
     const view=store.withWriteCheck(()=>{
       if(user(store,req)!==name)fail(401,'Session ended')
       if(actionNeedsFreedom&&roster(store,Date.now()).some(b=>b.user===name))fail(423,'In custody at Meridian Police')
-    },()=>city.update(name,action,data))
+    },()=>city.command(name,action,data))
     if(action==='use'||action==='floor')worldEconomyUsage(usage,store,name,action,view)
     return publicView({...view,mapVersion:mapRelease.version},roster(store,Date.now())) as typeof view
   },req=>user(store,req),mapRelease.version,(name,data)=>city.move(name,data))
-  const worldTimer=setInterval(()=>{try{const now=Date.now(),start=performance.now();city.step(now);live.tick(now,performance.now()-start)}catch(error){console.error('City tick failed',error)}},50)
+  const worldTimer=setInterval(()=>{
+    try{
+      const now=Date.now(),started=performance.now()
+      city.step(now)
+      live.tick(now,performance.now()-started)
+    }catch(error){console.error('City tick failed',error)}
+  },STEP_MS)
   worldTimer.unref()
   const stockHistory=new StockHistory()
   ai.kick()

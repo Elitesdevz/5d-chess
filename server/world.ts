@@ -192,14 +192,18 @@ export class CityWorlds {
     }
   }
 
+  // Synchronous entry for HTTP callers and simulations with an explicit clock.
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
-    return this.apply(name,action,data,now,false)!
+    this.step(now)
+    return this.apply(name,action,data,now,'full')!
+  }
+  command(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
+    return this.apply(name,action,data,now,'stream')!
   }
   move(name:string,data:Record<string,unknown>,now=Date.now()){
-    this.apply(name,'presence',data,now,true)
+    this.apply(name,'presence',data,now,'movement')
   }
-  private apply(name:string,action:string,data:Record<string,unknown>,now:number,inputOnly:boolean):WorldView|undefined{
-    this.step(now)
+  private apply(name:string,action:string,data:Record<string,unknown>,now:number,mode:'full'|'stream'|'movement'):WorldView|undefined{
     this.arcade.active(name,now,action!=='presence'&&action!=='observe')
     const bookings=roster(this.store,now),booking=bookings.find(b=>b.user===name)
     if(booking&&action!=='presence'&&action!=='observe')fail(423,'In custody at Meridian Police')
@@ -216,7 +220,7 @@ export class CityWorlds {
       if(me.cell!==booking.cell){this.arrive(world,me,galleryZone(booking.cell),now);me.cell=booking.cell}
       else if(data.world===world.id&&data.scene===true)this.store.transaction(tx=>cellMove(tx,booking,data.x,data.z,data.yaw))
       Object.assign(me,{x:booking.x,z:booking.z,yaw:booking.yaw,seen:now})
-      if(inputOnly)return
+      if(mode==='movement')return
       return {id:world.id,now,you:{...publicMember(me,data.scene===true),name:booking.name},players:[],coins:account.coins??0,caveOpen:false,
         arcade:{hp:this.store.cityStats(name)?.hp??MAX_HP,slots:Array(SLOT_COUNT).fill(null),sequence:0,remaining:0,stars:0,contacts:[],drops:[],custody:custodyView(booking)}}
     }
@@ -247,7 +251,7 @@ export class CityWorlds {
     }
     const selected=movement?.slot
     if(typeof selected==='number'&&Number.isInteger(selected)&&selected>=0&&selected<SLOT_COUNT)me.slot=selected
-    if(inputOnly)return
+    if(mode==='movement')return
     if(action==='close-resort'){
       if(me.interaction===data.station&&me.interaction?.startsWith('resort:')){
         if(me.homePose?.id.startsWith('salon-'))stand(me)
@@ -448,13 +452,13 @@ export class CityWorlds {
     if(me.zone.startsWith('floor:'))residents.push(...serviceStaff(me.zone))
     for(const a of restaurant?.actors??[])residents.push({id:'kfc:'+a.id,name:a.name,zone:'kfc',...site('kfc',a.x,a.z)})
     const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents,
-      residential:world.residential,vehicles:world.life.traffic.vehicles,caveOpen:open||me.zone==='cave',keys:housing.keys,drawer,front:me.interaction?.startsWith('front:')&&at(me.interaction)?storefront(me.interaction):undefined,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
+      residential:world.residential,vehicles:world.life.traffic.vehicles,caveOpen:open||me.zone==='cave',keys:housing.keys,drawer,front:me.interaction?.startsWith('front:')&&at(me.interaction)?storefront(me.interaction):undefined,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined,mode==='stream')
     if(action==='arcade'&&typeof data.slot==='number'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<SLOT_COUNT)me.slot=data.slot
     if(simulation.view.bite)me.eatingUntil=simulation.view.bite.ends
     const item=simulation.view.slots[me.slot??0]?.item
     me.equipped=isWeapon(item)?item:undefined
     if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;delete victim.equipped;this.arrive(world,victim,'city',now)}
-    if(simulation.view.custody)return this.update(name,'presence',{},now)
+    if(simulation.view.custody)return this.command(name,'presence',{},now)
     const players=me.zone==='private'?[]:[...world.members.values()].filter(p=>p.name!==name&&!bookings.some(b=>b.user===p.name)&&p.zone!=='private'&&near(me,p.x,p.z,48)&&(shared?Math.abs(riderHeight(p,now)-level)<23:p.zone===me.zone)).map(p=>publicMember(p,shared))
     if(me.interaction==='booking')simulation.view.register=bookings.map(b=>b.name)
     for(const b of bookings){

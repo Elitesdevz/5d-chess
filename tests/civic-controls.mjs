@@ -64,13 +64,15 @@ export function browserWalker(page,touch=false){
   }
   async function walk(...points){const r=await move(points);assert.ok(r.done,JSON.stringify(r))}
   async function outside(goal){
+    let last
     for(let attempt=0;attempt<9;attempt++){
       const current=await page.evaluate(()=>({at:window.walkObservation.position,traffic:window.walkObservation.view.traffic?.vehicles??[]}))
       const path=cityRoute(current.at,goal,attempt?current.traffic:[])
       assert.ok(path.length)
-      if((await move([...path,goal])).done)return
+      last=await move([...path,goal])
+      if(last.done)return
     }
-    assert.fail('No playable street route to '+JSON.stringify(goal))
+    assert.fail('No playable street route '+JSON.stringify({goal,last}))
   }
   async function use(id){
     if(!touch)await page.locator('#world-canvas').focus()

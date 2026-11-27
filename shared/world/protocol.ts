@@ -30,15 +30,23 @@ function apply(previous:any,patch:Patch):any{
   }
   return copy
 }
+const milli=(n:number)=>Math.round(n*1000)/1000
+function wirePose<T extends {x:number;z:number;yaw?:number}>(pose:T):T{
+  return {...pose,x:milli(pose.x),z:milli(pose.z),...(pose.yaw===undefined?{}:{yaw:milli(pose.yaw)})}
+}
+function networkView(view:WorldView){
+  // Rendered transforms use millimetres. Keep the local authoritative pose,
+  // transaction values and gameplay deadlines at their original precision.
+  const traffic=view.traffic&&{...view.traffic,vehicles:view.traffic.vehicles.map(v=>({...wirePose(v),speed:milli(v.speed)}))}
+  const contacts=view.arcade?.contacts.map(c=>({...wirePose(c),distance:c.distance===undefined?undefined:milli(c.distance)}))
+  return {...view,players:view.players.map(wirePose),residents:view.residents?.map(wirePose),traffic,arcade:view.arcade&&{...view.arcade,contacts}}
+}
 export class SnapshotWriter {
   private previous?:WorldView
   private seq=0
   frame(view:WorldView,input=0,tickMs=0):Frame{
     // Several gameplay services expose live objects. Retain an owned wire snapshot.
-    // Civilian positions are already in the visible roster. Only targetable civilians
-    // need a second entry in the reticle list. Officers and support have their own models.
-    const arcade=view.arcade&&{...view.arcade,contacts:view.arcade.contacts.filter(c=>c.inSight||c.kind==='officer'||c.kind==='dog'||c.kind==='helicopter')}
-    const current=JSON.parse(JSON.stringify({...view,...(arcade&&{arcade})})) as WorldView
+    const current=JSON.parse(JSON.stringify(networkView(view))) as WorldView
     const frame:Frame={now:view.now,input,tickMs,seq:++this.seq}
     if(!this.previous||this.previous.id!==current.id||Boolean(current.arcade?.custody)!==Boolean(this.previous.arcade?.custody))frame.full=current
     else{
