@@ -2,8 +2,9 @@ import type {CompanyView} from './equity-v2.ts'
 export const CAS='CAS'
 export const BNK='BNK'
 export const LOT='LOT'
-export type ExchangeSymbol=EquitySymbol|typeof LOT
-export const isExchangeStock=(s:string):s is ExchangeSymbol=>s===LOT||isEquity(s)
+export const PRI='PRI'
+export type ExchangeSymbol=EquitySymbol|typeof LOT|typeof PRI
+export const isExchangeStock=(s:string):s is ExchangeSymbol=>s===LOT||s===PRI||isEquity(s)
 export type EquitySymbol=typeof CAS|typeof BNK
 export const isEquity=(symbol:string):symbol is EquitySymbol=>symbol===CAS||symbol===BNK
 export const CAS_SHARES=1_000_000
@@ -17,7 +18,7 @@ export interface StockTrade {
 }
 export interface StockDividend {day:string;shares:number;amount:number;symbol?:ExchangeSymbol;at?:number}
 export interface StockPortfolio {
-  sequence:number; positions:Record<string,StockHolding>; trades:StockTrade[]; dividends:StockDividend[]; dividendsPaid:number;bankDividendsPaid?:number
+  sequence:number; positions:Record<string,StockHolding>; trades:StockTrade[]; dividends:StockDividend[]; dividendsPaid:number;bankDividendsPaid?:number;prisonDividendsPaid?:number
 }
 export interface PricePoint {at:number;price:number;volume?:number}
 export interface StockQuote {price:number;change:number;percent:number;updated:number;history:{at:number;price:number}[]}
@@ -28,13 +29,14 @@ export interface EquityPublic { float:number; available:number; price:number; bi
 }
 export interface CasPublic extends EquityPublic {equity:number;equityMoves:{at:number;shares:number;side:StockSide}[]}
 export interface StockView {
-  dayStart:number; saleQuotes:Record<string,number>; lottery:EquityPublic & Pick<CompanyView,'bids'|'asks'|'orders'>; lotteryDividends:number;
+  dayStart:number; saleQuotes:Record<string,number>; lottery:EquityPublic & Pick<CompanyView,'bids'|'asks'|'orders'>; lotteryDividends:number; prison:EquityPublic & Pick<CompanyView,'bids'|'asks'|'orders'>;
   coins:number; quotes:Record<string,StockQuote>; cas:CasPublic; bank:EquityPublic; portfolio:StockPortfolio; now:number; companies:Record<EquitySymbol,CompanyView>
 }
 export function cityQuote(data:StockView,symbol:string){
   if(symbol===CAS)return data.cas
   if(symbol===BNK)return data.bank
   if(symbol===LOT)return data.lottery
+  if(symbol===PRI)return data.prison
 }
 export interface StockOrder {sellAll?:boolean;symbol:string;side:StockSide;shares:number;total:number;sequence:number;id:string;version?:number;price?:number}
 export function bookQuote(orders:readonly {shares:number;price:number;holder:string}[],owner:string,shares:number){

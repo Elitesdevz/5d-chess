@@ -42,25 +42,25 @@ test('LOT market orders fill player limits in price order, reserve holdings and 
   assert.throws(()=>api('/support',{symbol:'LOT',policy:'dividend',value:30,on:true}),/no shareholder board/)
 })
 
-test('residents trade small funded orders on the three city books and release stock when offers run out',t=>{
+test('residents trade small funded orders on the four city books and release stock when offers run out',t=>{
   const {db,api}=fixture(t)
   api()
   const tick=now=>db.transaction(u=>advanceResidentStocks(u,now))
   tick(start)
-  for(let turn=1;turn<=18;turn++){
+  for(let turn=1;turn<=24;turn++){
     tick(start+turn*halfHour);tick(start+turn*halfHour)
     const e=db.metadataValue('economyV2')
-    for(const c of [e.LOT,e.CAS,e.BNK]){
+    for(const c of [e.LOT,e.CAS,e.BNK,e.PRI]){
       assert.equal(c.inventory+Object.values(c.holders).reduce((a,b)=>a+b,0),c.issued)
       for(const id of Object.keys(e.residents))assert.ok((c.holders[id]??0)<=6&&e.residents[id]>=0)
     }
   }
   const e=db.metadataValue('economyV2')
-  for(const c of [e.LOT,e.CAS,e.BNK]){
+  for(const c of [e.LOT,e.CAS,e.BNK,e.PRI]){
     assert.ok(c.trades.some(t=>residentHolder(t.buy)&&t.shares<=2))
     assert.ok(c.orders.some(o=>residentHolder(o.holder)&&o.side==='sell'&&o.initial<=2))
   }
-  const now=start+19*halfHour
+  const now=start+25*halfHour
   db.transaction(u=>{
     const e=companies(u,now),c=e.LOT,id=Object.keys(e.residents)[0]
     // Player-owned float, one remaining inventory share, and four held by a resident.

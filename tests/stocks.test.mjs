@@ -40,7 +40,7 @@ test('stock orders debit or credit the wallet once and reject stale quotes and o
   assert.equal(read('Alice').coins,9824.75)
 })
 
-test('weekly dividends cover losses and pay only eligible outstanding shares',t=>{
+test('bank dividends cover losses and pay only eligible outstanding shares',t=>{
   const {store,read}=fixture(t)
   const post=(account,action,data,now)=>store.transaction(unit=>stockApi(unit,unit.users.get(account),'/api/stocks/'+action,'POST',data,now).value)
   read('Alice')

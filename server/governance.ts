@@ -1,3 +1,4 @@
+import {advancePrison} from './prison-company.ts'
 import {randomUUID} from 'node:crypto'
 import {policies,rescueStages,rescuedPolicies,type BallotView,type CompanyView} from '../src/equity-v2.ts'
 import {fromStockUnits,type EquitySymbol} from '../src/stock-model.ts'
@@ -243,6 +244,7 @@ function invest(unit:UnitOfWork,e:Companies,now:number){
 }
 
 export function advanceEconomy(unit:UnitOfWork,e:Companies,now:number){
+  advancePrison(unit,e,now)
   const borrowers=unit.borrowers().map(name=>unit.users.get(name)!).filter(Boolean)
   for(const account of borrowers)updateCredit(account,now)
   postCreditCollections(unit,borrowers,now,e)

@@ -52,10 +52,14 @@ export interface Company extends Listing {
   bankruptcy?:Insolvency;recoveryUntil:number
 }
 export interface LotteryCompany extends Listing {symbol:'LOT'}
-export type ListedCompany=Company|LotteryCompany
+export interface PrisonCompany extends Listing {
+  symbol:'PRI';nextDividend:number;carry:number
+  terms:{user:string;start:number;end:number|null;earned:number}[]
+}
+export type ListedCompany=Company|LotteryCompany|PrisonCompany
 export interface Companies {
-  residents:Record<string,number>; LOT:LotteryCompany;
-  CAS:Company;BNK:Company;peCash:number;nextPE:number;peLadder?:true;lastSlot:number;ballot?:Ballot;reversals:Record<string,{buyer:string;at:number}>;dividendCadence?:'daily-amsterdam-v1'
+  residents:Record<string,number>; LOT:LotteryCompany;PRI:PrisonCompany;
+  CAS:Company;BNK:Company;peCash:number;nextPE:number;peLadder?:true;lastSlot:number;ballot?:Ballot;reversals:Record<string,{buyer:string;at:number}>;dividendCadence?:'daily-amsterdam-v1'|'daily-amsterdam-v2'
 }
 export const cashUnits=toStockUnits
 export function ratio(amount:number,numerator:number,denominator=100){
@@ -95,7 +99,7 @@ function openingCompany(symbol:EquitySymbol,old:Legacy|undefined,now:number):Com
     (old?.reserve??cashUnits(120_000))+(old?.marketCash??cashUnits(50_000))+(old?.collectedInterest??0),
     price,quotes:old?.history?.map(p=>({...p,price:p.price/100}))??[{at:now,price:fromStockUnits(price)}],
     orders:[],trades:[],nextOrder:0,policy:{...startingPolicies[symbol]},cooldowns:{},supports:{},marks:{},
-    loss:0,profit:symbol===CAS?old?.margin??0:old?.collectedInterest??0,nextDividend:now+7*DAY,nextOperatingCost:now+DAY,ledger:[],issuance:[],
+    loss:0,profit:symbol===CAS?old?.margin??0:old?.collectedInterest??0,nextDividend:nextAmsterdamMidnight(now),nextOperatingCost:now+DAY,ledger:[],issuance:[],
     buybackCash:0,pending:0,receivables:0,nonperforming:0,obligations:0,recoveryUntil:0}
 }
 function openingLottery(unit:UnitOfWork,now:number):LotteryCompany{
@@ -112,11 +116,19 @@ function openingLottery(unit:UnitOfWork,now:number):LotteryCompany{
   return {symbol:'LOT',issued:LOT_SHARES,inventory,holders,cash:draw?.principal??0,buybackCash:0,
     price,quotes:[{at:firstQuote,price:SHARE_PRICE}],orders:[],trades:[],nextOrder:0,ledger:[]}
 }
+function openingPrison(now:number):PrisonCompany{
+  const price=25
+  return {symbol:'PRI',issued:1000,inventory:1000,holders:dictionary(),cash:0,buybackCash:0,
+    price:toStockUnits(price),quotes:[{at:now,price}],orders:[],trades:[],nextOrder:0,ledger:[],
+    nextDividend:now+DAY,carry:0,terms:[]}
+}
 export function companies(unit:UnitOfWork,now=Date.now()):Companies{
   const existing=unit.metadata<Companies>(COMPANIES)
   if(existing){
     existing.residents??=residentFunds()
     if(!existing.LOT){existing.LOT=openingLottery(unit,now);saveCompanies(unit,existing)}
+    if(!existing.PRI){existing.PRI=openingPrison(now);saveCompanies(unit,existing)}
+    existing.PRI.holders=dictionary(existing.PRI.holders)
     existing.LOT.holders=dictionary(existing.LOT.holders)
     for(const c of [existing.CAS,existing.BNK]){
       c.holders=dictionary(c.holders)
@@ -127,10 +139,11 @@ export function companies(unit:UnitOfWork,now=Date.now()):Companies{
       }
     }
     if(existing.ballot){existing.ballot.snapshot=dictionary(existing.ballot.snapshot);existing.ballot.votes=dictionary(existing.ballot.votes)}
-    if(existing.dividendCadence!=='daily-amsterdam-v1'){
-      existing.CAS.nextDividend=nextAmsterdamMidnight(now)
-      existing.BNK.nextDividend=nextAmsterdamMidnight(now)
-      existing.dividendCadence='daily-amsterdam-v1'
+    if(existing.dividendCadence!=='daily-amsterdam-v2'){
+      const next=nextAmsterdamMidnight(now)
+      for(const c of [existing.CAS,existing.BNK])c.nextDividend=Math.min(c.nextDividend??next,next)
+      existing.dividendCadence='daily-amsterdam-v2'
+      saveCompanies(unit,existing)
     }
     return existing
   }
@@ -170,7 +183,7 @@ export function companies(unit:UnitOfWork,now=Date.now()):Companies{
       cas.profit+=toStockUnits(bet.stake)
     }
   }
-  const result={residents:residentFunds(),LOT:openingLottery(unit,now),CAS:cas,BNK:bank,peCash:cashUnits(50_000),nextPE:now+DAY,lastSlot:Math.floor((now-DAY/2)/DAY)-1,reversals:{},dividendCadence:'daily-amsterdam-v1' as const}
+  const result={residents:residentFunds(),LOT:openingLottery(unit,now),PRI:openingPrison(now),CAS:cas,BNK:bank,peCash:cashUnits(50_000),nextPE:now+DAY,lastSlot:Math.floor((now-DAY/2)/DAY)-1,reversals:{},dividendCadence:'daily-amsterdam-v2' as const}
   saveCompanies(unit,result)
   return result
 }

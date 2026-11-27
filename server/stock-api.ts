@@ -1,3 +1,4 @@
+import {advancePrison} from './prison-company.ts'
 import {advanceLottery} from './weekly-lottery.ts'
 import {offerResidentShares} from './resident-stocks.ts'
 import type {Account} from './accounts.ts'
@@ -7,7 +8,7 @@ import {wallet} from './economy.ts'
 import {fail} from './http.ts'
 import {portfolio} from './cas-shares.ts'
 import {companies,saveCompanies,PE,amsterdamDay,nextAmsterdamMidnight,type ListedCompany} from './corporate.ts'
-import {book,displayOrder,orderBookView,cancelOrders,maintainLotteryMarket,submit} from './order-book.ts'
+import {book,displayOrder,orderBookView,cancelOrders,maintainListingMarket,submit} from './order-book.ts'
 import {advanceEconomy,castVote,companyView,rescueSupport,supportPolicy,markSupport} from './governance.ts'
 import {income,requireSpending} from './credit.ts'
 import {STOCK_QUOTES} from './stock-quotes.ts'
@@ -48,6 +49,7 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
   if(!read&&(method!=='POST'||!['trade','market','order','cancel','support','vote','rescue'].some(k=>path==='/api/stocks/'+k)))return
   advanceLottery(unit,now)
   const e=companies(unit,now),quotes=unit.metadata<Record<string,StockQuote>>(STOCK_QUOTES)??{}
+  advancePrison(unit,e,now)
   const positions=portfolio(account),purse=wallet(account)
   const saleQuotes=()=>{
     const result:Record<string,number>={}
@@ -64,15 +66,17 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
   const dayStart=startOfDay(now)
   const view=():StockView=>({
     dayStart,saleQuotes:saleQuotes(),coins:purse.coins,portfolio:positions,quotes,now,
+    prison:{...equityQuote(e.PRI,dayStart),...orderBookView(e.PRI,account.name)},
     lottery:{...equityQuote(e.LOT,dayStart),...orderBookView(e.LOT,account.name)},lotteryDividends:account.resort?.dividends??0,
     cas:{...equityQuote(e.CAS,dayStart),equity:e.CAS.holders[PE]??0,equityMoves:[]},bank:equityQuote(e.BNK,dayStart),
     companies:{CAS:companyView(e,e.CAS,account.name,now),BNK:companyView(e,e.BNK,account.name,now)}
   })
   if(read){
-    let changed=maintainLotteryMarket(unit,e,now)
+    let changed=maintainListingMarket(unit,e,now)
+    if(maintainListingMarket(unit,e,now,e.PRI))changed=true
     // Initial offering is created on first read even when using the application without its scheduler.
     if(!e.CAS.nextOrder)advanceEconomy(unit,e,now)
-    for(const c of [e.CAS,e.BNK,e.LOT])if(offerResidentShares(unit,e,c,now))changed=true
+    for(const c of [e.CAS,e.BNK,e.LOT,e.PRI])if(offerResidentShares(unit,e,c,now))changed=true
     if(changed)saveCompanies(unit,e)
     return {status:200,value:view()}
   }
@@ -87,7 +91,7 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
       if(!old.market||old.side!==side||old.initial!==shares||old.market.quote!==total)fail(409,'That order ID belongs to another trade')
       return {status:200,value:{...view(),trade:trade(old.market.total,old.at)}}
     }
-    if(c.symbol==='LOT')maintainLotteryMarket(unit,e,now)
+    if(!('policy' in c))maintainListingMarket(unit,e,now,c)
     if(data.sellAll&&(side!=='sell'||shares!==positions.positions[symbol]?.shares))fail(409,'Your holding changed. Review the sale again.')
     advanceEconomy(unit,e,now)
     const quote=bookQuote(book(c,side==='buy'?'sell':'buy').map(displayOrder),account.name,shares)
@@ -99,8 +103,8 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
     if(fills.reduce((n,t)=>n+t.shares,0)!==shares)fail(409,'The trade could not be filled at this price')
     const paid=fromStockUnits(fills.reduce((n,t)=>n+t.shares*t.price,0))
     order.market={quote:quote.total,total:paid}
-    if(c.symbol!=='LOT')markSupport(c,now)
-    else maintainLotteryMarket(unit,e,now)
+    if('policy' in c)markSupport(c,now)
+    else maintainListingMarket(unit,e,now,c)
     offerResidentShares(unit,e,c,now);saveCompanies(unit,e)
     return {status:200,value:{...view(),trade:trade(paid,now)}}
   }
@@ -109,16 +113,16 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
     const c=e[symbol]
     advanceEconomy(unit,e,now)
     if(action==='order'){
-      if(c.symbol==='LOT')maintainLotteryMarket(unit,e,now)
+      if(!('policy' in c))maintainListingMarket(unit,e,now,c)
       if((side!=='buy'&&side!=='sell')||typeof shares!=='number'||typeof data.price!=='number')fail(400,'Choose a side, share count and limit price')
       const price=toStockUnits(data.price)
       if(fromStockUnits(price)!==data.price)fail(400,'Use a price in increments of 0.0001 coin')
       submit(unit,e,c,{holder:account.name,side,shares,price,id:idFrom(data.id)},now)
-      if(c.symbol!=='LOT')markSupport(c,now)
+      if('policy' in c)markSupport(c,now)
     }else if(action==='cancel'){
       const id=idFrom(data.id)
       cancelOrders(unit,e,c,o=>o.id===id&&o.holder===account.name,now)
-    }else if(c.symbol==='LOT')fail(400,'LOT has no shareholder board')
+    }else if(!('policy' in c))fail(400,c.symbol+' has no shareholder board')
     else if(action==='support'){
       if(supportPolicy(c,account.name,data,now))unit.economyUsage(account.name,'/api/stocks/support',{action:'policy_support',symbol,
         policy:data.policy as string,value:data.value as number,status:data.on?'enabled':'disabled'},now)
@@ -131,7 +135,7 @@ export function stockApi(unit:UnitOfWork,account:Account,path:string,method:stri
         policy:vote.policy,value:vote.value,status:vote.votes[account.name]},now)
       advanceEconomy(unit,e,now)
     }
-    if(c.symbol==='LOT')maintainLotteryMarket(unit,e,now)
+    if(!('policy' in c))maintainListingMarket(unit,e,now,c)
     offerResidentShares(unit,e,c,now);saveCompanies(unit,e)
     return {status:200,value:view()}
   }

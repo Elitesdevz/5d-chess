@@ -1,3 +1,4 @@
+import {prisonDue,prisonWakeKey,settlePrisonDue} from './prison-company.ts'
 import {stat} from 'node:fs/promises'
 import {dirname,join} from 'node:path'
 import {advanceResidentStocks} from './resident-stocks.ts'
@@ -37,6 +38,7 @@ export function createApplication(store: ChessStore, updateFlag = store.path ===
   const economyUsageTimer=setInterval(collectEconomy,2000);economyUsageTimer.unref()
   const settleResort=()=>store.transaction(unit=>{
     const now=Date.now()
+    settlePrisonDue(unit,now)
     advanceLottery(unit,now)
     advanceResidentStocks(unit,now)
     for(const game of ['poker','blackjack'] as const)advanceTable(unit,game,now)
@@ -75,6 +77,8 @@ export function createApplication(store: ChessStore, updateFlag = store.path ===
           json(res,200,{ok:true,storageSchema:STORAGE_SCHEMA,...(updating?{updating:true}:{})})
           return
         }
+        const settlementTime=Date.now()
+        if(prisonDue(store.metadataValue(prisonWakeKey),settlementTime))store.transaction(unit=>settlePrisonDue(unit,settlementTime))
         const authorize=(track=true)=>{
           const now=Date.now(),name=user(store,req),bookings=roster(store,now)
           const booking=bookings.find(b=>b.user===name)

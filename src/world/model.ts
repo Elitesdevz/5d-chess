@@ -19,7 +19,7 @@ export const WORLD_CAPACITY=50
 export const WORLD_SPEED=4.7
 export const SPRINT_SPEED=WORLD_SPEED*1.45
 export const CITY=shared.spawn
-export const stockFloor=(symbol:string)=>symbol==='CAS'||symbol==='BNK'||symbol==='LOT'||STOCK_SYMBOLS.has(symbol)
+export const stockFloor=(symbol:string)=>symbol==='CAS'||symbol==='BNK'||symbol==='LOT'||symbol==='PRI'||STOCK_SYMBOLS.has(symbol)
 export type PublicZone=GuestFloor|Gallery|Venue|'city'|'hotel'|'casino'|'bank'|'exchange'|'kfc'|'cave'|'oasis'|`floor:${string}`|HomeZone
 export type WorldZone=PublicZone|'private'
 export const DESTINATIONS={city:'city',casino:'hotel','casino-floor':'casino',bank:'bank',stocks:'exchange',kfc:'kfc',gunshop:'gunshop',prison:'station'} as const

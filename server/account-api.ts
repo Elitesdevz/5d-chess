@@ -15,7 +15,7 @@ function netWorthPrices(store:ChessStore){
   const quotes=store.metadataValue(STOCK_QUOTES) as Record<string,StockQuote>|undefined
   const prices=new Map(Object.entries(quotes??{}).map(([symbol,quote])=>[symbol,quote.price]))
   const economy=store.metadataValue(COMPANIES) as Companies|undefined
-  if(economy)for(const symbol of [CAS,BNK,'LOT'] as const)if(economy[symbol])prices.set(symbol,fromStockUnits(economy[symbol].price))
+  if(economy)for(const symbol of [CAS,BNK,'LOT','PRI'] as const)if(economy[symbol])prices.set(symbol,fromStockUnits(economy[symbol].price))
   return prices
 }
 
