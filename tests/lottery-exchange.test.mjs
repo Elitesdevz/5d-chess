@@ -130,12 +130,12 @@ test('an advisor can close a reference position larger than one broker order',t=
   assert.deepEqual(sale.portfolio.positions,{})
 })
 
-test('LOT is marked at the last fill and public resale offers can trade away from the initial price',t=>{
+for(const [symbol,listing] of [['LOT','lottery'],['PRI','prison']])test(symbol+' is marked at the last fill and public resale offers can trade away from the initial price',t=>{
   const {api}=fixture(t)
-  api();api('/market',{symbol:'LOT',side:'buy',shares:12,total:300,id:crypto.randomUUID()})
-  api('/order',{symbol:'LOT',side:'sell',shares:4,price:24.9,id:crypto.randomUUID()})
-  const bought=api('/market',{symbol:'LOT',side:'buy',shares:4,total:99.6,id:crypto.randomUUID()},'Bram')
-  assert.equal(bought.lottery.price,24.9)
-  assert.equal(bought.portfolio.positions.LOT.cost,99.6)
-  assert.equal(bought.lottery.history.at(-1).price,24.9)
+  api();api('/market',{symbol,side:'buy',shares:12,total:300,id:crypto.randomUUID()})
+  api('/order',{symbol,side:'sell',shares:4,price:24.9,id:crypto.randomUUID()})
+  const bought=api('/market',{symbol,side:'buy',shares:4,total:99.6,id:crypto.randomUUID()},'Bram')
+  assert.equal(bought[listing].price,24.9)
+  assert.equal(bought.portfolio.positions[symbol].cost,99.6)
+  assert.equal(bought[listing].history.at(-1).price,24.9)
 })

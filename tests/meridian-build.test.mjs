@@ -15,7 +15,7 @@ const json=file=>JSON.parse(readFileSync(file,'utf8'))
 const release=json('.meridian/manifest.json')
 test('clean Meridian build pins its seed, shared and visual bytes across Pi and frontend',()=>{
   assert.equal(meridian.seed,6821)
-  assert.equal(release.version,'afca84d21add5954d8024623b584a0a8eb39250434e25e57847cc90266e1c832')
+  assert.equal(release.version,'f866c1cd7e145828bcca89368008923e521af581a1f8648588c3f2e7799b117b')
   const output=compile()
   for(const [key,data] of Object.entries({shared,visual})){
     const bytes=Buffer.from(JSON.stringify(output[key])),section=release.sections[key]
