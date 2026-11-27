@@ -5,7 +5,9 @@ import type {Position} from '../../roulette-hall-model.ts'
 type Sample={seq:number;input:Input;at:number}
 type Command=Extract<ClientMessage,{type:'command'}>
 export class CityConnection {
-  private client=crypto.randomUUID()
+  private client=Array.from(crypto.getRandomValues(new Uint8Array(16)),n=>n.toString(16).padStart(2,'0')).join('')
+  private lastFrame=0
+  readonly timings={rtt:0,tick:0,projection:0}
   private socket?:WebSocket
   private epoch=''
   private id=0
@@ -45,6 +47,9 @@ export class CityConnection {
     return s
   }
   move(){
+    if(this.socket&&performance.now()-this.lastFrame>15000&&this.socket.readyState<WebSocket.CLOSING){
+      this.socket.close();return
+    }
     if(!this.ready||document.hidden||this.socket!.bufferedAmount>8192||this.socket?.readyState!==WebSocket.OPEN||this.pending)return
     const input=this.input(),key=JSON.stringify(input)
     if(key===this.lastSent)return
@@ -61,9 +66,10 @@ export class CityConnection {
     const url=new URL('/api/world/live',location.href)
     url.protocol=location.protocol==='https:'?'wss:':'ws:'
     url.search=new URLSearchParams({map:this.map,client:this.client,v:String(CITY_PROTOCOL)}).toString()
-    const ws=new WebSocket(url);this.socket=ws
+    const ws=new WebSocket(url);this.socket=ws;this.lastFrame=performance.now()
     ws.onmessage=event=>{
       if(this.socket!==ws||this.stopped)return
+      this.lastFrame=performance.now()
       const m=JSON.parse(event.data) as Message
       if(m.type==='hello'){
         if(this.epoch!==m.epoch){this.pending?.reject(Error('City restarted. Review the current state before retrying.'));this.pending=undefined;this.id=0}
@@ -74,6 +80,7 @@ export class CityConnection {
         this.frameSeq=m.frame.seq;this.view=applyFrame(this.view,m.frame)
         const ack=this.samples.find(s=>s.seq===m.frame.input)
         if(ack&&ack.seq>this.applied){this.applied=ack.seq;this.rtt=Math.min(2000,Date.now()-ack.at)}
+        Object.assign(this.timings,{rtt:this.rtt,tick:m.frame.tickMs,projection:m.frame.projectionMs??0})
         this.ready=true;this.delay=250
         const command=this.pending?.command,action=command?.action
         const reset=!!action&&['teleport','resort-floor','exit-cave'].includes(action)||action==='floor'&&command?.data.symbol==='residences'||action==='use'&&command?.data.target==='exchange-lobby'

@@ -50,12 +50,14 @@ export function createApplication(store: ChessStore, updateFlag = store.path ===
   const ai=new AiScheduler(store)
   const roulette=new RouletteHall(store)
   const city=new CityWorlds(store,roulette)
-  const live=new CityLive((name,action,data)=>{
-    const view=city.update(name,action,data)
+  const live=new CityLive((name,action,data,req)=>{
+    const view=store.withWriteCheck(()=>{
+      if(user(store,req)!==name)fail(401,'Session ended')
+    },()=>city.update(name,action,data))
     if(action==='use'||action==='floor')worldEconomyUsage(usage,store,name,action,view)
     return publicView({...view,mapVersion:mapRelease.version},roster(store,Date.now())) as typeof view
   },req=>user(store,req),mapRelease.version)
-  const worldTimer=setInterval(()=>{try{const now=Date.now();city.step(now);live.tick(now)}catch(error){console.error('City tick failed',error)}},50)
+  const worldTimer=setInterval(()=>{try{const now=Date.now(),start=performance.now();city.step(now);live.tick(now,performance.now()-start)}catch(error){console.error('City tick failed',error)}},50)
   worldTimer.unref()
   const stockHistory=new StockHistory()
   ai.kick()
@@ -134,6 +136,7 @@ export function createApplication(store: ChessStore, updateFlag = store.path ===
           actor=user(store,req)??fail(401,'Log in first')
           if((req.headers.origin||data.mapVersion!==undefined)&&data.mapVersion!==mapRelease.version)fail(412,'Meridian map version changed. Reload the city.')
           const action=path.slice('/api/world/'.length)
+          if(action==='observe')fail(404,'Unknown city action')
           const view=store.withWriteCheck(()=>{
             const fresh=authorize(false).booking
             if(fresh&&!booking)fail(423,'In custody at Meridian Police')

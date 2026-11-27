@@ -180,6 +180,7 @@ function accepted(next:WorldView & {mapVersion?:string},start:number,reposition=
     closed=true;location.reload();return
   }
   if(puzzleDialog.open&&(next.arcade?.custody?.ends!==null||next.arcade.custody.cell!==view?.arcade?.custody?.cell))puzzleDialog.close()
+  const balanceChanged=next.coins!==view?.coins
   view=next;packUI.update(next);syncLoadout()
   if(next.you.zone==='private'){
     closed=true;location.replace('/chess/dice.html?cave=1');return
@@ -194,7 +195,7 @@ function accepted(next:WorldView & {mapVersion?:string},start:number,reposition=
   stage?.set(next,offset,reposition,sent);syncControls();renderChat(next)
   connection.hidden=!stage?.preparingGraphics
   if(stage?.preparingGraphics)connection.textContent=graphicsMessage
-  updateWalletBalance(next.coins)
+  if(balanceChanged)updateWalletBalance(next.coins)
   restaurant?.update(next)
   if(changed){
     const nav=next.you.zone.startsWith('hotel')||next.you.zone==='casino'?'casino-floor':next.you.zone==='bank'?'bank':next.you.zone==='kfc'?'kfc':next.you.zone==='exchange'||next.you.zone.startsWith('floor:')?'stocks':next.you.zone==='station'||next.you.zone.startsWith('precinct:')?'prison':next.you.zone==='gunshop'?'gunshop':next.you.zone==='city'?'city':''
@@ -382,6 +383,7 @@ async function start(){
   live=new CityConnection(mapVersion,()=>({world:view?.id,zone:view?.you.zone,slot:packUI.slot,sprint:stage?.sprinting,kitchenMotion:stage?.kitchenMotion,...stage?.position}),
     (next,start,reset,sent)=>{
       if(arrival){const name=arrival;arrival='';void action(name,{to:go}).catch(showError);return}
+      if(live&&stage?.diagnostics)stage.diagnostics.network(live.timings.rtt,live.timings.tick,live.timings.projection)
       accepted(next,start,reset,sent)
     },(text,fatal)=>{if(fatal)unavailable(text);else{connection.textContent=text;connection.hidden=false}})
   history.replaceState(null,'',url.pathname)

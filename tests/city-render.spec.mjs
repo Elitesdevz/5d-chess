@@ -63,6 +63,6 @@ test('turning from a quiet street toward city lights reuses prepared shaders', {
     await browser?.close()
     server.closeAllConnections()
     await new Promise(resolve=>server.close(resolve))
-    app.close?.();store.close()
+    app.drain();store.close()
   }
 })
