@@ -16,7 +16,7 @@ export interface Account extends EconomicAccount,FoodAccount {cellPuzzle?:import
 export interface RatingChange {before: number; after: number; delta: number}
 export interface RatedRoom {legacyEloBackfill?:{batch:string;appliedAt:number;baseline:number};gameRewardTotals?:Partial<Record<Player,number>>;gameSettlementCoins?:Partial<Record<Player,number>>;gameRewardNotified?:Partial<Record<Player,boolean>>;code: string; title: string; seats: Partial<Record<Player,string>>; state: State; results: Resolution[]; rated?: boolean; rewardsSettled?: boolean; ratingStart?: Partial<Record<Player,number>>; statsStart?: Partial<Record<Player,number>>; ratingSettled?: boolean; ratingChanges?: Partial<Record<Player,RatingChange>>}
 export function pruneNotices(account: Account, now=Date.now()) {
-  if (account.notifications) account.notifications=account.notifications.filter(n=>n.permanent || (n.kind==='casino' && /received .* coins \(1% of profit\)/.test(n.detail)) || n.created>now-3*24*60*60*1000)
+  if (account.notifications) account.notifications=account.notifications.filter(n=>n.permanent || (n.kind==='warning'&&!n.read) || (n.kind==='casino' && /received .* coins \(1% of profit\)/.test(n.detail)) || n.created>now-3*24*60*60*1000)
 }
 export function ensureAccount(account: Account) {
   pruneNotices(account)
@@ -38,7 +38,7 @@ export function rankedPlayers(accounts:Account[]){
 }
 export function notify(account: Account, notice: Omit<Notice,'id'|'created'|'read'>) {
   const u=ensureAccount(account)
-  if (!u.settings.moveNotifications && !['rating','result','casino'].includes(notice.kind)) return
+  if (!u.settings.moveNotifications && !['rating','result','casino','warning'].includes(notice.kind)) return
   u.notifications.unshift({...notice,id:randomBytes(12).toString('hex'),created:Date.now(),read:false})
 
 }

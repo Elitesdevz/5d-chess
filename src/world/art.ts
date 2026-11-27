@@ -328,7 +328,7 @@ function makeScreen(scene:T.Object3D,symbol:string,x:number){
     const w=704,h=368
     ctx.fillStyle=symbol==='LOT'?'#352538':symbol==='CAS'?'#221c25':'#12282e';ctx.fillRect(0,0,w,h)
     ctx.font='600 35px Georgia';ctx.fillStyle='#cae7e0';ctx.fillText(symbol,30,53)
-    if(current!==undefined){ctx.font='600 26px system-ui';ctx.textAlign='right';ctx.fillText(current.toLocaleString('en',{maximumFractionDigits:2})+' coins',670,53);ctx.textAlign='left'}
+    if(current!==undefined){ctx.font='600 26px system-ui';ctx.textAlign='right';ctx.fillText(current.toLocaleString('en',{maximumFractionDigits:0})+' coins',670,53);ctx.textAlign='left'}
     for(let i=0;i<5;i++){ctx.beginPath();ctx.moveTo(32,85+i*53);ctx.lineTo(671,85+i*53);ctx.strokeStyle='#c7e5e241';ctx.stroke()}
     if(points.length){
       const values=points.map(p=>p.price),lo=Math.min(...values),hi=Math.max(...values),range=Math.max(.01,hi-lo)

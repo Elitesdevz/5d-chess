@@ -1,7 +1,7 @@
 import {armoryQuote,WEAPONS,weaponIds,type ArmoryPayment,type WeaponId} from './arcade.ts'
 import type {WorldView} from './model.ts'
 
-const money=(amount:number)=>amount.toLocaleString(undefined,{maximumFractionDigits:4})
+const money=(amount:number)=>amount.toLocaleString(undefined,{maximumFractionDigits:0})
 const photo=(id:WeaponId)=>'/chess/overrun/catalog-'+WEAPONS[id].model+'.webp'
 
 export function openArmory(dialog:HTMLDialogElement,initial:WorldView,buy:(id:WeaponId,payment:ArmoryPayment,sequence:number)=>Promise<void>){

@@ -23,7 +23,7 @@ export interface CasinoRound extends CasinoBet {id:string;result:number;won:bool
 export interface CasinoState {sequence:number;recent:CasinoRound[]}
 export interface CasinoView {coins:number;nextSequence:number;recent:CasinoRound[];houseEdge:number;profitTax:number;taxAccount:string;maxStake:number;open?:boolean}
 export interface CasinoReply extends CasinoView {round:CasinoRound}
-export const casinoCoins=(value:number)=>new Intl.NumberFormat('en',{maximumFractionDigits:4}).format(value)
+export const casinoCoins=(value:number)=>new Intl.NumberFormat('en',{maximumFractionDigits:0}).format(value)
 
 export const MIN_DICE_STAKE=1
 export const MAX_ELO_STAKE=100
