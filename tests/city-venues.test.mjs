@@ -65,7 +65,8 @@ test('street counters require a visit and a hotbar bite settles once across reco
 test('Exchange Crown connects the trading lift, housing clerk, residential lift and keyed apartment',t=>{
   const {act,walk}=guest(t)
   const tower=buildingById.get('block-'+crownBlock),unit=UNITS.find(u=>u.block===crownBlock)
-  assert.equal(tower.baseY,floorHeight('floor:LOT')+FLOOR_HEIGHT)
+  assert.equal(floorHeight('floor:PRI'),floorHeight('floor:LOT')+FLOOR_HEIGHT)
+  assert.equal(tower.baseY,floorHeight('floor:PRI')+FLOOR_HEIGHT)
   for(const t of TOWERS)assert.ok(UNITS.some(u=>u.name.startsWith(t.name+' · ')))
   let v=act('teleport',{to:'stocks'})
   const local=(x,z)=>{const p=site('exchange',x,z);walk(p.x,p.z)}

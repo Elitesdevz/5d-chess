@@ -1,3 +1,4 @@
+import {settlePrisonDue,setPrisonTerm} from './prison-company.ts'
 import {confined} from '../src/world/civic-venues.ts'
 import {randomInt} from 'node:crypto'
 import {alias,CELL_COUNT,cellPosition,JAIL_MINUTES,PUZZLE_SIZE,type CustodyView} from '../src/world/arcade.ts'
@@ -31,6 +32,7 @@ export function custodyView(b:Booking):CustodyView{
 }
 export function book(tx:UnitOfWork,user:string,stars:number,now:number,permanent=false,noRelease=false){
   const account=tx.users.get(user)??fail(404,'Player not found')
+  settlePrisonDue(tx,now)
   const list=(tx.metadata<Booking[]>(KEY)??[]).filter(b=>b.ends===null||b.ends>now)
   let b=list.find(b=>b.user===user)
   if(b&&!permanent)return b
@@ -42,6 +44,7 @@ export function book(tx:UnitOfWork,user:string,stars:number,now:number,permanent
   }
   if(!permanent&&(!Number.isInteger(stars)||stars<1||stars>5))fail(400,'Invalid wanted level')
   b.ends=permanent?null:now+JAIL_MINUTES[stars]*60000;b.noRelease=noRelease
+  setPrisonTerm(tx,user,b.ends,now)
   tx.putMetadata(KEY,list)
   const p=pack(account);p.stars=0;p.remaining=0
   if(account.cave)account.cave.active=false
@@ -52,8 +55,10 @@ export function book(tx:UnitOfWork,user:string,stars:number,now:number,permanent
   }
   return b
 }
-export function release(tx:UnitOfWork,user:string){
+export function release(tx:UnitOfWork,user:string,now=Date.now()){
+  settlePrisonDue(tx,now)
   const list=tx.metadata<Booking[]>(KEY)??[]
+  if(list.some(b=>b.user===user&&(b.ends===null||b.ends>now)))setPrisonTerm(tx,user,now,now)
   tx.putMetadata(KEY,list.filter(b=>b.user!==user))
   const a=tx.users.get(user)
   if(a)delete a.cellPuzzle

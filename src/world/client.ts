@@ -162,7 +162,7 @@ async function floorScreens(zone:string){
     if(view?.you.zone!==zone)return
     stage?.quote(symbol,issue?.history??data.quotes[symbol]?.history??[],issue?.price??data.quotes[symbol]?.price)
     if(isEquity(symbol))stage?.ownership(symbol,data.companies[symbol])
-    else if(symbol!=='LOT'){
+    else if(!issue){
       const {points}=await api<{points:PricePoint[]}>('/stocks/history?symbol='+encodeURIComponent(symbol))
       if(view?.you.zone===zone)stage?.quote(symbol,points.slice(-60),data.quotes[symbol]?.price)
     }
@@ -419,7 +419,7 @@ async function start(){
   }
   document.addEventListener('visibilitychange',wakePresence)
   void beat();window.setInterval(tableStatus,160)
-  window.setInterval(()=>{if(!closed&&!document.hidden&&view&&/^floor:(CAS|BNK|LOT)$/.test(view.you.zone))void floorScreens(view.you.zone)},12_000)
+  window.setInterval(()=>{if(!closed&&!document.hidden&&view&&/^floor:(CAS|BNK|LOT|PRI)$/.test(view.you.zone))void floorScreens(view.you.zone)},12_000)
 }
 document.addEventListener('click',event=>{
   const link=(event.target as Element).closest<HTMLAnchorElement>('a')

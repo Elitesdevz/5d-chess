@@ -42,25 +42,25 @@ test('LOT market orders fill player limits in price order, reserve holdings and 
   assert.throws(()=>api('/support',{symbol:'LOT',policy:'dividend',value:30,on:true}),/no shareholder board/)
 })
 
-test('residents trade small funded orders on the three city books and release stock when offers run out',t=>{
+test('residents trade small funded orders on the four city books and release stock when offers run out',t=>{
   const {db,api}=fixture(t)
   api()
   const tick=now=>db.transaction(u=>advanceResidentStocks(u,now))
   tick(start)
-  for(let turn=1;turn<=18;turn++){
+  for(let turn=1;turn<=24;turn++){
     tick(start+turn*halfHour);tick(start+turn*halfHour)
     const e=db.metadataValue('economyV2')
-    for(const c of [e.LOT,e.CAS,e.BNK]){
+    for(const c of [e.LOT,e.CAS,e.BNK,e.PRI]){
       assert.equal(c.inventory+Object.values(c.holders).reduce((a,b)=>a+b,0),c.issued)
       for(const id of Object.keys(e.residents))assert.ok((c.holders[id]??0)<=6&&e.residents[id]>=0)
     }
   }
   const e=db.metadataValue('economyV2')
-  for(const c of [e.LOT,e.CAS,e.BNK]){
+  for(const c of [e.LOT,e.CAS,e.BNK,e.PRI]){
     assert.ok(c.trades.some(t=>residentHolder(t.buy)&&t.shares<=2))
     assert.ok(c.orders.some(o=>residentHolder(o.holder)&&o.side==='sell'&&o.initial<=2))
   }
-  const now=start+19*halfHour
+  const now=start+25*halfHour
   db.transaction(u=>{
     const e=companies(u,now),c=e.LOT,id=Object.keys(e.residents)[0]
     // Player-owned float, one remaining inventory share, and four held by a resident.
@@ -130,12 +130,12 @@ test('an advisor can close a reference position larger than one broker order',t=
   assert.deepEqual(sale.portfolio.positions,{})
 })
 
-test('LOT is marked at the last fill and public resale offers can trade away from the initial price',t=>{
+for(const [symbol,listing] of [['LOT','lottery'],['PRI','prison']])test(symbol+' is marked at the last fill and public resale offers can trade away from the initial price',t=>{
   const {api}=fixture(t)
-  api();api('/market',{symbol:'LOT',side:'buy',shares:12,total:300,id:crypto.randomUUID()})
-  api('/order',{symbol:'LOT',side:'sell',shares:4,price:24.9,id:crypto.randomUUID()})
-  const bought=api('/market',{symbol:'LOT',side:'buy',shares:4,total:99.6,id:crypto.randomUUID()},'Bram')
-  assert.equal(bought.lottery.price,24.9)
-  assert.equal(bought.portfolio.positions.LOT.cost,99.6)
-  assert.equal(bought.lottery.history.at(-1).price,24.9)
+  api();api('/market',{symbol,side:'buy',shares:12,total:300,id:crypto.randomUUID()})
+  api('/order',{symbol,side:'sell',shares:4,price:24.9,id:crypto.randomUUID()})
+  const bought=api('/market',{symbol,side:'buy',shares:4,total:99.6,id:crypto.randomUUID()},'Bram')
+  assert.equal(bought[listing].price,24.9)
+  assert.equal(bought.portfolio.positions[symbol].cost,99.6)
+  assert.equal(bought[listing].history.at(-1).price,24.9)
 })

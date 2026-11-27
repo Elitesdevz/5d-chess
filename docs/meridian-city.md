@@ -32,11 +32,23 @@ At KFC, move the spatula, scoop and soda cup with the mouse, touch or arrow keys
 
 Buy weekly draw tickets at the Royal’s lobby stand. To trade shares, use the Exchange Tower elevator and search for LOT. The two brokers on floor 103 accept market and limit orders through the city exchange. The weekly jackpot receives 99% of ticket sales. LOT shareholders split the other 1% according to shares held at the draw. Existing lottery holdings and accrued dividends carry over.
 
-Three city residents trade CAS, BNK and LOT with their own coin balances. Across the entire exchange they attempt one ordinary order of up to two shares every half hour. They leave the last listed share for players. When a stock has no offers, a resident who owns shares lists up to three immediately.
+Three city residents trade CAS, BNK, LOT and PRI with their own coin balances. Across the entire exchange they attempt one ordinary order of up to two shares every half hour. They leave the last listed share for players. When a stock has no offers, a resident who owns shares lists up to three immediately.
 
 Visit the financial advisor in reception to see your holdings, cash, daily and lifetime gains, dividends and open orders. Gains include closed positions. Select **Sell all** beside a stock to review the proceeds for the entire holding before confirming. Reserved shares, an expired external quote or insufficient bids can prevent a full sale.
 
 [LOT trading floor](review/lottery-exchange/lottery-floor.jpg) · [Financial advisor](review/lottery-exchange/financial-advisor.jpg) · [Mobile sale confirmation](review/lottery-exchange/advisor-sale-mobile.jpg)
+
+## Meridian Prison shares
+
+Search for **PRI** in the Exchange Tower lift. Floor 104 has two brokers for market and limit orders, live price screens and a brass clock above the lift. PRI opens with 1,000 shares at 25 coins each. Completed trades set subsequent prices. The reception advisor includes PRI holdings, sale quotes, gains and dividends.
+
+Each inmate generates 100 new coins per 24 hours served, including offline time. Short stays earn a proportional amount. The inmate keeps their wallet. At booking, the prison freezes the existing bank loans and locks a one-time surcharge of 50% of the outstanding balance. Each inmate’s earnings pay that inmate’s loans first, then the surcharge. BNK receives the principal as loan repayment and the interest through its ordinary profit ledger. On release the unpaid surcharge is waived. Any remaining original loan resumes at its original rate with its remaining repayment time.
+
+Every 24 hours PRI distributes the remaining income in proportion to outstanding shares and notifies each player paid. For a 100-coin loan, day one pays BNK 100. Day two pays BNK 50 and shareholders 50. Each further full day pays shareholders 100. Undistributed fractional coins and pools with no shareholders carry forward. Bookings already active when the feature is installed start earning at installation.
+
+BNK and CAS check for distributable profit at midnight in Amsterdam and notify recipients. LOT distributes at its weekly draw.
+
+[PRI trading floor](review/prison-exchange.jpg)
 
 ## Meridian Police
 

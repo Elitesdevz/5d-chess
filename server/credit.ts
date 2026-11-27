@@ -13,6 +13,7 @@ export type Loan={
   dueDay?:number;lastDay?:number;due?:number;lastAccrual?:number;rate?:number;late?:boolean;defaulted?:boolean
 }
 export interface BankAccount {
+  prisonHold?:{from:number;premium:number}
   loan?:Loan;additionalLoans?:Loan[];sequence:number;receipts:BankReceipt[];score?:number;positive?:number[]
   blockedUntil?:number;recoveryAt?:number
 }
@@ -49,6 +50,7 @@ function creditEvent(account:Account,details:EconomyUsage,at:number){
 }
 export function updateCredit(account:Account,now:number){
   const bank=creditAccount(account),loans=loansFor(bank)
+  if(bank.prisonHold)return bank
   if(!loans.length){
     if(bank.recoveryAt&&now>=bank.recoveryAt&&bank.score<600){
       const steps=1+Math.floor((now-bank.recoveryAt)/(14*DAY))
@@ -117,7 +119,7 @@ export function collect(account:Account,amount:number,now:number,automatic=false
 export function income(account:Account,units:number,now=Date.now()){
   if(!Number.isSafeInteger(units)||units<0)throw new Error('Invalid coin credit')
   let swept=0
-  if(loansFor(account.bank).length){
+  if(!account.bank?.prisonHold&&loansFor(account.bank).length){
     const loans=loansFor(updateCredit(account,now)).filter(l=>l.defaulted).sort((a,b)=>a.due!-b.due!)
     const limit=Math.floor(units/4)
     for(const loan of loans){

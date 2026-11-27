@@ -21,7 +21,7 @@ export function portfolioPerformance(data:StockView){
     const f=flow(d.symbol??'CAS')
     if(d.at===undefined?d.day===today:d.at>=data.dayStart)f.incomeToday+=toStockUnits(d.amount)
   }
-  const dividends:Record<string,number>={CAS:p.dividendsPaid,BNK:p.bankDividendsPaid??0,LOT:data.lotteryDividends}
+  const dividends:Record<string,number>={CAS:p.dividendsPaid,BNK:p.bankDividendsPaid??0,LOT:data.lotteryDividends,PRI:p.prisonDividendsPaid??0}
   for(const symbol of Object.keys(dividends))if(dividends[symbol])flow(symbol)
   const complete=p.trades.length===p.sequence
   const todayComplete=complete||p.trades.some(t=>t.at<data.dayStart)
