@@ -7,6 +7,7 @@ import {type Notice,type Profile} from './account-model.ts'
 import {avatarArt,framedAvatar} from './cosmetic-art.ts'
 import {icon} from './icons.ts'
 import {initBackdrop} from './backdrop.ts'
+import {casinoCoins} from './casino-model.ts'
 export class ApiError extends Error {constructor(message:string,public status:number){super(message)}}
 export async function api<T>(path:string,data?:unknown):Promise<T> {
   const trace=usageTrace();let status=0
@@ -28,7 +29,7 @@ function applyRating(){
   if(!current)return
   const el=document.getElementById('account-rating')
   if(el){el.textContent=`${Math.round(current.rating.value)} ELO`;el.title=`${current.rating.games} rated games`}
-  document.querySelectorAll<HTMLElement>('[data-coins]').forEach(el=>{el.textContent=current!.coins>=100000?new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:1}).format(current!.coins):current!.coins.toLocaleString(undefined,{maximumFractionDigits:4});el.parentElement!.title=`${current!.coins.toLocaleString(undefined,{maximumFractionDigits:4})} earned coins`})
+  document.querySelectorAll<HTMLElement>('[data-coins]').forEach(el=>{el.textContent=current!.coins>=100000?new Intl.NumberFormat('en',{notation:'compact',maximumFractionDigits:0}).format(current!.coins):casinoCoins(current!.coins);el.parentElement!.title=`${casinoCoins(current!.coins)} earned coins`})
 }
 export function updateWalletBalance(coins:number){
   if(!current||current.coins===coins)return
@@ -93,7 +94,20 @@ export function renderGuestNav(promptLogin:()=>void){
  const start=document.createElement('button');start.type='button';start.className='button primary guest-start';start.textContent='Start new game';start.onclick=()=>document.getElementById('new')?.click();actions.append(start)
 }
 export function updateNoticeCount(count:number){document.querySelectorAll<HTMLElement>('[data-notification-count]').forEach(el=>{el.hidden=!count;el.textContent=String(count)})}
-export async function fetchNotices(){const data=await api<{items:Notice[];unread:number}>('/notifications');updateNoticeCount(data.unread);renderNotificationPanel(data.items);return data}
+let warningShown=false
+export async function fetchNotices(){
+ const data=await api<{items:Notice[];unread:number}>('/notifications');updateNoticeCount(data.unread);renderNotificationPanel(data.items)
+ const warnings=data.items.filter(n=>n.kind==='warning'&&!n.read)
+ if(warnings.length&&!warningShown){
+  warningShown=true
+  const panel=notificationPanel();panel.hidden=false
+  document.querySelectorAll('[data-open-notifications]').forEach(b=>b.setAttribute('aria-expanded','true'))
+  panel.querySelector<HTMLElement>('.notice-close')?.focus()
+  const read=await api<{unread:number}>('/notifications/read',{ids:warnings.map(n=>n.id)})
+  updateNoticeCount(read.unread)
+ }
+ return data
+}
 export async function refreshRating(){
   const data=await api<SessionInfo>('/me');session=Promise.resolve(data)
   if(data.profile){current=data.profile;applyRating();const avatar=document.querySelector('.account-profile-link .profile-avatar');if(avatar)avatar.innerHTML=framedAvatar(current.loadout.icon,current.loadout.frame)}

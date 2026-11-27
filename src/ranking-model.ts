@@ -8,7 +8,7 @@ export type RankingMode=keyof typeof rankingModes
 export type RankingValue={rating?:number;coins?:number;netWorth?:number;rank:number|null}
 export type RankedPlayer=RankingValue&{name:string;avatar:string;frame?:string;games?:number;rank:number}
 export interface RankingPage {players:RankedPlayer[];me:RankingValue}
-const coinFormat=new Intl.NumberFormat('en',{maximumFractionDigits:4})
+const coinFormat=new Intl.NumberFormat('en',{maximumFractionDigits:0})
 
 export function rankingMode(value:string|null):RankingMode{
   return value==='coins'||value==='net-worth'?value:'elo'

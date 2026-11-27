@@ -74,7 +74,7 @@ export function counterUI(dialog:HTMLDialogElement,view:WorldView,send:(data:obj
   const carried=a.slots.filter((s):s is Stack=>!!s),amount='<label>Quantity <input aria-label="Quantity" type="number" min="1" step="1" value="1"></label>'
   let title='',content=''
   if(service==='cash'){
-    title='Cash counter';content=`<p>Banked ${view.coins.toLocaleString()} · Carried cash ${carried.find(s=>s.item==='cash')?.count??0}</p>`+amount+
+    title='Cash counter';content=`<p>Banked ${view.coins.toLocaleString(undefined,{maximumFractionDigits:0})} · Carried cash ${carried.find(s=>s.item==='cash')?.count??0}</p>`+amount+
       '<button data-op="withdraw">Withdraw</button><button data-op="deposit">Deposit</button>'+
       (a.recovery?.length?'<h3>Recovered belongings</h3>'+transfer(a.recovery,'recover','Collect'):'')
   }else if(service.startsWith('drawer:')){

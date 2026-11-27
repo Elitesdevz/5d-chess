@@ -11,7 +11,7 @@ const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById
 const esc=(value:string)=>value.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!))
 let card:PlayerCard,editor:ProfileEditor,tab='games',cursor:string|null=null,loading=false,generation=0,editing=false,saving=false,editorReady=false,editorRequest=0
 let selected:(ShowcaseSkin|null)[]=[]
-const format=(value:number)=>new Intl.NumberFormat('en',{maximumFractionDigits:4}).format(value)
+const format=(value:number)=>new Intl.NumberFormat('en',{maximumFractionDigits:0}).format(value)
 const delta=(n:number)=>`${n>0?'+':n<0?'−':''}${format(Math.abs(n))}`
 function message(id:string,text=''){el(id).textContent=text;el(id).hidden=!text}
 function showcaseArt(entry:ShowcaseSkin,size:number){
