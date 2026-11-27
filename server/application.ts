@@ -28,8 +28,10 @@ import {casinoApi} from './casino-api.ts'
 import {ensureAccount,profile,pruneNotices} from './accounts.ts'
 import {staticFile} from './static.ts'
 import {STORAGE_SCHEMA} from './storage.ts'
+import {applyAccountUpdates} from './account-updates.ts'
 
 export function createApplication(store: ChessStore, updateFlag = store.path === ':memory:' ? undefined : join(dirname(store.path),'update-in-progress')) {
+  store.transaction(applyAccountUpdates)
   const usage=new UsageStore(usagePath(store))
   let telemetryWarning=false
   const collectEconomy=()=>{try{drainEconomyUsage(usage,store)}catch{
