@@ -1,4 +1,5 @@
 import {shopCounter} from './civic-venues.ts'
+import {towerClerk} from './housing.ts'
 import {BAR} from './bar-menu.ts'
 import {CREDIT_ADVISOR,FINANCIAL_ADVISOR,PUBLIC_DICE,site,type WorldZone} from './model.ts'
 import {BUILDINGS,homeZone,residentialAt,residentialSite} from './residential.ts'
@@ -16,7 +17,7 @@ export const staffId=(zone:string,i:number)=>'staff:'+zone+':'+i
 export function serviceStaff(zone:WorldZone){
   const home=residentialAt(zone)
   const team=zone==='gunshop'?[armoryClerk]:zone==='hotel'?hotelStaff:zone==='bank'?bankStaff:zone==='exchange'?exchangeStaff:zone==='casino'?casinoStaff:
-    zone.startsWith('floor:')?floorStaff:home?.building.block!==undefined&&home.level===0&&!home.stairs?[housingClerk]:[]
+    zone.startsWith('floor:')?floorStaff:home?.building.block!==undefined&&home.level===0&&!home.stairs?[home.building.tower?{...housingClerk,...towerClerk}:housingClerk]:[]
   return team.map((p,i)=>({id:staffId(zone,i),name:p.name,zone,...(home?residentialSite(home.building,p.x,p.z):site(zone,p.x,p.z))}))
 }
 

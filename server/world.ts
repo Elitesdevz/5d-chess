@@ -1,6 +1,7 @@
 import {civicRoom,galleryZone} from '../src/world/civic-venues.ts'
+import {storefront} from '../src/world/storefronts.ts'
 import {resortService} from './resort.ts'
-import {HOTEL_LIFT,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
+import {HOTEL_LIFT,bathSeats,gameStations,bedAt,guestFloor,roomAt,roomPoints,type ResortView} from '../src/world/resort.ts'
 import {randomUUID} from 'node:crypto'
 import {CityArcade} from './city-arcade.ts'
 import {roster,cellMove,custodyView} from './custody.ts'
@@ -8,9 +9,9 @@ import {SLOT_COUNT,isWeapon,MAX_HP} from '../src/world/arcade.ts'
 import {cityStaff,serviceStaff} from '../src/world/service-staff.ts'
 import {CityLife} from './city-life.ts'
 import {callResidentialLift,occupy,operateDoor,residentialRide,settleResidentialLifts,stand} from './residential-actions.ts'
-import {aboard,access,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
+import {buildingById,homeZone,aboard,access,openLift,residentialAt,residentialPoints,residentialSite,unauthorizedHome,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
 import {residentialFood} from './residential-food.ts'
-import {UNITS,type Deeds,type HousingView} from '../src/world/housing.ts'
+import {crownBlock,UNITS,type Deeds,type HousingView} from '../src/world/housing.ts'
 import {BAR,BAR_STOOLS,DRINKS,type BarService} from '../src/world/bar-menu.ts'
 import {requireSpending} from './credit.ts'
 import {wallet} from './economy.ts'
@@ -249,20 +250,23 @@ export class CityWorlds {
       }
     }
     if(action==='close-resort'){
-      if(me.interaction===data.station&&me.interaction?.startsWith('resort:'))me.interaction=undefined
+      if(me.interaction===data.station&&me.interaction?.startsWith('resort:')){
+        if(me.homePose?.id.startsWith('salon-'))stand(me)
+        me.interaction=undefined
+      }
     }else if(action==='resort-floor'){
       const to=data.floor
       if(me.interaction!=='resort:lift'||(to!=='hotel'&&to!=='hotel:2'&&to!=='hotel:3'))fail(409,'Choose a floor from the hotel lift')
       this.arrive(world,me,to,now,{...HOTEL_LIFT,yaw:0})
     }else if(action==='resort'){
       const station=me.interaction
-      if(!station?.startsWith('resort:')||!this.points(world,me,now).some(p=>p.id===station&&near(me,p.x,p.z,p.range)))fail(409,'Visit the resort counter or table first')
+      if(!station?.startsWith('resort:')||!me.homePose?.id.startsWith('salon-')&&!this.points(world,me,now).some(p=>p.id===station&&near(me,p.x,p.z,p.range)))fail(409,'Visit the resort counter or table first')
       resort=this.store.transaction(u=>resortService(u,name,station!,now,data))
       housing=this.housing(name,now)
     }else if(action==='housing'){
       const unit=UNITS.find(u=>u.id===data.unit)??fail(400,'Unknown address')
       const counter='property:'+(unit.block===undefined?unit.id:'desk-'+unit.block)
-      if(!this.points(world,me,now).some(p=>p.id===counter&&near(me,p.x,p.z,p.range)))fail(409,'Visit the listing or clerk first')
+      if(!this.points(world,me,now).some(p=>(p.id===counter||p.id==='front:hall'&&me.interaction===p.id)&&near(me,p.x,p.z,p.range)))fail(409,'Visit the listing or clerk first')
       this.store.transaction(u=>{
         const deeds=u.metadata<Deeds>('cityDeeds')??{},old=deeds[unit.id]
         if(old&&(!old.until||old.until>now)){
@@ -281,7 +285,7 @@ export class CityWorlds {
       housing=this.housing(name,now)
     }else if(action==='home-floor'){
       const a=residentialAt(me.zone),to=data.level
-      if(typeof to!=='number'||!Number.isInteger(to)||to<0||to>4)fail(400,'Choose a residential floor')
+      if(typeof to!=='number'||!Number.isInteger(to)||to<0||!a?.building.levels[to])fail(400,'Choose a residential floor')
       if(!a||!a.building.lift||me.interaction!=='lift:'+a.building.id||!aboard(me.zone,me.x,me.z))fail(409,'Step inside the elevator first')
       const error=residentialRide(me,to,world.residential,world.life.people(world.members.values()),now)
       if(error)fail(409,error)
@@ -294,7 +298,7 @@ export class CityWorlds {
       }else{
         if(data.operation!=='eat'&&data.operation!==undefined&&!target)fail(409,'Open an accessible refrigerator first')
         food=residentialFood(this.store,name,housing.keys,target?.unit,data.operation===undefined?undefined:data)
-        if(!target)me.interaction='food'
+        if(!target&&data.operation===undefined)me.interaction='food'
       }
     }else if(action==='chat'){
       const text=typeof data.text==='string'?data.text.replace(/[\p{Cc}\p{Cf}]/gu,' ').trim():''
@@ -328,6 +332,24 @@ export class CityWorlds {
         }else if(target.id.startsWith('resort:bath:')){
           me.shower={room:r.number,until:now+12_000};me.interaction=undefined
         }else me.interaction=target.id as WorldUse
+      }else if(target.id==='exchange-lobby'){
+        this.arrive(world,me,'exchange',now,{...LIFT,yaw:Math.PI})
+        me.liftArrived=true
+      }else if(target.id.startsWith('bath-seat:')){
+        const z=bathSeats[Number(target.id.slice(10))]
+        const pose={...site(me.zone,2.35,z),yaw:-Math.PI/2,id:target.id,kind:'sit' as const,height:.50}
+        if(me.homePose||!occupy(me,{...target,range:.82,pose,exit:{x:target.x,z:target.z}},[...world.members.values()]))fail(409,'This bench is occupied')
+        me.interaction=undefined
+      }else if(['resort:poker','resort:blackjack','resort:slots'].includes(target.id)){
+        if(me.homePose)fail(409,'Stand up first')
+        const game=target.id.slice(7),local=localSite(me.zone,target.x,target.z)
+        const positions=game==='slots'?[{x:6.72,yaw:-Math.PI/2,id:'salon-slots-'+gameStations.find(s=>s.id===game&&Math.abs(local.z-s.z)<.01)!.z}]:
+          [1,-1].map(side=>({x:-6+side*1.64,yaw:side*Math.PI/2,id:'salon-'+game+'-'+side}))
+        const seat=positions.find(s=>![...world.members.values()].some(m=>m.zone===me.zone&&m.homePose?.id===s.id))
+        if(!seat)fail(409,'All seats are occupied')
+        const pose={...site(me.zone,seat.x,local.z),yaw:seat.yaw,id:seat.id,kind:'sit' as const,height:.53}
+        occupy(me,{...target,range:1.28,pose,exit:{x:me.x,z:me.z}},[])
+        me.interaction=target.id as WorldUse
       }else if(/^(door|furniture|call|lift|fridge|drawer):/.test(target.id)){
         this.homeUse(world,me,target as HomePoint,housing.keys,now)
       }else if(target.id.startsWith('seat:')||target.id.startsWith('couch:')){
@@ -392,11 +414,16 @@ export class CityWorlds {
     }else if(action==='floor'){
       const local=localSite(me.zone,me.x,me.z)
       if(me.interaction!=='elevator'||!near({...local,yaw:me.yaw},LIFT.x,LIFT.z,1.25))fail(409,'Enter the elevator first')
-      const to=data.symbol===''?'exchange':typeof data.symbol==='string'&&stockFloor(data.symbol)?`floor:${data.symbol}` as const:fail(400,'Choose a listed floor')
-      if(to!==me.zone){
-        const duration=1000+Math.min(4800,Math.abs(floorHeight(to)-floorHeight(me.zone))*9)
-        me.lift={to,started:now+250,ends:now+250+duration};me.interaction=undefined;me.yaw=Math.PI
-      }else{me.interaction=undefined;me.liftArrived=true}
+      if(data.symbol==='residences'){
+        const crown=buildingById.get('block-'+crownBlock)!
+        this.arrive(world,me,homeZone(crown.id,0),now,{...residentialSite(crown,0,crown.rect.b+1.03),yaw:Math.PI})
+      }else{
+        const to=data.symbol===''?'exchange':typeof data.symbol==='string'&&stockFloor(data.symbol)?`floor:${data.symbol}` as const:fail(400,'Choose a listed floor')
+        if(to!==me.zone){
+          const duration=1000+Math.min(4800,Math.abs(floorHeight(to)-floorHeight(me.zone))*9)
+          me.lift={to,started:now+250,ends:now+250+duration};me.interaction=undefined;me.yaw=Math.PI
+        }else{me.interaction=undefined;me.liftArrived=true}
+      }
     }else if(action==='stand'||action==='bet'){
       if(me.zone!=='casino')fail(409,'Visit the casino to use a table')
       hall=this.roulette.update(name,action,data,now,{id:world.id,position:this.boundPosition(me)})
@@ -421,8 +448,9 @@ export class CityWorlds {
     if(me.zone.startsWith('floor:'))residents.push(...serviceStaff(me.zone))
     for(const a of restaurant?.actors??[])residents.push({id:'kfc:'+a.id,name:a.name,zone:'kfc',...site('kfc',a.x,a.z)})
     const simulation=this.arcade.run({world:world.id,shard:world.shard,me,players:[...world.members.values()],residents,
-      residential:world.residential,vehicles:world.life.traffic.vehicles,caveOpen:open||me.zone==='cave',keys:housing.keys,drawer,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
+      residential:world.residential,vehicles:world.life.traffic.vehicles,caveOpen:open||me.zone==='cave',keys:housing.keys,drawer,front:me.interaction?.startsWith('front:')&&at(me.interaction)?storefront(me.interaction):undefined,bank:at('cash'),shop:at('counter')},now,action==='arcade'?data:undefined)
     if((action==='presence'||action==='arcade')&&typeof data.slot==='number'&&Number.isInteger(data.slot)&&data.slot>=0&&data.slot<SLOT_COUNT)me.slot=data.slot
+    if(simulation.view.bite)me.eatingUntil=simulation.view.bite.ends
     const item=simulation.view.slots[me.slot??0]?.item
     me.equipped=isWeapon(item)?item:undefined
     if(simulation.respawn){const victim=world.members.get(simulation.respawn)!;delete victim.equipped;this.arrive(world,victim,'city',now)}

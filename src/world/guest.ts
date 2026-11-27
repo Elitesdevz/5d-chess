@@ -10,7 +10,4 @@ export class CityGuest extends ClubGuest {
       batchOpaque(hand.root)
     }
   }
-  override pose(now:number,lean=0){
-    super.pose(now,lean)
-  }
 }

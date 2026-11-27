@@ -1,5 +1,6 @@
 import {build as bundle} from 'esbuild'
 import {resolve} from 'node:path'
+import {createHash} from 'node:crypto'
 import {cp, mkdir, rm, readFile, writeFile, readdir} from 'node:fs/promises'
 
 // Browsers load map sections on world entry. Node embeds the same compiled bytes
@@ -51,6 +52,26 @@ const types = {'world.html':'text/html; charset=utf-8','world.js':'text/javascri
   'game.js': 'text/javascript; charset=utf-8', 'portal.js': 'text/javascript; charset=utf-8',
   'online.js': 'text/javascript; charset=utf-8', 'styles.css': 'text/css; charset=utf-8',
   'portal.css': 'text/css; charset=utf-8', 'shell.css': 'text/css; charset=utf-8', 'logo.png': 'image/png', 'emblem.svg': 'image/svg+xml'}
+// Practice uses the real guest AI and board with an independent local save.
+const root='dist/chess/',practice=(await readFile(root+'index.html','utf8'))
+  .replace('5D Chess · Local play','Offline practice with Pip · 5D Chess')
+  .replace('/chess/logo.png','/chess/emblem.svg')
+await writeFile(root+'practice.html',practice)
+for(const [page,type] of Object.entries(types)){
+  if(!type.startsWith('text/html'))continue
+  const html=await readFile(root+page,'utf8')
+  const gated=html.replace(/<script type="module" src="([^"]+)"><\/script>/,'<script type="module" src="/chess/availability.js" data-entry="$1"></script>')
+  if(gated===html)throw Error('Missing app entry in '+page)
+  await writeFile(root+page,gated)
+}
+const kit=['update.html','update.js','update.css','availability.js','practice.html','game.js','emblem.svg','styles.css','shell.css','match.css']
+const worker=await readFile('scripts/update-worker.js','utf8')
+const hash=createHash('sha256').update(worker)
+for(const file of kit)hash.update(file).update(await readFile(root+file))
+await writeFile(root+'update-worker.js',`const CACHE_NAME='5d-update-${hash.digest('hex')}';\nconst FILES=${JSON.stringify(kit.map(f=>'/chess/'+f))};\n${worker}`)
+for(const name of [...kit,'update-worker.js']){
+  types[name]??=name.endsWith('.js')?'text/javascript; charset=utf-8':name.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8'
+}
 for(const chunk of await readdir('dist/chess/chunks'))types['chunks/'+chunk]='text/javascript; charset=utf-8'
 await cp('node_modules/three/LICENSE','dist/chess/third-party-notices.txt');types['third-party-notices.txt']='text/plain; charset=utf-8'
 for(const name of await readdir('dist/chess/overrun'))types['overrun/'+name]=name.endsWith('.glb')?'model/gltf-binary':'image/webp'

@@ -5,12 +5,12 @@ import {casinoCoins} from './casino-model.ts'
 import type {Profile} from './account-model.ts'
 import {STOCKS,SECTORS} from './stock-catalog.ts'
 import {CityServices} from './world/services.ts'
-import {BNK,CAS,MAX_STOCK_ORDER,QUOTE_MAX_AGE,isEquity,type PricePoint,type StockOrder,type StockSide,type StockTrade,type StockView} from './stock-model.ts'
+import {BNK,CAS,cityQuote,MAX_STOCK_ORDER,QUOTE_MAX_AGE,isEquity,type PricePoint,type StockOrder,type StockSide,type StockTrade,type StockView} from './stock-model.ts'
 
 const el=<E extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as E
 const nodes=[...document.querySelectorAll<HTMLButtonElement>('[data-exchange-view]')]
 const symbols=new Map<string,{name:string;sector:string}>(STOCKS.map(s=>[s.symbol,s]))
-const label=(symbol:string)=>symbol===CAS?'The Casino':symbol===BNK?'Fifth Dimension Bank':symbols.get(symbol)?.name??symbol
+const label=(symbol:string)=>symbol===CAS?'The Casino':symbol===BNK?'Fifth Dimension Bank':symbol==='PRI'?'Meridian Prison':symbol==='LOT'?'Royal Weekly Lottery':symbols.get(symbol)?.name??symbol
 const coins=(value:number)=>casinoCoins(value)+' coins'
 const signed=(value:number)=>value===0?'0':(value>0?'+':'−')+casinoCoins(Math.abs(value))
 const changeClass=(v:number)=>v>0?'is-gain':v<0?'is-loss':''
@@ -40,7 +40,7 @@ el('exchange-bank-art').innerHTML=icon('bank')
 el('stock-watch').innerHTML='<span aria-hidden="true">☆</span>'
 el<HTMLSelectElement>('exchange-sector').insertAdjacentHTML('beforeend',SECTORS.map(sector=>`<option>${sector}</option>`).join(''))
 const input=<I extends HTMLInputElement|HTMLSelectElement>(id:string)=>el<I>(id).value
-const issue=(symbol:string)=>symbol===CAS?state?.cas:symbol===BNK?state?.bank:undefined
+const issue=(symbol:string)=>state?cityQuote(state,symbol):undefined
 const mark=(symbol:string)=>issue(symbol)?.price??state?.quotes[symbol]?.price
 const validQuote=(symbol:string)=>Boolean(issue(symbol)||(state?.quotes[symbol]&&state.now-state.quotes[symbol].updated<QUOTE_MAX_AGE))
 
@@ -68,7 +68,7 @@ function renderExchange(){
   el('exchange-value').title=unmarked?`${unmarked} positions have no displayed price`:''
   el('exchange-gain').textContent=signed(gain)
   el('exchange-gain').className=changeClass(gain)
-  el('exchange-dividends').textContent=casinoCoins(state.portfolio.dividendsPaid+(state.portfolio.bankDividendsPaid??0))
+  el('exchange-dividends').textContent=casinoCoins(state.portfolio.dividendsPaid+(state.portfolio.bankDividendsPaid??0)+(state.portfolio.prisonDividendsPaid??0))
   const positions=Object.keys(state.portfolio.positions).length
   el('exchange-holding-count').textContent=positions===1?'1 position':`${positions} positions`
   el('exchange-gain-percent').textContent=cost?`${signed(Math.round(gain/cost*10000)/100)}% vs. cost`:'Across open positions'

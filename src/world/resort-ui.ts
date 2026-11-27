@@ -13,10 +13,14 @@ const grossLabel=(n:number)=>n?'Paid '+coins(n):'No payout'
 
 export class ResortUI {
   private digest=''
+  private slotSequence=-1
+  private stake=1
   constructor(private dialog:HTMLDialogElement,private send:(action:string,data:Record<string,unknown>)=>Promise<void>){}
   open(v:WorldView){
     const station=v.interaction?.split(':')[1],resort=v.resort
     if(!station||!resort)return
+    const spinning=station==='slots'&&this.dialog.open&&this.slotSequence>=0&&resort.sequence!==this.slotSequence
+    this.slotSequence=station==='slots'?resort.sequence:-1
     const key=JSON.stringify([v.interaction,resort,v.housing?.keys,v.housing?.occupied,v.coins,v.you.zone])
     if(this.dialog.open&&key===this.digest)return
     this.digest=key
@@ -43,7 +47,7 @@ export class ResortUI {
     }
     if(station==='slots'){
       body=`<div class="royal-reels" aria-label="Slot reels">${(resort.slots?.reels??[-1,-1,-1]).map(r=>`<b>${slotSymbols[r]??'★'}</b>`).join('')}</div><p role="status">${resort.slots?grossLabel(resort.slots.paid):'Match all three symbols to win.'}</p>
-        <div class="royal-order">${count('Stake in coins',100)}${button('spin','Spin reels',v.coins<1)}</div><details><summary>Paytable · 94.91% return</summary><p>Three independent reels, six equally likely symbols. Three of a kind pays the listed multiple of your stake, including your stake.</p>${slotSymbols.map((s,i)=>`<div class="royal-pay"><span>${s}</span><b>${slotPays[i]}×</b></div>`).join('')}</details>`
+        <div class="royal-order">${count('Stake in coins',100,this.stake)}${button('spin','Spin reels',v.coins<1)}</div><details><summary>Paytable · 94.91% return</summary><p>Three independent reels, six equally likely symbols. Three of a kind pays the listed multiple of your stake, including your stake.</p>${slotSymbols.map((s,i)=>`<div class="royal-pay"><span>${s}</span><b>${slotPays[i]}×</b></div>`).join('')}</details>`
     }
     const t=resort.table
     if(t){
@@ -58,7 +62,14 @@ export class ResortUI {
         ${me?.done&&t.phase==='play'&&!t.actions.length?'<p>Waiting for the other player.</p>':''}<details><summary>Table rules</summary><p>${poker?'Both players ante 10 coins. Replace up to three cards once, then check or bet 10. Highest five-card hand wins. Ties split the pot. House rake is 5%. On timeout the table shows down, or folds an unanswered bet.':'Six decks. Dealer stands on soft 17 and checks for blackjack. Naturals pay 3:2, ordinary wins pay 1:1, and ties push. Double on two cards or split a pair once. Split aces receive one card. Inactive hands stand after one minute.'}</p></details>`
     }
     const host=this.dialog.querySelector<HTMLElement>('.world-dialog-body')!
-    host.innerHTML=`<header class="world-service-head"><div><span>ROYAL HOTEL & CASINO</span><h2 id="world-dialog-title">${titles[station]}</h2></div><form method="dialog"><button aria-label="Close">×</button></form></header><div class="royal-service">${body}</div>`
+    host.innerHTML=`<header class="world-service-head"><div><span>ROYAL HOTEL & CASINO</span><h2 id="world-dialog-title">${titles[station]}</h2></div><form method="dialog"><button aria-label="Close">×</button></form></header><div class="royal-service ${t||station==='slots'?'salon-controls':''}">${body}</div>`
+    if(spinning&&!matchMedia('(prefers-reduced-motion:reduce)').matches){
+      const status=host.querySelector<HTMLElement>('[role=status]')!,result=status.textContent
+      const spin=host.querySelector<HTMLButtonElement>('[data-command=spin]')!
+      const stops=host.querySelector('.royal-reels')!
+      spin.disabled=true;status.textContent='Reels spinning…';stops.setAttribute('data-spinning','')
+      window.setTimeout(()=>{status.textContent=result;spin.disabled=v.coins<1;stops.removeAttribute('data-spinning')},1490)
+    }
     if(station==='billiards')billiards(host.querySelector('.royal-service')!)
     host.querySelectorAll<HTMLInputElement>('.royal-discard input').forEach(input=>input.onchange=()=>{
       const limit=host.querySelectorAll('.royal-discard :checked').length>=3
@@ -71,7 +82,7 @@ export class ResortUI {
       if(input&&!input.reportValidity())return
       const data:Record<string,unknown>={id:crypto.randomUUID(),sequence:resort.sequence+1,kind}
       if(kind?.startsWith('room-'))data.room=Number(kind.slice(5))
-      if(kind==='spin')data.stake=Number(input?.value)
+      if(kind==='spin')data.stake=this.stake=Number(input?.value)
       if(resort.lottery){data.count=Number(input?.value);data.draw=resort.lottery.until}
       if(t){
         data.round=t.id;data.revision=t.revision

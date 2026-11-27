@@ -72,7 +72,7 @@ export function submit(unit:UnitOfWork,e:Companies,c:ListedCompany,input:{holder
     if(e.peCash<units)fail(409,'Insufficient private equity funds')
     e.peCash-=units
   }else if(holder===BUYBACK){
-    if((c.symbol==='LOT'?c.cash:c.bankruptcy?0:cashForDistribution(c,now))<units)fail(409,'Insufficient free cash for buyback')
+    if((!('policy' in c)?c.cash:c.bankruptcy?0:cashForDistribution(c,now))<units)fail(409,'Insufficient free cash for buyback')
     c.cash-=units;c.buybackCash+=units
   }else{
     const owner=unit.users.get(holder)??fail(409,'Order owner unavailable')
@@ -144,8 +144,8 @@ export function offerInventory(unit:UnitOfWork,e:Companies,c:ListedCompany,now:n
   }
 }
 // Only share-sale proceeds back the standing bid. Ticket receipts fund the draw.
-export function maintainLotteryMarket(unit:UnitOfWork,e:Companies,now:number){
-  const c=e.LOT,before=c.nextOrder
+export function maintainListingMarket(unit:UnitOfWork,e:Companies,now:number,c:Companies['LOT']|Companies['PRI']=e.LOT){
+  const before=c.nextOrder
   const canceled=cancelOrders(unit,e,c,o=>o.side==='buy'&&!institution(o.holder)&&inDefault(unit.users.get(o.holder)?.bank),now)
   offerInventory(unit,e,c,now)
   const bid=Math.max(1,Math.floor(c.price*99/100))

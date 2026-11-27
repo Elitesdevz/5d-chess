@@ -6,7 +6,7 @@ import type {Venue} from '../../src/world/civic-venues.ts'
 import type {civicParcels} from './parcels.ts'
 import type {laneNetwork} from './lanes.ts'
 export function streetDetails(s:Resolved, BUILDINGS:Building[], civic:ReturnType<typeof civicParcels>, SIGNAL_HEADS:ReturnType<typeof laneNetwork>['signalHeads']){
-  const {streets:STREETS,circle,parking:PARKING,parks:PARKS,parkFeatures:PARK_FEATURES,market:MARKET,offices:OFFICES,boulevardTrees:BOULEVARD_TREES,overrides}=s
+  const {streets:STREETS,circle,parking:PARKING,parks:PARKS,parkFeatures:PARK_FEATURES,market:MARKET,boulevardTrees:BOULEVARD_TREES,overrides}=s
   const LANDMARKS:Landmark[]=s.landmarks
   const {origins,footprint,front}=civic
   const threshold=(id:Venue,offset:number)=>point(origins[id].x+front[id].x,origins[id].z+front[id].z+offset*front[id].sign)
@@ -19,8 +19,8 @@ export function streetDetails(s:Resolved, BUILDINGS:Building[], civic:ReturnType
     ...point(s.square.x+s.square.directory.across,s.square.z+s.square.directory.along)}
   const roomEntrances=(['hotel','bank','exchange','kfc'] as const).map(id=>({id,...point(s.rooms[id].x,s.rooms[id].z+s.rooms[id].front)}))
   const ENTRANCES=[
-    ...BUILDINGS.map(b=>{
-      const at=residentialSite(b,0,b.rect.f),parcel=b.block===undefined?s.houses.find(h=>h.id===b.id)!:s.apartments[b.block],road=STREETS.find(r=>r.id===parcel.street)!
+    ...BUILDINGS.filter(b=>!b.baseY).map(b=>{
+      const at=residentialSite(b,0,b.rect.f),parcel=b.block===undefined?s.houses.find(h=>h.id===b.id)!:[...s.apartments,...s.towers][b.block],road=STREETS.find(r=>r.id===parcel.street)!
       return {...at,id:b.id,front:residentialSite(b,0,b.rect.f+.87),road}
     }),
     ...Object.entries(entrances).map(([key,front])=>({...threshold(key as Venue,0),id:key==='station'?'police':key,front,road:STREETS.find(r=>r.id===(key==='gunshop'?s.shop.street:LANDMARKS.find(b=>b.id===s.precinct.landmark)!.street))!})),
@@ -66,8 +66,7 @@ export function streetDetails(s:Resolved, BUILDINGS:Building[], civic:ReturnType
   function solidStructure(x:number,z:number,pad:number){
     if(Object.entries(footprint).some(([id,f])=>{const o=origins[id as Venue];return Math.abs(x-o.x)<f.w/2+pad&&Math.abs(z-o.z)<f.d/2+pad}))return true
     if(LANDMARKS.some(b=>Math.abs(x-b.x)<b.w/2+pad&&Math.abs(z-b.z)<b.d/2+pad))return true
-    if(OFFICES.some(b=>Math.abs(x-b.x)<b.w/2+pad&&Math.abs(z-b.z)<b.d/2+pad))return true
-    if(BUILDINGS.some(b=>contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad)))return true
+    if(BUILDINGS.some(b=>!b.baseY&&contains(b.rect,(x-b.x)*b.facing,(z-b.z)*b.facing,pad)))return true
     return Object.values(s.rooms).some(r=>'width' in r&&Math.abs(x-r.x)<r.width+pad&&z>r.z+r.back-pad&&z<r.z+r.front+pad)
   }
   for(const [index,s] of STREETS.entries()){

@@ -1,6 +1,8 @@
 import * as T from 'three'
+import {bathWater,travelPrint,finishFloor} from './hotel-finishes.ts'
+import {salonGames} from './salon-games.ts'
 import {Scenery} from './landscape.ts'
-import {ROOMS,TIERS,venues,center,bedAt,fridgeAt,dresserAt,bathAt,HOTEL_LIFT,gameStations,guestFloor,type HotelRoom,type GuestFloor} from './resort.ts'
+import {ROOMS,TIERS,venues,center,bedAt,fridgeAt,dresserAt,bathAt,HOTEL_LIFT,bathSeats,gameStations,guestFloor,type HotelRoom,type GuestFloor} from './resort.ts'
 import {floorHeight,type WorldView} from './model.ts'
 
 type Sign=(parent:T.Object3D,text:string,size:[number,number],point:number[],color?:string,backdrop?:string)=>T.Mesh
@@ -14,6 +16,8 @@ export function royalResort(hotel:T.Group,sign:Sign){
     const panel=new T.Mesh(new T.PlaneGeometry(w,h),glazing)
     panel.position.set(x,y,z);panel.rotation.y=yaw;parent.add(panel)
   }
+  let games:ReturnType<typeof salonGames>|undefined
+  let water:ReturnType<typeof bathWater>|undefined
   const showers:{spray:T.Group;room:HotelRoom}[]=[]
   const levels:{floor:GuestFloor;group:T.Group;inside:T.Group}[]=[]
   const doors:{mesh:T.Group;room:HotelRoom}[]=[]
@@ -108,7 +112,11 @@ export function royalResort(hotel:T.Group,sign:Sign){
       }
       box(s*1.71,3.35,mid,.17,2.02,1.53,wall)
       makeSign(inside,room?String(room.number):('name' in bay?bay.name.toUpperCase():''),s*1.59,2.63,mid,room?.tier===4?1.65:1.50,.31,-s*Math.PI/2)
-      if(!room)continue
+      if(!room){
+        if(!top)finishFloor(inside,s<0?'salon':'arcade',s*5.62,.015,mid,7.70,depth-.12,1.43)
+        continue
+      }
+      finishFloor(inside,'parquet',s*5.62,.014,mid,7.70,depth-.13,2.65)
       const door=new T.Group(),leaf=new Scenery();inside.add(door);door.position.set(s*1.71,0,mid-.74)
       leaf.add('box',0,1.14,.73,.1,2.28,1.46,room.tier>=3?jade:walnut)
       leaf.add('box',-s*.061,1.34,.73,.025,1.57,1.11,room.tier>=3?0x39716c:0x745747)
@@ -117,14 +125,34 @@ export function royalResort(hotel:T.Group,sign:Sign){
       const tier=room.tier,bed=bedAt(room),fridge=fridgeAt(room),bath=bathAt(room)
       const wide=1.12+tier*.18
       box(bed.x,.27,bed.z,2.16,.52,wide+.12,walnut)
-      box(bed.x,.57,bed.z,2.13,.20,wide,linen[tier])
-      box(bed.x-s*.28,.69,bed.z,1.46,.08,wide+.035,velvet[tier])
-      box(bed.x+s*.78,.74,bed.z,.40,.12,wide*.78,ivory)
+      parts.add('cushion',bed.x,.57,bed.z,2.13,.20,wide,linen[tier])
+      parts.add('cushion',bed.x-s*.28,.69,bed.z,1.46,.08,wide+.035,velvet[tier])
+      parts.add('cushion',bed.x+s*.78,.74,bed.z,.40,.12,wide*.78,ivory)
       box(bed.x+s*1.12,.76,bed.z,.13,1.45,wide+.3,velvet[tier])
       if(tier>=2){
         for(let j=-3;j<=3;j++)box(bed.x+s*1.035,1.01,bed.z+j*wide/7,.092,.91,wide/8,velvet[tier])
-        for(const dz of [-.28,.28])box(bed.x+s*.63,.82,bed.z+dz,.40,.15,wide*.39,linen[tier])
+        for(const dz of [-.28,.28])parts.add('cushion',bed.x+s*.63,.82,bed.z+dz,.40,.15,wide*.39,linen[tier])
         box(bed.x-s*.53,.745,bed.z,.28,.03,wide+.04,tier===4?gold:jade)
+      }
+      // Layer a woven runner over the bed and print a different landscape for each tier.
+      const runner=bed.x-s*.58
+      box(runner,.752,bed.z,.44,.025,wide+.05,tier%2?jade:plum)
+      for(const dx of [-.18,-.12,.12,.18])box(runner+dx,.768,bed.z,.021,.009,wide+.05,gold)
+      const headWall=room.front-.11
+      box(s*7.30,2.12,headWall,2.24,1.25,.07,trim)
+      travelPrint(inside,(tier+room.number)%5,s*7.30,2.12,headWall-.044,2.13,1.14,true)
+      for(const dx of [2.18,8.86]){
+        box(s*dx,2.16,headWall-.03,.22,.72,.14,walnut)
+        parts.add('post',s*dx,2.13,headWall-.15,.19,.45,.19,0xffdfac)
+        for(const y of [1.89,2.37])parts.add('post',s*dx,y,headWall-.15,.22,.045,.22,gold)
+      }
+      const rugZ=room.front-1.98
+      box(s*4.56,.035,rugZ,2.74,.022,.98,tier%2?jade:plum)
+      for(const z of [-.40,.40])box(s*4.56,.05,rugZ+z,2.60,.010,.032,gold)
+      for(let i=-4;i<=4;i++)parts.add('box',s*4.56+i*.27,.05,rugZ,.14,.011,.14,ivory,Math.PI/4)
+      for(let i=0;i<4;i++){
+        const z=bed.z+.84+i*.10
+        box(s*9.23,2.20,z,.12,3.86,.11,i%2?velvet[tier]:trim)
       }
       const dresser=dresserAt(room),finish=tier>2?jade:walnut
       box(dresser.x,.43,dresser.z,1.42,.81,.68,finish)
@@ -207,23 +235,44 @@ export function royalResort(hotel:T.Group,sign:Sign){
       }
     }
     if(!top){
+      games=salonGames(inside)
       for(const [i,station] of gameStations.entries()){
         const z=station.z
         if(i<2){
+          parts.add('post',-6,.075,z,1.42,.15,1.54,walnut)
+          parts.add('post',-6,.16,z,1.32,.047,1.45,gold)
           parts.add('post',-6,.47,z,1.10,.9,1.2,walnut)
+          for(let k=0;k<12;k++){
+            const a=k*Math.PI/6
+            parts.add('post',-6+Math.sin(a)*.54,.48,z+Math.cos(a)*.59,.035,.56,.035,gold)
+          }
           parts.add('post',-6,.96,z,2.28,.16,2.47,gold)
           parts.add('post',-6,1.057,z,2.17,.05,2.35,i===0?jade:plum)
-          for(let j=0;j<5;j++)box(-6.52+j*.23,1.093,z,.14,.012,.22,ivory)
-          for(const ds of [-1,1]){box(-6,.49,z+ds*1.61,.68,.18,.61,velvet[2]);box(-6,.77,z+ds*1.89,.68,.70,.10,walnut)}
-          makeSign(inside,i===0?'FIVE-CARD DRAW':'BLACKJACK',-6,1.65,z-.60,1.65,.3)
+          for(const side of [-1,1]){
+            const x=-6+side*1.64
+            parts.add('post',x,.15,z,.58,.10,.58,gold)
+            parts.add('post',x,.32,z,.14,.36,.14,walnut)
+            parts.add('cushion',x,.51,z,.66,.17,.68,velvet[2]);box(x+side*.30,.76,z,.12,.59,.67,walnut)
+            parts.add('cushion',x+side*.231,.80,z,.09,.38,.57,velvet[2])
+            for(let k=0;k<5;k++)parts.add('post',-6+side*.81,1.105+k*.024,z-.37,.12,.024,.12,k%2?ivory:plum)
+          }
+          for(let j=0;j<7;j++)box(-6,1.093+j*.012,z-.86,.19,.011,.26,j%2?ivory:night)
+          parts.add('post',-6,3.88,z,.048,.95,.048,gold)
+          parts.add('pine',-6,3.32,z,1.51,.50,1.51,jade)
+          parts.add('post',-6,3.075,z,1.49,.045,1.49,0xffe2ac)
+          makeSign(inside,i===0?'FIVE-CARD DRAW':'BLACKJACK',-9.28,2.23,z,2.4,.41,Math.PI/2)
         }else{
           box(8.66,.85,z,.95,1.70,1.20,jade);box(8.37,1.84,z,.58,1.22,1.32,plum)
           box(8.06,1.81,z,.08,.60,1.18,gold)
-          for(let j=-1;j<=1;j++){
-            box(8.01,1.81,z+j*.34,.04,.41,.30,ivory)
-            parts.add('crown',7.98,1.81,z+j*.34,.06,.17,.17,[0xa44b50,gold,jade][j+1])
+          for(const side of [-1,1]){
+            box(8.035,1.82,z+side*.62,.09,1.22,.068,gold)
+            for(let k=0;k<6;k++)parts.add('crown',7.979,1.32+k*.187,z+side*.62,.06,.066,.066,0xffd494)
           }
           box(8.07,1.19,z,.66,.13,1.19,walnut);parts.add('post',7.88,1.28,z+.28,.17,.055,.17,gold)
+          box(7.88,1.27,z-.23,.19,.038,.29,night)
+          parts.add('post',6.72,.08,z,.60,.11,.60,gold)
+          parts.add('post',6.72,.32,z,.14,.45,.14,walnut)
+          parts.add('post',6.72,.54,z,.64,.15,.64,plum)
           makeSign(inside,'STARLIGHT',8.03,2.28,z,1.13,.23,-Math.PI/2)
         }
       }
@@ -248,15 +297,26 @@ export function royalResort(hotel:T.Group,sign:Sign){
       for(const x of [3.52,8.43])box(x,-.6,-17,.09,1.24,9.80,0x78aca5)
       for(const z of [-21.88,-12.12])box(5.97,-.6,z,4.95,1.24,.09,0x78aca5)
       for(const x of [4.7,7.1])box(x,-1.18,-17,.12,.02,8.96,0x234f5b)
-      const canvas=document.createElement('canvas');canvas.width=canvas.height=128
-      const ctx=canvas.getContext('2d')!;ctx.fillStyle='#70beb5';ctx.fillRect(0,0,128,128)
-      for(let n=0;n<38;n++){
-        const x=n*41%128,y=n*37%124
-        ctx.strokeStyle=n%3?'#c2f0db68':'#539b9588';ctx.lineWidth=1.1;ctx.beginPath();ctx.moveTo(x-5,y);ctx.bezierCurveTo(x+3,y+1,x+8,y-4,x+15,y-2);ctx.stroke()
+      water=bathWater(inside)
+      // The shallow end looks onto the mural through a rhythm of timber ribs.
+      for(const z of [-12.9,-15.6,-18.3,-21.0]){
+        box(5.55,4.23,z,7.7,.17,.14,walnut)
+        for(const x of [2.05,9.13]){box(x,3.60,z,.14,1.25,.14,walnut);box(x,3.06,z,.21,.15,.22,gold)}
+        box(5.98,4.12,z,2.57,.05,.062,0xffdf9e)
       }
-      const water=new T.CanvasTexture(canvas);water.colorSpace=T.SRGBColorSpace;water.wrapS=water.wrapT=T.RepeatWrapping;water.repeat.set(2,4)
-      const surface=new T.Mesh(new T.PlaneGeometry(4.94,9.78),new T.MeshStandardMaterial({map:water,color:0xb4e6d8,transparent:true,opacity:.64,roughness:.20,metalness:.16,side:T.DoubleSide}))
-      surface.rotation.x=-Math.PI/2;surface.position.set(5.975,-.13,-17);inside.add(surface)
+      travelPrint(inside,2,5.98,1.95,-22.97,4.74,1.78)
+      for(const z of bathSeats){
+        box(2.35,.36,z,.62,.11,1.36,walnut)
+        box(2.35,.45,z,.58,.12,1.29,ivory)
+        box(2.09,.66,z,.14,.50,1.32,jade)
+        for(const dz of [-.47,.47])box(2.35,.18,z+dz,.53,.32,.073,gold)
+        for(let j=0;j<5;j++)box(2.35,.515,z-.48+j*.06,.59,.016,.028,jade)
+      }
+      for(let i=0;i<18;i++)for(const x of [3.57,8.38])box(x,-.27,-21.60+i*.54,.045,.19,.50,i%3===0?ivory:jade)
+      for(let i=0;i<9;i++)for(const z of [-21.81,-12.18])box(3.8+i*.54,-.27,z,.50,.19,.045,i%3===0?ivory:jade)
+      for(const x of [3.59,8.36])for(const z of [-14.1,-17,-19.9]){
+        box(x,-.54,z,.09,.24,.41,jade);box(x+(x<6?.052:-.052),-.54,z,.022,.13,.29,0xd1fff1)
+      }
       for(let n=0;n<20;n++)for(const x of [3.39,8.56])box(x,.03,-21.73+n*.50,.19,.055,.46,n%4?ivory:jade)
       for(let n=0;n<10;n++)for(const z of [-22,-12])box(3.72+n*.50,.03,z,.46,.055,.19,n%4?ivory:jade)
       for(const x of [4.64,7.31]){
@@ -265,11 +325,12 @@ export function royalResort(hotel:T.Group,sign:Sign){
         box(x,.94,-12.45,.07,.07,.86,gold)
       }
       for(let i=0;i<4;i++)box(5.975,-.2-i*.24,-12.35-i*.35,2.29,.18,.40,0x9ac2b4)
-      makeSign(inside,'PALM BATHS',5.9,2.58,-22.96,4.65,.53)
+      makeSign(inside,'PALM BATHS',5.9,3.28,-22.96,4.65,.53)
     }
     parts.finish(inside);shell.finish(group)
   }
-  return (v:WorldView,prepared:boolean)=>{
+  const update=(v:WorldView,prepared:boolean)=>{
+    games?.update(v)
     for(const level of levels){
       level.group.visible=!prepared||(v.you.zone!=='hotel'&&v.you.zone!=='casino')
       level.inside.visible=!prepared||v.you.zone===level.floor
@@ -284,4 +345,8 @@ export function royalResort(hotel:T.Group,sign:Sign){
       mesh.rotation.y=open?room.side*Math.PI/2:0
     }
   }
+  return {update,tick:(zone:string,now:number,x:number,z:number,swimming:boolean,reduced:boolean)=>{
+    if(zone==='hotel:2')games?.tick(reduced)
+    if(zone==='hotel:3')water?.(now,x,z,swimming,reduced)
+  }}
 }

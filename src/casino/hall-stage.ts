@@ -16,7 +16,8 @@ const suits=[0x33495e,0x814855,0x456a61,0x75604e,0x4c476c,0x885742]
 const skins=[0xd5aa8a,0x8d5f49,0xae7b5c,0xe2bca1,0x6d4a40,0xb98870]
 const material=(color:number,roughness=.78)=>new T.MeshStandardMaterial({color,roughness})
 const shoe=material(0x201a1b),shirt=material(0xe0d4be),gold=material(0xc2a16a,.37)
-const hairPalette=[0x2d211d,0x332e2a,0x4c342b,0x624d3b].map(color=>material(color))
+const denim=material(0x374c59),wool=material(0x64554d),canvas=material(0xb29b70),stitch=material(0xd8c7a0)
+const hairPalette=[0x2d211d,0x332e2a,0x4c342b,0x805439,0xafa38d,0xa3764e].map(color=>material(color))
 function contactTexture(){
   const c=document.createElement('canvas');c.width=c.height=64
   const ctx=c.getContext('2d')!,gradient=ctx.createRadialGradient(32,32,2,32,32,31)
@@ -50,7 +51,7 @@ export class Figure {
   private motion=0
   private shadow:T.Mesh<T.PlaneGeometry,T.MeshBasicMaterial>
   private ownedMaterials:T.Material[]
-  constructor(scene:T.Scene,player:HallPlayer,shadow:T.Texture,staff:boolean|'cashier'|'cook'|'janitor'|'manager'|'officer'=false){
+  constructor(scene:T.Scene,player:HallPlayer,shadow:T.Texture,staff:boolean|'cashier'|'cook'|'janitor'|'manager'|'officer'=false,streetStyle?:number){
     this.target=player
     this.root.position.set(player.x,0,player.z)
     this.root.rotation.y=player.yaw
@@ -59,33 +60,81 @@ export class Figure {
     const code=[...player.name].reduce((acc,c)=>(acc*31+c.charCodeAt(0))>>>0,0)
     const suit=material(staff==='officer'?0x324f74:staff==='cook'?0xdbc8ae:staff==='cashier'?0x962d39:staff==='janitor'?0x487274:staff?0x202830:suits[code%suits.length]),skin=material(skins[(code>>>4)%skins.length])
     this.ownedMaterials=[suit,skin]
+    const casual=streetStyle!==undefined,look=(streetStyle??0)%5
+    const trousers=casual?(look%2?denim:wool):suit
+    const hair=hairPalette[(code>>>2)%hairPalette.length]
+    if(casual)this.body.scale.set(1+((code%7)-3)*.027,.96+(code%6)*.014,1)
+
     box(this.body,[.43,.50,.25],[0,1.18,0],suit,.074)
-    box(this.body,[.30,.18,.23],[0,.885,0],suit,.041)
+    box(this.body,[.30,.18,.23],[0,.885,0],trousers,.041)
+    if(casual){
+      if(look===0||look===3){
+        // Knitted yoke, turned cuffs and a ribbed hem.
+        for(let i=0;i<3;i++)box(this.body,[.378,.021,.021],[0,1.32-i*.044,-.127],i===1?canvas:shirt,.006)
+        box(this.body,[.366,.061,.236],[0,.963,0],suit,.020)
+      }else{
+        box(this.body,[.05,.39,.023],[0,1.18,-.132],shirt,.008)
+        for(const side of [-1,1]){
+          const collar=box(this.body,[.10,.084,.029],[side*.073,1.372,-.128],suit,.012);collar.rotation.z=side*.38
+          box(this.body,[.093,.085,.027],[side*.122,1.25,-.133],suit,.008)
+          box(this.body,[.098,.015,.031],[side*.122,1.29,-.141],stitch,.002)
+        }
+      }
+      if(look===2){
+        box(this.body,[.27,.30,.14],[0,1.17,.156],canvas,.040)
+        for(const side of [-1,1])box(this.body,[.041,.32,.03],[side*.15,1.25,-.12],canvas,.009)
+      }
+      if(look===4){
+        const strap=box(this.body,[.038,.55,.024],[.003,1.19,-.151],wool,.006);strap.rotation.z=-.59
+        box(this.body,[.12,.23,.23],[.211,.97,.004],canvas,.029)
+      }
+    }else{
     box(this.body,[.16,.37,.022],[0,1.2,-.132],shirt,.006)
     box(this.body,[staff?.16:.046,staff?.049:.21,.022],[0,staff?1.34:1.22,-.15],staff?gold:suit,.008)
+    }
     for(const side of [-1,1]){
-      const lapel=box(this.body,[.085,.32,.023],[side*.101,1.23,-.135],suit,.006);lapel.rotation.z=side*.19
+      if(!casual){const lapel=box(this.body,[.085,.32,.023],[side*.101,1.23,-.135],suit,.006);lapel.rotation.z=side*.19}
       const arm=new T.Group();arm.position.set(side*.235,1.37,0);this.body.add(arm);this.arms.push(arm)
       limb(arm,v(0,0,0),v(side*.035,-.22,0),.069,suit)
       limb(arm,v(side*.035,-.22,0),v(side*.031,-.39,-.072),.055,suit)
+      limb(arm,v(side*.034,-.35,-.05),v(side*.032,-.385,-.07),.055,casual?stitch:shirt)
       mesh(new T.SphereGeometry(.047,12,8),skin,arm,[side*.031,-.43,-.09]).scale.set(.87,1.22,.83)
       const hip=new T.Group();hip.position.set(side*.105,.87,0);this.body.add(hip);this.legs.push(hip)
-      limb(hip,v(),v(0,-.37,0),.083,suit)
+      limb(hip,v(),v(0,-.37,0),.083,trousers)
       const knee=new T.Group();knee.position.y=-.36;hip.add(knee);this.knees.push(knee)
-      limb(knee,v(),v(0,-.37,0),.062,suit)
+      limb(knee,v(),v(0,-.37,0),.062,trousers)
       box(knee,[.139,.085,.23],[0,-.38,-.055],shoe,.03)
       batchStatic(arm);batchStatic(knee)
     }
     mesh(new T.CylinderGeometry(.057,.065,.13,12),skin,this.body,[0,1.46,0])
     this.body.add(this.head)
     mesh(new T.SphereGeometry(.145,20,14),skin,this.head,[0,1.62,0]).scale.set(.88,1.19,.86)
-    mesh(new T.SphereGeometry(.138,18,12,0,tau,0,Math.PI*.53),hairPalette[(code>>>2)%hairPalette.length],this.head,[0,1.66,.013]).scale.set(.99,1.15,.97)
+    mesh(new T.SphereGeometry(.138,18,12,0,tau,0,Math.PI*.53),hair,this.head,[0,1.66,.013]).scale.set(.99,1.15,.97)
     for(const side of [-1,1]){
       mesh(new T.SphereGeometry(.027,9,7),skin,this.head,[side*.122,1.603,0]).scale.set(.73,1.14,.79)
-      mesh(new T.SphereGeometry(.011,8,6),shoe,this.head,[side*.043,1.637,-.114])
+      mesh(new T.SphereGeometry(.021,10,7),shirt,this.head,[side*.046,1.638,-.115]).scale.set(1,.58,.44)
+      mesh(new T.SphereGeometry(.010,8,6),shoe,this.head,[side*.046,1.638,-.124]).scale.set(.81,1,.56)
+      const brow=box(this.head,[.042,.009,.014],[side*.048,1.660,-.112],hair,.004);brow.rotation.z=side*.1
+      if(casual&&look===3){
+        const frame=mesh(new T.TorusGeometry(.035,.0038,6,16),gold,this.head,[side*.043,1.637,-.129]);frame.scale.y=.70
+        box(this.head,[.018,.007,.085],[side*.086,1.638,-.083],gold,.002)
+      }
     }
     mesh(new T.SphereGeometry(.035,10,8),skin,this.head,[0,1.603,-.117]).scale.set(.66,1.05,.73)
     box(this.head,[.045,.009,.007],[0,1.564,-.116],shoe,.003)
+    if(casual){
+      if(look===1){
+        mesh(new T.SphereGeometry(.094,12,9),hair,this.head,[0,1.72,.105])
+        for(const side of [-1,1])mesh(new T.SphereGeometry(.042,10,8),hair,this.head,[side*.107,1.636,.012]).scale.y=1.76
+      }else if(look===2){
+        mesh(new T.SphereGeometry(.143,16,9,0,tau,0,Math.PI*.53),suit,this.head,[0,1.711,.011]).scale.set(.96,.70,1)
+        box(this.head,[.187,.020,.133],[0,1.708,-.121],suit,.009)
+      }else if(look===0)for(let j=0;j<9;j++){
+        const a=j*tau/9
+        mesh(new T.SphereGeometry(.050,10,8),hair,this.head,[.103*Math.sin(a),1.736+.016*(j%2),.093*Math.cos(a)]).scale.y=.87
+      }
+      if(look===3)box(this.head,[.029,.006,.011],[0,1.64,-.13],gold,.002)
+    }
     if(staff==='cook'){
       box(this.head,[.28,.077,.245],[0,1.752,.014],shirt,.03)
       for(const x of [-.074,0,.074])mesh(new T.SphereGeometry(.091,12,8),shirt,this.head,[x,1.82,.018])
@@ -129,6 +178,7 @@ export class Figure {
       this.knees[i].rotation.x=chair?-1.35:-Math.max(0,swing*side)*.61
       this.arms[i].rotation.x=chair?.75:serving?1.12+breathe*side*.33:swing*-.38*side+breathe*.025
     }
+    this.head.rotation.y=.069*Math.sin(now*.00075+target.x)*(1-this.motion)
     const resting=homePose?.kind==='rest'
     this.body.position.z=0
     this.shadow.visible=!homePose

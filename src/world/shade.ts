@@ -2,14 +2,17 @@ import {shared} from './map-data.ts'
 import * as T from 'three'
 import {BOULEVARD_TREES,MARKET} from './terrain.ts'
 
-/** Ground contact and eave shade baked once for the mobile renderer. */
-export function contactShade(scene:T.Scene){
+export function groundShadow(){
   const canvas=document.createElement('canvas');canvas.width=canvas.height=64
   const ctx=canvas.getContext('2d')!
   const shade=ctx.createRadialGradient(32,32,1,32,32,32)
   shade.addColorStop(0,'rgba(41,31,23,.47)');shade.addColorStop(.55,'rgba(41,31,23,.32)');shade.addColorStop(1,'rgba(41,31,23,0)')
   ctx.fillStyle=shade;ctx.fillRect(0,0,64,64)
-  const mat=new T.MeshBasicMaterial({map:new T.CanvasTexture(canvas),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1})
+  return new T.MeshBasicMaterial({map:new T.CanvasTexture(canvas),transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-1})
+}
+/** Ground contact and eave shade baked once for the mobile renderer. */
+export function contactShade(scene:T.Scene){
+  const mat=groundShadow()
   const t=new T.Object3D(),stamps:T.Matrix4[]=[]
   const stamp=(x:number,y:number,z:number,w:number,d:number)=>{
     t.position.set(x,y,z);t.rotation.x=-Math.PI/2;t.scale.set(w,d,1);t.updateMatrix();stamps.push(t.matrix.clone())

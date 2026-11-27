@@ -13,7 +13,7 @@ import {frontage,distance,type Point} from '../../src/world/geo.ts'
 const direction=(from:Point,to:Point)=>['north','northeast','east','southeast','south','southwest','west','northwest'][(Math.round(Math.atan2(to.x-from.x,from.z-to.z)/(Math.PI/4))+8)%8]
 export function compile(source:MeridianSource=meridian){
   const s=resolveParcels(source)
-  const {streets,circle,landmarks,houses,apartments,offices,market,boulevardTrees,parks,parkFeatures,pond,rail,crossings,parking,rooms,arrivals,spawn}=s
+  const {streets,circle,landmarks,houses,apartments,towers,market,boulevardTrees,parks,parkFeatures,pond,rail,crossings,parking,rooms,arrivals,spawn}=s
   const civic=civicParcels(s),homes=residences(s),traffic=laneNetwork(streets,circle)
   const detail=streetDetails(s,homes.buildings,civic,traffic.signalHeads)
   const destinations={bank:['Bank',1.8],exchange:['Stock Exchange',1.9],hotel:['Hotel',1.88],kfc:['Krulliversal Fried Chicken',.8]} as const
@@ -26,7 +26,7 @@ export function compile(source:MeridianSource=meridian){
       title:p.label??'Local directory',street:p.kind==='sign'&&p.label?p.label:road.name,nearby:nearest.map(n=>({name:n.name,direction:direction(p,n),metres:Math.round(distance(p,n))}))}
   })
   const lots=validateLots(s,civic,homes,detail),navigation=pedestrianGrid(s,detail.paths)
-  const shared={lots,navigation,streets,circle,landmarks,houses,apartments,offices,market,boulevardTrees,parks,parkFeatures,pond,rail,crossings,parking,rooms,arrivals,spawn,
+  const shared={lots,navigation,streets,circle,landmarks,houses,apartments,towers,market,boulevardTrees,parks,parkFeatures,pond,rail,crossings,parking,rooms,arrivals,spawn,
     civic,places,...traffic,...homes,...detail,directory,woodland:woodland(source)}
   return {shared,visual:{...paving(streets,circle),inlays:frontages(s,detail),facades:facadeFinishes(s)}}
 }

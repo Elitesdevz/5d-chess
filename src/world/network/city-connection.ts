@@ -75,7 +75,8 @@ export class CityConnection {
         const ack=this.samples.find(s=>s.seq===m.frame.input)
         if(ack&&ack.seq>this.applied){this.applied=ack.seq;this.rtt=Math.min(2000,Date.now()-ack.at)}
         this.ready=true;this.delay=250
-        const action=this.pending?.command.action,reset=!!action&&['teleport','resort-floor','exit-cave'].includes(action)
+        const command=this.pending?.command,action=command?.action
+        const reset=!!action&&['teleport','resort-floor','exit-cave'].includes(action)||action==='floor'&&command?.data.symbol==='residences'||action==='use'&&command?.data.target==='exchange-lobby'
         const retry=initial&&this.pending
         this.onView(this.view,Date.now()-this.rtt,initial||reset,ack?.input as Position|undefined)
         if(initial){this.visibility();if(retry)this.send(retry.command)}

@@ -1,14 +1,15 @@
-import {distance,parkedCars,point,type Point} from '../src/world/city-plan.ts'
+import {distance,LANDMARKS,parkedCars,point,type Point} from '../src/world/city-plan.ts'
 import {cityGridBounds,findPath,pedestrianCost,outdoorGrid} from '../src/world/city-navigation.ts'
 import {assignResidents,CITY_DAY_MS,routine,scheduledPlace,type Resident,type ResidentView} from '../src/world/city-residents.ts'
 import {UNITS,type Deeds} from '../src/world/housing.ts'
 import {groundZone,outdoorWalkable,riderHeight,worldMove,type WorldZone} from '../src/world/model.ts'
 import {aboard,buildingById,contains,homeZone,openLift,residentialAt,residentialPoints,residentialSite,residentialStep,streetBuilding,type Building,type HomePoint,type ResidentialView} from '../src/world/residential.ts'
 import {CityTraffic,vehicleContains,type Vehicle} from '../src/world/traffic.ts'
+import {counterLayout,counterSeats} from '../src/world/storefronts.ts'
 import {PUBLIC_SEATS} from '../src/world/urban-layout.ts'
 import {callResidentialLift,occupy,operateDoor,residentialRide,settleResidentialLifts,stand,type Occupant} from './residential-actions.ts'
 
-type Goal=Point&{key:string;point?:HomePoint;outside?:boolean;kind?:'call'|'board'|'stairs'|'door'|'exit';level?:number}
+type Goal=Point&{key:string;yaw?:number;point?:HomePoint;outside?:boolean;kind?:'call'|'board'|'stairs'|'door'|'exit';level?:number}
 type Citizen=Occupant&{
   resident:Resident;keys:string[];activity:string;destination:string;goal?:Goal;route:Point[];retry:number;blocked:number;rest?:boolean
   routeAt:number;closed?:HomePoint;stair?:{building:string;floor:number;up:boolean;way:number};lastLift?:number;liftWait?:number
@@ -19,7 +20,8 @@ function outside(p:Point){
   const k=(Math.round(p.x*1000)+100_000)*200_000+Math.round(p.z*1000)+100_000
   const old=navCells.get(k)
   if(old!==undefined)return old
-  const okay=groundZone(p.x,p.z)==='city'&&!streetBuilding(p.x,p.z,.32)&&outdoorWalkable(p.x,p.z)&&!parkedCars.some(v=>vehicleContains(p,v,.35))
+  // Leave room to round corners between waypoints without grazing a residential wall.
+  const okay=groundZone(p.x,p.z)==='city'&&!streetBuilding(p.x,p.z,.52)&&outdoorWalkable(p.x,p.z)&&!parkedCars.some(v=>vehicleContains(p,v,.35))
   navCells.set(k,okay)
   return okay
 }
@@ -50,6 +52,10 @@ export function cityRoute(a:Point,b:Point,vehicles:readonly Vehicle[]=[]){
   if(path.length)cachedPaths.set(key,path)
   return [...path]
 }
+const workRooms=new Map<string,{x:number;z:number;facing:number;bench:typeof counterSeats[number]|undefined}>(LANDMARKS.filter(b=>b.id!=='police').map(b=>[b.id,{
+  x:b.x,z:b.z+b.facing*(counterLayout(b).counterZ+1.07),facing:b.facing,
+  bench:counterSeats.find(p=>p.pose.id==='window-seat-'+b.id),
+}]))
 const unitById=new Map(UNITS.map(u=>[u.id,u]))
 const STEP=240
 const maxReach=.38
@@ -132,6 +138,15 @@ export class CityLife {
       }
       const destination=scheduledPlace(actor.destination)
       if(!destination)return
+      const room=workRooms.get(actor.destination)
+      if(room){
+        const bench=room.bench
+        if(r.work!==actor.destination&&bench&&!people.some(n=>n.homePose?.id===bench.pose.id))
+          return {...bench,key:bench.id,point:bench,outside:true}
+        // Colleagues share a counter and leave the middle of the doorway clear.
+        const dx=(r.style<18?-.43:.43)*room.facing
+        return {x:room.x+dx,z:room.z,key:actor.destination,outside:true,yaw:room.facing>0?Math.PI:0}
+      }
       const seats=PUBLIC_SEATS.filter(p=>distance(p,destination)<7&&!people.some(n=>n.homePose?.id===p.pose?.id))
       const seat=actor.resident.style%3!==0?seats[actor.resident.style%Math.max(seats.length,1)]:undefined
       return seat?{...seat,key:actor.destination+':'+seat.id,point:seat,outside:true}:{...destination,key:actor.destination,outside:true}
@@ -222,6 +237,7 @@ export class CityLife {
     const gap=distance(actor,goal)
     if(gap<(goal.point?.pose?.kind==='rest'?.43:goal.point?.pose?.kind==='sit'?.52:goal.kind==='stairs'?.085:.16)){
       actor.activity=plan.activity
+      if(goal.yaw!==undefined)actor.yaw=goal.yaw
       if(goal.point)occupy(actor,goal.point,people)
       return
     }

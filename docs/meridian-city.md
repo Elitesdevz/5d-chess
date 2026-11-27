@@ -2,17 +2,21 @@
 
 Open the City from the signed-in header. Walk with WASD or the joystick and press E or the interaction button at a counter or a closed residential door. The city requires WebGL 2. If graphics are unavailable, the city entrance offers Retry and Back home.
 
+[View the hotel, tower apartments, bakery and taxi rank in game](review/visualupgrade/meridian.webp)
+
 ## Bank, hotbar and homes
 
 The middle counter at Fifth Dimension Bank exchanges whole coins between the existing wallet and carried cash. Loans, repayments, rewards and existing shops continue to use the wallet. A withdrawal leaves fractional bank balances intact.
 
-Click a hotbar slot or press 1–9 to select it. Cash stacks in one slot. Each food stack holds nine of one menu item. Each weapon occupies a separate slot. The existing Food and fridge menus work with these same slots. Takeaway collection waits if an order will not fit. Eating a carried portion restores 20 HP, and a dine-in bite restores 10, up to 100.
+Click a food slot to eat or drink. With the mouse captured, press 1–9 to select a slot and click in the city to use it. The item rises into view for 2.4 seconds and restores 20 HP when the animation finishes, up to 100 HP. A slot holds nine portions of the same food, one weapon, or a stack of cash. Collect takeaway at the till or a served tray at your restaurant table. If the order will not fit, it waits for you.
 
 At the Royal, each motel key opens a private room for one hour. Store carried cash and weapons in its dresser and food in its minibar. At checkout, drawer contents go to the bank recovery counter. Minibar contents return to available inventory slots, with overflow available at the same counter.
 
 [Backstage Single](images/royal-single.webp) · [Aureate Penthouse](images/royal-penthouse.webp)
 
 Existing SQLite accounts acquire the hotbar on first use. Older food quantities fill available slots in menu order. The cash counter holds excess for collection after space opens. Contents of an expired drawer also go to the recovery counter. Expired fridge contents fill available slots and excess goes to recovery. The legacy food field remains a projection of carried food.
+
+Visit Town Hall for the searchable housing register. The four residential towers have private full-floor apartments. For Exchange Crown, choose **PH** in the Exchange lift and speak to the housing clerk above the LOT floor. Clerks sell or lease available units using the existing deed system.
 
 The kitchen counter has a storage drawer in each house and apartment. An active deed or lease allows its resident to put away and retrieve cash and weapons. Walk up to the drawer to use it. Food goes in the existing fridge.
 
@@ -28,11 +32,23 @@ At KFC, move the spatula, scoop and soda cup with the mouse, touch or arrow keys
 
 Buy weekly draw tickets at the Royal’s lobby stand. To trade shares, use the Exchange Tower elevator and search for LOT. The two brokers on floor 103 accept market and limit orders through the city exchange. The weekly jackpot receives 99% of ticket sales. LOT shareholders split the other 1% according to shares held at the draw. Existing lottery holdings and accrued dividends carry over.
 
-Three city residents trade CAS, BNK and LOT with their own coin balances. Across the entire exchange they attempt one ordinary order of up to two shares every half hour. They leave the last listed share for players. When a stock has no offers, a resident who owns shares lists up to three immediately.
+Three city residents trade CAS, BNK, LOT and PRI with their own coin balances. Across the entire exchange they attempt one ordinary order of up to two shares every half hour. They leave the last listed share for players. When a stock has no offers, a resident who owns shares lists up to three immediately.
 
 Visit the financial advisor in reception to see your holdings, cash, daily and lifetime gains, dividends and open orders. Gains include closed positions. Select **Sell all** beside a stock to review the proceeds for the entire holding before confirming. Reserved shares, an expired external quote or insufficient bids can prevent a full sale.
 
 [LOT trading floor](review/lottery-exchange/lottery-floor.jpg) · [Financial advisor](review/lottery-exchange/financial-advisor.jpg) · [Mobile sale confirmation](review/lottery-exchange/advisor-sale-mobile.jpg)
+
+## Meridian Prison shares
+
+Search for **PRI** in the Exchange Tower lift. Floor 104 has two brokers for market and limit orders, live price screens and a brass clock above the lift. PRI opens with 1,000 shares at 25 coins each. Completed trades set subsequent prices. The reception advisor includes PRI holdings, sale quotes, gains and dividends.
+
+Each inmate generates 100 new coins per 24 hours served, including offline time. Short stays earn a proportional amount. The inmate keeps their wallet. At booking, the prison freezes the existing bank loans and locks a one-time surcharge of 50% of the outstanding balance. Each inmate’s earnings pay that inmate’s loans first, then the surcharge. BNK receives the principal as loan repayment and the interest through its ordinary profit ledger. On release the unpaid surcharge is waived. Any remaining original loan resumes at its original rate with its remaining repayment time.
+
+Every 24 hours PRI distributes the remaining income in proportion to outstanding shares and notifies each player paid. For a 100-coin loan, day one pays BNK 100. Day two pays BNK 50 and shareholders 50. Each further full day pays shareholders 100. Undistributed fractional coins and pools with no shareholders carry forward. Bookings already active when the feature is installed start earning at installation.
+
+BNK and CAS check for distributable profit at midnight in Amsterdam and notify recipients. LOT distributes at its weekly draw.
+
+[PRI trading floor](review/prison-exchange.jpg)
 
 ## Meridian Police
 

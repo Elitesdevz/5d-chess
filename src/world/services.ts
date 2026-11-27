@@ -97,9 +97,10 @@ export class CityServices {
     const render=()=>{
       const q=search.value.trim().toLowerCase()
       const matches=FLOOR_LIST.map((stock,i)=>({...stock,floor:i+1})).filter(s=>!q||s.symbol.toLowerCase().includes(q)||s.name.toLowerCase().includes(q)||String(s.floor)===q)
-      list.innerHTML=(q?'':'<button type="button" data-floor=""><b>G</b><span>Reception</span></button>')+
+      const sky='exchange crown apartments'.includes(q)?'<button type="button" data-floor="residences"><b>PH</b><span><strong>Exchange Crown</strong><small>Apartment reception</small></span></button>':''
+      list.innerHTML=sky+(q?'':'<button type="button" data-floor=""><b>G</b><span>Reception</span></button>')+
         matches.map(s=>`<button type="button" data-floor="${s.symbol}"><b>${s.floor}</b><span><strong>${s.symbol}</strong> ${safeText(s.name)}</span><span aria-hidden="true">›</span></button>`).join('')
-      if(!matches.length)list.innerHTML='<p class="world-muted">No matching floors.</p>'
+      if(!matches.length&&!sky)list.innerHTML='<p class="world-muted">No matching floors.</p>'
     }
     search.oninput=render
     list.onclick=e=>{
@@ -126,7 +127,7 @@ export class CityServices {
       return
     }
     if(view==='reserve'){
-      this.render('FIFTH DIMENSION BANK','Bank reserve',`<div class="world-metrics"><div><small>Lending reserve</small><b>${coins(data.reserve)}</b></div><div><small>Exchange ticker</small><b>BNK</b></div></div><p>Weekly dividends depend on profit and available reserves. Visit the BNK floor of the Exchange Tower to trade or vote.</p>`)
+      this.render('FIFTH DIMENSION BANK','Bank reserve',`<div class="world-metrics"><div><small>Lending reserve</small><b>${coins(data.reserve)}</b></div><div><small>Exchange ticker</small><b>BNK</b></div></div><p>BNK checks for distributable profit at midnight in Amsterdam and notifies shareholders when it pays. Visit the BNK floor of the Exchange Tower to trade or vote.</p>`)
       return
     }
     if(view==='loans'){
@@ -215,6 +216,7 @@ export class CityServices {
       <article><span>FLOOR DIRECTORY</span><h3>Trade with a broker</h3><p>Enter the elevator, pick a company, and speak to a broker on its floor. Use coins to buy and sell shares.</p></article>
       <article><span>FINANCIAL ADVISOR</span><h3>Follow your investments</h3><p>Visit the desk to your left for your holdings, daily performance and available cash.</p></article>
       <article><span>CAS AND BNK</span><h3>Own a piece of the city</h3><p>Prices follow completed trades. Shareholders can earn dividends and vote on company policy at the board table.</p></article>
+      <article><span>PRI</span><h3>Meridian Prison</h3><p>Trade prison shares upstairs. Income from time served repays locked bank debt first. Shareholders split the remaining income every 24 hours.</p></article>
       <article><span>LOT</span><h3>Royal Weekly Lottery</h3><p>Buy tickets at the hotel. LOT brokers trade shares upstairs. Shareholders split 1% of weekly ticket sales.</p></article>
       <article><span>REFERENCE STOCKS</span><h3>Explore real-world companies</h3><p>These virtual shares track external prices. Your holdings stay in the game and are traded with coins.</p></article>
       </div>`)
@@ -224,7 +226,7 @@ export class CityServices {
     const report=portfolioPerformance(data),holdings=report.rows.filter(row=>row.shares>0)
     const signed=(n:number|undefined)=>n===undefined?'—':`<span class="${n<0?'world-loss':'world-gain'}">${n>0?'+':''}${casinoCoins(n)}</span>`
     const amount=(units:number|undefined)=>units===undefined?'—':signed(fromStockUnits(units))
-    const orders=[...Object.values(data.companies).flatMap(c=>c.orders.map(o=>({...o,symbol:c.symbol}))),...data.lottery.orders.map(o=>({...o,symbol:'LOT'}))]
+    const orders=[...Object.values(data.companies).flatMap(c=>c.orders.map(o=>({...o,symbol:c.symbol}))),...data.lottery.orders.map(o=>({...o,symbol:'LOT'})),...data.prison.orders.map(o=>({...o,symbol:'PRI'}))]
     const cards=holdings.map(row=>{
       const ticker=safeText(row.symbol),sale=data.saleQuotes[row.symbol]
       const reason=orders.some(o=>o.symbol===row.symbol&&o.side==='sell')?'Cancel open sell orders to sell this holding.':isExchangeStock(row.symbol)?'Waiting for enough bids to fill the holding.':'Waiting for a current quote.'
@@ -300,7 +302,7 @@ export class CityServices {
   private stock(symbol:string,data:StockView,token:number,notice=''){
     this.balance(data.coins)
     const holding=data.portfolio.positions[symbol],price=this.marketPrice(symbol,data),issue=cityQuote(data,symbol),saved=this.get<StockOrder>('stock')
-    const company=isEquity(symbol)?data.companies[symbol]:symbol==='LOT'?data.lottery:undefined,cap=company?EQUITY_ORDER_LIMIT:MAX_STOCK_ORDER
+    const company=isEquity(symbol)?data.companies[symbol]:symbol==='LOT'?data.lottery:symbol==='PRI'?data.prison:undefined,cap=company?EQUITY_ORDER_LIMIT:MAX_STOCK_ORDER
     const available=(holding?.shares??0)-(company?.orders.filter(o=>o.side==='sell').reduce((n,o)=>n+o.shares,0)??0)
     const pending=saved?.symbol===symbol?saved:undefined
     if(pending)this.orderSide=pending.side

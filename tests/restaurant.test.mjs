@@ -68,6 +68,21 @@ test('a meal debits once, survives a restaurant reboot, and can be eaten only wh
   restarted.act(p,'buy',buy,time+31000)
   assert.equal(wallet(store,'Alice'),92)
 })
+test('a served restaurant tray moves into the diner’s hotbar exactly once',t=>{
+  const {store,restaurant}=fixture(t),p=member('Alice',counter(0))
+  const items={...blankOrder(),burger:1,cola:2},id='guest-hotbar-tray'
+  restaurant.act(p,'buy',{id,lane:0,items},time)
+  for(let i=1;i<=35;i++)restaurant.tick(time+i*1000)
+  const now=time+36000,view=restaurant.view('Alice',now,true)
+  assert.equal(view.meal.status,'served')
+  assert.throws(()=>restaurant.act(p,'collect',{id},now),{status:409})
+  const seat=SEATS.findIndex((_,i)=>!view.taken.includes(i))
+  Object.assign(p,member('Alice',SEATS[seat]))
+  restaurant.act(p,'sit',{seat},now)
+  restaurant.act(p,'collect',{id},now+1);restaurant.act(p,'collect',{id},now+2)
+  assert.equal(restaurant.view('Alice',now+3,true).meal,undefined)
+  assert.deepEqual(JSON.parse(store.accountJson('Alice')).cityPack.slots.filter(Boolean),[{item:'burger',count:1},{item:'cola',count:2}])
+})
 function kitchen(r,person){
   return (where,at,gesture)=>{
     const point=where==='station'?stationPoint(0):where==='send'?PASS:SUPPLIES[where]

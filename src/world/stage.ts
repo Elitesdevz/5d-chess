@@ -1,3 +1,4 @@
+import {poolDepth} from './resort.ts'
 import {staffId,bankStaff} from './service-staff.ts'
 import {civicRoom,confined,tablePosition} from './civic-venues.ts'
 import {HeldModel} from './overrun-models.ts'
@@ -7,7 +8,8 @@ import {residentialAt,residentialPoints} from './residential.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {kitchenTools} from './kitchen-tools.ts'
 import {restaurantPoints} from './restaurant-model.ts'
-import {staffProps} from './restaurant-art.ts'
+import {BITE_MS,type Grocery} from './food.ts'
+import {eatingHand,foodVisual,staffProps} from './restaurant-art.ts'
 import {WHEEL_X,WHEEL_Z} from '../casino/hall-decor.ts'
 import {terrainHeight,inPool} from './terrain.ts'
 import * as T from 'three'
@@ -57,13 +59,17 @@ export class CityStage {
   private held=new HeldModel(true)
   private chase=false
   private chaseVisible=false
+  private snackHand?:T.Group
+  private snacks=new Map<Grocery,T.Group>()
+  private eat?:()=>boolean
   private weapon?:WeaponId
   private firing?:(operation:'fire'|'reload',target?:string)=>void
   private holdingFire=false
   private nextTrigger=0
   private aiming=false
   get sprinting(){return !this.pause&&!this.aiming&&!this.view?.arcade?.custody&&this.arrows.has('shift')}
-  setLoadout(id:WeaponId|undefined,fire:(operation:'fire'|'reload',target?:string)=>void){
+  setLoadout(id:WeaponId|undefined,fire:(operation:'fire'|'reload',target?:string)=>void,eat:()=>boolean){
+    this.eat=eat
     if(this.weapon!==id){this.holdingFire=false;this.aiming=false}
     this.weapon=id;this.firing=fire
     if(!id)this.aiming=false
@@ -179,7 +185,13 @@ export class CityStage {
       if(this.reduced){this.yaw=Math.PI;this.pitch=0}
       else this.liftFacing={from:this.yaw,delta,started:performance.now()}
     }
+    const biteChanged=this.view?.arcade?.bite?.ends!==view.arcade?.bite?.ends
     this.clock=offset;this.view=view;this.zone=next.zone;this.caveOpen=view.caveOpen
+    if(biteChanged){
+      this.updateBite(view.now)
+      // Queue the first bite pose even when the previous street frame is still drawing.
+      if(view.arcade?.bite&&this.gl&&this.fence){this.gl.deleteSync(this.fence);this.fence=null}
+    }
     if(changedWorld){this.lastMessage=0;this.speech.clear();this.playerMotion.clear()}
     for(const member of view.players){
       let motion=this.playerMotion.get(member.name)
@@ -201,7 +213,7 @@ export class CityStage {
       this.art.seal.visible=!this.caveOpen&&next.zone!=='cave'
       this.art.grotto.visible=!this.art.seal.visible
       this.art.restaurant.update(view.restaurant)
-      this.art.resort(view,this.graphicsReady)
+      this.art.resort.update(view,this.graphicsReady)
       this.art.civic(next.zone,next.x,next.z)
       const hidden=view.arcade?.recoveringStaff??[]
       this.art.staff.forEach((a,i)=>a.root.visible=!hidden.includes(i<bankStaff.length?staffId('bank',i):staffId('exchange',i-bankStaff.length)))
@@ -346,6 +358,7 @@ export class CityStage {
     },{signal})
     this.canvas.addEventListener('pointerdown',e=>{
       if(this.pause)return
+      if(e.button===0&&document.pointerLockElement===this.canvas&&!this.station&&this.eat?.())return
       if(document.pointerLockElement===this.canvas&&this.weapon&&this.parent.hasAttribute('data-armed')){
         if(e.button===2){this.aiming=true;return}
         if(e.button===0){this.holdingFire=true;this.fireAtReticle();return}
@@ -518,7 +531,7 @@ export class CityStage {
       let figure=this.npc.get(member.id)
       const height=riderHeight(member,now)
       if(!figure){
-        figure=new Figure(this.art.scene,member,this.shadow!,'kind' in member?'officer':false)
+        figure=new Figure(this.art.scene,member,this.shadow!,'kind' in member?'officer':false,'style' in member?member.style:undefined)
         figure.root.position.y=height;this.npc.set(member.id,figure)
       }
       const visible=height<21&&this.camera.position.distanceTo(figure.root.position)<49
@@ -552,6 +565,25 @@ export class CityStage {
     }
     for(const [id,entry] of this.restaurantNpc)if(!active.has(id)){entry.figure.dispose();this.restaurantNpc.delete(id)}
   }
+  private updateBite(now:number){
+    const bite=this.view?.arcade?.bite,eating=!!bite&&now<bite.ends
+    if(this.snackHand)this.snackHand.visible=eating
+    if(bite&&eating){
+      if(!this.snackHand){this.snackHand=eatingHand();this.camera.add(this.snackHand)}
+      const hand=this.snackHand
+      for(const [id,snack] of this.snacks)snack.visible=id===bite.item
+      let snack=this.snacks.get(bite.item)
+      if(!snack){snack=foodVisual(bite.item);hand.add(snack);this.snacks.set(bite.item,snack)}
+      const t=T.MathUtils.clamp(1-(bite.ends-now)/BITE_MS,0,1)
+      const raised=Math.sin(Math.PI*t)**.7
+      snack.visible=true
+      hand.position.set(.17-.12*raised,-.36+.22*raised,-.53+.21*raised)
+      hand.rotation.set(raised*(bite.item==='cola'||bite.item==='coffee'||bite.item==='tea'?.69:.23),-.3,.09*Math.sin(t*Math.PI*4))
+      hand.scale.setScalar(1.35-.35*t)
+    }
+    this.parent.toggleAttribute('data-eating',eating)
+    return eating
+  }
   private cameraView(now:number){
     const me=this.view?.you,{x,z}=this.position
     if(this.liftFacing){
@@ -565,6 +597,11 @@ export class CityStage {
       if(inPool(p.x,p.z))this.camera.position.y+=Math.sin(now*.0027)*.055
     }
     this.camera.rotation.set(T.MathUtils.clamp(this.pitch+(me?.homePose?.kind==='rest'?1.05:0),-1.55,1.55),this.yaw,0,'YXZ')
+    if(me?.homePose?.id.startsWith('salon-')){
+      const slots=me.homePose.id.startsWith('salon-slots')
+      const focus=site(me.zone,slots?8.02:-6,0)
+      this.camera.lookAt(focus.x,walkingHeight(me.zone,x,z)+(slots?1.58:.90),z)
+    }
     const chair=me?.chair,round=chair&&this.view?.hall?.tables[chair.table]
     if(chair&&round){
       const table=WORLD_TABLES[chair.table],dice=chair.table===DICE_TABLE_INDEX
@@ -585,7 +622,8 @@ export class CityStage {
       this.camera.lookAt(p.x,1.16,p.z)
     }
     this.tools?.show(s?.point,r,s?.x??0,s?.y??0,!!s?.fillAt,!!s?.phase)
-    const free=!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
+    const eating=this.updateBite(now)
+    const free=!eating&&!!me&&!me.chair&&!me.lounge&&!me.homePose&&!me.lift&&me.dining===undefined&&me.boardSeat===undefined&&me.barSeat===undefined&&!this.station&&!me.carrying&&!me.kitchenHand&&!this.view?.arcade?.custody
     this.chaseVisible=false
     if(this.chase&&free){
       const behind=worldMove(me.zone,{x,z,yaw:this.yaw},x+2.8*Math.sin(this.yaw),z+2.8*Math.cos(this.yaw),2.8,true,this.view?.housing?.keys,this.view?.residential,now)
@@ -612,6 +650,10 @@ export class CityStage {
   }
   private motion(now:number,dt:number){
     if(!this.art)return
+    if(this.zone==='hotel:2'||this.zone==='hotel:3'){
+      const {x,z}=this.position,local=localSite(this.zone,x,z)
+      this.art.resort.tick(this.zone,now,x,z,poolDepth(local.x,local.z)>.04,this.reduced)
+    }
     this.art.lightZone(this.zone,dt)
     this.art.urban(this.view?.traffic,dt,this.reduced)
     this.art.homes.update(this.view?.residential,this.view?.housing?.occupied,now,dt,this.position.x,this.position.z)

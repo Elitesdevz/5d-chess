@@ -4,7 +4,6 @@ import {armoryClerk,bankStaff,hotelStaff,exchangeStaff,casinoStaff,floorStaff} f
 import {arcadeBuildings} from './arcade-art.ts'
 import {urbanArt} from './urban-art.ts'
 import {basinBed,tunnelBed,poolLevel} from './terrain.ts'
-import {district} from './district.ts'
 import {ownershipSegments} from './company-desk.ts'
 import type {CompanyView} from '../equity-v2.ts'
 import {salonBar} from './salon-bar.ts'
@@ -564,8 +563,35 @@ function elevator(scene:T.Object3D){
   }
   return shaft
 }
+// The clock and enamel signs use the precinct’s slate and brass finishes.
+function prisonTradingFloor(room:T.Group){
+  const slate=std(0x344357,.28,.48),enamel=std(0x182b40,.22,.57)
+  // Hang the fascia in front of the lift head, above its clear opening.
+  for(const x of [-2.16,2.16])block(room,.08,1.06,.08,x,5.35,-2.96,brass)
+  block(room,4.68,1.06,.18,0,4.39,-2.97,slate)
+  for(const y of [3.87,4.91])block(room,4.74,.065,.22,0,y,-2.95,brass)
+  banner(room,'MERIDIAN PRISON',[3.22,.39],[.47,4.54,-2.86],'#f6dfad','#26394a',true)
+  banner(room,'PRI  /  DAILY DIVIDENDS',[2.92,.20],[.47,4.15,-2.86],'#d4c5a4','#26394a',true)
+  const seal=new T.Group();seal.position.set(-1.73,4.4,-2.85);room.add(seal)
+  mesh(new T.CircleGeometry(.397,48),enamel,seal,[0,0,0])
+  mesh(new T.TorusGeometry(.397,.024,8,48),brass,seal,[0,0,.025])
+  for(let i=0;i<12;i++){
+    const a=i*tau/12
+    block(seal,.022,.063,.023,.33*Math.sin(a),.33*Math.cos(a),.042,ivory).rotation.z=-a
+  }
+  block(seal,.025,.22,.025,0,.10,.058,gold)
+  block(seal,.18,.025,.025,.08,0,.058,gold)
+  for(const side of [-1,1]){
+    const x=side*2.7
+    block(room,2.29,.73,.055,x,.54,-1.40,slate)
+    banner(room,side<0?'PRI   /   BUY':'PRI   /   SELL',[1.52,.24],[x,.55,-1.36],'#f6dfad','#26394a',true)
+  }
+  plane(room,4.39,5.14,0,.019,2,brass)
+  plane(room,4.29,5.04,0,.022,2,enamel)
+  for(const x of [-1.94,1.94])plane(room,.025,4.76,x,.024,2,brass)
+}
 function tower(shaft:T.Object3D){
-  const tile=paving(),standardWall=std(0x234653),casinoWall=std(0x51333c),bankWall=std(0x375560),lotteryWall=std(0x453356),trim=std(0x90adb2,.28,.48)
+  const tile=paving(),standardWall=std(0x234653),casinoWall=std(0x51333c),bankWall=std(0x375560),lotteryWall=std(0x453356),prisonWall=std(0x344357),trim=std(0x90adb2,.28,.48)
   const sections:T.Group[]=[]
   for(const [i,{symbol}] of FLOOR_LIST.entries()){
     const height=floorHeight(`floor:${symbol}`)
@@ -574,7 +600,7 @@ function tower(shaft:T.Object3D){
     }
     const section=sections.at(-1)!
     const room=new T.Group();room.position.y=height-section.position.y;section.add(room)
-    const wall=symbol==='CAS'?casinoWall:symbol==='BNK'?bankWall:symbol==='LOT'?lotteryWall:standardWall
+    const wall=symbol==='CAS'?casinoWall:symbol==='BNK'?bankWall:symbol==='LOT'?lotteryWall:symbol==='PRI'?prisonWall:standardWall
     liftDeck(room,tile);liftDoorway(room,wall)
     for(const side of [-1,1]){
       const x=side*7.96
@@ -609,7 +635,8 @@ function tower(shaft:T.Object3D){
       const room=new T.Group();room.position.y=floorHeight(`floor:${symbol}`);shaft.add(room)
       venueDetail(room,'floor',symbol)
       const name=FLOOR_LIST.find(stock=>stock.symbol===symbol)!.name
-      if(symbol==='LOT')banner(room,name,[5.9,.58],[0,4.28,-4.08],'#ffe8b7','#453356',true)
+      if(symbol==='PRI')prisonTradingFloor(room)
+      else if(symbol==='LOT')banner(room,name,[5.9,.58],[0,4.28,-4.08],'#ffe8b7','#453356',true)
       else banner(room,name,[6,.39],[0,4.17,-4.08],symbol==='CAS'?'#ffdca1':'#ccecee')
       const actors=floorStaff.map((p,i)=>new CityGuest(room,p.x,p.z,i?0xd2a17d:0xaa7c61,i?(symbol==='CAS'?0x674451:0x374d5d):0x365263,true,i))
       const screens=[makeScreen(room,symbol,-4.53),makeScreen(room,symbol,4.53)]
@@ -681,7 +708,6 @@ export function makeWorldArt(open:boolean){
   scene.add(skylight)
   const sun=new T.DirectionalLight(0xffe2bb,1.47);sun.position.set(-12,18,10);scene.add(sun)
   scene.add(street());contactShade(scene);const water=fountain(scene),{wind,seal}=landscape(scene)
-  district(scene)
   const civic=arcadeBuildings(scene,(parent,text,size,point,fg,bg)=>banner(parent,text,size,point,fg,bg,true))
   const homes=residentialArt(scene,banner),urban=urbanArt(scene,banner)
   const ambient=(time:number)=>{water(time);wind(time);poolRipples(time)}
