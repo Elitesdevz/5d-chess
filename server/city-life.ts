@@ -97,7 +97,7 @@ export class CityLife {
   }
   tick(now:number,state:ResidentialView,players:Iterable<Occupant>){
     const people=this.people(players)
-    this.routeBudget=4
+    this.routeBudget=1
     const elapsed=Math.min(1200,Math.max(0,now-this.now))
     if(now-this.now>1500)this.now=now-elapsed
     const until=this.now+elapsed

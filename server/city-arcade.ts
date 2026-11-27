@@ -1,3 +1,4 @@
+import {patrolSpawn,walkPatrol} from './world/patrol-motion.ts'
 import {deskFurniture,at,insideDoor,venue} from '../src/world/civic-venues.ts'
 import {randomUUID} from 'node:crypto'
 import type {ChessStore,UnitOfWork} from './storage.ts'
@@ -17,7 +18,7 @@ type Located={x:number;z:number;zone:string}
 type Drop=Located&{id:string;items:Stack[]}
 type NpcHealth={hp:number;returns:number}
 type Scene={residential?:ResidentialView;vehicles?:readonly Vehicle[];caveOpen?:boolean;world:string;shard:number;me:WorldPlayer;players:WorldPlayer[];residents:(Located&{id:string;name:string})[];keys:string[];drawer?:string;bank:boolean;shop:boolean}
-type Search={id:string;world:string;units:Contact[];cursor:number;lastKnown:Located;last:number;arrived:number;raidAt:number;dogAt:number;dogWarningUntil?:number;searched:string[];warning:string}
+type Search={id:string;world:string;units:Contact[];cursor:number;lastKnown:Located;last:number;arrived:number;raidAt:number;raidTarget?:Located;dogAt:number;dogWarningUntil?:number;searched:string[];warning:string}
 const longestRange=Math.max(...Object.values(WEAPONS).map(w=>w.range))
 const searchSites=[
   ...UNITS.map(unit=>{
@@ -41,6 +42,9 @@ function advance(p:Pack,by:number){
 export class CityArcade {
   private store:ChessStore
   private seen=new Map<string,number>()
+  private elapsed=new Map<string,number>()
+  private hitPoints=new Map<string,number>()
+  private healthAt=-Infinity
   private tracked=new Map<string,{scene:Scene;stars:number}>()
   private searches=new Map<string,Search>()
   constructor(store:ChessStore){
@@ -71,23 +75,38 @@ export class CityArcade {
     })
   }
   leaveCity(name:string){this.tracked.delete(name);this.searches.delete(name)}
-  offline(name:string){this.seen.delete(name);this.leaveCity(name)}
+  offline(name:string){this.checkpoint(name);this.seen.delete(name);this.leaveCity(name)}
+  flush(){for(const name of this.elapsed.keys())this.checkpoint(name)}
+  private checkpoint(name:string){
+    const elapsed=this.elapsed.get(name)
+    if(!elapsed)return
+    this.store.transaction(tx=>{
+      const account=tx.users.get(name)
+      if(!account)return
+      const p=pack(account)
+      p.remaining=Math.max(0,p.remaining-elapsed)
+      if(!p.remaining){p.stars=0;this.leaveCity(name)}
+    })
+    this.elapsed.delete(name)
+  }
   step(world:string,now:number){
     for(const [name,entry] of this.tracked){
       if(entry.scene.world!==world)continue
       if(this.pursue(entry.scene,entry.stars,now))this.tracked.delete(name)
     }
   }
-  active(name:string,now:number){
+  active(name:string,now:number,immediate=true){
     const last=this.seen.get(name)
     this.seen.set(name,now)
-    if(last===undefined||now<=last||now-last>30000)return
-    if(!this.store.cityStats(name)?.stars)return
-    this.store.transaction(tx=>{
-      const p=pack(tx.users.get(name)!)
-      p.remaining=Math.max(0,p.remaining-(now-last))
-      if(!p.remaining){p.stars=0;this.tracked.delete(name);this.searches.delete(name)}
-    })
+    if(last!==undefined&&now>last&&now-last<=30000&&this.store.cityStats(name)?.stars)
+      this.elapsed.set(name,(this.elapsed.get(name)??0)+now-last)
+    if(immediate||(this.elapsed.get(name)??0)>=1000)this.checkpoint(name)
+  }
+  private hp(name:string,now:number){
+    if(now-this.healthAt>=50||now<this.healthAt){this.healthAt=now;this.hitPoints.clear()}
+    let value=this.hitPoints.get(name)
+    if(value===undefined){value=this.store.cityStats(name)?.hp??MAX_HP;this.hitPoints.set(name,value)}
+    return value
   }
   private staff(now:number):Contact[]{
     return [...deskFurniture.map(d=>({id:d.id,label:d.id==='desk'?'Desk officer':'Booking officer',kind:'officer' as const,zone:'station',...at('station',d.x,d.z+.72)})),
@@ -100,8 +119,7 @@ export class CityArcade {
     const unit=candidates.find(u=>!search.searched.includes(u.id))??candidates[search.cursor%candidates.length]
     if(!unit)return
     search.cursor++;search.searched=[...search.searched.slice(-3),unit.id];search.warning='Searching '+unit.name
-    const officer=search.units.at(-1)!
-    Object.assign(officer,unit.target)
+    search.raidTarget=unit.target
     if(!owned.includes(unit))return
     const a=tx.users.get(s.me.name)!,p=pack(a)
     const drawer=p.drawers[unit.id]
@@ -127,7 +145,7 @@ export class CityArcade {
     const canEnter=(!residence&&!guestRoom)||stars>=3&&(!room||s.keys.includes(room.id)||stars>=4)
     while(search.units.length<RULES.officers[stars]){
       const i=search.units.length
-      search.units.push({id:'patrol-'+search.id+'-'+i,label:'Patrol '+(i+1),kind:'officer',x:me.x+10+i*1.5,z:me.z+4-i,zone:canEnter?me.zone:'city'})
+      search.units.push({id:'patrol-'+search.id+'-'+i,label:'Patrol '+(i+1),kind:'officer',...patrolSpawn({...me,zone:canEnter?me.zone:'city'},i)})
     }
     if(stars>=3&&now-search.raidAt>=RULES.raidDelay){
       this.store.transaction(tx=>this.sweep(tx,s,stars,search!,now))
@@ -137,32 +155,30 @@ export class CityArcade {
     const health=this.store.metadataValue('npc:'+s.shard) as Record<string,NpcHealth>|undefined
     for(const [i,o] of search.units.entries()){
       if(!canEnter||(health?.[o.id]?.returns??0)>now)continue
-      if(stars>=3&&i===search.units.length-1&&search.searched.length&&now-search.raidAt<5000)continue
-      if(o.zone!==me.zone){
-        if(now-search.arrived<5000)continue
-        Object.assign(o,{x:me.x+12,z:me.z+2,zone:me.zone})
+      if(i===search.units.length-1&&search.raidTarget&&now-search.raidAt<5000){
+        walkPatrol(o,search.raidTarget,RULES.speed[stars]*dt,s,now);continue
       }
       if(now-search.arrived<RULES.notice)continue
       const distance=Math.hypot(o.x-me.x,o.z-me.z)
-      const spotted=distance<=RULES.sight[stars]||stars===5&&me.zone==='city'
+      const visible=distance<=RULES.sight[stars]&&clearSight(o,me,s,now)
+      const spotted=visible||stars===5&&me.zone==='city'
       if(spotted){search.lastKnown={x:me.x,z:me.z,zone:me.zone};tracking=true}
       const phase=(now-search.arrived)/4500+i
-      const goal=spotted?me:{x:search.lastKnown.x+4*Math.cos(phase),z:search.lastKnown.z+4*Math.sin(phase)}
-      const d=Math.hypot(goal.x-o.x,goal.z-o.z),step=Math.min(d,RULES.speed[stars]*dt)
-      if(d){o.x+=(goal.x-o.x)*step/d;o.z+=(goal.z-o.z)*step/d}
-      if(distance<1.15)caught=true
+      const goal=spotted?me:o.zone!==search.lastKnown.zone?search.lastKnown:{x:search.lastKnown.x+4*Math.cos(phase),z:search.lastKnown.z+4*Math.sin(phase)}
+      walkPatrol(o,{...goal,zone:spotted?me.zone:search.lastKnown.zone},RULES.speed[stars]*dt,s,now)
+      if(distance<1.15&&visible)caught=true
     }
     if(!search.searched.length||now-search.raidAt>5000)search.warning=tracking?'Meridian patrol in pursuit':'Meridian patrol is searching'
     if(stars===5){
       const lead=search.units[0],d=Math.hypot(lead.x-me.x,lead.z-me.z)
-      if(d<=RULES.dogRange&&lead.zone===me.zone&&now-search.dogAt>=RULES.dogCooldown){
+      if(d<=RULES.dogRange&&lead.zone===me.zone&&clearSight(lead,me,s,now)&&now-search.dogAt>=RULES.dogCooldown){
         search.dogAt=now;search.dogWarningUntil=now+RULES.dogNotice
       }
       if(search.dogWarningUntil!==undefined){
         if(now<search.dogWarningUntil){
           search.warning='Dog team approaching — move away!';caught=false
         }else{
-          if(now-search.dogWarningUntil<1500&&d<2.8&&lead.zone===me.zone)caught=true
+          if(now-search.dogWarningUntil<1500&&d<2.8&&lead.zone===me.zone&&clearSight(lead,me,s,now))caught=true
           search.warning='Helicopter tracking the area';delete search.dogWarningUntil
         }
       }
@@ -253,6 +269,8 @@ export class CityArcade {
     const booked=previous?.stars!==p.stars&&p.stars?this.pursue(s,p.stars,now):undefined
     if(p.stars&&!booked)this.tracked.set(me.name,{scene:s,stars:p.stars})
     else {this.tracked.delete(me.name);this.searches.delete(me.name)}
+    if(respawn||data?.operation==='fire')this.hitPoints.clear()
+    this.hitPoints.set(me.name,p.hp)
     const search=this.searches.get(me.name)
     // A raid has its own write transaction after the encounter.
     if(search?.raidAt===now&&search.cursor)Object.assign(p,this.store.cityPack(me.name))
@@ -262,11 +280,11 @@ export class CityArcade {
       if(me.zone==='private'||t.zone==='private'||health[t.id]?.returns>now||!near(me,t.x,t.z,36))continue
       const distance=actorDistance(observer,t)
       if(distance>36)continue
-      const hp=t.kind==='player'?this.store.cityStats(t.label)?.hp:health[t.id]?.hp
+      const hp=t.kind==='player'?this.hp(t.label,now):health[t.id]?.hp
       contacts.push({...t,distance,inSight:armed&&distance<=longestRange&&canTarget(t),hp:hp??MAX_HP})
     }
     if(p.stars===5&&search){const lead=search.units[0];contacts.push({...lead,id:'heli',label:'Police helicopter',kind:'helicopter',hp:100},{...lead,x:lead.x+.8,id:'dog',label:'Dog team',kind:'dog',hp:100})}
-    const view:ArcadeView={magazines:p.magazines,lastShot:p.lastShot,lastHit:p.lastHit,sequence:p.sequence,slots:p.slots,hp:p.hp,stars:p.stars,remaining:p.remaining,contacts,
+    const view:ArcadeView={magazines:p.magazines,lastShot:p.lastShot,lastHit:p.lastHit,sequence:p.sequence,slots:p.slots,hp:p.hp,stars:p.stars,remaining:Math.max(0,p.remaining-(this.elapsed.get(me.name)??0)),contacts,
       drops:drops.filter(d=>d.zone===me.zone&&near(me,d.x,d.z,28)).map(({id,x,z})=>({id,x,z})),
       recoveringStaff:Object.keys(health).filter(id=>id.startsWith('staff:')&&health[id].returns>now),
       drawer:s.drawer?p.drawers[s.drawer]??[]:undefined,recovery:s.bank?p.recovery:undefined,warning:search?.warning,searches:search?.searched.slice(-4),custody:booked&&custodyView(booked)}

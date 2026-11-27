@@ -192,7 +192,7 @@ export class CityWorlds {
 
   update(name:string,action:string,data:Record<string,unknown>,now=Date.now()):WorldView{
     this.step(now)
-    this.arcade.active(name,now)
+    this.arcade.active(name,now,action!=='presence'&&action!=='observe')
     const bookings=roster(this.store,now),booking=bookings.find(b=>b.user===name)
     if(booking&&action!=='presence'&&action!=='observe')fail(423,'In custody at Meridian Police')
     const account=this.store.rouletteWallet(name)??fail(401,'Log in first')
